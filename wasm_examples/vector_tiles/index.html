@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple map</title>
+</head>
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+    }
+
+    .buttons {
+        position: absolute;
+    }
+</style>
+<body id="map">
+<script src="./pkg/vector_tiles_example.js"></script>
+
+<script>
+    const {init, set_style} = wasm_bindgen;
+
+    async function run_wasm() {
+        await wasm_bindgen();
+
+        init().then(() => {
+            console.log("WASM loaded");
+        })
+
+        window.send_feature = (layer_name, type, feature) => {
+            alert(`
+Layer name: ${layer_name}
+Feature type: ${type}
+Feature properties: ${feature}
+        `)
+        }
+
+        function setGrayscale() {
+            let style = `
+{
+  "rules": [
+  ],
+  "background": "#ffffffff",
+  "default_symbol": {
+    "line": {
+      "stroke_color": "#000000ff",
+      "width": 0.5
+    },
+    "polygon": {
+      "fill_color": "#000000a0"
+    }
+  }
+}
+        `
+            set_style(style);
+        }
+
+        function setColored() {
+            set_style("");
+        }
+
+        window.setGrayscale = setGrayscale;
+        window.setColored = setColored;
+    }
+
+    run_wasm();
+</script>
+<div class="buttons">
+    <button onclick="setGrayscale()">Grayscale</button>
+    <button onclick="setColored()">Colored</button>
+</div>
+
+
+</body>
+</html>

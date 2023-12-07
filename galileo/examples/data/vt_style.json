@@ -1,0 +1,210 @@
+{
+  "rules": [
+    {
+      "layer_name": "park",
+      "symbol": {},
+      "properties": {
+        "class": "protected_area"
+      }
+    },
+    {
+      "layer_name": "boundary",
+      "symbol": {
+        "line": {
+          "stroke_color": "#e1cec1",
+          "width": 0.8
+        }
+      },
+      "properties": {
+        "admin_level": "2"
+      }
+    },
+    {
+      "layer_name": "boundary",
+      "symbol": {
+        "line": {
+          "stroke_color": "#94c3f5",
+          "width": 0.5
+        }
+      },
+      "properties": {
+        "admin_level": "3"
+      }
+    },
+    {
+      "layer_name": "boundary",
+      "symbol": {
+        "line": {
+          "stroke_color": "#b0b0b0",
+          "width": 0.2
+        }
+      },
+      "properties": {}
+    },
+    {
+      "layer_name": "landcover",
+      "symbol": {
+        "polygon": {
+          "fill_color": "#b3b3b356"
+        }
+      },
+      "properties": {
+        "class": "ice"
+      }
+    },
+    {
+      "layer_name": "water",
+      "symbol": {
+        "polygon": {
+          "fill_color": "#81C4EC"
+        }
+      },
+      "properties": {
+        "class": "ocean"
+      }
+    },
+    {
+      "layer_name": "water",
+      "symbol": {
+        "polygon": {
+          "fill_color": "#759ec7"
+        }
+      },
+      "properties": {
+        "class": "lake"
+      }
+    },
+    {
+      "layer_name": "water",
+      "symbol": {
+        "polygon": {
+          "fill_color": "#b8dff5"
+        }
+      },
+      "properties": {
+        "class": "river"
+      }
+    },
+    {
+      "layer_name": "landcover",
+      "symbol": {
+        "polygon": {
+          "fill_color": "#C1E3C4"
+        }
+      },
+      "properties": {
+        "class": "wood"
+      }
+    },
+    {
+      "layer_name": "transportation",
+      "symbol": {
+        "line": {
+          "stroke_color": "#dea73a",
+          "width": 0.5
+        }
+      },
+      "properties": {
+        "class": "service"
+      }
+    },
+    {
+      "layer_name": "building",
+      "symbol": {
+        "polygon": {
+          "fill_color": "#cfab7f"
+        }
+      },
+      "properties": {}
+    },
+    {
+      "layer_name": "transportation",
+      "symbol": {
+        "line": {
+          "stroke_color": "#e8a343",
+          "width": 0.5
+        }
+      },
+      "properties": {
+        "class": "primary"
+      }
+    },
+    {
+      "layer_name": "transportation",
+      "symbol": {
+        "line": {
+          "stroke_color": "#d19046",
+          "width": 0.5
+        }
+      },
+      "properties": {
+        "class": "rail"
+      }
+    },
+    {
+      "layer_name": "transportation",
+      "symbol": {
+        "line": {
+          "stroke_color": "#c9a55b",
+          "width": 0.5
+        }
+      },
+      "properties": {
+        "class": "trunk"
+      }
+    },
+    {
+      "layer_name": "transportation",
+      "symbol": {
+        "line": {
+          "stroke_color": "#b3801c",
+          "width": 0.5
+        }
+      },
+      "properties": {
+        "class": "motorway"
+      }
+    },
+    {
+      "layer_name": "transportation",
+      "symbol": {
+        "line": {
+          "stroke_color": "#b3801c",
+          "width": 0.2
+        }
+      },
+      "properties": {
+        "class": "secondary"
+      }
+    },
+    {
+      "layer_name": "park",
+      "symbol": {},
+      "properties": {
+        "class": "национальный_парк"
+      }
+    },
+    {
+      "layer_name": "transportation",
+      "symbol": {
+        "line": {
+          "stroke_color": "#918f00",
+          "width": 0.5
+        }
+      },
+      "properties": {
+        "class": "trunk_construction"
+      }
+    }
+  ],
+  "default_symbol": {
+    "line": {
+      "stroke_color": "#00000010",
+      "width": 0.5
+    },
+    "polygon": {
+      "fill_color": "#00000010"
+    }
+  },
+  "background": "#fff3e4"
+}

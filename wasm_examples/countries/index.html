@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple map</title>
+</head>
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+    }
+</style>
+<body id="map">
+<script src="./pkg/countries.js"></script>
+
+<script>
+    const {init} = wasm_bindgen;
+
+    async function run_wasm() {
+        await wasm_bindgen();
+
+        init().then(() => {
+            console.log("WASM loaded");
+        })
+    }
+
+    run_wasm();
+</script>
+</body>
+</html>

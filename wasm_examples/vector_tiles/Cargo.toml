@@ -1,0 +1,23 @@
+[package]
+name = "vector_tiles_example"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+winit = { version ="0.29", features = ["rwh_05"] }
+galileo = { path = "../../galileo", default-features = false, features = ["wgpu", "image", "web", "serde"] }
+console_error_panic_hook = "0.1"
+console_log = "1.0"
+wasm-bindgen = "0.2"
+log = "0.4"
+wasm-bindgen-futures = "0.4"
+js-sys = { version = "0.3" }
+web-sys = { version = "0.3", features = [
+    "Document",
+    "Window",
+    "Element",
+]}
+serde_json = "1.0"
