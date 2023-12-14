@@ -2,7 +2,8 @@ use crate::error::GalileoMvtError;
 use crate::vector_tile::tile::GeomType;
 use bytes::Buf;
 use galileo_types::traits::contour::{CartesianClosedContour, Winding};
-use galileo_types::{CartesianPoint2d, ClosedContour, Contour, Point2d, Polygon};
+use galileo_types::{CartesianPoint2d, ClosedContour, Contour, Polygon};
+use nalgebra::Point2;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -173,7 +174,7 @@ impl Display for MvtValue {
     }
 }
 
-pub type Point = Point2d<f32>;
+pub type Point = Point2<f32>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MvtGeometry {

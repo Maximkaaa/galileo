@@ -1,7 +1,6 @@
 use crate::layer::tile_provider::TileSource;
 use crate::layer::Layer;
 use crate::messenger::Messenger;
-use crate::primitives::Size;
 use crate::render::{Canvas, PackedBundle, Renderer};
 use crate::tile_scheme::TileScheme;
 use crate::view::MapView;
@@ -9,13 +8,13 @@ use std::any::Any;
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 
-use crate::bounding_box::BoundingBox;
 use crate::layer::vector_tile::style::VectorTileStyle;
 use crate::layer::vector_tile::tile_provider::{LockedTileStore, VectorTileProvider};
 use crate::layer::vector_tile::vector_tile::VectorTile;
 use galileo_mvt::{MvtFeature, MvtGeometry};
+use galileo_types::bounding_rect::BoundingRect;
 use galileo_types::geometry::Geometry;
-use galileo_types::{CartesianPoint2d, Point2d};
+use galileo_types::{CartesianPoint2d, Point2};
 
 pub mod style;
 pub mod tile_provider;
@@ -29,7 +28,7 @@ pub struct VectorTileLayer<Provider: VectorTileProvider> {
 
 impl<Provider: VectorTileProvider + 'static> Layer for VectorTileLayer<Provider> {
     fn render<'a>(&self, map_view: MapView, canvas: &'a mut dyn Canvas) {
-        let bbox = map_view.get_bbox(canvas.size());
+        let bbox = map_view.get_bbox();
 
         let tiles_store = self.tile_provider.read();
         let tiles = self.get_tiles_to_draw(map_view.resolution(), bbox, &tiles_store);
@@ -38,8 +37,8 @@ impl<Provider: VectorTileProvider + 'static> Layer for VectorTileLayer<Provider>
         canvas.draw_bundles(&to_render);
     }
 
-    fn prepare(&self, view: MapView, map_size: Size, renderer: &Arc<RwLock<dyn Renderer>>) {
-        let bbox = view.get_bbox(map_size);
+    fn prepare(&self, view: MapView, renderer: &Arc<RwLock<dyn Renderer>>) {
+        let bbox = view.get_bbox();
         if let Some(iter) = self.tile_scheme.iter_tiles(view.resolution(), bbox) {
             for index in iter {
                 if self.tile_provider.supports(&**renderer) {
@@ -81,7 +80,7 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
     fn get_tiles_to_draw<'a>(
         &self,
         resolution: f64,
-        bbox: BoundingBox,
+        bbox: BoundingRect,
         tiles_store: &'a LockedTileStore,
     ) -> Vec<&'a VectorTile> {
         let mut tiles = vec![];
@@ -142,7 +141,7 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
         point: &impl CartesianPoint2d<Num = f64>,
         resolution: f64,
     ) -> Vec<(String, MvtFeature)> {
-        let bbox = BoundingBox::new(point.x(), point.y(), point.x(), point.y());
+        let bbox = BoundingRect::new(point.x(), point.y(), point.x(), point.y());
 
         let tile_store = self.tile_provider.read();
         let mut features = vec![];
@@ -152,7 +151,7 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
                 let lod_resolution = self.tile_scheme.lod_resolution(index.z).unwrap();
                 let tile_resolution = lod_resolution * self.tile_scheme.tile_width() as f64;
 
-                let tile_point = Point2d::new(
+                let tile_point = Point2::new(
                     ((point.x() - tile_bbox.x_min()) / tile_resolution) as f32,
                     ((tile_bbox.y_max() - point.y()) / tile_resolution) as f32,
                 );

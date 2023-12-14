@@ -1,9 +1,9 @@
-use crate::bounding_box::BoundingBox;
 use crate::error::GalileoError;
 use crate::layer::vector_tile::style::VectorTileStyle;
 use crate::render::{LineCap, LinePaint, PackedBundle, Paint, RenderBundle, Renderer};
 use crate::tile_scheme::{TileIndex, TileScheme};
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
+use galileo_types::bounding_rect::BoundingRect;
 use galileo_types::{CartesianPoint2d, Contour, Point2d};
 use num_traits::ToPrimitive;
 
@@ -135,7 +135,7 @@ impl VectorTile {
 
     fn transform_point<Num: num_traits::Float + ToPrimitive>(
         p_in: &impl CartesianPoint2d<Num = Num>,
-        tile_bbox: BoundingBox,
+        tile_bbox: BoundingRect,
         tile_resolution: f64,
     ) -> Point2d {
         let x = tile_bbox.x_min() + p_in.x().to_f64().unwrap() * tile_resolution;

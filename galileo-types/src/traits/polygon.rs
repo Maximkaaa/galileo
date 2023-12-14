@@ -2,7 +2,8 @@ use crate::bounding_rect::BoundingRect;
 use crate::geometry::{Geometry, GeometryHelper, GeometryMarker};
 use crate::segment::Segment;
 use crate::traits::contour::{ClosedContour, Contour};
-use crate::{CartesianPoint2d, Point2d};
+use crate::CartesianPoint2d;
+use nalgebra::Point2;
 
 pub trait Polygon: GeometryMarker {
     type Contour: ClosedContour;
@@ -53,8 +54,8 @@ where
                 } else {
                     segment.1.x()
                 };
-                let ray_p1 = Point2d::new(x, y);
-                let ray_p2 = Point2d::new(x_max, y);
+                let ray_p1 = Point2::new(x, y);
+                let ray_p2 = Point2::new(x_max, y);
                 let ray = Segment(&ray_p1, &ray_p2);
 
                 segment.intersects(&ray)

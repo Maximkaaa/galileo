@@ -1,8 +1,8 @@
 use crate::layer::Layer;
 use crate::messenger::Messenger;
-use crate::primitives::Size;
 use crate::render::Renderer;
 use crate::view::MapView;
+use galileo_types::size::Size;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use web_time::SystemTime;
@@ -54,9 +54,9 @@ impl Map {
         self.messenger.request_redraw();
     }
 
-    pub fn load_layers(&self, size: Size, renderer: &Arc<RwLock<dyn Renderer>>) {
+    pub fn load_layers(&self, renderer: &Arc<RwLock<dyn Renderer>>) {
         for layer in &self.layers {
-            layer.prepare(self.view, size, renderer);
+            layer.prepare(self.view, renderer);
         }
     }
 
@@ -100,5 +100,9 @@ impl Map {
             start_time: SystemTime::now() - FRAME_DURATION,
             duration,
         });
+    }
+
+    pub fn set_size(&mut self, new_size: Size) {
+        self.view = self.view.with_size(new_size);
     }
 }

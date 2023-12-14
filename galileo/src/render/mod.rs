@@ -1,6 +1,8 @@
-use crate::bounding_box::BoundingBox;
-use crate::primitives::{Color, Contour, DecodedImage, Image, Point2d, Polygon, Size};
+use crate::primitives::{Color, Contour, DecodedImage, Image, Point2d, Polygon};
+use galileo_types::bounding_rect::BoundingRect;
+use galileo_types::size::Size;
 use maybe_sync::{MaybeSend, MaybeSync};
+use nalgebra::Point3;
 use std::any::Any;
 
 #[cfg(feature = "wgpu")]
@@ -15,7 +17,7 @@ pub trait Renderer: MaybeSend + MaybeSync {
 
 pub trait Canvas {
     fn size(&self) -> Size;
-    fn create_image(&mut self, image: &DecodedImage, bbox: BoundingBox) -> Box<dyn Image>;
+    fn create_image(&mut self, image: &DecodedImage, bbox: BoundingRect) -> Box<dyn Image>;
     fn draw_images(&mut self, images: &Vec<&Box<dyn Image>>);
     fn draw_image(&mut self, image: &Box<dyn Image>);
 
@@ -39,6 +41,7 @@ pub trait Canvas {
 }
 
 pub trait RenderBundle {
+    fn add_points(&mut self, points: &[Point3<f64>], paint: PointPaint);
     fn add_line(&mut self, line: &Contour<Point2d>, paint: LinePaint, resolution: f64) -> usize;
     fn add_polygon(&mut self, polygon: &Polygon<Point2d>, paint: Paint, resolution: f64) -> usize;
     fn into_any(self: Box<Self>) -> Box<dyn Any>;

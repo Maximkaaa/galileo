@@ -1,5 +1,21 @@
 **Galileo** is a general purpose cross-platform geo-rendering library.
 
+# Web examples
+
+![Raster tile layer](https://maximkaaa.github.io/galileo/osm_256.png)
+![Vector tile layer](https://maximkaaa.github.io/galileo/vector_tiles_256.png)
+![Feature layer](https://maximkaaa.github.io/galileo/feature_layer_256.png)
+
+* [Raster tile layer (OSM)](https://maximkaaa.github.io/galileo/simple_map/)
+* [Vector tile layer (Maplibre)](https://maximkaaa.github.io/galileo/vector_tiles/)
+  * Use buttons at the top to change the style of the map
+  * Click on any object to get information about it
+* [Feature layer](https://maximkaaa.github.io/galileo/countries/)
+  * NOTE! Contains large dataset (~10 MB), might take some time to load
+  * Draws 250 countries' borders, consisting of ~4000 polygons with ~500K vertices
+  * Move mouse pointer to highlight any country
+
+
 ## General purpose
 
 Architecture of **Galileo** is designed specifically to allow different modes of use:
@@ -34,22 +50,8 @@ Galileo is an active WIP, here is the list of the features that are already pres
 * raster tile layers
 * vector tile layers with styling
 * vector geo-data layers (feature layers) with styling
+* 3d view and 3d object rendering
 * user-input handling on layers (mouse only at the moment, touch is WIP)
-
-# Web examples
-
-![Raster tile layer](https://maximkaaa.github.io/galileo/osm_256.png)
-![Vector tile layer](https://maximkaaa.github.io/galileo/vector_tiles_256.png)
-![Feature layer](https://maximkaaa.github.io/galileo/feature_layer_256.png)
-
-* [Raster tile layer (OSM)](https://maximkaaa.github.io/galileo/simple_map/)
-* [Vector tile layer (Maplibre)](https://maximkaaa.github.io/galileo/vector_tiles/)
-  * Use buttons at the top to change the style of the map
-  * Click on any object to get information about it
-* [Feature layer](https://maximkaaa.github.io/galileo/countries/)
-  * NOTE! Contains large dataset (~10 MB), might take some time to load
-  * Draws 250 countries' borders, consisting of ~4000 polygons with ~500K vertices
-  * Move mouse pointer to highlight any country
 
 # Running examples
 

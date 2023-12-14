@@ -1,13 +1,15 @@
 use crate::layer::Layer;
-use crate::primitives::{Color, Contour, Point2d, Polygon, Size};
+use crate::primitives::{Color, Contour, Point2d, Polygon};
 use crate::render::wgpu::WgpuRenderer;
 use crate::render::{
-    Canvas, LineCap, LinePaint, PackedBundle, Paint, RenderBundle, Renderer, UnpackedBundle,
+    Canvas, LineCap, LinePaint, PackedBundle, Paint, PointPaint, RenderBundle, Renderer,
+    UnpackedBundle,
 };
 use crate::view::MapView;
 use galileo_types::geometry::Geometry;
 use galileo_types::CartesianPoint2dFloat;
 use maybe_sync::{MaybeSend, MaybeSync};
+use nalgebra::Point3;
 use num_traits::Float;
 use std::any::Any;
 use std::sync::{Arc, RwLock};
@@ -115,7 +117,7 @@ impl<Feature: MaybeSend + MaybeSync, S: Symbol<Feature> + MaybeSend + MaybeSync>
         canvas.draw_bundles(&[self.render_bundle.read().unwrap().as_ref().unwrap()]);
     }
 
-    fn prepare(&self, _view: MapView, _map_size: Size, _renderer: &Arc<RwLock<dyn Renderer>>) {
+    fn prepare(&self, _view: MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
         // do nothing
     }
 
@@ -130,32 +132,39 @@ impl<Feature: MaybeSend + MaybeSync, S: Symbol<Feature> + MaybeSend + MaybeSync>
 
 pub struct CirclePointSymbol {
     pub color: Color,
-    pub radius: f64,
+    pub size: f64,
 }
 
-impl Symbol<Point2d> for CirclePointSymbol {
-    fn render(&self, feature: &Point2d, bundle: &mut Box<dyn RenderBundle>) -> Vec<usize> {
-        let contour = Contour {
-            points: [*feature, *feature].into(),
-            is_closed: false,
+impl Symbol<Vec<Point3<f64>>> for CirclePointSymbol {
+    fn render(&self, feature: &Vec<Point3<f64>>, bundle: &mut Box<dyn RenderBundle>) -> Vec<usize> {
+        let paint = PointPaint {
+            color: self.color,
+            size: self.size,
         };
-        let id = bundle.add_line(
-            &contour,
-            LinePaint {
-                color: self.color,
-                width: self.radius * 2.0,
-                offset: 0.0,
-                line_cap: LineCap::Round,
-            },
-            1.0,
-        );
+        bundle.add_points(feature, paint);
 
-        vec![id]
+        vec![]
+        // let contour = Contour {
+        //     points: [*feature, *feature].into(),
+        //     is_closed: false,
+        // };
+        // let id = bundle.add_line(
+        //     &contour,
+        //     LinePaint {
+        //         color: self.color,
+        //         width: self.size,
+        //         offset: 0.0,
+        //         line_cap: LineCap::Round,
+        //     },
+        //     1.0,
+        // );
+        //
+        // vec![id]
     }
 
     fn update(
         &self,
-        _feature: &Point2d,
+        _feature: &Vec<Point3<f64>>,
         _renders_ids: &[usize],
         _bundle: &mut Box<dyn UnpackedBundle>,
     ) {

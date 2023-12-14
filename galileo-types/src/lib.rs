@@ -10,10 +10,7 @@ pub use contour::*;
 pub mod polygon;
 pub use polygon::*;
 
-pub mod segment;
-
-pub mod vec;
-
-pub mod orient;
-
 pub mod bounding_rect;
+pub mod orient;
+pub mod segment;
+pub mod size;
