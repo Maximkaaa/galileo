@@ -1,11 +1,10 @@
 use crate::bounding_rect::BoundingRect;
 use crate::geometry::{GeometryHelper, GeometryMarker};
-use crate::vec::Vec2d;
-use crate::Point2d;
-use num_traits::{Bounded, Float, Num};
+use nalgebra::{Point2, Scalar, Vector2};
+use num_traits::{Bounded, Float, FromPrimitive, Num};
 
 pub trait CartesianPoint2d {
-    type Num: Num + Copy + PartialOrd + Bounded;
+    type Num: Num + Copy + PartialOrd + Bounded + Scalar + FromPrimitive;
 
     fn x(&self) -> Self::Num;
     fn y(&self) -> Self::Num;
@@ -17,22 +16,20 @@ pub trait CartesianPoint2d {
         self.x() == other.x() && self.y() == other.y()
     }
 
-    fn add(&self, vec: Vec2d<Self::Num>) -> Point2d<Self::Num>
+    fn add(&self, vec: Vector2<Self::Num>) -> Point2<Self::Num>
     where
         Self: Sized,
     {
-        Point2d::new(self.x() + vec.dx, self.y() + vec.dy)
+        Point2::new(self.x() + vec.x, self.y() + vec.y)
     }
 
-    fn sub(&self, other: &impl CartesianPoint2d<Num = Self::Num>) -> Vec2d<Self::Num> {
-        Vec2d {
-            dx: self.x() - other.x(),
-            dy: self.y() - other.y(),
-        }
+    fn sub(&self, other: &impl CartesianPoint2d<Num = Self::Num>) -> Vector2<Self::Num> {
+        Vector2::new(self.x() - other.x(), self.y() - other.y())
     }
 
     fn distance_sq(&self, other: &impl CartesianPoint2d<Num = Self::Num>) -> Self::Num {
-        self.sub(other).length_sq()
+        let v = self.sub(other);
+        v.x * v.x + v.y * v.y
     }
 
     fn taxicab_distance(&self, other: &impl CartesianPoint2d<Num = Self::Num>) -> Self::Num {
@@ -76,18 +73,5 @@ where
         P: CartesianPoint2d<Num = Self::Num>,
     {
         self.distance_sq(point) < tolerance * tolerance
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn distance() {
-        let p1 = Point2d::new(0.0, 0.0);
-        let p2 = Point2d::new(2.0, 0.0);
-
-        assert_eq!(p1.distance(&p2), 2.0);
     }
 }

@@ -64,6 +64,7 @@ Feature properties: ${feature}
     }
 
     run_wasm();
+    document.addEventListener('contextmenu', event => event.preventDefault());
 </script>
 <div class="buttons">
     <button onclick="setGrayscale()">Grayscale</button>

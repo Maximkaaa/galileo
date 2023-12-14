@@ -9,6 +9,7 @@ use galileo::messenger::Messenger;
 use galileo::primitives::{Color, Point2d};
 use galileo::render::{Canvas, RenderBundle, UnpackedBundle};
 use galileo::winit::{WinitInputHandler, WinitMessenger};
+use galileo_types::size::Size;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use wasm_bindgen::prelude::*;
@@ -27,10 +28,7 @@ pub async fn init() {
     console_log::init_with_level(log::Level::Info).expect("Couldn't init logger");
 
     let event_loop = EventLoop::new().unwrap();
-    let window = WindowBuilder::new()
-        // .with_maximized(true)
-        .build(&event_loop)
-        .unwrap();
+    let window = WindowBuilder::new().build(&event_loop).unwrap();
     let window = Arc::new(window);
 
     web_sys::window()
@@ -55,6 +53,7 @@ pub async fn init() {
     let messenger = WinitMessenger::new(window.clone());
 
     let mut backend = galileo::render::wgpu::WgpuRenderer::create(&window).await;
+    backend.set_background(Color::rgba(255, 255, 255, 255));
     let backend = Arc::new(Mutex::new(backend));
 
     let countries = load_countries();
@@ -62,10 +61,7 @@ pub async fn init() {
     let feature_layer = Arc::new(RwLock::new(feature_layer));
 
     let mut map = galileo::map::Map::new(
-        galileo::view::MapView {
-            position: Point2d::new(0.0, 0.0),
-            resolution: 156543.03392800014 / 8.0,
-        },
+        galileo::view::MapView::new(Point2d::new(0.0, 0.0), 156543.03392800014 / 8.0),
         vec![Box::new(feature_layer.clone())],
         messenger.clone(),
     );
@@ -80,8 +76,8 @@ pub async fn init() {
             if *button == MouseButton::Left {
                 let layer = layer_clone.write().unwrap();
 
-                for (_idx, feature) in
-                    layer.get_features_at(&event.map_pointer_position, map.view().resolution * 2.0)
+                for (_idx, feature) in layer
+                    .get_features_at(&event.map_pointer_position, map.view().resolution() * 2.0)
                 {
                     log::info!("Found {} with bbox {:?}", feature.name, feature.bbox);
                 }
@@ -97,7 +93,7 @@ pub async fn init() {
 
             let mut new_selected = usize::MAX;
             if let Some((index, feature)) = layer
-                .get_features_at_mut(&event.map_pointer_position, map.view().resolution * 2.0)
+                .get_features_at_mut(&event.map_pointer_position, map.view().resolution() * 2.0)
                 .first_mut()
             {
                 if *index == selected_index.load(Ordering::Relaxed) {
@@ -145,14 +141,14 @@ pub async fn init() {
                         }
                         WindowEvent::Resized(size) => {
                             backend.lock().unwrap().resize(size);
+                            map.set_size(Size::new(size.width as f64, size.height as f64));
                         }
                         WindowEvent::RedrawRequested => {
                             backend.lock().unwrap().render(&map).unwrap();
                         }
                         other => {
                             if let Some(raw_event) = input_handler.process_user_input(&other) {
-                                let size = backend.lock().unwrap().size();
-                                event_processor.handle(raw_event, &mut map, size);
+                                event_processor.handle(raw_event, &mut map);
                             }
                         }
                     }

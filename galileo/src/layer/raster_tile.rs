@@ -3,15 +3,15 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
 
-use crate::bounding_box::BoundingBox;
 use async_trait::async_trait;
+use galileo_types::bounding_rect::BoundingRect;
 use maybe_sync::{MaybeSend, MaybeSync};
 
 use crate::error::GalileoError;
 use crate::layer::tile_provider::{TileProvider, TileSource, TileState, UrlTileProvider};
 use crate::messenger::Messenger;
 use crate::platform::PlatformService;
-use crate::primitives::{DecodedImage, Image, Size};
+use crate::primitives::{DecodedImage, Image};
 use crate::render::{Canvas, Renderer};
 use crate::tile_scheme::{TileIndex, TileScheme};
 use crate::view::MapView;
@@ -35,7 +35,7 @@ impl RasterTileLayer {
         }
     }
 
-    fn get_tiles_to_draw<'a>(&self, resolution: f64, bbox: BoundingBox) -> Vec<RasterTile> {
+    fn get_tiles_to_draw<'a>(&self, resolution: f64, bbox: BoundingRect) -> Vec<RasterTile> {
         let mut tiles = vec![];
         let Some(tile_iter) = self.tile_scheme.iter_tiles(resolution, bbox) else {
             return vec![];
@@ -88,7 +88,7 @@ impl RasterTileLayer {
 #[async_trait]
 impl Layer for RasterTileLayer {
     fn render<'a>(&self, map_view: MapView, canvas: &'a mut dyn Canvas) {
-        let bbox = map_view.get_bbox(canvas.size());
+        let bbox = map_view.get_bbox();
         let tiles = self.get_tiles_to_draw(map_view.resolution(), bbox);
 
         let tile_renders = self.tile_renders.try_read().unwrap();
@@ -122,8 +122,8 @@ impl Layer for RasterTileLayer {
         }
     }
 
-    fn prepare(&self, map_view: MapView, map_size: Size, _renderer: &Arc<RwLock<dyn Renderer>>) {
-        let bbox = map_view.get_bbox(map_size);
+    fn prepare(&self, map_view: MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
+        let bbox = map_view.get_bbox();
         if let Some(iter) = self.tile_scheme.iter_tiles(map_view.resolution(), bbox) {
             for index in iter {
                 let tile_provider = self.tile_provider.clone();

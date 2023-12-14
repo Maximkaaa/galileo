@@ -12,6 +12,7 @@ use galileo::primitives::Point2d;
 use galileo::render::Renderer;
 use galileo::tile_scheme::{TileScheme, VerticalDirection};
 use galileo::winit::{WinitInputHandler, WinitMessenger};
+use galileo_types::size::Size;
 use std::sync::{Arc, RwLock};
 use wasm_bindgen::prelude::*;
 use winit::dpi::PhysicalSize;
@@ -96,10 +97,7 @@ pub async fn init() {
         tile_scheme(),
     );
     let mut map = galileo::map::Map::new(
-        galileo::view::MapView {
-            position: Point2d::new(0.0, 0.0),
-            resolution: 156543.03392800014 / 8.0,
-        },
+        galileo::view::MapView::new(Point2d::new(0.0, 0.0), 156543.03392800014 / 8.0),
         vec![Box::new(layer)],
         messenger.clone(),
     );
@@ -109,7 +107,7 @@ pub async fn init() {
     let mut custom_handler = CustomEventHandler::default();
     custom_handler.set_input_handler(move |ev, map| match ev {
         UserEvent::Click(MouseButton::Left, mouse_event) => {
-            let resolution = map.view().resolution;
+            let resolution = map.view().resolution();
             let features = map
                 .layer_mut(0)
                 .as_mut()
@@ -157,17 +155,20 @@ pub async fn init() {
                         }
                         WindowEvent::Resized(size) => {
                             backend.write().unwrap().resize(size);
+                            map.write()
+                                .unwrap()
+                                .set_size(Size::new(size.width as f64, size.height as f64));
                         }
                         WindowEvent::RedrawRequested => {
                             let map = map.read().unwrap();
                             let cast: Arc<RwLock<dyn Renderer>> = backend.clone();
-                            map.load_layers(backend.read().unwrap().size(), &cast);
+                            map.load_layers(&cast);
                             backend.read().unwrap().render(&map).unwrap();
                         }
                         other => {
                             if let Some(raw_event) = input_handler.process_user_input(&other) {
                                 let size = backend.read().unwrap().size();
-                                event_processor.handle(raw_event, &mut map.write().unwrap(), size);
+                                event_processor.handle(raw_event, &mut map.write().unwrap());
                             }
                         }
                     }

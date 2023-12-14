@@ -1,6 +1,6 @@
 use crate::map::Map;
-use galileo_types::vec::Vec2d;
 use galileo_types::Point2d;
+use nalgebra::Vector2;
 
 pub mod custom;
 pub mod event_processor;
@@ -29,7 +29,7 @@ pub enum UserEvent {
     PointerMoved(MouseEvent),
 
     DragStarted(MouseButton, MouseEvent),
-    Drag(MouseButton, Vec2d<f64>, MouseEvent),
+    Drag(MouseButton, Vector2<f64>, MouseEvent),
     DragEnded(MouseButton, MouseEvent),
 
     Zoom(f64, MouseEvent),

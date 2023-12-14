@@ -1,3 +1,5 @@
+use galileo_types::bounding_rect::BoundingRect;
+use galileo_types::CartesianPoint2d;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -7,7 +9,7 @@ use crate::primitives::Point2d;
 
 const RESOLUTION_TOLERANCE: f64 = 0.01;
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum VerticalDirection {
     TopToBottom,
     BottomToTop,
@@ -79,41 +81,35 @@ impl TileScheme {
     pub fn iter_tiles(
         &self,
         resolution: f64,
-        bounding_box: BoundingBox,
+        bounding_box: BoundingRect,
     ) -> Option<impl Iterator<Item = TileIndex>> {
         let lod = self.select_lod(resolution)?;
 
         let tile_w = lod.resolution() * self.tile_width as f64;
         let tile_h = lod.resolution() * self.tile_height as f64;
 
-        let x_min = ((bounding_box.x_min() - self.origin.x()) / tile_w) as i64;
+        let x_min = (self.x_adj(bounding_box.x_min()) / tile_w) as i64;
         let x_min = x_min.max(self.min_x_index(lod.resolution()));
 
-        let x_max = if bounding_box.width() > 0.0 {
-            let x_add_one = if (bounding_box.x_max() - self.origin.x()) % tile_w == 0.0 {
-                -1
-            } else {
-                0
-            };
-            ((bounding_box.x_max() - self.origin.x()) / tile_w) as i64 + x_add_one
-        } else {
-            x_min
-        };
+        let x_max_adj = self.x_adj(bounding_box.x_max());
+        let x_add_one = if (x_max_adj % tile_w) < 0.001 { -1 } else { 0 };
+
+        let x_max = (x_max_adj / tile_w) as i64 + x_add_one;
         let x_max = x_max.min(self.max_x_index(lod.resolution()));
 
-        let y_min = ((self.origin.y() - bounding_box.y_max()) / tile_h) as i64;
+        let (top, bottom) = if self.y_direction == VerticalDirection::TopToBottom {
+            (bounding_box.y_min(), bounding_box.y_max())
+        } else {
+            (bounding_box.y_max(), bounding_box.y_min())
+        };
+
+        let y_min = (self.y_adj(bottom) / tile_h) as i64;
         let y_min = y_min.max(self.min_y_index(lod.resolution()));
 
-        let y_max = if bounding_box.height() > 0.0 {
-            let y_add_one = if ((self.origin.y() - bounding_box.y_min()) % tile_h) == 0.0 {
-                -1
-            } else {
-                0
-            };
-            ((self.origin.y() - bounding_box.y_min()) / tile_h) as i64 + y_add_one
-        } else {
-            y_min
-        };
+        let y_max_adj = self.y_adj(top);
+        let y_add_one = if (y_max_adj % tile_h) < 0.001 { -1 } else { 0 };
+
+        let y_max = (x_max_adj / tile_h) as i64 + y_add_one;
         let y_max = y_max.min(self.max_y_index(lod.resolution()));
 
         Some((x_min..=x_max).flat_map(move |x| {
@@ -124,6 +120,17 @@ impl TileScheme {
                 display_x: x,
             })
         }))
+    }
+
+    fn x_adj(&self, x: f64) -> f64 {
+        x - self.origin.x()
+    }
+
+    fn y_adj(&self, y: f64) -> f64 {
+        match self.y_direction {
+            VerticalDirection::TopToBottom => self.origin.y() - y,
+            VerticalDirection::BottomToTop => y - self.origin.y(),
+        }
     }
 
     pub fn web(lods_count: u32) -> Self {
@@ -152,7 +159,7 @@ impl TileScheme {
         }
     }
 
-    pub fn tile_bbox(&self, index: TileIndex) -> Option<BoundingBox> {
+    pub fn tile_bbox(&self, index: TileIndex) -> Option<BoundingRect> {
         let resolution = self
             .lods
             .iter()
@@ -168,7 +175,7 @@ impl TileScheme {
             }
         };
 
-        Some(BoundingBox::new(
+        Some(BoundingRect::new(
             x_min,
             y_min,
             x_min + self.tile_width as f64 * resolution,
@@ -284,7 +291,7 @@ mod tests {
     #[test]
     fn iter_indices_full_bbox() {
         let schema = simple_schema();
-        let bbox = BoundingBox::new(0.0, 0.0, 2048.0, 2048.0);
+        let bbox = BoundingRect::new(0.0, 0.0, 2048.0, 2048.0);
         assert_eq!(schema.iter_tiles(8.0, bbox).unwrap().count(), 1);
         for tile in schema.iter_tiles(8.0, bbox).unwrap() {
             assert_eq!(tile.x, 0);
@@ -314,7 +321,7 @@ mod tests {
     #[test]
     fn iter_indices_part_bbox() {
         let schema = simple_schema();
-        let bbox = BoundingBox::new(200.0, 700.0, 1200.0, 1100.0);
+        let bbox = BoundingRect::new(200.0, 700.0, 1200.0, 1100.0);
         assert_eq!(schema.iter_tiles(8.0, bbox).unwrap().count(), 1);
         for tile in schema.iter_tiles(8.0, bbox).unwrap() {
             assert_eq!(tile.x, 0);
@@ -344,11 +351,11 @@ mod tests {
     #[test]
     fn iter_tiles_outside_of_bbox() {
         let schema = simple_schema();
-        let bbox = BoundingBox::new(-100.0, -100.0, -50.0, -50.0);
+        let bbox = BoundingRect::new(-100.0, -100.0, -50.0, -50.0);
         assert_eq!(schema.iter_tiles(8.0, bbox).unwrap().count(), 0);
         assert_eq!(schema.iter_tiles(2.0, bbox).unwrap().count(), 0);
 
-        let bbox = BoundingBox::new(2100.0, 0.0, 2500.0, 2048.0);
+        let bbox = BoundingRect::new(2100.0, 0.0, 2500.0, 2048.0);
         assert_eq!(schema.iter_tiles(8.0, bbox).unwrap().count(), 0);
         assert_eq!(schema.iter_tiles(2.0, bbox).unwrap().count(), 0);
     }
@@ -356,7 +363,7 @@ mod tests {
     #[test]
     fn iter_tiles_does_not_include_tiles_outside_bbox() {
         let schema = simple_schema();
-        let bbox = BoundingBox::new(-2048.0, -2048.0, 4096.0, 4096.0);
+        let bbox = BoundingRect::new(-2048.0, -2048.0, 4096.0, 4096.0);
         for tile in schema.iter_tiles(8.0, bbox).unwrap() {
             println!("{tile:?}");
         }

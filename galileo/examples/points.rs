@@ -1,9 +1,11 @@
 use galileo::control::event_processor::EventProcessor;
 use galileo::control::map::MapController;
-use galileo::primitives::Point2d;
+use galileo::layer::feature::{CirclePointSymbol, FeatureLayer};
+use galileo::primitives::{Color, Point2d};
 use galileo::render::Renderer;
 use galileo::winit::{WinitInputHandler, WinitMessenger};
 use galileo_types::size::Size;
+use nalgebra::Point3;
 use std::sync::{Arc, RwLock};
 use winit::event_loop::ControlFlow;
 use winit::{
@@ -11,6 +13,22 @@ use winit::{
     event_loop::EventLoop,
     window::WindowBuilder,
 };
+
+fn generate_points() -> Vec<Vec<Point3<f64>>> {
+    let mut points = vec![];
+    for x in -50..50 {
+        for y in -50..50 {
+            for z in 0..150 {
+                points.push(Point3::new(
+                    x as f64 * 10000.0,
+                    y as f64 * 10000.0,
+                    z as f64 * 10000.0,
+                ))
+            }
+        }
+    }
+    vec![points]
+}
 
 #[tokio::main]
 async fn main() {
@@ -33,9 +51,18 @@ async fn main() {
         messenger.clone(),
     );
 
+    let points = generate_points();
+    let feature_layer = FeatureLayer::new(
+        points,
+        CirclePointSymbol {
+            size: 3.0,
+            color: Color::rgba(226, 184, 34, 255),
+        },
+    );
+
     let mut map = galileo::map::Map::new(
         galileo::view::MapView::new(Point2d::new(0.0, 0.0), 156543.03392800014 / 4.0),
-        vec![Box::new(osm)],
+        vec![Box::new(osm), Box::new(feature_layer)],
         messenger.clone(),
     );
 

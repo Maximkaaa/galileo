@@ -1,5 +1,7 @@
 use crate::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
 use crate::map::Map;
+use crate::view::MapView;
+use nalgebra::Vector2;
 use std::time::Duration;
 
 const DEFAULT_ZOOM_DURATION: Duration = Duration::from_millis(50);
@@ -14,6 +16,9 @@ pub struct MapControllerParameters {
     zoom_speed: f64,
     min_resolution: f64,
     max_resolution: f64,
+
+    rotation_speed: f64,
+    max_rotation_x: f64,
 }
 
 impl Default for MapControllerParameters {
@@ -23,6 +28,8 @@ impl Default for MapControllerParameters {
             zoom_speed: 0.2,
             max_resolution: 156543.03392800014 / 8.0,
             min_resolution: 156543.03392800014 / 8.0 / 2.0f64.powi(16),
+            rotation_speed: 0.005,
+            max_rotation_x: 80f64.to_radians(),
         }
     }
 }
@@ -30,18 +37,33 @@ impl Default for MapControllerParameters {
 impl UserEventHandler for MapController {
     fn handle(&self, event: &UserEvent, map: &mut Map) -> EventPropagation {
         match event {
-            UserEvent::DragStarted(button, _) if *button == MouseButton::Left => {
+            UserEvent::DragStarted(button, _)
+                if *button == MouseButton::Left || *button == MouseButton::Right =>
+            {
                 EventPropagation::Consume
             }
-            UserEvent::Drag(_, delta, _) => {
-                map.set_view(map.view().translate(*delta));
-                EventPropagation::Stop
-            }
+            UserEvent::Drag(button, delta, e) => match button {
+                MouseButton::Left => {
+                    let current_position = e.screen_pointer_position;
+                    let prev_position = current_position - delta;
+
+                    map.set_view(
+                        map.view()
+                            .translate_by_pixels(prev_position, current_position),
+                    );
+                    EventPropagation::Stop
+                }
+                MouseButton::Right => {
+                    map.set_view(self.get_rotation(map.view(), (*delta).into()));
+                    EventPropagation::Stop
+                }
+                _ => EventPropagation::Propagate,
+            },
             UserEvent::Zoom(delta, mouse_event) => {
-                let zoom = self.get_zoom(*delta, map.view().resolution);
+                let zoom = self.get_zoom(*delta, map.view().resolution());
                 let target = map
                     .target_view()
-                    .zoom(zoom, mouse_event.map_pointer_position);
+                    .zoom(zoom, mouse_event.screen_pointer_position);
                 map.animate_to(target, self.parameters.zoom_duration);
 
                 EventPropagation::Stop
@@ -62,5 +84,20 @@ impl MapController {
         } else {
             zoom
         }
+    }
+
+    fn get_rotation(&self, curr_view: MapView, px_delta: Vector2<f64>) -> MapView {
+        let dz = px_delta.x * self.parameters.rotation_speed;
+
+        let rotation_z = curr_view.rotation_z() + dz;
+        let mut rotation_x = curr_view.rotation_x() - px_delta.y * self.parameters.rotation_speed;
+
+        if rotation_x < 0.0 {
+            rotation_x = 0.0;
+        } else if rotation_x > self.parameters.max_rotation_x {
+            rotation_x = self.parameters.max_rotation_x;
+        };
+
+        curr_view.with_rotation(rotation_x, rotation_z)
     }
 }

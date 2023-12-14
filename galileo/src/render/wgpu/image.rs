@@ -1,8 +1,8 @@
+use galileo_types::bounding_rect::BoundingRect;
 use std::any::Any;
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroupLayout, Device, Queue};
 
-use crate::bounding_box::BoundingBox;
 use crate::primitives::{DecodedImage, Image};
 use crate::render::wgpu::WgpuRenderer;
 
@@ -16,11 +16,8 @@ pub struct ImagePainter {
 }
 
 pub struct WgpuImage {
-    texture: wgpu::Texture,
     texture_bind_group: wgpu::BindGroup,
-    vertices: [ImageVertex; 4],
     vertex_buffer: wgpu::Buffer,
-    bbox: BoundingBox,
 }
 
 impl Image for WgpuImage {
@@ -120,7 +117,7 @@ impl ImagePainter {
         device: &Device,
         queue: &Queue,
         image: &DecodedImage,
-        bbox: BoundingBox,
+        bbox: BoundingRect,
     ) -> WgpuImage {
         let texture_size = wgpu::Extent3d {
             width: image.dimensions.0,
@@ -149,8 +146,8 @@ impl ImagePainter {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });
@@ -200,11 +197,8 @@ impl ImagePainter {
         });
 
         WgpuImage {
-            texture,
             texture_bind_group,
-            vertices,
             vertex_buffer,
-            bbox,
         }
     }
 

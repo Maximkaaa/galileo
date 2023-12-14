@@ -1,5 +1,6 @@
-use crate::CartesianPoint2d;
-use num_traits::Num;
+use crate::{CartesianPoint2d, ClosedContour};
+use nalgebra::{Point2, Scalar};
+use num_traits::{FromPrimitive, Num};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
@@ -10,7 +11,58 @@ pub struct BoundingRect<N: Num + Copy + PartialOrd = f64> {
     pub y_max: N,
 }
 
-impl<N: Num + Copy + PartialOrd> BoundingRect<N> {
+impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> BoundingRect<N> {
+    pub fn new(x_min: N, y_min: N, x_max: N, y_max: N) -> Self {
+        Self {
+            x_min,
+            y_min,
+            x_max,
+            y_max,
+        }
+    }
+
+    pub fn x_min(&self) -> N {
+        self.x_min
+    }
+
+    pub fn x_max(&self) -> N {
+        self.x_max
+    }
+
+    pub fn y_min(&self) -> N {
+        self.y_min
+    }
+
+    pub fn y_max(&self) -> N {
+        self.y_max
+    }
+
+    pub fn width(&self) -> N {
+        self.x_max - self.x_min
+    }
+
+    pub fn height(&self) -> N {
+        self.y_max - self.y_min
+    }
+
+    pub fn into_contour(&self) -> ClosedContour<Point2<N>> {
+        ClosedContour::new(vec![
+            Point2::new(self.x_min, self.y_min),
+            Point2::new(self.x_min, self.y_max),
+            Point2::new(self.x_max, self.y_max),
+            Point2::new(self.x_max, self.y_min),
+        ])
+    }
+
+    pub fn shrink(&self, amount: N) -> Self {
+        Self {
+            x_min: self.x_min + amount,
+            x_max: self.x_max - amount,
+            y_min: self.y_min + amount,
+            y_max: self.y_max - amount,
+        }
+    }
+
     pub fn merge(&self, other: Self) -> Self {
         Self {
             x_min: if self.x_min < other.x_min {
@@ -83,9 +135,50 @@ impl<N: Num + Copy + PartialOrd> BoundingRect<N> {
             && self.y_min <= point.y()
             && self.y_max >= point.y()
     }
+
+    pub fn magnify(&self, factor: N) -> Self {
+        let two = N::from_f64(2.0).unwrap();
+        let cx = (self.x_min + self.x_max) / two;
+        let cy = (self.y_min + self.y_max) / two;
+        let half_width = self.width() / two * factor;
+        let half_height = self.height() / two * factor;
+        Self {
+            x_min: cx - half_width,
+            x_max: cx + half_width,
+            y_min: cy - half_height,
+            y_max: cy + half_height,
+        }
+    }
+
+    pub fn limit(&self, other: Self) -> Self {
+        Self {
+            x_min: if self.x_min > other.x_min {
+                self.x_min
+            } else {
+                other.x_min
+            },
+            y_min: if self.y_min > other.y_min {
+                self.y_min
+            } else {
+                other.y_min
+            },
+            x_max: if self.x_max < other.x_max {
+                self.x_max
+            } else {
+                other.x_max
+            },
+            y_max: if self.y_max < other.y_max {
+                self.y_max
+            } else {
+                other.y_max
+            },
+        }
+    }
 }
 
-impl<N: Num + Copy + PartialOrd> FromIterator<BoundingRect<N>> for BoundingRect<N> {
+impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> FromIterator<BoundingRect<N>>
+    for BoundingRect<N>
+{
     fn from_iter<T: IntoIterator<Item = BoundingRect<N>>>(iter: T) -> Self {
         let mut iter = iter.into_iter();
         let mut curr = iter.next().unwrap();

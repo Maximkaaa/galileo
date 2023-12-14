@@ -8,6 +8,7 @@ use galileo::messenger::Messenger;
 use galileo::primitives::{Color, Point2d};
 use galileo::render::{RenderBundle, UnpackedBundle};
 use galileo::winit::{WinitInputHandler, WinitMessenger};
+use galileo_types::size::Size;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use winit::event_loop::ControlFlow;
@@ -57,10 +58,7 @@ async fn main() {
     let feature_layer = Arc::new(RwLock::new(feature_layer));
 
     let mut map = galileo::map::Map::new(
-        galileo::view::MapView {
-            position: Point2d::new(0.0, 0.0),
-            resolution: 156543.03392800014 / 4.0,
-        },
+        galileo::view::MapView::new(Point2d::new(0.0, 0.0), 156543.03392800014 / 4.0),
         vec![Box::new(feature_layer.clone())],
         messenger.clone(),
     );
@@ -75,8 +73,8 @@ async fn main() {
             if *button == MouseButton::Left {
                 let layer = layer_clone.write().unwrap();
 
-                for (_idx, feature) in
-                    layer.get_features_at(&event.map_pointer_position, map.view().resolution * 2.0)
+                for (_idx, feature) in layer
+                    .get_features_at(&event.map_pointer_position, map.view().resolution() * 2.0)
                 {
                     log::info!("Found {} with bbox {:?}", feature.name, feature.bbox);
                 }
@@ -92,7 +90,7 @@ async fn main() {
 
             let mut new_selected = usize::MAX;
             if let Some((index, feature)) = layer
-                .get_features_at_mut(&event.map_pointer_position, map.view().resolution * 2.0)
+                .get_features_at_mut(&event.map_pointer_position, map.view().resolution() * 2.0)
                 .first_mut()
             {
                 if *index == selected_index.load(Ordering::Relaxed) {
@@ -139,6 +137,7 @@ async fn main() {
                             target.exit();
                         }
                         WindowEvent::Resized(size) => {
+                            map.set_size(Size::new(size.width as f64, size.height as f64));
                             backend.lock().unwrap().resize(size);
                         }
                         WindowEvent::RedrawRequested => {
@@ -146,8 +145,7 @@ async fn main() {
                         }
                         other => {
                             if let Some(raw_event) = input_handler.process_user_input(&other) {
-                                let size = backend.lock().unwrap().size();
-                                event_processor.handle(raw_event, &mut map, size);
+                                event_processor.handle(raw_event, &mut map);
                             }
                         }
                     }

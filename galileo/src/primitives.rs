@@ -8,21 +8,6 @@ use serde::{Deserialize, Serialize};
 
 pub use galileo_types::{ClosedContour, Contour, Point2d, Polygon};
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Size {
-    pub width: u32,
-    pub height: u32,
-}
-
-impl From<winit::dpi::PhysicalSize<u32>> for Size {
-    fn from(value: winit::dpi::PhysicalSize<u32>) -> Self {
-        Self {
-            width: value.width,
-            height: value.height,
-        }
-    }
-}
-
 pub trait Image: MaybeSend + MaybeSync {
     fn as_any(&self) -> &dyn Any;
 }
@@ -101,6 +86,10 @@ impl Color {
         };
 
         Some(Self { r, g, b, a })
+    }
+    
+    pub fn with_alpha(&self, a: u8) -> Self {
+        Self { a, ..*self }
     }
 }
 
