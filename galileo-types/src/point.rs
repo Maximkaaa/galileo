@@ -1,6 +1,6 @@
 use crate::geometry::GeometryMarker;
 use crate::traits::PointMarker;
-use crate::CartesianPoint2d;
+use crate::{CartesianPoint2d, NewCartesianPoint2d};
 pub use nalgebra::Point2;
 use nalgebra::Scalar;
 use num_traits::{Bounded, FromPrimitive};
@@ -21,5 +21,13 @@ impl<Num: num_traits::Num + Copy + PartialOrd + Bounded + Scalar + FromPrimitive
     }
     fn y(&self) -> Num {
         self.y
+    }
+}
+
+impl<Num: num_traits::Num + Copy + PartialOrd + Bounded + Scalar + FromPrimitive>
+    NewCartesianPoint2d<Num> for Point2<Num>
+{
+    fn new(x: Num, y: Num) -> Self {
+        Point2::new(x, y)
     }
 }

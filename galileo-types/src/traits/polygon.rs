@@ -1,5 +1,5 @@
-use crate::bounding_rect::BoundingRect;
-use crate::geometry::{Geometry, GeometryHelper, GeometryMarker};
+use crate::geometry::{CartesianGeometry, GeometryHelper, GeometryMarker};
+use crate::rect::Rect;
 use crate::segment::Segment;
 use crate::traits::contour::{ClosedContour, Contour};
 use crate::CartesianPoint2d;
@@ -84,7 +84,7 @@ where
 {
     type Num = P::Num;
 
-    fn __bounding_rect(&self) -> BoundingRect<Self::Num> {
+    fn __bounding_rect(&self) -> Rect<Self::Num> {
         self.outer_contour().bounding_rect()
     }
 

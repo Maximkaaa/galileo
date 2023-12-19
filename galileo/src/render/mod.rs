@@ -1,5 +1,5 @@
 use crate::primitives::{Color, Contour, DecodedImage, Image, Point2d, Polygon};
-use galileo_types::bounding_rect::BoundingRect;
+use galileo_types::rect::Rect;
 use galileo_types::size::Size;
 use maybe_sync::{MaybeSend, MaybeSync};
 use nalgebra::Point3;
@@ -17,7 +17,7 @@ pub trait Renderer: MaybeSend + MaybeSync {
 
 pub trait Canvas {
     fn size(&self) -> Size;
-    fn create_image(&mut self, image: &DecodedImage, bbox: BoundingRect) -> Box<dyn Image>;
+    fn create_image(&mut self, image: &DecodedImage, bbox: Rect) -> Box<dyn Image>;
     fn draw_images(&mut self, images: &Vec<&Box<dyn Image>>);
     fn draw_image(&mut self, image: &Box<dyn Image>);
 

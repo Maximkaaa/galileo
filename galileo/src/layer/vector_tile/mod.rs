@@ -12,8 +12,8 @@ use crate::layer::vector_tile::style::VectorTileStyle;
 use crate::layer::vector_tile::tile_provider::{LockedTileStore, VectorTileProvider};
 use crate::layer::vector_tile::vector_tile::VectorTile;
 use galileo_mvt::{MvtFeature, MvtGeometry};
-use galileo_types::bounding_rect::BoundingRect;
-use galileo_types::geometry::Geometry;
+use galileo_types::geometry::CartesianGeometry;
+use galileo_types::rect::Rect;
 use galileo_types::{CartesianPoint2d, Point2};
 
 pub mod style;
@@ -27,18 +27,20 @@ pub struct VectorTileLayer<Provider: VectorTileProvider> {
 }
 
 impl<Provider: VectorTileProvider + 'static> Layer for VectorTileLayer<Provider> {
-    fn render<'a>(&self, map_view: MapView, canvas: &'a mut dyn Canvas) {
-        let bbox = map_view.get_bbox();
+    fn render<'a>(&self, position: &MapView, canvas: &'a mut dyn Canvas) {
+        let Some(bbox) = position.get_bbox() else {
+            return;
+        };
 
         let tiles_store = self.tile_provider.read();
-        let tiles = self.get_tiles_to_draw(map_view.resolution(), bbox, &tiles_store);
+        let tiles = self.get_tiles_to_draw(position.resolution(), bbox, &tiles_store);
         let to_render: Vec<&Box<dyn PackedBundle>> = tiles.iter().map(|v| &v.bundle).collect();
 
         canvas.draw_bundles(&to_render);
     }
 
-    fn prepare(&self, view: MapView, renderer: &Arc<RwLock<dyn Renderer>>) {
-        let bbox = view.get_bbox();
+    fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>) {
+        let Some(bbox) = view.get_bbox() else { return };
         if let Some(iter) = self.tile_scheme.iter_tiles(view.resolution(), bbox) {
             for index in iter {
                 if self.tile_provider.supports(&**renderer) {
@@ -80,7 +82,7 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
     fn get_tiles_to_draw<'a>(
         &self,
         resolution: f64,
-        bbox: BoundingRect,
+        bbox: Rect,
         tiles_store: &'a LockedTileStore,
     ) -> Vec<&'a VectorTile> {
         let mut tiles = vec![];
@@ -141,7 +143,7 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
         point: &impl CartesianPoint2d<Num = f64>,
         resolution: f64,
     ) -> Vec<(String, MvtFeature)> {
-        let bbox = BoundingRect::new(point.x(), point.y(), point.x(), point.y());
+        let bbox = Rect::new(point.x(), point.y(), point.x(), point.y());
 
         let tile_store = self.tile_provider.read();
         let mut features = vec![];

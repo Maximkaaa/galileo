@@ -52,7 +52,7 @@ async fn main() {
     );
 
     let map = galileo::map::Map::new(
-        galileo::view::MapView::new(Point2d::new(0.0, 0.0), 156543.03392800014 / 8.0),
+        galileo::view::MapView::new_projected(&Point2d::new(0.0, 0.0), 156543.03392800014 / 8.0),
         vec![Box::new(vt_layer)],
         messenger.clone(),
     );
@@ -87,6 +87,10 @@ async fn main() {
     custom_handler.set_input_handler(move |ev, map| match ev {
         UserEvent::Click(MouseButton::Left, mouse_event) => {
             let resolution = map.view().resolution();
+            let position = map
+                .view()
+                .screen_to_map(mouse_event.screen_pointer_position)
+                .unwrap();
             let features = map
                 .layer_mut(0)
                 .as_mut()
@@ -94,7 +98,7 @@ async fn main() {
                 .as_any_mut()
                 .downcast_mut::<VectorTileLayer<RayonProvider>>()
                 .unwrap()
-                .get_features_at(&mouse_event.map_pointer_position, resolution);
+                .get_features_at(&position, resolution);
 
             for (layer, feature) in features {
                 println!("{layer}, {:?}", feature.properties);

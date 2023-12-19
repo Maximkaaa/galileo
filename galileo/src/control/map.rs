@@ -86,7 +86,7 @@ impl MapController {
         }
     }
 
-    fn get_rotation(&self, curr_view: MapView, px_delta: Vector2<f64>) -> MapView {
+    fn get_rotation(&self, curr_view: &MapView, px_delta: Vector2<f64>) -> MapView {
         let dz = px_delta.x * self.parameters.rotation_speed;
 
         let rotation_z = curr_view.rotation_z() + dz;

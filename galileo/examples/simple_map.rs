@@ -1,8 +1,9 @@
 use galileo::control::event_processor::EventProcessor;
 use galileo::control::map::MapController;
-use galileo::primitives::Point2d;
 use galileo::render::Renderer;
 use galileo::winit::{WinitInputHandler, WinitMessenger};
+use galileo_types::geo::impls::point::GeoPoint2d;
+use galileo_types::geo::traits::point::NewGeoPoint;
 use galileo_types::size::Size;
 use std::sync::{Arc, RwLock};
 use winit::event_loop::ControlFlow;
@@ -34,7 +35,7 @@ async fn main() {
     );
 
     let mut map = galileo::map::Map::new(
-        galileo::view::MapView::new(Point2d::new(0.0, 0.0), 156543.03392800014 / 4.0),
+        galileo::view::MapView::new(&GeoPoint2d::latlon(37.566, 126.9784), 156543.0 / 128.0),
         vec![Box::new(osm)],
         messenger.clone(),
     );

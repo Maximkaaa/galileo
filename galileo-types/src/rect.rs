@@ -4,14 +4,14 @@ use num_traits::{FromPrimitive, Num};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BoundingRect<N: Num + Copy + PartialOrd = f64> {
+pub struct Rect<N: Num + Copy + PartialOrd = f64> {
     pub x_min: N,
     pub y_min: N,
     pub x_max: N,
     pub y_max: N,
 }
 
-impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> BoundingRect<N> {
+impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
     pub fn new(x_min: N, y_min: N, x_max: N, y_max: N) -> Self {
         Self {
             x_min,
@@ -176,10 +176,8 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> BoundingRect<N> {
     }
 }
 
-impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> FromIterator<BoundingRect<N>>
-    for BoundingRect<N>
-{
-    fn from_iter<T: IntoIterator<Item = BoundingRect<N>>>(iter: T) -> Self {
+impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> FromIterator<Rect<N>> for Rect<N> {
+    fn from_iter<T: IntoIterator<Item = Rect<N>>>(iter: T) -> Self {
         let mut iter = iter.into_iter();
         let mut curr = iter.next().unwrap();
         for rect in iter {

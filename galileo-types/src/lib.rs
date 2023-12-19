@@ -10,7 +10,8 @@ pub use contour::*;
 pub mod polygon;
 pub use polygon::*;
 
-pub mod bounding_rect;
+pub mod geo;
 pub mod orient;
+pub mod rect;
 pub mod segment;
 pub mod size;

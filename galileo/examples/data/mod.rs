@@ -1,6 +1,6 @@
 use galileo::primitives::{Color, Point2d, Polygon};
-use galileo_types::bounding_rect::BoundingRect;
-use galileo_types::geometry::Geometry;
+use galileo_types::geometry::CartesianGeometry;
+use galileo_types::rect::Rect;
 use galileo_types::CartesianPoint2d;
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +9,7 @@ pub struct Country {
     pub name: String,
     pub geometry: Vec<Polygon<Point2d>>,
     pub color: Color,
-    pub bbox: BoundingRect,
+    pub bbox: Rect,
     pub is_selected: bool,
 }
 
@@ -19,10 +19,10 @@ impl Country {
     }
 }
 
-impl Geometry for Country {
+impl CartesianGeometry for Country {
     type Num = f64;
 
-    fn bounding_rect(&self) -> BoundingRect<Self::Num> {
+    fn bounding_rect(&self) -> Rect<Self::Num> {
         self.bbox
     }
 

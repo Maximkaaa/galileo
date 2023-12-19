@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
-use galileo_types::bounding_rect::BoundingRect;
+use galileo_types::rect::Rect;
 use maybe_sync::{MaybeSend, MaybeSync};
 
 use crate::error::GalileoError;
@@ -35,7 +35,7 @@ impl RasterTileLayer {
         }
     }
 
-    fn get_tiles_to_draw<'a>(&self, resolution: f64, bbox: BoundingRect) -> Vec<RasterTile> {
+    fn get_tiles_to_draw<'a>(&self, resolution: f64, bbox: Rect) -> Vec<RasterTile> {
         let mut tiles = vec![];
         let Some(tile_iter) = self.tile_scheme.iter_tiles(resolution, bbox) else {
             return vec![];
@@ -87,9 +87,11 @@ impl RasterTileLayer {
 
 #[async_trait]
 impl Layer for RasterTileLayer {
-    fn render<'a>(&self, map_view: MapView, canvas: &'a mut dyn Canvas) {
-        let bbox = map_view.get_bbox();
-        let tiles = self.get_tiles_to_draw(map_view.resolution(), bbox);
+    fn render<'a>(&self, position: &MapView, canvas: &'a mut dyn Canvas) {
+        let Some(bbox) = position.get_bbox() else {
+            return;
+        };
+        let tiles = self.get_tiles_to_draw(position.resolution(), bbox);
 
         let tile_renders = self.tile_renders.try_read().unwrap();
         let mut renders_to_add: Vec<(TileIndex, Box<dyn Image>)> = Vec::new();
@@ -122,9 +124,11 @@ impl Layer for RasterTileLayer {
         }
     }
 
-    fn prepare(&self, map_view: MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
-        let bbox = map_view.get_bbox();
-        if let Some(iter) = self.tile_scheme.iter_tiles(map_view.resolution(), bbox) {
+    fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>) {
+        let Some(bbox) = view.get_bbox() else {
+            return;
+        };
+        if let Some(iter) = self.tile_scheme.iter_tiles(view.resolution(), bbox) {
             for index in iter {
                 let tile_provider = self.tile_provider.clone();
                 crate::async_runtime::spawn(async move { tile_provider.load_tile(index).await });

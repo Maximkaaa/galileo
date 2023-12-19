@@ -58,7 +58,7 @@ async fn main() {
     let feature_layer = Arc::new(RwLock::new(feature_layer));
 
     let mut map = galileo::map::Map::new(
-        galileo::view::MapView::new(Point2d::new(0.0, 0.0), 156543.03392800014 / 4.0),
+        galileo::view::MapView::new_projected(&Point2d::new(0.0, 0.0), 156543.03392800014 / 4.0),
         vec![Box::new(feature_layer.clone())],
         messenger.clone(),
     );
@@ -73,8 +73,12 @@ async fn main() {
             if *button == MouseButton::Left {
                 let layer = layer_clone.write().unwrap();
 
-                for (_idx, feature) in layer
-                    .get_features_at(&event.map_pointer_position, map.view().resolution() * 2.0)
+                let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {
+                    return EventPropagation::Stop;
+                };
+
+                for (_idx, feature) in
+                    layer.get_features_at(&position, map.view().resolution() * 2.0)
                 {
                     log::info!("Found {} with bbox {:?}", feature.name, feature.bbox);
                 }
@@ -89,8 +93,11 @@ async fn main() {
             let mut to_update = vec![];
 
             let mut new_selected = usize::MAX;
+            let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {
+                return EventPropagation::Stop;
+            };
             if let Some((index, feature)) = layer
-                .get_features_at_mut(&event.map_pointer_position, map.view().resolution() * 2.0)
+                .get_features_at_mut(&position, map.view().resolution() * 2.0)
                 .first_mut()
             {
                 if *index == selected_index.load(Ordering::Relaxed) {

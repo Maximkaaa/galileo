@@ -61,7 +61,7 @@ async fn main() {
     );
 
     let mut map = galileo::map::Map::new(
-        galileo::view::MapView::new(Point2d::new(0.0, 0.0), 156543.03392800014 / 4.0),
+        galileo::view::MapView::new_projected(&Point2d::new(0.0, 0.0), 156543.03392800014 / 4.0),
         vec![Box::new(osm), Box::new(feature_layer)],
         messenger.clone(),
     );

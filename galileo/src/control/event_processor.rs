@@ -169,7 +169,6 @@ impl EventProcessor {
     fn get_mouse_event_pos(&self, map: &Map, screen_pointer_position: Point2d) -> MouseEvent {
         MouseEvent {
             screen_pointer_position,
-            map_pointer_position: map.view().screen_to_map(self.pointer_position),
             buttons: self.buttons_state,
         }
     }

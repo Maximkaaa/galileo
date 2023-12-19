@@ -1,5 +1,5 @@
-use crate::bounding_rect::BoundingRect;
 use crate::geometry::{GeometryHelper, GeometryMarker};
+use crate::rect::Rect;
 use crate::segment::Segment;
 use crate::CartesianPoint2d;
 use num_traits::{One, Zero};
@@ -192,8 +192,8 @@ where
 {
     type Num = P::Num;
 
-    fn __bounding_rect(&self) -> BoundingRect<Self::Num> {
-        BoundingRect::from_points(self.iter_points()).unwrap()
+    fn __bounding_rect(&self) -> Rect<Self::Num> {
+        Rect::from_points(self.iter_points()).unwrap()
     }
 
     fn __contains_point<Point>(&self, point: &Point, tolerance: Self::Num) -> bool

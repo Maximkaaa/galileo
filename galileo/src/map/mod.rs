@@ -37,8 +37,8 @@ impl Map {
         }
     }
 
-    pub fn view(&self) -> MapView {
-        self.view
+    pub fn view(&self) -> &MapView {
+        &self.view
     }
 
     pub fn layers(&self) -> &[Box<dyn Layer>] {
@@ -56,7 +56,7 @@ impl Map {
 
     pub fn load_layers(&self, renderer: &Arc<RwLock<dyn Renderer>>) {
         for layer in &self.layers {
-            layer.prepare(self.view, renderer);
+            layer.prepare(&self.view, renderer);
         }
     }
 
@@ -77,25 +77,25 @@ impl Map {
             / animation.duration.as_millis() as f64;
 
         if k >= 1.0 {
+            let animation = self.animation.take().unwrap();
             self.view = animation.end_view;
-            self.animation = None;
         } else {
-            self.view = animation.start_view.interpolate(animation.end_view, k);
+            self.view = animation.start_view.interpolate(&animation.end_view, k);
         }
 
         self.redraw();
     }
 
-    pub fn target_view(&self) -> MapView {
+    pub fn target_view(&self) -> &MapView {
         self.animation
             .as_ref()
-            .map(|v| v.end_view)
-            .unwrap_or(self.view)
+            .map(|v| &v.end_view)
+            .unwrap_or(&self.view)
     }
 
     pub fn animate_to(&mut self, target: MapView, duration: Duration) {
         self.animation = Some(AnimationParameters {
-            start_view: self.view,
+            start_view: self.view.clone(),
             end_view: target,
             start_time: SystemTime::now() - FRAME_DURATION,
             duration,

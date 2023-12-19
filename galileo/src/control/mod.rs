@@ -52,7 +52,6 @@ pub enum MouseButton {
 #[derive(Debug, Clone)]
 pub struct MouseEvent {
     pub screen_pointer_position: Point2d,
-    pub map_pointer_position: Point2d,
     pub buttons: MouseButtonsState,
 }
 

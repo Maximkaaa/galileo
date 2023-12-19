@@ -6,7 +6,9 @@ use crate::render::{
     UnpackedBundle,
 };
 use crate::view::MapView;
-use galileo_types::geometry::Geometry;
+use galileo_types::geo::crs::Crs;
+use galileo_types::geo::traits::point::GeoPoint;
+use galileo_types::geometry::CartesianGeometry;
 use galileo_types::CartesianPoint2dFloat;
 use maybe_sync::{MaybeSend, MaybeSync};
 use nalgebra::Point3;
@@ -14,20 +16,22 @@ use num_traits::Float;
 use std::any::Any;
 use std::sync::{Arc, RwLock};
 
-pub struct FeatureLayer<Feature, S: Symbol<Feature>> {
+pub struct FeatureLayer<Feature, Symbol> {
     features: Vec<Feature>,
-    style: S,
+    style: Symbol,
     render_bundle: RwLock<Option<Box<dyn PackedBundle>>>,
     feature_render_map: RwLock<Vec<Vec<usize>>>,
+    crs: Crs,
 }
 
-impl<Feature, S: Symbol<Feature>> FeatureLayer<Feature, S> {
-    pub fn new(features: Vec<Feature>, style: S) -> Self {
+impl<Feature, Symbol> FeatureLayer<Feature, Symbol> {
+    pub fn new(features: Vec<Feature>, style: Symbol, crs: Crs) -> Self {
         Self {
             features,
             style,
             render_bundle: RwLock::new(None),
             feature_render_map: RwLock::new(Vec::new()),
+            crs,
         }
     }
 
@@ -37,7 +41,7 @@ impl<Feature, S: Symbol<Feature>> FeatureLayer<Feature, S> {
         tolerance: N,
     ) -> Vec<(usize, &Feature)>
     where
-        Feature: Geometry<Num = N>,
+        Feature: CartesianGeometry<Num = N>,
     {
         self.features
             .iter()
@@ -52,7 +56,7 @@ impl<Feature, S: Symbol<Feature>> FeatureLayer<Feature, S> {
         tolerance: N,
     ) -> Vec<(usize, &mut Feature)>
     where
-        Feature: Geometry<Num = N>,
+        Feature: CartesianGeometry<Num = N>,
     {
         self.features
             .iter_mut()
@@ -68,7 +72,9 @@ impl<Feature, S: Symbol<Feature>> FeatureLayer<Feature, S> {
     pub fn features_mut(&mut self) -> impl Iterator<Item = &'_ mut Feature> + '_ {
         self.features.iter_mut()
     }
+}
 
+impl<Feature, S: Symbol<Feature>> FeatureLayer<Feature, S> {
     // todo: remove deps on wgpu
     pub fn update_features(&mut self, indices: &[usize], renderer: &WgpuRenderer) {
         let mut bundle_lock = self.render_bundle.write().unwrap();
@@ -98,10 +104,12 @@ pub trait Symbol<Feature> {
     );
 }
 
-impl<Feature: MaybeSend + MaybeSync, S: Symbol<Feature> + MaybeSend + MaybeSync> Layer
-    for FeatureLayer<Feature, S>
+impl<F, S> Layer for FeatureLayer<F, S>
+where
+    F: MaybeSend + MaybeSync,
+    S: Symbol<F> + MaybeSend + MaybeSync,
 {
-    fn render<'a>(&self, _position: MapView, canvas: &'a mut dyn Canvas) {
+    fn render<'a>(&self, view: &MapView, canvas: &'a mut dyn Canvas) {
         if self.render_bundle.read().unwrap().is_none() {
             let mut bundle = canvas.create_bundle();
             let mut render_map = self.feature_render_map.write().unwrap();
@@ -117,7 +125,7 @@ impl<Feature: MaybeSend + MaybeSync, S: Symbol<Feature> + MaybeSend + MaybeSync>
         canvas.draw_bundles(&[self.render_bundle.read().unwrap().as_ref().unwrap()]);
     }
 
-    fn prepare(&self, _view: MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
+    fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>) {
         // do nothing
     }
 

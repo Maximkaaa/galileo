@@ -1,4 +1,4 @@
-use galileo_types::bounding_rect::BoundingRect;
+use galileo_types::rect::Rect;
 use galileo_types::CartesianPoint2d;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -81,7 +81,7 @@ impl TileScheme {
     pub fn iter_tiles(
         &self,
         resolution: f64,
-        bounding_box: BoundingRect,
+        bounding_box: Rect,
     ) -> Option<impl Iterator<Item = TileIndex>> {
         let lod = self.select_lod(resolution)?;
 
@@ -159,7 +159,7 @@ impl TileScheme {
         }
     }
 
-    pub fn tile_bbox(&self, index: TileIndex) -> Option<BoundingRect> {
+    pub fn tile_bbox(&self, index: TileIndex) -> Option<Rect> {
         let resolution = self
             .lods
             .iter()
@@ -175,7 +175,7 @@ impl TileScheme {
             }
         };
 
-        Some(BoundingRect::new(
+        Some(Rect::new(
             x_min,
             y_min,
             x_min + self.tile_width as f64 * resolution,
@@ -291,7 +291,7 @@ mod tests {
     #[test]
     fn iter_indices_full_bbox() {
         let schema = simple_schema();
-        let bbox = BoundingRect::new(0.0, 0.0, 2048.0, 2048.0);
+        let bbox = Rect::new(0.0, 0.0, 2048.0, 2048.0);
         assert_eq!(schema.iter_tiles(8.0, bbox).unwrap().count(), 1);
         for tile in schema.iter_tiles(8.0, bbox).unwrap() {
             assert_eq!(tile.x, 0);
@@ -321,7 +321,7 @@ mod tests {
     #[test]
     fn iter_indices_part_bbox() {
         let schema = simple_schema();
-        let bbox = BoundingRect::new(200.0, 700.0, 1200.0, 1100.0);
+        let bbox = Rect::new(200.0, 700.0, 1200.0, 1100.0);
         assert_eq!(schema.iter_tiles(8.0, bbox).unwrap().count(), 1);
         for tile in schema.iter_tiles(8.0, bbox).unwrap() {
             assert_eq!(tile.x, 0);
@@ -351,11 +351,11 @@ mod tests {
     #[test]
     fn iter_tiles_outside_of_bbox() {
         let schema = simple_schema();
-        let bbox = BoundingRect::new(-100.0, -100.0, -50.0, -50.0);
+        let bbox = Rect::new(-100.0, -100.0, -50.0, -50.0);
         assert_eq!(schema.iter_tiles(8.0, bbox).unwrap().count(), 0);
         assert_eq!(schema.iter_tiles(2.0, bbox).unwrap().count(), 0);
 
-        let bbox = BoundingRect::new(2100.0, 0.0, 2500.0, 2048.0);
+        let bbox = Rect::new(2100.0, 0.0, 2500.0, 2048.0);
         assert_eq!(schema.iter_tiles(8.0, bbox).unwrap().count(), 0);
         assert_eq!(schema.iter_tiles(2.0, bbox).unwrap().count(), 0);
     }
@@ -363,7 +363,7 @@ mod tests {
     #[test]
     fn iter_tiles_does_not_include_tiles_outside_bbox() {
         let schema = simple_schema();
-        let bbox = BoundingRect::new(-2048.0, -2048.0, 4096.0, 4096.0);
+        let bbox = Rect::new(-2048.0, -2048.0, 4096.0, 4096.0);
         for tile in schema.iter_tiles(8.0, bbox).unwrap() {
             println!("{tile:?}");
         }
