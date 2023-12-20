@@ -1,9 +1,10 @@
-use crate::geometry::{GeometryHelper, GeometryMarker};
+use crate::geometry::{CartesianPointType, Geometry, GeometryHelper, GeometryMarker, Point};
 use crate::rect::Rect;
 use crate::segment::Segment;
 use crate::CartesianPoint2d;
-use num_traits::{One, Zero};
+use num_traits::{FromPrimitive, One, Zero};
 use std::cmp::Ordering;
+use std::fmt::Debug;
 
 pub trait Contour {
     type Point;
@@ -185,20 +186,21 @@ impl<'a, P> Iterator for ContourSegmentIterator<'a, P> {
 
 pub struct ContourMarker {}
 
-impl<P, T> GeometryHelper<ContourMarker> for T
+impl<N, P, T> GeometryHelper<ContourMarker> for T
 where
-    P: CartesianPoint2d,
+    N: num_traits::Num + PartialOrd + FromPrimitive + Copy + Debug + 'static,
+    P: CartesianPoint2d<Num = N> + Point<Type = CartesianPointType, Num = N>,
     T: Contour<Point = P> + GeometryMarker<Marker = ContourMarker>,
 {
-    type Num = P::Num;
+    type Point = P;
 
-    fn __bounding_rect(&self) -> Rect<Self::Num> {
+    fn __bounding_rect(&self) -> Rect<<Self::Point as Point>::Num> {
         Rect::from_points(self.iter_points()).unwrap()
     }
 
-    fn __contains_point<Point>(&self, point: &Point, tolerance: Self::Num) -> bool
+    fn __contains_point<Other>(&self, point: &Other, tolerance: <Self::Point as Point>::Num) -> bool
     where
-        Point: CartesianPoint2d<Num = Self::Num>,
+        Other: CartesianPoint2d<Num = <Self::Point as Point>::Num>,
     {
         let max_distance_sq = tolerance * tolerance;
         for segment in self.iter_segments() {

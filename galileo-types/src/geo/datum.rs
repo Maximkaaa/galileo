@@ -9,11 +9,11 @@ impl Datum {
         semimajor: 6_378_137.0,
         inv_flattening: 298.257223563,
     };
-    
+
     pub fn semimajor(&self) -> f64 {
         self.semimajor
     }
-    
+
     pub fn inv_flattening(&self) -> f64 {
         self.inv_flattening
     }

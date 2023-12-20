@@ -1,4 +1,5 @@
 use crate::geo::traits::point::{GeoPoint, NewGeoPoint};
+use crate::geometry::{GeoPointType, Point};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GeoPoint2d {
@@ -31,4 +32,10 @@ impl GeoPoint2d {
             lon: other.lon(),
         }
     }
+}
+
+impl Point for GeoPoint2d {
+    type Type = GeoPointType;
+    type Num = f64;
+    const DIMENSIONS: usize = 2;
 }

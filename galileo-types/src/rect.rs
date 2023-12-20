@@ -4,7 +4,7 @@ use num_traits::{FromPrimitive, Num};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Rect<N: Num + Copy + PartialOrd = f64> {
+pub struct Rect<N = f64> {
     pub x_min: N,
     pub y_min: N,
     pub x_max: N,

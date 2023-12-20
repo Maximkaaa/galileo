@@ -1,4 +1,4 @@
-use crate::geometry::GeometryMarker;
+use crate::geometry::{CartesianPointType, GeometryMarker, Point};
 use crate::traits::PointMarker;
 use crate::{CartesianPoint2d, NewCartesianPoint2d};
 pub use nalgebra::Point2;
@@ -30,4 +30,10 @@ impl<Num: num_traits::Num + Copy + PartialOrd + Bounded + Scalar + FromPrimitive
     fn new(x: Num, y: Num) -> Self {
         Point2::new(x, y)
     }
+}
+
+impl<Num: Scalar> Point for Point2<Num> {
+    type Type = CartesianPointType;
+    type Num = Num;
+    const DIMENSIONS: usize = 2;
 }

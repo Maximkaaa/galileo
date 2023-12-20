@@ -7,14 +7,19 @@ use crate::render::{
 };
 use crate::view::MapView;
 use galileo_types::geo::crs::Crs;
-use galileo_types::geo::traits::point::GeoPoint;
-use galileo_types::geometry::CartesianGeometry;
+use galileo_types::geometry::{CartesianGeometry, CartesianPointType, GeoPointType};
+use galileo_types::geometry::{Geometry, Point};
 use galileo_types::CartesianPoint2dFloat;
 use maybe_sync::{MaybeSend, MaybeSync};
 use nalgebra::Point3;
 use num_traits::Float;
 use std::any::Any;
 use std::sync::{Arc, RwLock};
+
+pub trait Feature {
+    type Geometry: Geometry;
+    fn geometry(&self) -> &Self::Geometry;
+}
 
 pub struct FeatureLayer<Feature, Symbol> {
     features: Vec<Feature>,
@@ -35,13 +40,14 @@ impl<Feature, Symbol> FeatureLayer<Feature, Symbol> {
         }
     }
 
-    pub fn get_features_at<N: Float>(
+    pub fn get_features_at<N: Float, P>(
         &self,
         point: &impl CartesianPoint2dFloat<N>,
         tolerance: N,
     ) -> Vec<(usize, &Feature)>
     where
-        Feature: CartesianGeometry<Num = N>,
+        P: Point<Type = CartesianPointType, Num = N>,
+        Feature: CartesianGeometry<Point = P>,
     {
         self.features
             .iter()
@@ -50,13 +56,14 @@ impl<Feature, Symbol> FeatureLayer<Feature, Symbol> {
             .collect()
     }
 
-    pub fn get_features_at_mut<N: Float>(
+    pub fn get_features_at_mut<N: Float, P>(
         &mut self,
         point: &impl CartesianPoint2dFloat<N>,
         tolerance: N,
     ) -> Vec<(usize, &mut Feature)>
     where
-        Feature: CartesianGeometry<Num = N>,
+        P: Point<Type = CartesianPointType, Num = N>,
+        Feature: CartesianGeometry<Point = P>,
     {
         self.features
             .iter_mut()
@@ -74,7 +81,11 @@ impl<Feature, Symbol> FeatureLayer<Feature, Symbol> {
     }
 }
 
-impl<Feature, S: Symbol<Feature>> FeatureLayer<Feature, S> {
+impl<F, S> FeatureLayer<F, S>
+where
+    F: Feature,
+    S: Symbol<F, Geometry = <F as Feature>::Geometry>,
+{
     // todo: remove deps on wgpu
     pub fn update_features(&mut self, indices: &[usize], renderer: &WgpuRenderer) {
         let mut bundle_lock = self.render_bundle.write().unwrap();
@@ -95,7 +106,14 @@ impl<Feature, S: Symbol<Feature>> FeatureLayer<Feature, S> {
 }
 
 pub trait Symbol<Feature> {
-    fn render(&self, feature: &Feature, bundle: &mut Box<dyn RenderBundle>) -> Vec<usize>;
+    type Geometry;
+
+    fn render(
+        &self,
+        feature: &Feature,
+        geometry: &Self::Geometry,
+        bundle: &mut Box<dyn RenderBundle>,
+    ) -> Vec<usize>;
     fn update(
         &self,
         feature: &Feature,
@@ -104,17 +122,45 @@ pub trait Symbol<Feature> {
     );
 }
 
-impl<F, S> Layer for FeatureLayer<F, S>
+impl<P, SP, G, SG, F, S> Layer for FeatureLayer<F, S>
 where
-    F: MaybeSend + MaybeSync,
-    S: Symbol<F> + MaybeSend + MaybeSync,
+    P: Point<Type = GeoPointType>,
+    SP: Point<Type = CartesianPointType>,
+    G: Geometry<Point = P>,
+    SG: Geometry<Point = SP>,
+    F: Feature<Geometry = G>,
+    S: Symbol<F, Geometry = SG>,
+{
+    fn render<'a>(&self, position: &MapView, canvas: &'a mut dyn Canvas) {
+        todo!()
+    }
+
+    fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>) {
+        todo!()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        todo!()
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        todo!()
+    }
+}
+
+impl<P, G, F, S> Layer for FeatureLayer<F, S>
+where
+    P: Point<Type = CartesianPointType>,
+    G: Geometry<Point = P>,
+    F: Feature<Geometry = G> + MaybeSend + MaybeSync,
+    S: Symbol<F, Geometry = <F as Feature>::Geometry> + MaybeSend + MaybeSync,
 {
     fn render<'a>(&self, view: &MapView, canvas: &'a mut dyn Canvas) {
         if self.render_bundle.read().unwrap().is_none() {
             let mut bundle = canvas.create_bundle();
             let mut render_map = self.feature_render_map.write().unwrap();
             for feature in &self.features {
-                let ids = self.style.render(feature, &mut bundle);
+                let ids = self.style.render(feature, feature.geometry(), &mut bundle);
                 render_map.push(ids)
             }
 
@@ -143,13 +189,20 @@ pub struct CirclePointSymbol {
     pub size: f64,
 }
 
-impl Symbol<Vec<Point3<f64>>> for CirclePointSymbol {
-    fn render(&self, feature: &Vec<Point3<f64>>, bundle: &mut Box<dyn RenderBundle>) -> Vec<usize> {
+impl Symbol<()> for CirclePointSymbol {
+    type Geometry = Vec<Point3<f64>>;
+
+    fn render(
+        &self,
+        _feature: &(),
+        geometry: &Vec<Point3<f64>>,
+        bundle: &mut Box<dyn RenderBundle>,
+    ) -> Vec<usize> {
         let paint = PointPaint {
             color: self.color,
             size: self.size,
         };
-        bundle.add_points(feature, paint);
+        bundle.add_points(geometry, paint);
 
         vec![]
         // let contour = Contour {
@@ -170,12 +223,7 @@ impl Symbol<Vec<Point3<f64>>> for CirclePointSymbol {
         // vec![id]
     }
 
-    fn update(
-        &self,
-        _feature: &Vec<Point3<f64>>,
-        _renders_ids: &[usize],
-        _bundle: &mut Box<dyn UnpackedBundle>,
-    ) {
+    fn update(&self, _feature: &(), _renders_ids: &[usize], _bundle: &mut Box<dyn UnpackedBundle>) {
         todo!()
     }
 }
@@ -185,10 +233,17 @@ pub struct SimpleLineSymbol {
     pub width: f64,
 }
 
-impl Symbol<Contour<Point2d>> for SimpleLineSymbol {
-    fn render(&self, feature: &Contour<Point2d>, bundle: &mut Box<dyn RenderBundle>) -> Vec<usize> {
+impl Symbol<()> for SimpleLineSymbol {
+    type Geometry = Contour<Point2d>;
+
+    fn render(
+        &self,
+        _feature: &(),
+        geometry: &Contour<Point2d>,
+        bundle: &mut Box<dyn RenderBundle>,
+    ) -> Vec<usize> {
         let id = bundle.add_line(
-            &feature,
+            &geometry,
             LinePaint {
                 color: self.color,
                 width: self.width,
@@ -201,12 +256,7 @@ impl Symbol<Contour<Point2d>> for SimpleLineSymbol {
         vec![id]
     }
 
-    fn update(
-        &self,
-        _feature: &Contour<Point2d>,
-        _renders_ids: &[usize],
-        _bundle: &mut Box<dyn UnpackedBundle>,
-    ) {
+    fn update(&self, _feature: &(), _renders_ids: &[usize], _bundle: &mut Box<dyn UnpackedBundle>) {
         todo!()
     }
 }
@@ -218,11 +268,18 @@ pub struct SimplePolygonSymbol {
     pub stroke_offset: f64,
 }
 
-impl Symbol<Polygon<Point2d>> for SimplePolygonSymbol {
-    fn render(&self, feature: &Polygon<Point2d>, bundle: &mut Box<dyn RenderBundle>) -> Vec<usize> {
+impl Symbol<()> for SimplePolygonSymbol {
+    type Geometry = Polygon<Point2d>;
+
+    fn render(
+        &self,
+        _feature: &(),
+        geometry: &Polygon<Point2d>,
+        bundle: &mut Box<dyn RenderBundle>,
+    ) -> Vec<usize> {
         let mut ids = vec![];
         let id = bundle.add_polygon(
-            feature,
+            geometry,
             Paint {
                 color: self.fill_color,
             },
@@ -238,19 +295,14 @@ impl Symbol<Polygon<Point2d>> for SimplePolygonSymbol {
             line_cap: LineCap::Butt,
         };
 
-        for contour in feature.iter_contours() {
+        for contour in geometry.iter_contours() {
             ids.push(bundle.add_line(&contour.clone().into(), line_paint, 10000.0));
         }
 
         ids
     }
 
-    fn update(
-        &self,
-        _feature: &Polygon<Point2d>,
-        renders_ids: &[usize],
-        bundle: &mut Box<dyn UnpackedBundle>,
-    ) {
+    fn update(&self, _feature: &(), renders_ids: &[usize], bundle: &mut Box<dyn UnpackedBundle>) {
         let poly_paint = Paint {
             color: self.fill_color,
         };

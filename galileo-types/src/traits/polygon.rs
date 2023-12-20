@@ -1,9 +1,13 @@
-use crate::geometry::{CartesianGeometry, GeometryHelper, GeometryMarker};
+use crate::geometry::{
+    CartesianGeometry, CartesianPointType, Geometry, GeometryHelper, GeometryMarker, Point,
+};
 use crate::rect::Rect;
 use crate::segment::Segment;
 use crate::traits::contour::{ClosedContour, Contour};
 use crate::CartesianPoint2d;
 use nalgebra::Point2;
+use num_traits::FromPrimitive;
+use std::fmt::Debug;
 
 pub trait Polygon: GeometryMarker {
     type Contour: ClosedContour;
@@ -76,21 +80,22 @@ where
 
 pub struct PolygonMarker {}
 
-impl<P, C, T> GeometryHelper<PolygonMarker> for T
+impl<N, P, C, T> GeometryHelper<PolygonMarker> for T
 where
-    P: CartesianPoint2d,
+    N: num_traits::Num + PartialOrd + FromPrimitive + Copy + Debug + 'static,
+    P: CartesianPoint2d<Num = N> + Point<Type = CartesianPointType, Num = N>,
     C: ClosedContour<Point = P>,
     T: Polygon<Contour = C> + GeometryMarker<Marker = PolygonMarker>,
 {
-    type Num = P::Num;
+    type Point = P;
 
-    fn __bounding_rect(&self) -> Rect<Self::Num> {
+    fn __bounding_rect(&self) -> Rect<<P as Point>::Num> {
         self.outer_contour().bounding_rect()
     }
 
-    fn __contains_point<Point>(&self, point: &Point, _: Self::Num) -> bool
+    fn __contains_point<Other>(&self, point: &Other, _: <P as Point>::Num) -> bool
     where
-        Point: CartesianPoint2d<Num = Self::Num>,
+        Other: CartesianPoint2d<Num = <P as Point>::Num>,
     {
         self.contains_point(point)
     }
