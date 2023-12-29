@@ -1,5 +1,5 @@
 use crate::geo::datum::Datum;
-use crate::geometry::{GeoPointType, Point, PointHelper};
+use crate::point::{GeoPointType, Point, PointHelper};
 use num_traits::Float;
 
 pub trait GeoPoint {
@@ -16,7 +16,11 @@ pub trait GeoPoint {
         self.lon().to_radians()
     }
 
-    fn distance(&self, other: &impl GeoPoint<Num = Self::Num>, datum: &Datum) -> Option<Self::Num> {
+    fn distance(
+        &self,
+        _other: &impl GeoPoint<Num = Self::Num>,
+        _datum: &Datum,
+    ) -> Option<Self::Num> {
         todo!()
     }
 }

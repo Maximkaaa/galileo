@@ -1,7 +1,4 @@
-use crate::geometry::{
-    CartesianPointType, Geometry, GeometryHelper, GeometryMarker, Point, PointHelper,
-};
-use crate::rect::Rect;
+use crate::point::{CartesianPointType, Point, PointHelper};
 use nalgebra::{Point2, Scalar, Vector2};
 use num_traits::{Bounded, Float, FromPrimitive, Num};
 
@@ -66,27 +63,3 @@ pub trait CartesianPoint2dFloat<N: Float = f64>: CartesianPoint2d<Num = N> {
 }
 
 impl<N: Float, T: CartesianPoint2d<Num = N>> CartesianPoint2dFloat<N> for T {}
-
-pub struct PointMarker {}
-
-impl<N, T> GeometryHelper<PointMarker> for T
-where
-    N: Num + Copy + PartialOrd + Bounded + Scalar + FromPrimitive,
-    T: CartesianPoint2d<Num = N>
-        + GeometryMarker<Marker = PointMarker>
-        + Point<Type = CartesianPointType, Num = N>
-        + Geometry<Point = Self>,
-{
-    type Point = T;
-
-    fn __bounding_rect(&self) -> Rect<N> {
-        Rect::from_point(self)
-    }
-
-    fn __contains_point<P>(&self, point: &P, tolerance: N) -> bool
-    where
-        P: CartesianPoint2d<Num = N>,
-    {
-        self.distance_sq(point) < tolerance * tolerance
-    }
-}

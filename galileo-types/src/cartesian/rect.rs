@@ -1,4 +1,5 @@
-use crate::{CartesianPoint2d, ClosedContour};
+use crate::cartesian::impls::contour::ClosedContour;
+use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
 use nalgebra::{Point2, Scalar};
 use num_traits::{FromPrimitive, Num};
 use serde::{Deserialize, Serialize};
@@ -45,7 +46,7 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
         self.y_max - self.y_min
     }
 
-    pub fn into_contour(&self) -> ClosedContour<Point2<N>> {
+    pub fn into_contour(self) -> ClosedContour<Point2<N>> {
         ClosedContour::new(vec![
             Point2::new(self.x_min, self.y_min),
             Point2::new(self.x_min, self.y_max),
@@ -173,6 +174,13 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
                 other.y_max
             },
         }
+    }
+
+    pub fn center(&self) -> Point2<N> {
+        Point2::new(
+            (self.x_min + self.x_max) / N::from_f64(2.0).unwrap(),
+            (self.y_min + self.y_max) / N::from_f64(2.0).unwrap(),
+        )
     }
 }
 

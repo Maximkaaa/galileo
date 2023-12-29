@@ -2,7 +2,7 @@ use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::Renderer;
 use crate::view::MapView;
-use galileo_types::size::Size;
+use galileo_types::cartesian::size::Size;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use web_time::SystemTime;

@@ -1,10 +1,10 @@
-use crate::primitives::Point2d;
+use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::rect::Rect;
+use galileo_types::cartesian::size::Size;
+use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
 use galileo_types::geo::crs::Crs;
 use galileo_types::geo::impls::point::GeoPoint2d;
 use galileo_types::geo::traits::point::GeoPoint;
-use galileo_types::rect::Rect;
-use galileo_types::size::Size;
-use galileo_types::CartesianPoint2d;
 use nalgebra::{
     Matrix4, OMatrix, Perspective3, Point2, Point3, Rotation3, Scale3, Translation3, Vector2,
     Vector3, Vector4, U4,
@@ -22,7 +22,10 @@ pub struct MapView {
 
 impl MapView {
     pub fn new(position: &impl GeoPoint<Num = f64>, resolution: f64) -> Self {
-        let crs = Crs::EPSG3857;
+        Self::new_with_crs(position, resolution, Crs::EPSG3857)
+    }
+
+    pub fn new_with_crs(position: &impl GeoPoint<Num = f64>, resolution: f64, crs: Crs) -> Self {
         let projected = crs
             .get_projection()
             .and_then(|projection| projection.project(&GeoPoint2d::from(position)))
@@ -33,19 +36,31 @@ impl MapView {
             rotation_z: 0.0,
             rotation_x: 0.0,
             size: Default::default(),
-            crs: Crs::EPSG3857,
+            crs,
         }
     }
 
     pub fn new_projected(position: &impl CartesianPoint2d<Num = f64>, resolution: f64) -> Self {
+        Self::new_projected_with_crs(position, resolution, Crs::EPSG3857)
+    }
+
+    pub fn new_projected_with_crs(
+        position: &impl CartesianPoint2d<Num = f64>,
+        resolution: f64,
+        crs: Crs,
+    ) -> Self {
         Self {
             projected_position: Some(Point3::new(position.x(), position.y(), 0.0)),
             resolution,
             rotation_z: 0.0,
             rotation_x: 0.0,
             size: Default::default(),
-            crs: Crs::EPSG3857,
+            crs,
         }
+    }
+
+    pub fn crs(&self) -> &Crs {
+        &self.crs
     }
 
     pub fn resolution(&self) -> f64 {

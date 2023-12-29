@@ -1,7 +1,9 @@
 use crate::geo::traits::point::{GeoPoint, NewGeoPoint};
-use crate::geometry::{GeoPointType, Point};
+use crate::geo::traits::projection::Projection;
+use crate::geometry::{Geom, Geometry};
+use crate::point::{GeoPointType, Point};
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct GeoPoint2d {
     lat: f64,
     lon: f64,
@@ -38,4 +40,15 @@ impl Point for GeoPoint2d {
     type Type = GeoPointType;
     type Num = f64;
     const DIMENSIONS: usize = 2;
+}
+
+impl Geometry for GeoPoint2d {
+    type Point = Self;
+
+    fn project<P: Projection<InPoint = Self::Point> + ?Sized>(
+        &self,
+        projection: &P,
+    ) -> Option<Geom<P::OutPoint>> {
+        Some(Geom::Point(projection.project(&self)?))
+    }
 }

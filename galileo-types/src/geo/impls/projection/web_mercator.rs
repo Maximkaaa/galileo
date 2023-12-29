@@ -1,8 +1,7 @@
+use crate::cartesian::traits::cartesian_point::NewCartesianPoint2d;
 use crate::geo::datum::Datum;
-use crate::geo::traits::point::{GeoPoint, NewGeoPoint};
+use crate::geo::traits::point::NewGeoPoint;
 use crate::geo::traits::projection::Projection;
-use crate::{CartesianPoint2d, NewCartesianPoint2d};
-use num_traits::Float;
 use std::marker::PhantomData;
 
 #[derive(Debug, Copy, Clone)]
@@ -52,12 +51,13 @@ impl<In: NewGeoPoint<f64>, Out: NewCartesianPoint2d<f64>> Projection for WebMerc
 
     fn unproject(&self, input: &Self::OutPoint) -> Option<Self::InPoint> {
         let lat = std::f64::consts::FRAC_PI_2
-            - 2.0
-                * (-(*input).y() / self.datum.semimajor())
-                    .powf(std::f64::consts::E)
-                    .atan();
+            - 2.0 * (-(*input).y() / self.datum.semimajor()).exp().atan();
         let lon = input.x() / self.datum.semimajor();
 
-        Some(Self::InPoint::latlon(lat, lon))
+        if !lat.is_finite() || !lon.is_finite() {
+            return None;
+        }
+
+        Some(Self::InPoint::latlon(lat.to_degrees(), lon.to_degrees()))
     }
 }

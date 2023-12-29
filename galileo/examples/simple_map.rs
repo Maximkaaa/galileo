@@ -2,9 +2,9 @@ use galileo::control::event_processor::EventProcessor;
 use galileo::control::map::MapController;
 use galileo::render::Renderer;
 use galileo::winit::{WinitInputHandler, WinitMessenger};
+use galileo_types::cartesian::size::Size;
 use galileo_types::geo::impls::point::GeoPoint2d;
 use galileo_types::geo::traits::point::NewGeoPoint;
-use galileo_types::size::Size;
 use std::sync::{Arc, RwLock};
 use winit::event_loop::ControlFlow;
 use winit::{

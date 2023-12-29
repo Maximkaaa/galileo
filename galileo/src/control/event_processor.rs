@@ -2,7 +2,8 @@ use crate::control::{
     EventPropagation, MouseButtonsState, MouseEvent, RawUserEvent, UserEvent, UserEventHandler,
 };
 use crate::map::Map;
-use galileo_types::{CartesianPoint2d, Point2d};
+use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
 use web_time::SystemTime;
 
 const DRAG_THRESHOLD: f64 = 3.0;
@@ -42,12 +43,12 @@ impl EventProcessor {
     }
 
     pub fn handle(&mut self, event: RawUserEvent, map: &mut Map) {
-        if let Some(user_events) = self.process(event, map) {
+        if let Some(user_events) = self.process(event) {
             for user_event in user_events {
                 let mut drag_start_target = None;
 
                 let delta = self.pointer_position - self.pointer_pressed_position;
-                let mouse_event = self.get_mouse_event(map);
+                let mouse_event = self.get_mouse_event();
 
                 for (index, handler) in self.handlers.iter_mut().enumerate() {
                     if matches!(user_event, UserEvent::Drag(..) | UserEvent::DragEnded(..)) {
@@ -89,7 +90,7 @@ impl EventProcessor {
         }
     }
 
-    fn process(&mut self, event: RawUserEvent, map: &Map) -> Option<Vec<UserEvent>> {
+    fn process(&mut self, event: RawUserEvent) -> Option<Vec<UserEvent>> {
         let now = SystemTime::now();
         match event {
             RawUserEvent::ButtonPressed(button) => {
@@ -99,27 +100,27 @@ impl EventProcessor {
 
                 Some(vec![UserEvent::ButtonPressed(
                     button,
-                    self.get_mouse_event(map),
+                    self.get_mouse_event(),
                 )])
             }
             RawUserEvent::ButtonReleased(button) => {
                 self.buttons_state.set_released(button);
-                let mut events = vec![UserEvent::ButtonReleased(button, self.get_mouse_event(map))];
+                let mut events = vec![UserEvent::ButtonReleased(button, self.get_mouse_event())];
 
                 if (now.duration_since(self.last_pressed_time)).unwrap_or_default() < CLICK_TIMEOUT
                 {
-                    events.push(UserEvent::Click(button, self.get_mouse_event(map)));
+                    events.push(UserEvent::Click(button, self.get_mouse_event()));
 
                     if (now.duration_since(self.last_click_time)).unwrap_or_default()
                         < DBL_CLICK_TIMEOUT
                     {
-                        events.push(UserEvent::DoubleClick(button, self.get_mouse_event(map)));
+                        events.push(UserEvent::DoubleClick(button, self.get_mouse_event()));
                     }
 
                     self.last_click_time = now;
 
                     if self.drag_target.take().is_some() {
-                        events.push(UserEvent::DragEnded(button, self.get_mouse_event(map)));
+                        events.push(UserEvent::DragEnded(button, self.get_mouse_event()));
                     }
                 }
 
@@ -129,7 +130,7 @@ impl EventProcessor {
                 let prev_position = self.pointer_position;
                 self.pointer_position = position;
 
-                let mut events = vec![UserEvent::PointerMoved(self.get_mouse_event(map))];
+                let mut events = vec![UserEvent::PointerMoved(self.get_mouse_event())];
                 if let Some(button) = self.buttons_state.single_pressed() {
                     if self.drag_target.is_none()
                         && position.taxicab_distance(&self.pointer_pressed_position)
@@ -137,7 +138,7 @@ impl EventProcessor {
                     {
                         events.push(UserEvent::DragStarted(
                             button,
-                            self.get_mouse_event_pos(map, self.pointer_pressed_position),
+                            self.get_mouse_event_pos(self.pointer_pressed_position),
                         ));
                     }
 
@@ -145,7 +146,7 @@ impl EventProcessor {
                         events.push(UserEvent::Drag(
                             button,
                             (self.pointer_position - prev_position).into(),
-                            self.get_mouse_event(map),
+                            self.get_mouse_event(),
                         ));
                     }
                 }
@@ -153,7 +154,7 @@ impl EventProcessor {
                 Some(events)
             }
             RawUserEvent::MouseWheel(delta) => {
-                Some(vec![UserEvent::Zoom(delta, self.get_mouse_event(map))])
+                Some(vec![UserEvent::Zoom(delta, self.get_mouse_event())])
             }
             // todo
             RawUserEvent::TouchStart(_touch) => None,
@@ -162,11 +163,11 @@ impl EventProcessor {
         }
     }
 
-    fn get_mouse_event(&self, map: &Map) -> MouseEvent {
-        self.get_mouse_event_pos(map, self.pointer_position)
+    fn get_mouse_event(&self) -> MouseEvent {
+        self.get_mouse_event_pos(self.pointer_position)
     }
 
-    fn get_mouse_event_pos(&self, map: &Map, screen_pointer_position: Point2d) -> MouseEvent {
+    fn get_mouse_event_pos(&self, screen_pointer_position: Point2d) -> MouseEvent {
         MouseEvent {
             screen_pointer_position,
             buttons: self.buttons_state,

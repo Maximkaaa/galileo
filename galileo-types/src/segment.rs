@@ -1,5 +1,5 @@
-use crate::orient::Orientation;
-use crate::CartesianPoint2d;
+use crate::cartesian::orient::Orientation;
+use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
 use num_traits::{One, Zero};
 
 #[derive(Debug, PartialEq)]

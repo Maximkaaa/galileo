@@ -1,4 +1,4 @@
-use galileo_types::rect::Rect;
+use galileo_types::cartesian::rect::Rect;
 use std::any::Any;
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroupLayout, Device, Queue};

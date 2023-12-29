@@ -1,39 +1,15 @@
-use crate::geometry::{CartesianPointType, GeometryMarker, Point};
-use crate::traits::PointMarker;
-use crate::{CartesianPoint2d, NewCartesianPoint2d};
-pub use nalgebra::Point2;
-use nalgebra::Scalar;
-use num_traits::{Bounded, FromPrimitive};
-
-pub type Point2d = Point2<f64>;
-
-impl<N: Scalar> GeometryMarker for Point2<N> {
-    type Marker = PointMarker;
+pub trait Point {
+    type Type: PointType;
+    type Num;
+    const DIMENSIONS: usize;
 }
 
-impl<Num: num_traits::Num + Copy + PartialOrd + Bounded + Scalar + FromPrimitive> CartesianPoint2d
-    for Point2<Num>
-{
-    type Num = Num;
+pub trait PointType {}
 
-    fn x(&self) -> Num {
-        self.x
-    }
-    fn y(&self) -> Num {
-        self.y
-    }
-}
+pub struct CartesianPointType;
+impl PointType for CartesianPointType {}
 
-impl<Num: num_traits::Num + Copy + PartialOrd + Bounded + Scalar + FromPrimitive>
-    NewCartesianPoint2d<Num> for Point2<Num>
-{
-    fn new(x: Num, y: Num) -> Self {
-        Point2::new(x, y)
-    }
-}
+pub struct GeoPointType;
+impl PointType for GeoPointType {}
 
-impl<Num: Scalar> Point for Point2<Num> {
-    type Type = CartesianPointType;
-    type Num = Num;
-    const DIMENSIONS: usize = 2;
-}
+pub trait PointHelper<T>: Point {}

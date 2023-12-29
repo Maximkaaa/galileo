@@ -1,6 +1,9 @@
-use galileo_types::rect::Rect;
-use galileo_types::size::Size;
-use galileo_types::CartesianPoint2d;
+use galileo_types::cartesian::impls::contour::Contour;
+use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::impls::polygon::Polygon;
+use galileo_types::cartesian::rect::Rect;
+use galileo_types::cartesian::size::Size;
+use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
 use lyon::lyon_tessellation::{
     BuffersBuilder, FillOptions, FillVertex, LineJoin, Side, StrokeOptions,
 };
@@ -26,7 +29,7 @@ use winit::dpi::PhysicalSize;
 
 use crate::layer::Layer;
 use crate::map::Map;
-use crate::primitives::{Color, Contour, DecodedImage, Image, Point2d, Polygon};
+use crate::primitives::{Color, DecodedImage, Image};
 use crate::render::wgpu::image::WgpuImage;
 use crate::view::MapView;
 

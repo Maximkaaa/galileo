@@ -1,16 +1,23 @@
-use galileo::primitives::{Color, Point2d, Polygon};
-use galileo_types::geometry::CartesianGeometry;
-use galileo_types::rect::Rect;
-use galileo_types::CartesianPoint2d;
-use serde::{Deserialize, Serialize};
+use galileo::layer::feature::feature::Feature;
+use galileo::primitives::Color;
+use galileo_types::cartesian::impls::multipolygon::MultiPolygon;
+use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::impls::polygon::Polygon;
+use galileo_types::cartesian::rect::Rect;
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Country {
     pub name: String,
-    pub geometry: Vec<Polygon<Point2d>>,
+    #[serde(deserialize_with = "des_geometry")]
+    pub geometry: MultiPolygon<Point2d>,
     pub color: Color,
     pub bbox: Rect,
     pub is_selected: bool,
+}
+
+fn des_geometry<'de, D: Deserializer<'de>>(d: D) -> Result<MultiPolygon<Point2d>, D::Error> {
+    Ok(Vec::<Polygon<Point2d>>::deserialize(d)?.into())
 }
 
 impl Country {
@@ -19,22 +26,11 @@ impl Country {
     }
 }
 
-impl CartesianGeometry for Country {
-    type Num = f64;
+impl Feature for Country {
+    type Geom = MultiPolygon<Point2d>;
 
-    fn bounding_rect(&self) -> Rect<Self::Num> {
-        self.bbox
-    }
-
-    fn is_point_inside<P>(&self, point: &P, tolerance: Self::Num) -> bool
-    where
-        P: CartesianPoint2d<Num = Self::Num>,
-    {
-        self.bbox.contains(point)
-            && self
-                .geometry
-                .iter()
-                .any(|p| p.is_point_inside(point, tolerance))
+    fn geometry(&self) -> &MultiPolygon<Point2d> {
+        &self.geometry
     }
 }
 

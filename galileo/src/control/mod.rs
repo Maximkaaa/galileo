@@ -1,5 +1,5 @@
 use crate::map::Map;
-use galileo_types::Point2d;
+use galileo_types::cartesian::impls::point::Point2d;
 use nalgebra::Vector2;
 
 pub mod custom;

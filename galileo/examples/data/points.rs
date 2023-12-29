@@ -1,10 +1,11 @@
 use galileo::control::event_processor::EventProcessor;
 use galileo::control::map::MapController;
 use galileo::layer::feature::{CirclePointSymbol, FeatureLayer};
-use galileo::primitives::{Color, Point2d};
+use galileo::primitives::Color;
 use galileo::render::Renderer;
 use galileo::winit::{WinitInputHandler, WinitMessenger};
-use galileo_types::size::Size;
+use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::size::Size;
 use nalgebra::Point3;
 use std::sync::{Arc, RwLock};
 use winit::event_loop::ControlFlow;
@@ -13,7 +14,7 @@ use winit::{
     event_loop::EventLoop,
     window::WindowBuilder,
 };
-
+// todo: temporary moved out of examples until 3d points are figured out
 fn generate_points() -> Vec<Vec<Point3<f64>>> {
     let mut points = vec![];
     for x in -50..50 {
