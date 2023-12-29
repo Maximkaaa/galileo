@@ -6,8 +6,6 @@ use std::ops::Deref;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-pub use galileo_types::{ClosedContour, Contour, Point2d, Polygon};
-
 pub trait Image: MaybeSend + MaybeSync {
     fn as_any(&self) -> &dyn Any;
 }
@@ -87,7 +85,7 @@ impl Color {
 
         Some(Self { r, g, b, a })
     }
-    
+
     pub fn with_alpha(&self, a: u8) -> Self {
         Self { a, ..*self }
     }

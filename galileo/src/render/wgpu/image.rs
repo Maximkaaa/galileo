@@ -1,4 +1,4 @@
-use galileo_types::bounding_rect::BoundingRect;
+use galileo_types::cartesian::rect::Rect;
 use std::any::Any;
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroupLayout, Device, Queue};
@@ -117,7 +117,7 @@ impl ImagePainter {
         device: &Device,
         queue: &Queue,
         image: &DecodedImage,
-        bbox: BoundingRect,
+        bbox: Rect,
     ) -> WgpuImage {
         let texture_size = wgpu::Extent3d {
             width: image.dimensions.0,

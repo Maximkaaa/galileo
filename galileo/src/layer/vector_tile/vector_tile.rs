@@ -3,8 +3,10 @@ use crate::layer::vector_tile::style::VectorTileStyle;
 use crate::render::{LineCap, LinePaint, PackedBundle, Paint, RenderBundle, Renderer};
 use crate::tile_scheme::{TileIndex, TileScheme};
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
-use galileo_types::bounding_rect::BoundingRect;
-use galileo_types::{CartesianPoint2d, Contour, Point2d};
+use galileo_types::cartesian::impls::contour::Contour;
+use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::rect::Rect;
+use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
 use num_traits::ToPrimitive;
 
 pub struct VectorTile {
@@ -135,7 +137,7 @@ impl VectorTile {
 
     fn transform_point<Num: num_traits::Float + ToPrimitive>(
         p_in: &impl CartesianPoint2d<Num = Num>,
-        tile_bbox: BoundingRect,
+        tile_bbox: Rect,
         tile_resolution: f64,
     ) -> Point2d {
         let x = tile_bbox.x_min() + p_in.x().to_f64().unwrap() * tile_resolution;

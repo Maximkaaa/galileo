@@ -4,7 +4,6 @@ use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
-use galileo_types::bounding_rect::BoundingRect;
 use maybe_sync::{MaybeSend, MaybeSync};
 
 use crate::error::GalileoError;
@@ -35,9 +34,9 @@ impl RasterTileLayer {
         }
     }
 
-    fn get_tiles_to_draw<'a>(&self, resolution: f64, bbox: BoundingRect) -> Vec<RasterTile> {
+    fn get_tiles_to_draw<'a>(&self, view: &MapView) -> Vec<RasterTile> {
         let mut tiles = vec![];
-        let Some(tile_iter) = self.tile_scheme.iter_tiles(resolution, bbox) else {
+        let Some(tile_iter) = self.tile_scheme.iter_tiles(view) else {
             return vec![];
         };
 
@@ -51,31 +50,20 @@ impl RasterTileLayer {
 
         let mut substitute_indices = HashSet::new();
         for index in to_substitute {
-            let tile_bbox = self
-                .tile_scheme
-                .tile_bbox(index)
-                .unwrap()
-                .shrink(resolution);
-            if index.z == 0 {
-                continue;
-            }
+            let mut substitute_index = index;
+            while let Some(mut subst) = self.tile_scheme.get_substitutes(substitute_index) {
+                substitute_index = match subst.next() {
+                    Some(v) => v,
+                    None => break,
+                };
 
-            'indexer: for z in (0..index.z).rev() {
-                if let Some(curr_resolution) = self.tile_scheme.lod_resolution(z) {
-                    for substitute_index in self
-                        .tile_scheme
-                        .iter_tiles(curr_resolution, tile_bbox)
-                        .unwrap()
-                    {
-                        if let Some(tile) = self.tile_provider.get_tile(substitute_index) {
-                            if !substitute_indices.contains(&substitute_index) {
-                                tiles.push((substitute_index, tile));
-                                substitute_indices.insert(substitute_index);
-                            }
-
-                            break 'indexer;
-                        }
+                if let Some(tile) = self.tile_provider.get_tile(substitute_index) {
+                    if !substitute_indices.contains(&substitute_index) {
+                        tiles.push((substitute_index, tile));
+                        substitute_indices.insert(substitute_index);
                     }
+
+                    break;
                 }
             }
         }
@@ -87,9 +75,8 @@ impl RasterTileLayer {
 
 #[async_trait]
 impl Layer for RasterTileLayer {
-    fn render<'a>(&self, map_view: MapView, canvas: &'a mut dyn Canvas) {
-        let bbox = map_view.get_bbox();
-        let tiles = self.get_tiles_to_draw(map_view.resolution(), bbox);
+    fn render<'a>(&self, view: &MapView, canvas: &'a mut dyn Canvas) {
+        let tiles = self.get_tiles_to_draw(view);
 
         let tile_renders = self.tile_renders.try_read().unwrap();
         let mut renders_to_add: Vec<(TileIndex, Box<dyn Image>)> = Vec::new();
@@ -122,9 +109,8 @@ impl Layer for RasterTileLayer {
         }
     }
 
-    fn prepare(&self, map_view: MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
-        let bbox = map_view.get_bbox();
-        if let Some(iter) = self.tile_scheme.iter_tiles(map_view.resolution(), bbox) {
+    fn prepare(&self, view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
+        if let Some(iter) = self.tile_scheme.iter_tiles(view) {
             for index in iter {
                 let tile_provider = self.tile_provider.clone();
                 crate::async_runtime::spawn(async move { tile_provider.load_tile(index).await });

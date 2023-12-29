@@ -1,11 +1,13 @@
-use galileo_types::bounding_rect::BoundingRect;
-use galileo_types::CartesianPoint2d;
+use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::rect::Rect;
+use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
+use galileo_types::geo::crs::Crs;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 use crate::bounding_box::BoundingBox;
 use crate::lod::Lod;
-use crate::primitives::Point2d;
+use crate::view::MapView;
 
 const RESOLUTION_TOLERANCE: f64 = 0.01;
 
@@ -33,6 +35,7 @@ pub struct TileScheme {
     pub y_direction: VerticalDirection,
     pub max_tile_scale: f64,
     pub cycle_x: bool,
+    pub crs: Crs,
 }
 
 impl TileScheme {
@@ -78,10 +81,20 @@ impl TileScheme {
         }
     }
 
-    pub fn iter_tiles(
+    pub fn iter_tiles(&self, view: &MapView) -> Option<impl Iterator<Item = TileIndex>> {
+        if *view.crs() != self.crs {
+            return None;
+        }
+
+        let resolution = view.resolution();
+        let bounding_box = view.get_bbox()?;
+        self.iter_tiles_over_bbox(resolution, bounding_box)
+    }
+
+    fn iter_tiles_over_bbox(
         &self,
         resolution: f64,
-        bounding_box: BoundingRect,
+        bounding_box: Rect,
     ) -> Option<impl Iterator<Item = TileIndex>> {
         let lod = self.select_lod(resolution)?;
 
@@ -122,6 +135,23 @@ impl TileScheme {
         }))
     }
 
+    pub fn get_substitutes(&self, index: TileIndex) -> Option<impl Iterator<Item = TileIndex>> {
+        let lod = self.lod_over(index.z)?;
+        self.iter_tiles_over_bbox(lod.resolution(), self.tile_bbox(index)?)
+    }
+
+    /// Returns lod one z-level over the given.
+    fn lod_over(&self, z: u32) -> Option<&Lod> {
+        let mut lod_iter = self.lods.iter();
+        while let Some(lod) = lod_iter.next() {
+            if lod.z_index() == z {
+                break;
+            }
+        }
+
+        lod_iter.next()
+    }
+
     fn x_adj(&self, x: f64) -> f64 {
         x - self.origin.x()
     }
@@ -154,12 +184,13 @@ impl TileScheme {
             tile_width: 256,
             tile_height: 256,
             y_direction: VerticalDirection::TopToBottom,
-            max_tile_scale: 8.0,
+            max_tile_scale: 1024.0,
             cycle_x: true,
+            crs: Crs::EPSG3857,
         }
     }
 
-    pub fn tile_bbox(&self, index: TileIndex) -> Option<BoundingRect> {
+    pub fn tile_bbox(&self, index: TileIndex) -> Option<Rect> {
         let resolution = self
             .lods
             .iter()
@@ -175,7 +206,7 @@ impl TileScheme {
             }
         };
 
-        Some(BoundingRect::new(
+        Some(Rect::new(
             x_min,
             y_min,
             x_min + self.tile_width as f64 * resolution,
@@ -228,6 +259,7 @@ impl TileScheme {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use galileo_types::cartesian::size::Size;
 
     fn simple_schema() -> TileScheme {
         TileScheme {
@@ -244,7 +276,15 @@ mod tests {
             y_direction: VerticalDirection::BottomToTop,
             max_tile_scale: 2.0,
             cycle_x: false,
+            crs: Crs::EPSG3857,
         }
+    }
+
+    fn get_view(resolution: f64, bbox: Rect) -> MapView {
+        MapView::new_projected(&bbox.center(), resolution).with_size(Size::new(
+            bbox.width() / resolution,
+            bbox.height() / resolution,
+        ))
     }
 
     #[test]
@@ -291,15 +331,17 @@ mod tests {
     #[test]
     fn iter_indices_full_bbox() {
         let schema = simple_schema();
-        let bbox = BoundingRect::new(0.0, 0.0, 2048.0, 2048.0);
-        assert_eq!(schema.iter_tiles(8.0, bbox).unwrap().count(), 1);
-        for tile in schema.iter_tiles(8.0, bbox).unwrap() {
+        let bbox = Rect::new(0.0, 0.0, 2048.0, 2048.0);
+        let view = get_view(8.0, bbox);
+        assert_eq!(schema.iter_tiles(&view).unwrap().count(), 1);
+        for tile in schema.iter_tiles(&view).unwrap() {
             assert_eq!(tile.x, 0);
             assert_eq!(tile.y, 0);
             assert_eq!(tile.z, 0);
         }
 
-        let mut tiles: Vec<TileIndex> = schema.iter_tiles(4.0, bbox).unwrap().collect();
+        let view = get_view(4.0, bbox);
+        let mut tiles: Vec<TileIndex> = schema.iter_tiles(&view).unwrap().collect();
         tiles.dedup();
         assert_eq!(tiles.len(), 4);
         for tile in tiles {
@@ -308,7 +350,8 @@ mod tests {
             assert_eq!(tile.z, 1);
         }
 
-        let mut tiles: Vec<TileIndex> = schema.iter_tiles(2.0, bbox).unwrap().collect();
+        let view = get_view(2.0, bbox);
+        let mut tiles: Vec<TileIndex> = schema.iter_tiles(&view).unwrap().collect();
         tiles.dedup();
         assert_eq!(tiles.len(), 16);
         for tile in tiles {
@@ -321,15 +364,17 @@ mod tests {
     #[test]
     fn iter_indices_part_bbox() {
         let schema = simple_schema();
-        let bbox = BoundingRect::new(200.0, 700.0, 1200.0, 1100.0);
-        assert_eq!(schema.iter_tiles(8.0, bbox).unwrap().count(), 1);
-        for tile in schema.iter_tiles(8.0, bbox).unwrap() {
+        let bbox = Rect::new(200.0, 700.0, 1200.0, 1100.0);
+        let view = get_view(8.0, bbox);
+        assert_eq!(schema.iter_tiles(&view).unwrap().count(), 1);
+        for tile in schema.iter_tiles(&view).unwrap() {
             assert_eq!(tile.x, 0);
             assert_eq!(tile.y, 0);
             assert_eq!(tile.z, 0);
         }
 
-        let mut tiles: Vec<TileIndex> = schema.iter_tiles(4.0, bbox).unwrap().collect();
+        let view = get_view(4.0, bbox);
+        let mut tiles: Vec<TileIndex> = schema.iter_tiles(&view).unwrap().collect();
         tiles.dedup();
         assert_eq!(tiles.len(), 4);
         for tile in tiles {
@@ -338,7 +383,8 @@ mod tests {
             assert_eq!(tile.z, 1);
         }
 
-        let mut tiles: Vec<TileIndex> = schema.iter_tiles(2.0, bbox).unwrap().collect();
+        let view = get_view(2.0, bbox);
+        let mut tiles: Vec<TileIndex> = schema.iter_tiles(&view).unwrap().collect();
         tiles.dedup();
         assert_eq!(tiles.len(), 6);
         for tile in tiles {
@@ -351,24 +397,39 @@ mod tests {
     #[test]
     fn iter_tiles_outside_of_bbox() {
         let schema = simple_schema();
-        let bbox = BoundingRect::new(-100.0, -100.0, -50.0, -50.0);
-        assert_eq!(schema.iter_tiles(8.0, bbox).unwrap().count(), 0);
-        assert_eq!(schema.iter_tiles(2.0, bbox).unwrap().count(), 0);
+        let bbox = Rect::new(-100.0, -100.0, -50.0, -50.0);
+        let view = get_view(8.0, bbox);
+        assert_eq!(schema.iter_tiles(&view).unwrap().count(), 0);
+        let view = get_view(2.0, bbox);
+        assert_eq!(schema.iter_tiles(&view).unwrap().count(), 0);
 
-        let bbox = BoundingRect::new(2100.0, 0.0, 2500.0, 2048.0);
-        assert_eq!(schema.iter_tiles(8.0, bbox).unwrap().count(), 0);
-        assert_eq!(schema.iter_tiles(2.0, bbox).unwrap().count(), 0);
+        let bbox = Rect::new(2100.0, 0.0, 2500.0, 2048.0);
+        let view = get_view(8.0, bbox);
+        assert_eq!(schema.iter_tiles(&view).unwrap().count(), 0);
+        let view = get_view(2.0, bbox);
+        assert_eq!(schema.iter_tiles(&view).unwrap().count(), 0);
     }
 
     #[test]
     fn iter_tiles_does_not_include_tiles_outside_bbox() {
         let schema = simple_schema();
-        let bbox = BoundingRect::new(-2048.0, -2048.0, 4096.0, 4096.0);
-        for tile in schema.iter_tiles(8.0, bbox).unwrap() {
+        let bbox = Rect::new(-2048.0, -2048.0, 4096.0, 4096.0);
+        let view = get_view(8.0, bbox);
+        for tile in schema.iter_tiles(&view).unwrap() {
             println!("{tile:?}");
         }
 
-        assert_eq!(schema.iter_tiles(8.0, bbox).unwrap().count(), 1);
-        assert_eq!(schema.iter_tiles(2.0, bbox).unwrap().count(), 16);
+        assert_eq!(schema.iter_tiles(&view).unwrap().count(), 1);
+        let view = get_view(2.0, bbox);
+        assert_eq!(schema.iter_tiles(&view).unwrap().count(), 16);
+    }
+
+    #[test]
+    fn lod_over() {
+        let schema = simple_schema();
+        assert_eq!(schema.lod_over(0), None);
+        assert_eq!(schema.lod_over(1).unwrap().z_index(), 0);
+        assert_eq!(schema.lod_over(2).unwrap().z_index(), 1);
+        assert_eq!(schema.lod_over(3), None);
     }
 }

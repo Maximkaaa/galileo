@@ -1,4 +1,5 @@
-use galileo_types::{ClosedContour, Point2d};
+use galileo_types::cartesian::impls::contour::ClosedContour;
+use galileo_types::cartesian::impls::point::Point2d;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]

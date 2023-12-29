@@ -1,5 +1,5 @@
 use crate::map::Map;
-use galileo_types::Point2d;
+use galileo_types::cartesian::impls::point::Point2d;
 use nalgebra::Vector2;
 
 pub mod custom;
@@ -52,7 +52,6 @@ pub enum MouseButton {
 #[derive(Debug, Clone)]
 pub struct MouseEvent {
     pub screen_pointer_position: Point2d,
-    pub map_pointer_position: Point2d,
     pub buttons: MouseButtonsState,
 }
 

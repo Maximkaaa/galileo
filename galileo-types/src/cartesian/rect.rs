@@ -1,17 +1,18 @@
-use crate::{CartesianPoint2d, ClosedContour};
+use crate::cartesian::impls::contour::ClosedContour;
+use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
 use nalgebra::{Point2, Scalar};
 use num_traits::{FromPrimitive, Num};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BoundingRect<N: Num + Copy + PartialOrd = f64> {
+pub struct Rect<N = f64> {
     pub x_min: N,
     pub y_min: N,
     pub x_max: N,
     pub y_max: N,
 }
 
-impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> BoundingRect<N> {
+impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
     pub fn new(x_min: N, y_min: N, x_max: N, y_max: N) -> Self {
         Self {
             x_min,
@@ -45,7 +46,7 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> BoundingRect<N> {
         self.y_max - self.y_min
     }
 
-    pub fn into_contour(&self) -> ClosedContour<Point2<N>> {
+    pub fn into_contour(self) -> ClosedContour<Point2<N>> {
         ClosedContour::new(vec![
             Point2::new(self.x_min, self.y_min),
             Point2::new(self.x_min, self.y_max),
@@ -174,12 +175,17 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> BoundingRect<N> {
             },
         }
     }
+
+    pub fn center(&self) -> Point2<N> {
+        Point2::new(
+            (self.x_min + self.x_max) / N::from_f64(2.0).unwrap(),
+            (self.y_min + self.y_max) / N::from_f64(2.0).unwrap(),
+        )
+    }
 }
 
-impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> FromIterator<BoundingRect<N>>
-    for BoundingRect<N>
-{
-    fn from_iter<T: IntoIterator<Item = BoundingRect<N>>>(iter: T) -> Self {
+impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> FromIterator<Rect<N>> for Rect<N> {
+    fn from_iter<T: IntoIterator<Item = Rect<N>>>(iter: T) -> Self {
         let mut iter = iter.into_iter();
         let mut curr = iter.next().unwrap();
         for rect in iter {

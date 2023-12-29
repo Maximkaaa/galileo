@@ -4,6 +4,7 @@ use crate::messenger::Messenger;
 use crate::render::{Canvas, PackedBundle, Renderer};
 use crate::tile_scheme::TileScheme;
 use crate::view::MapView;
+use nalgebra::Point2;
 use std::any::Any;
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
@@ -12,9 +13,8 @@ use crate::layer::vector_tile::style::VectorTileStyle;
 use crate::layer::vector_tile::tile_provider::{LockedTileStore, VectorTileProvider};
 use crate::layer::vector_tile::vector_tile::VectorTile;
 use galileo_mvt::{MvtFeature, MvtGeometry};
-use galileo_types::bounding_rect::BoundingRect;
-use galileo_types::geometry::Geometry;
-use galileo_types::{CartesianPoint2d, Point2};
+use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
+use galileo_types::geometry::CartesianGeometry2d;
 
 pub mod style;
 pub mod tile_provider;
@@ -27,19 +27,16 @@ pub struct VectorTileLayer<Provider: VectorTileProvider> {
 }
 
 impl<Provider: VectorTileProvider + 'static> Layer for VectorTileLayer<Provider> {
-    fn render<'a>(&self, map_view: MapView, canvas: &'a mut dyn Canvas) {
-        let bbox = map_view.get_bbox();
-
+    fn render<'a>(&self, view: &MapView, canvas: &'a mut dyn Canvas) {
         let tiles_store = self.tile_provider.read();
-        let tiles = self.get_tiles_to_draw(map_view.resolution(), bbox, &tiles_store);
+        let tiles = self.get_tiles_to_draw(view, &tiles_store);
         let to_render: Vec<&Box<dyn PackedBundle>> = tiles.iter().map(|v| &v.bundle).collect();
 
         canvas.draw_bundles(&to_render);
     }
 
-    fn prepare(&self, view: MapView, renderer: &Arc<RwLock<dyn Renderer>>) {
-        let bbox = view.get_bbox();
-        if let Some(iter) = self.tile_scheme.iter_tiles(view.resolution(), bbox) {
+    fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>) {
+        if let Some(iter) = self.tile_scheme.iter_tiles(view) {
             for index in iter {
                 if self.tile_provider.supports(&**renderer) {
                     self.tile_provider.load_tile(index, &self.style, renderer);
@@ -79,12 +76,11 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
 
     fn get_tiles_to_draw<'a>(
         &self,
-        resolution: f64,
-        bbox: BoundingRect,
+        view: &MapView,
         tiles_store: &'a LockedTileStore,
     ) -> Vec<&'a VectorTile> {
         let mut tiles = vec![];
-        let Some(tile_iter) = self.tile_scheme.iter_tiles(resolution, bbox) else {
+        let Some(tile_iter) = self.tile_scheme.iter_tiles(view) else {
             return vec![];
         };
 
@@ -98,31 +94,20 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
 
         let mut substitute_indices = HashSet::new();
         for index in to_substitute {
-            let tile_bbox = self
-                .tile_scheme
-                .tile_bbox(index)
-                .unwrap()
-                .shrink(resolution);
-            if index.z == 0 {
-                continue;
-            }
+            let mut substitute_index = index;
+            while let Some(mut subst) = self.tile_scheme.get_substitutes(substitute_index) {
+                substitute_index = match subst.next() {
+                    Some(v) => v,
+                    None => break,
+                };
 
-            'indexer: for z in (0..index.z).rev() {
-                if let Some(curr_resolution) = self.tile_scheme.lod_resolution(z) {
-                    for substitute_index in self
-                        .tile_scheme
-                        .iter_tiles(curr_resolution, tile_bbox)
-                        .unwrap()
-                    {
-                        if let Some(tile) = tiles_store.get_tile(substitute_index) {
-                            if !substitute_indices.contains(&substitute_index) {
-                                tiles.push((substitute_index, tile));
-                                substitute_indices.insert(substitute_index);
-                            }
-
-                            break 'indexer;
-                        }
+                if let Some(tile) = tiles_store.get_tile(substitute_index) {
+                    if !substitute_indices.contains(&substitute_index) {
+                        tiles.push((substitute_index, tile));
+                        substitute_indices.insert(substitute_index);
                     }
+
+                    break;
                 }
             }
         }
@@ -139,13 +124,11 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
     pub fn get_features_at(
         &self,
         point: &impl CartesianPoint2d<Num = f64>,
-        resolution: f64,
+        view: &MapView,
     ) -> Vec<(String, MvtFeature)> {
-        let bbox = BoundingRect::new(point.x(), point.y(), point.x(), point.y());
-
         let tile_store = self.tile_provider.read();
         let mut features = vec![];
-        if let Some(iter) = self.tile_scheme.iter_tiles(resolution, bbox) {
+        if let Some(iter) = self.tile_scheme.iter_tiles(view) {
             for index in iter {
                 let tile_bbox = self.tile_scheme.tile_bbox(index).unwrap();
                 let lod_resolution = self.tile_scheme.lod_resolution(index.z).unwrap();
@@ -156,7 +139,7 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
                     ((tile_bbox.y_max() - point.y()) / tile_resolution) as f32,
                 );
 
-                let tolerance = (resolution / tile_resolution) as f32 * 2.0;
+                let tolerance = (view.resolution() / tile_resolution) as f32 * 2.0;
 
                 if let Some(tile) = tile_store.get_tile(index) {
                     for layer in &tile.mvt_tile.layers {

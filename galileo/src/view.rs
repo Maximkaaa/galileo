@@ -1,41 +1,66 @@
-use crate::primitives::Point2d;
-use galileo_types::bounding_rect::BoundingRect;
-use galileo_types::size::Size;
-use galileo_types::CartesianPoint2d;
+use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::rect::Rect;
+use galileo_types::cartesian::size::Size;
+use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
+use galileo_types::geo::crs::Crs;
+use galileo_types::geo::impls::point::GeoPoint2d;
+use galileo_types::geo::traits::point::GeoPoint;
 use nalgebra::{
     Matrix4, OMatrix, Perspective3, Point2, Point3, Rotation3, Scale3, Translation3, Vector2,
     Vector3, Vector4, U4,
 };
-use num_traits::Zero;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct MapView {
-    position: Point3<f64>,
+    projected_position: Option<Point3<f64>>,
     resolution: f64,
     rotation_x: f64,
     rotation_z: f64,
     size: Size,
-}
-
-impl Default for MapView {
-    fn default() -> Self {
-        Self {
-            position: Default::default(),
-            resolution: 1.0,
-            rotation_x: 0.0,
-            rotation_z: 0.0,
-            size: Size::new(0.0, 0.0),
-        }
-    }
+    crs: Crs,
 }
 
 impl MapView {
-    pub fn new(position: impl CartesianPoint2d<Num = f64>, resolution: f64) -> Self {
+    pub fn new(position: &impl GeoPoint<Num = f64>, resolution: f64) -> Self {
+        Self::new_with_crs(position, resolution, Crs::EPSG3857)
+    }
+
+    pub fn new_with_crs(position: &impl GeoPoint<Num = f64>, resolution: f64, crs: Crs) -> Self {
+        let projected = crs
+            .get_projection()
+            .and_then(|projection| projection.project(&GeoPoint2d::from(position)))
+            .map(|p: Point2d| Point3::new(p.x, p.y, 0.0));
         Self {
-            position: Point3::new(position.x(), position.y(), 0.0),
+            projected_position: projected,
             resolution,
-            ..Default::default()
+            rotation_z: 0.0,
+            rotation_x: 0.0,
+            size: Default::default(),
+            crs,
         }
+    }
+
+    pub fn new_projected(position: &impl CartesianPoint2d<Num = f64>, resolution: f64) -> Self {
+        Self::new_projected_with_crs(position, resolution, Crs::EPSG3857)
+    }
+
+    pub fn new_projected_with_crs(
+        position: &impl CartesianPoint2d<Num = f64>,
+        resolution: f64,
+        crs: Crs,
+    ) -> Self {
+        Self {
+            projected_position: Some(Point3::new(position.x(), position.y(), 0.0)),
+            resolution,
+            rotation_z: 0.0,
+            rotation_x: 0.0,
+            size: Default::default(),
+            crs,
+        }
+    }
+
+    pub fn crs(&self) -> &Crs {
+        &self.crs
     }
 
     pub fn resolution(&self) -> f64 {
@@ -45,6 +70,7 @@ impl MapView {
     pub fn with_resolution(&self, resolution: f64) -> Self {
         Self {
             resolution,
+            crs: self.crs.clone(),
             ..*self
         }
     }
@@ -56,11 +82,12 @@ impl MapView {
     pub fn with_size(&self, new_size: Size) -> Self {
         Self {
             size: new_size,
+            crs: self.crs.clone(),
             ..*self
         }
     }
 
-    pub fn get_bbox(&self) -> BoundingRect {
+    pub fn get_bbox(&self) -> Option<Rect> {
         let points = [
             Point2::new(0.0, 0.0),
             Point2::new(self.size.width(), 0.0),
@@ -68,26 +95,30 @@ impl MapView {
             Point2::new(self.size.width(), self.size.height()),
         ];
 
-        let points = points.map(|p| self.screen_to_map(p));
-        let bbox = BoundingRect::from_points(points.iter()).unwrap();
-        let max_bbox = BoundingRect::new(
-            self.position.x - self.size.half_width() * self.resolution,
-            self.position.y - self.size.half_height() * self.resolution,
-            self.position.x + self.size.half_width() * self.resolution,
-            self.position.y + self.size.half_height() * self.resolution,
+        let points: Vec<Point2<f64>> = points
+            .into_iter()
+            .map(|p| self.screen_to_map(p))
+            .collect::<Option<_>>()?;
+        let bbox = Rect::from_points(points.iter())?;
+        let position = self.projected_position?;
+        let max_bbox = Rect::new(
+            position.x - self.size.half_width() * self.resolution,
+            position.y - self.size.half_height() * self.resolution,
+            position.x + self.size.half_width() * self.resolution,
+            position.y + self.size.half_height() * self.resolution,
         )
         .magnify(4.0);
 
-        bbox.limit(max_bbox)
+        Some(bbox.limit(max_bbox))
     }
 
-    fn map_to_screen_center_transform(&self) -> OMatrix<f64, U4, U4> {
+    fn map_to_screen_center_transform(&self) -> Option<OMatrix<f64, U4, U4>> {
         if self.size.is_zero() {
-            return Matrix4::identity();
+            return None;
         }
 
-        let translate = Translation3::new(-self.position.x, -self.position.y, -self.position.z)
-            .to_homogeneous();
+        let position = self.projected_position?;
+        let translate = Translation3::new(-position.x, -position.y, -position.z).to_homogeneous();
         let rotation_x = Rotation3::new(Vector3::new(-self.rotation_x, 0.0, 0.0)).to_homogeneous();
         let rotation_z = Rotation3::new(Vector3::new(0.0, 0.0, self.rotation_z)).to_homogeneous();
 
@@ -100,7 +131,7 @@ impl MapView {
 
         let translate_z = Translation3::new(0.0, 0.0, -self.size.height() / 2.0).to_homogeneous();
         let perspective = self.perspective();
-        perspective * translate_z * scale * rotation_x * rotation_z * translate
+        Some(perspective * translate_z * scale * rotation_x * rotation_z * translate)
     }
 
     fn perspective(&self) -> Matrix4<f64> {
@@ -113,27 +144,20 @@ impl MapView {
         .to_homogeneous()
     }
 
-    fn map_to_screen_transform(&self) -> Matrix4<f64> {
+    fn map_to_screen_transform(&self) -> Option<Matrix4<f64>> {
         let translate = Translation3::new(self.size.half_width(), -self.size.half_height(), 0.0)
             .to_homogeneous();
         let scale = Scale3::new(1.0, -1.0, 1.0).to_homogeneous();
-        scale * translate * self.map_to_screen_center_transform()
+        Some(scale * translate * self.map_to_screen_center_transform()?)
     }
 
-    fn screen_to_map_transform(&self) -> Matrix4<f64> {
-        self.map_to_screen_transform().try_inverse().unwrap()
+    fn screen_to_map_transform(&self) -> Option<Matrix4<f64>> {
+        Some(self.map_to_screen_transform()?.try_inverse().unwrap())
     }
 
     fn map_to_scene_transform(&self) -> Option<OMatrix<f64, U4, U4>> {
-        let width = self.size.width();
-        let height = self.size.height();
-
-        if width.is_zero() || height.is_zero() || !width.is_finite() || !height.is_finite() {
-            return None;
-        }
-
         let scale = Scale3::new(1.0, 1.0, 0.5).to_homogeneous();
-        Some(scale * self.map_to_screen_center_transform())
+        Some(scale * self.map_to_screen_center_transform()?)
     }
 
     pub fn map_to_scene_mtx(&self) -> Option<[[f32; 4]; 4]> {
@@ -151,6 +175,7 @@ impl MapView {
     pub fn with_rotation_x(&self, rotation_x: f64) -> Self {
         Self {
             rotation_x,
+            crs: self.crs.clone(),
             ..*self
         }
     }
@@ -158,6 +183,7 @@ impl MapView {
     pub fn with_rotation_z(&self, rotation_z: f64) -> Self {
         Self {
             rotation_z,
+            crs: self.crs.clone(),
             ..*self
         }
     }
@@ -166,11 +192,12 @@ impl MapView {
         Self {
             rotation_x,
             rotation_z,
+            crs: self.crs.clone(),
             ..*self
         }
     }
 
-    pub fn screen_to_map(&self, px_position: Point2d) -> Point2d {
+    pub fn screen_to_map(&self, px_position: Point2d) -> Option<Point2d> {
         // todo: this must be calculated with matrices somehow but I'm not bright enough
         // to figure out how to do it...
         let x = px_position.x;
@@ -183,18 +210,8 @@ impl MapView {
         let x0 = (x - self.size.half_width()) * self.resolution;
         let y0 = (self.size.half_height() - y) * self.resolution;
 
-        if s.is_infinite() || s <= 0.0 {
-            let x = if x0 >= 0.0 {
-                f64::INFINITY
-            } else {
-                f64::NEG_INFINITY
-            };
-            let y = if y0 >= 0.0 {
-                f64::INFINITY
-            } else {
-                f64::NEG_INFINITY
-            };
-            return Point2d::new(x, y);
+        if s.is_infinite() || s.is_nan() || s <= 0.0 {
+            return None;
         }
 
         let y0_ang = y0 / self.rotation_x.cos();
@@ -203,16 +220,24 @@ impl MapView {
         let y0_scaled = y0_ang * s;
 
         let rotation_z = Rotation3::new(Vector3::new(0.0, 0.0, -self.rotation_z));
-        let translation = Translation3::new(self.position.x, self.position.y, self.position.z);
+        let position = self.projected_position?;
+        let translation = Translation3::new(position.x, position.y, position.z);
 
         let p = Point3::new(x0_scaled, y0_scaled, 0.0);
         let transformed = translation * rotation_z * p;
 
-        Point2::new(transformed.x, transformed.y)
+        Some(Point2::new(transformed.x, transformed.y))
     }
 
     pub fn translate_by_pixels(&self, from: Point2d, to: Point2d) -> Self {
-        let transform = self.screen_to_map_transform();
+        let Some(transform) = self.screen_to_map_transform() else {
+            return Self {
+                projected_position: None,
+                crs: self.crs.clone(),
+                ..*self
+            };
+        };
+
         let from_projected = transform * Vector4::new(from.x, from.y, 0.0, 1.0);
         let to_projected = transform * Vector4::new(to.x, to.y, 0.0, 1.0);
         let delta = to_projected - from_projected;
@@ -220,29 +245,55 @@ impl MapView {
     }
 
     pub fn translate(&self, delta: Vector2<f64>) -> Self {
-        let delta3 = Vector3::new(delta.x, delta.y, 0.0);
-        Self {
-            position: self.position - delta3,
-            ..*self
+        match self.projected_position {
+            Some(v) => {
+                let projected_position = v - Vector3::new(delta.x, delta.y, 0.0);
+                Self {
+                    projected_position: Some(projected_position),
+                    crs: self.crs.clone(),
+                    ..*self
+                }
+            }
+            None => Self {
+                crs: self.crs.clone(),
+                ..*self
+            },
         }
     }
 
     pub(crate) fn zoom(&self, zoom: f64, base_point: Point2d) -> Self {
         let base_point = self.screen_to_map(base_point);
         let resolution = self.resolution * zoom;
-        let position2d = Point2::new(self.position.x, self.position.y);
-        let new_position = base_point.add(((position2d - base_point) * zoom).into());
+
+        let new_position = base_point.and_then(|base_point| {
+            self.projected_position.map(|position| {
+                let position2d = Point2::new(position.x, position.y);
+                let result = base_point.add(((position2d - base_point) * zoom).into());
+                Point3::new(result.x, result.y, position.z)
+            })
+        });
+
         Self {
-            position: Point3::new(new_position.x, new_position.y, self.position.z),
+            projected_position: new_position,
             resolution,
+            crs: self.crs.clone(),
             ..*self
         }
     }
 
-    pub(crate) fn interpolate(&self, target: MapView, k: f64) -> Self {
+    pub(crate) fn interpolate(&self, target: &MapView, k: f64) -> Self {
+        let Some(source_position) = self.projected_position else {
+            return self.clone();
+        };
+        let Some(target_position) = target.projected_position else {
+            return self.clone();
+        };
+
+        let projected_position = source_position + (target_position - source_position) * k;
         Self {
-            position: self.position + (target.position - self.position) * k,
+            projected_position: Some(projected_position),
             resolution: self.resolution + (target.resolution - self.resolution) * k,
+            crs: self.crs.clone(),
             ..*self
         }
     }
@@ -253,30 +304,34 @@ mod tests {
     use super::*;
     use approx::assert_abs_diff_eq;
 
+    fn test_view() -> MapView {
+        MapView::new_projected(&Point2d::new(0.0, 0.0), 1.0)
+    }
+
     #[test]
     fn screen_to_map_size() {
-        let view = MapView::default().with_size(Size::new(100.0, 100.0));
+        let view = test_view().with_size(Size::new(100.0, 100.0));
 
         assert_abs_diff_eq!(
-            view.screen_to_map(Point2d::new(0.0, 0.0)),
+            view.screen_to_map(Point2d::new(0.0, 0.0)).unwrap(),
             Point2d::new(-50.0, 50.0),
             epsilon = 0.0001,
         );
         assert_abs_diff_eq!(
-            view.screen_to_map(Point2d::new(50.0, 50.0)),
+            view.screen_to_map(Point2d::new(50.0, 50.0)).unwrap(),
             Point2d::new(0.0, 0.0),
             epsilon = 0.0001,
         );
 
-        let view = MapView::default().with_size(Size::new(200.0, 50.0));
+        let view = test_view().with_size(Size::new(200.0, 50.0));
 
         assert_abs_diff_eq!(
-            view.screen_to_map(Point2d::new(0.0, 0.0)),
+            view.screen_to_map(Point2d::new(0.0, 0.0)).unwrap(),
             Point2d::new(-100.0, 25.0),
             epsilon = 0.0001,
         );
         assert_abs_diff_eq!(
-            view.screen_to_map(Point2d::new(25.0, 49.0)),
+            view.screen_to_map(Point2d::new(25.0, 49.0)).unwrap(),
             Point2d::new(-75.0, -24.0),
             epsilon = 0.0001,
         );
@@ -284,35 +339,28 @@ mod tests {
 
     #[test]
     fn screen_to_map_zero_size() {
-        // todo: should this work like this?
-        let view = MapView::default().with_size(Size::new(0.0, 0.0));
+        let view = test_view().with_size(Size::new(0.0, 0.0));
         let projected = view.screen_to_map(Point2d::new(0.0, 0.0));
-        assert!(projected.x.is_nan());
-        assert!(projected.y.is_nan());
+        assert!(projected.is_none());
     }
 
     #[test]
     fn screen_to_map_position() {
-        let view = MapView {
-            position: Point3::new(-100.0, -100.0, 0.0),
-            size: Size::new(100.0, 100.0),
-            ..Default::default()
-        };
-
-        // println!("-150, -50")
+        let view = MapView::new_projected(&Point2d::new(-100.0, -100.0), 1.0)
+            .with_size(Size::new(100.0, 100.0));
 
         assert_abs_diff_eq!(
-            view.screen_to_map(Point2d::new(0.0, 0.0)),
+            view.screen_to_map(Point2d::new(0.0, 0.0)).unwrap(),
             Point2d::new(-150.0, -50.0),
             epsilon = 0.0001,
         );
         assert_abs_diff_eq!(
-            view.screen_to_map(Point2d::new(50.0, 50.0)),
+            view.screen_to_map(Point2d::new(50.0, 50.0)).unwrap(),
             Point2d::new(-100.0, -100.0),
             epsilon = 0.0001,
         );
         assert_abs_diff_eq!(
-            view.screen_to_map(Point2d::new(100.0, 100.0)),
+            view.screen_to_map(Point2d::new(100.0, 100.0)).unwrap(),
             Point2d::new(-50.0, -150.0),
             epsilon = 0.0001,
         );
@@ -320,19 +368,17 @@ mod tests {
 
     #[test]
     fn screen_to_map_resolution() {
-        let view = MapView {
-            resolution: 2.0,
-            size: Size::new(100.0, 100.0),
-            ..Default::default()
-        };
+        let view = test_view()
+            .with_resolution(2.0)
+            .with_size(Size::new(100.0, 100.0));
 
         assert_abs_diff_eq!(
-            view.screen_to_map(Point2d::new(0.0, 0.0)),
+            view.screen_to_map(Point2d::new(0.0, 0.0)).unwrap(),
             Point2d::new(-100.0, 100.0),
             epsilon = 0.0001,
         );
         assert_abs_diff_eq!(
-            view.screen_to_map(Point2d::new(100.0, 100.0)),
+            view.screen_to_map(Point2d::new(100.0, 100.0)).unwrap(),
             Point2d::new(100.0, -100.0),
             epsilon = 0.0001,
         );
@@ -340,24 +386,21 @@ mod tests {
 
     #[test]
     fn screen_to_map_rotation_x() {
-        let view = MapView {
-            rotation_x: std::f64::consts::PI / 4.0,
-            size: Size::new(100.0, 100.0),
-            ..Default::default()
-        };
+        let view = test_view()
+            .with_rotation_x(std::f64::consts::PI / 4.0)
+            .with_size(Size::new(100.0, 100.0));
 
         assert_abs_diff_eq!(
-            view.screen_to_map(Point2d::new(50.0, 50.0)),
+            view.screen_to_map(Point2d::new(50.0, 50.0)).unwrap(),
             Point2d::new(0.0, 0.0),
             epsilon = 0.0001,
         );
 
         let projected = view.screen_to_map(Point2d::new(0.0, 0.0));
-        assert_eq!(projected.x, f64::NEG_INFINITY);
-        assert_eq!(projected.y, f64::INFINITY);
+        assert!(projected.is_none());
 
         assert_abs_diff_eq!(
-            view.screen_to_map(Point2d::new(100.0, 100.0)),
+            view.screen_to_map(Point2d::new(100.0, 100.0)).unwrap(),
             Point2d::new(25.0, -35.35),
             epsilon = 0.1,
         );
@@ -365,7 +408,7 @@ mod tests {
 
     #[test]
     fn map_to_scene() {
-        let view = MapView::default().with_size(Size::new(100.0, 100.0));
+        let view = test_view().with_size(Size::new(100.0, 100.0));
         let point = Point3::new(-50.0, 50.0, 0.0).to_homogeneous();
         let transform = view.map_to_scene_transform().unwrap();
         let projected = transform * point;

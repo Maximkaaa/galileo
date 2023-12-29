@@ -1,6 +1,6 @@
 use crate::control::{MouseButton, RawUserEvent, TouchEvent};
 use crate::messenger::Messenger;
-use crate::primitives::Point2d;
+use galileo_types::cartesian::impls::point::Point2d;
 use std::sync::Arc;
 use winit::event::{ElementState, MouseScrollDelta, Touch, TouchPhase, WindowEvent};
 use winit::window::Window;

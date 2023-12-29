@@ -1,6 +1,9 @@
-use galileo_types::bounding_rect::BoundingRect;
-use galileo_types::size::Size;
-use galileo_types::CartesianPoint2d;
+use galileo_types::cartesian::impls::contour::Contour;
+use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::impls::polygon::Polygon;
+use galileo_types::cartesian::rect::Rect;
+use galileo_types::cartesian::size::Size;
+use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
 use lyon::lyon_tessellation::{
     BuffersBuilder, FillOptions, FillVertex, LineJoin, Side, StrokeOptions,
 };
@@ -26,7 +29,7 @@ use winit::dpi::PhysicalSize;
 
 use crate::layer::Layer;
 use crate::map::Map;
-use crate::primitives::{Color, Contour, DecodedImage, Image, Point2d, Polygon};
+use crate::primitives::{Color, DecodedImage, Image};
 use crate::render::wgpu::image::WgpuImage;
 use crate::view::MapView;
 
@@ -369,9 +372,9 @@ impl WgpuRenderer {
         }
     }
 
-    fn render_layer(&self, layer: &Box<dyn Layer>, view: MapView, texture_view: &TextureView) {
-        let mut canvas = WgpuCanvas::new(self, texture_view, view);
-        layer.render(view, &mut canvas);
+    fn render_layer(&self, layer: &Box<dyn Layer>, view: &MapView, texture_view: &TextureView) {
+        let mut canvas = WgpuCanvas::new(self, texture_view, view.clone());
+        layer.render(&view, &mut canvas);
     }
 
     pub fn size(&self) -> Size {
@@ -415,7 +418,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
         self.renderer.size()
     }
 
-    fn create_image(&mut self, image: &DecodedImage, bbox: BoundingRect) -> Box<dyn Image> {
+    fn create_image(&mut self, image: &DecodedImage, bbox: Rect) -> Box<dyn Image> {
         let wgpu_image = self.renderer.image_painter.create_image(
             &self.renderer.device,
             &self.renderer.queue,

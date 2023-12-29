@@ -10,18 +10,18 @@ pub mod tile_provider;
 pub mod vector_tile;
 
 pub trait Layer: MaybeSend + MaybeSync {
-    fn render<'a>(&self, position: MapView, canvas: &'a mut dyn Canvas);
-    fn prepare(&self, view: MapView, renderer: &Arc<RwLock<dyn Renderer>>);
+    fn render<'a>(&self, position: &MapView, canvas: &'a mut dyn Canvas);
+    fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>);
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 impl<T: Layer> Layer for Arc<RwLock<T>> {
-    fn render<'a>(&self, position: MapView, canvas: &'a mut dyn Canvas) {
+    fn render<'a>(&self, position: &MapView, canvas: &'a mut dyn Canvas) {
         self.read().unwrap().render(position, canvas)
     }
 
-    fn prepare(&self, view: MapView, renderer: &Arc<RwLock<dyn Renderer>>) {
+    fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>) {
         self.read().unwrap().prepare(view, renderer)
     }
 

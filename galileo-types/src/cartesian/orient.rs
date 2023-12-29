@@ -1,4 +1,4 @@
-use crate::CartesianPoint2d;
+use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Orientation {

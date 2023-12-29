@@ -7,11 +7,12 @@ use galileo::layer::vector_tile::style::VectorTileStyle;
 use galileo::layer::vector_tile::tile_provider::rayon_provider::RayonProvider;
 use galileo::layer::vector_tile::VectorTileLayer;
 use galileo::lod::Lod;
-use galileo::primitives::Point2d;
 use galileo::render::Renderer;
 use galileo::tile_scheme::{TileScheme, VerticalDirection};
 use galileo::winit::{WinitInputHandler, WinitMessenger};
-use galileo_types::size::Size;
+use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::size::Size;
+use galileo_types::geo::crs::Crs;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 use winit::event_loop::ControlFlow;
@@ -52,7 +53,7 @@ async fn main() {
     );
 
     let map = galileo::map::Map::new(
-        galileo::view::MapView::new(Point2d::new(0.0, 0.0), 156543.03392800014 / 8.0),
+        galileo::view::MapView::new_projected(&Point2d::new(0.0, 0.0), 156543.03392800014 / 8.0),
         vec![Box::new(vt_layer)],
         messenger.clone(),
     );
@@ -86,7 +87,11 @@ async fn main() {
     let mut custom_handler = CustomEventHandler::default();
     custom_handler.set_input_handler(move |ev, map| match ev {
         UserEvent::Click(MouseButton::Left, mouse_event) => {
-            let resolution = map.view().resolution();
+            let view = map.view().clone();
+            let position = map
+                .view()
+                .screen_to_map(mouse_event.screen_pointer_position)
+                .unwrap();
             let features = map
                 .layer_mut(0)
                 .as_mut()
@@ -94,7 +99,7 @@ async fn main() {
                 .as_any_mut()
                 .downcast_mut::<VectorTileLayer<RayonProvider>>()
                 .unwrap()
-                .get_features_at(&mouse_event.map_pointer_position, resolution);
+                .get_features_at(&position, &view);
 
             for (layer, feature) in features {
                 println!("{layer}, {:?}", feature.properties);
@@ -175,5 +180,6 @@ pub fn tile_scheme() -> TileScheme {
         y_direction: VerticalDirection::TopToBottom,
         max_tile_scale: 8.0,
         cycle_x: true,
+        crs: Crs::EPSG3857,
     }
 }

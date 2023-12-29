@@ -1,11 +1,9 @@
-use crate::bounding_rect::BoundingRect;
-use crate::geometry::{Geometry, GeometryHelper, GeometryMarker};
+use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
+use crate::cartesian::traits::contour::{ClosedContour, Contour};
 use crate::segment::Segment;
-use crate::traits::contour::{ClosedContour, Contour};
-use crate::CartesianPoint2d;
 use nalgebra::Point2;
 
-pub trait Polygon: GeometryMarker {
+pub trait Polygon {
     type Contour: ClosedContour;
 
     fn outer_contour(&self) -> &Self::Contour;
@@ -74,37 +72,15 @@ where
     }
 }
 
-pub struct PolygonMarker {}
-
-impl<P, C, T> GeometryHelper<PolygonMarker> for T
-where
-    P: CartesianPoint2d,
-    C: ClosedContour<Point = P>,
-    T: Polygon<Contour = C> + GeometryMarker<Marker = PolygonMarker>,
-{
-    type Num = P::Num;
-
-    fn __bounding_rect(&self) -> BoundingRect<Self::Num> {
-        self.outer_contour().bounding_rect()
-    }
-
-    fn __contains_point<Point>(&self, point: &Point, _: Self::Num) -> bool
-    where
-        Point: CartesianPoint2d<Num = Self::Num>,
-    {
-        self.contains_point(point)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ClosedContour, Point2d};
+    use crate::cartesian::impls::point::Point2d;
 
     #[test]
     fn contains_point() {
-        let polygon = crate::Polygon {
-            outer_contour: ClosedContour {
+        let polygon = crate::cartesian::impls::polygon::Polygon {
+            outer_contour: crate::cartesian::impls::contour::ClosedContour {
                 points: vec![
                     Point2d::new(0.0, 0.0),
                     Point2d::new(1.0, 1.0),

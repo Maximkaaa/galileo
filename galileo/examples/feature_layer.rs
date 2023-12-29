@@ -3,12 +3,17 @@ use galileo::control::custom::CustomEventHandler;
 use galileo::control::event_processor::EventProcessor;
 use galileo::control::map::MapController;
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
-use galileo::layer::feature::{FeatureLayer, SimplePolygonSymbol, Symbol};
+use galileo::layer::feature::{CirclePointSymbol, FeatureLayer, SimplePolygonSymbol, Symbol};
 use galileo::messenger::Messenger;
-use galileo::primitives::{Color, Point2d};
+use galileo::primitives::Color;
 use galileo::render::{RenderBundle, UnpackedBundle};
 use galileo::winit::{WinitInputHandler, WinitMessenger};
-use galileo_types::size::Size;
+use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::size::Size;
+use galileo_types::geo::crs::Crs;
+use galileo_types::geo::impls::point::GeoPoint2d;
+use galileo_types::geo::traits::point::NewGeoPoint;
+use galileo_types::geometry::Geom;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use winit::event_loop::ControlFlow;
@@ -36,12 +41,13 @@ async fn main() {
     let countries = load_countries();
     let polygon_count = countries
         .iter()
-        .map(|c| c.geometry.len())
+        .map(|c| c.geometry.parts().len())
         .fold(0, |a, v| a + v);
     let point_count = countries
         .iter()
         .map(|c| {
             c.geometry
+                .parts()
                 .iter()
                 .map(|p| p.iter_contours().map(|x| x.points.len()))
                 .flatten()
@@ -54,12 +60,29 @@ async fn main() {
         countries.len()
     );
 
-    let feature_layer = FeatureLayer::new(countries, CountrySymbol {});
+    let feature_layer = FeatureLayer::new(countries, CountrySymbol {}, Crs::EPSG3857);
     let feature_layer = Arc::new(RwLock::new(feature_layer));
 
+    let point_layer = FeatureLayer::new(
+        vec![GeoPoint2d::latlon(55.0, 37.0)],
+        CirclePointSymbol {
+            color: Color::rgba(255, 0, 0, 255),
+            size: 20.0,
+        },
+        Crs::WGS84,
+    );
+
     let mut map = galileo::map::Map::new(
-        galileo::view::MapView::new(Point2d::new(0.0, 0.0), 156543.03392800014 / 4.0),
-        vec![Box::new(feature_layer.clone())],
+        galileo::view::MapView::new_projected(&Point2d::new(0.0, 0.0), 156543.03392800014 / 4.0),
+        // galileo::view::MapView::new_with_crs(
+        //     &GeoPoint2d::latlon(52.0, 10.0),
+        //     156543.03392800014 / 4.0,
+        //     Crs::new(
+        //         Datum::WGS84,
+        //         ProjectionType::Other("laea lon_0=10 lat_0=52 x_0=4321000 y_0=3210000".into()),
+        //     ),
+        // ),
+        vec![Box::new(feature_layer.clone()), Box::new(point_layer)],
         messenger.clone(),
     );
 
@@ -73,8 +96,12 @@ async fn main() {
             if *button == MouseButton::Left {
                 let layer = layer_clone.write().unwrap();
 
-                for (_idx, feature) in layer
-                    .get_features_at(&event.map_pointer_position, map.view().resolution() * 2.0)
+                let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {
+                    return EventPropagation::Stop;
+                };
+
+                for (_idx, feature) in
+                    layer.get_features_at(&position, map.view().resolution() * 2.0)
                 {
                     log::info!("Found {} with bbox {:?}", feature.name, feature.bbox);
                 }
@@ -89,8 +116,11 @@ async fn main() {
             let mut to_update = vec![];
 
             let mut new_selected = usize::MAX;
+            let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {
+                return EventPropagation::Stop;
+            };
             if let Some((index, feature)) = layer
-                .get_features_at_mut(&event.map_pointer_position, map.view().resolution() * 2.0)
+                .get_features_at_mut(&position, map.view().resolution() * 2.0)
                 .first_mut()
             {
                 if *index == selected_index.load(Ordering::Relaxed) {
@@ -177,11 +207,24 @@ impl CountrySymbol {
     }
 }
 
-impl Symbol<Country> for CountrySymbol {
-    fn render(&self, feature: &Country, bundle: &mut Box<dyn RenderBundle>) -> Vec<usize> {
+impl Symbol<Country, Geom<Point2d>> for CountrySymbol {
+    fn render(
+        &self,
+        feature: &Country,
+        geometry: &Geom<Point2d>,
+        bundle: &mut Box<dyn RenderBundle>,
+    ) -> Vec<usize> {
         let mut ids = vec![];
-        for polygon in &feature.geometry {
-            ids.append(&mut self.get_polygon_symbol(feature).render(polygon, bundle))
+        let Geom::MultiPolygon(geometry) = geometry else {
+            return ids;
+        };
+
+        for polygon in geometry.parts() {
+            ids.append(
+                &mut self
+                    .get_polygon_symbol(feature)
+                    .render(&(), &polygon, bundle),
+            )
         }
 
         ids
@@ -193,11 +236,11 @@ impl Symbol<Country> for CountrySymbol {
         render_ids: &[usize],
         bundle: &mut Box<dyn UnpackedBundle>,
     ) {
-        let renders_by_feature = render_ids.len() / feature.geometry.len();
+        let renders_by_feature = render_ids.len() / feature.geometry.parts().len();
         let mut next_index = 0;
-        for geom in &feature.geometry {
+        for _ in feature.geometry.parts() {
             self.get_polygon_symbol(feature).update(
-                geom,
+                &(),
                 &render_ids[next_index..next_index + renders_by_feature],
                 bundle,
             );

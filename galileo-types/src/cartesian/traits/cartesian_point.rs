@@ -1,5 +1,4 @@
-use crate::bounding_rect::BoundingRect;
-use crate::geometry::{GeometryHelper, GeometryMarker};
+use crate::point::{CartesianPointType, Point, PointHelper};
 use nalgebra::{Point2, Scalar, Vector2};
 use num_traits::{Bounded, Float, FromPrimitive, Num};
 
@@ -48,6 +47,15 @@ pub trait CartesianPoint2d {
     }
 }
 
+impl<T> PointHelper<CartesianPointType> for T where
+    T: CartesianPoint2d + Point<Type = CartesianPointType>
+{
+}
+
+pub trait NewCartesianPoint2d<Num = f64>: CartesianPoint2d<Num = Num> {
+    fn new(x: Num, y: Num) -> Self;
+}
+
 pub trait CartesianPoint2dFloat<N: Float = f64>: CartesianPoint2d<Num = N> {
     fn distance(&self, other: &impl CartesianPoint2d<Num = N>) -> N {
         self.distance_sq(other).sqrt()
@@ -55,23 +63,3 @@ pub trait CartesianPoint2dFloat<N: Float = f64>: CartesianPoint2d<Num = N> {
 }
 
 impl<N: Float, T: CartesianPoint2d<Num = N>> CartesianPoint2dFloat<N> for T {}
-
-pub struct PointMarker {}
-
-impl<T> GeometryHelper<PointMarker> for T
-where
-    T: CartesianPoint2d + GeometryMarker<Marker = PointMarker>,
-{
-    type Num = T::Num;
-
-    fn __bounding_rect(&self) -> BoundingRect<Self::Num> {
-        BoundingRect::from_point(self)
-    }
-
-    fn __contains_point<P>(&self, point: &P, tolerance: Self::Num) -> bool
-    where
-        P: CartesianPoint2d<Num = Self::Num>,
-    {
-        self.distance_sq(point) < tolerance * tolerance
-    }
-}

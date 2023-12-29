@@ -1,9 +1,8 @@
-use crate::bounding_rect::BoundingRect;
-use crate::geometry::{GeometryHelper, GeometryMarker};
+use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
 use crate::segment::Segment;
-use crate::CartesianPoint2d;
 use num_traits::{One, Zero};
 use std::cmp::Ordering;
+use std::fmt::Debug;
 
 pub trait Contour {
     type Point;
@@ -33,7 +32,7 @@ pub trait Contour {
     }
 }
 
-pub trait ClosedContour: GeometryMarker<Marker = ContourMarker> {
+pub trait ClosedContour {
     type Point;
     fn iter_points(&self) -> Box<dyn Iterator<Item = &'_ Self::Point> + '_>;
 }
@@ -183,42 +182,18 @@ impl<'a, P> Iterator for ContourSegmentIterator<'a, P> {
     }
 }
 
-pub struct ContourMarker {}
-
-impl<P, T> GeometryHelper<ContourMarker> for T
-where
-    P: CartesianPoint2d,
-    T: Contour<Point = P> + GeometryMarker<Marker = ContourMarker>,
-{
-    type Num = P::Num;
-
-    fn __bounding_rect(&self) -> BoundingRect<Self::Num> {
-        BoundingRect::from_points(self.iter_points()).unwrap()
-    }
-
-    fn __contains_point<Point>(&self, point: &Point, tolerance: Self::Num) -> bool
-    where
-        Point: CartesianPoint2d<Num = Self::Num>,
-    {
-        let max_distance_sq = tolerance * tolerance;
-        for segment in self.iter_segments() {
-            if segment.distance_to_point_sq(point) < max_distance_sq {
-                return true;
-            }
-        }
-
-        false
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ClosedContour, Point2d};
+    use crate::cartesian::impls::contour::ClosedContour;
+    use crate::cartesian::impls::point::Point2d;
 
     #[test]
     fn iter_points_closing() {
-        let contour = crate::Contour::open(vec![Point2d::new(0.0, 0.0), Point2d::new(1.0, 1.0)]);
+        let contour = crate::cartesian::impls::contour::Contour::open(vec![
+            Point2d::new(0.0, 0.0),
+            Point2d::new(1.0, 1.0),
+        ]);
         assert_eq!(contour.iter_points_closing().count(), 2);
         assert_eq!(
             *contour.iter_points_closing().last().unwrap(),
@@ -237,10 +212,13 @@ mod tests {
 
     #[test]
     fn iter_segments() {
-        let contour = crate::Contour::open(vec![Point2d::new(0.0, 0.0)]);
+        let contour = crate::cartesian::impls::contour::Contour::open(vec![Point2d::new(0.0, 0.0)]);
         assert_eq!(contour.iter_segments().count(), 0);
 
-        let contour = crate::Contour::open(vec![Point2d::new(0.0, 0.0), Point2d::new(1.0, 1.0)]);
+        let contour = crate::cartesian::impls::contour::Contour::open(vec![
+            Point2d::new(0.0, 0.0),
+            Point2d::new(1.0, 1.0),
+        ]);
         assert_eq!(contour.iter_segments().count(), 1);
         assert_eq!(
             contour.iter_segments().last().unwrap(),
