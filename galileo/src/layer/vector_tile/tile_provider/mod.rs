@@ -16,7 +16,7 @@ pub mod rayon_provider;
 
 pub trait VectorTileProvider: MaybeSend + MaybeSync {
     fn create(
-        messenger: impl Messenger + 'static,
+        messenger: Option<Box<dyn Messenger>>,
         tile_source: impl TileSource + 'static,
         tile_scheme: TileScheme,
     ) -> Self;
@@ -30,6 +30,7 @@ pub trait VectorTileProvider: MaybeSend + MaybeSync {
     );
     fn update_style(&self);
     fn read(&self) -> LockedTileStore;
+    fn set_messenger(&self, messenger: Box<dyn Messenger>);
 }
 
 pub struct LockedTileStore<'a> {

@@ -64,7 +64,7 @@ impl From<&winit::event::MouseButton> for MouseButton {
 
 #[derive(Debug, Clone)]
 pub struct WinitMessenger {
-    pub window: Arc<Window>,
+    window: Arc<Window>,
 }
 
 impl WinitMessenger {

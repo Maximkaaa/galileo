@@ -18,7 +18,6 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 use wasm_bindgen::prelude::*;
-use web_sys::WorkerGlobalScope;
 
 const WORKER_URL: &str = "./vt_worker.js";
 const DEFAULT_WORKER_COUNT: usize = 4;
@@ -28,7 +27,7 @@ pub struct WebWorkerVectorTileProvider {
     worker_pool: Vec<Rc<RefCell<WorkerState>>>,
     next_worker: AtomicUsize,
     tiles: Arc<RwLock<HashMap<TileIndex, TileState>>>,
-    messenger: Arc<dyn Messenger>,
+    messenger: Arc<RwLock<Option<Box<dyn Messenger>>>>,
     tile_source: Box<dyn TileSource>,
     tile_scheme: TileScheme,
 }
@@ -40,14 +39,19 @@ struct WorkerState {
 
 impl VectorTileProvider for WebWorkerVectorTileProvider {
     fn create(
-        messenger: impl Messenger + 'static,
+        messenger: Option<Box<dyn Messenger>>,
         tile_source: impl TileSource + 'static,
         tile_scheme: TileScheme,
     ) -> Self {
-        Self::new(4, messenger, Box::new(tile_source), tile_scheme)
+        Self::new(
+            DEFAULT_WORKER_COUNT,
+            messenger,
+            Box::new(tile_source),
+            tile_scheme,
+        )
     }
 
-    fn supports(&self, renderer: &RwLock<dyn Renderer>) -> bool {
+    fn supports(&self, _renderer: &RwLock<dyn Renderer>) -> bool {
         // todo
         true
     }
@@ -72,6 +76,10 @@ impl VectorTileProvider for WebWorkerVectorTileProvider {
                 *tile_state = TileState::Outdated(tile);
             }
         }
+
+        if let Some(messenger) = &(*self.messenger.read().unwrap()) {
+            messenger.request_redraw();
+        }
     }
 
     fn read(&self) -> LockedTileStore {
@@ -79,12 +87,16 @@ impl VectorTileProvider for WebWorkerVectorTileProvider {
             guard: self.tiles.read().unwrap(),
         }
     }
+
+    fn set_messenger(&self, messenger: Box<dyn Messenger>) {
+        *self.messenger.write().unwrap() = Some(messenger.into())
+    }
 }
 
 impl WebWorkerVectorTileProvider {
     pub fn new(
         pool_size: usize,
-        messenger: impl Messenger + 'static,
+        messenger: Option<Box<dyn Messenger>>,
         tile_source: Box<dyn TileSource>,
         tile_scheme: TileScheme,
     ) -> Self {
@@ -92,7 +104,7 @@ impl WebWorkerVectorTileProvider {
             worker_pool: Vec::with_capacity(pool_size),
             next_worker: Default::default(),
             tiles: Arc::new(RwLock::new(HashMap::new())),
-            messenger: Arc::new(messenger),
+            messenger: Arc::new(RwLock::new(messenger)),
             tile_source,
             tile_scheme,
         };
@@ -174,7 +186,9 @@ impl WebWorkerVectorTileProvider {
                 if let Some(message) = event.data().as_f64() {
                     if message == READY_MESSAGE {
                         worker_clone.borrow_mut().is_ready = true;
-                        messenger.request_redraw();
+                        if let Some(messenger) = &(*messenger.read().unwrap()) {
+                            messenger.request_redraw();
+                        }
 
                         log::info!("Received worker ready message");
                     }
@@ -211,7 +225,9 @@ impl WebWorkerVectorTileProvider {
                             );
 
                             log::info!("Tile {:?} is stored", index);
-                            messenger.request_redraw();
+                            if let Some(messenger) = &(*messenger.read().unwrap()) {
+                                messenger.request_redraw();
+                            }
                         }
                         _ => {
                             store.insert(index, TileState::Error);

@@ -1,11 +1,3 @@
-use std::any::Any;
-use std::collections::{HashMap, HashSet};
-use std::fmt::Debug;
-use std::sync::{Arc, RwLock};
-
-use async_trait::async_trait;
-use maybe_sync::{MaybeSend, MaybeSync};
-
 use crate::error::GalileoError;
 use crate::layer::tile_provider::{TileProvider, TileSource, TileState, UrlTileProvider};
 use crate::messenger::Messenger;
@@ -14,7 +6,11 @@ use crate::primitives::{DecodedImage, Image};
 use crate::render::{Canvas, Renderer};
 use crate::tile_scheme::{TileIndex, TileScheme};
 use crate::view::MapView;
-use crate::winit::WinitMessenger;
+use async_trait::async_trait;
+use std::any::Any;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
+use std::sync::{Arc, RwLock};
 
 use super::Layer;
 
@@ -25,11 +21,15 @@ pub struct RasterTileLayer {
 }
 
 impl RasterTileLayer {
-    pub fn from_url(tile_source: impl TileSource + 'static, messenger: WinitMessenger) -> Self {
+    pub fn from_url(
+        tile_source: impl TileSource + 'static,
+        tile_scheme: TileScheme,
+        messenger: Option<Box<dyn Messenger>>,
+    ) -> Self {
         let tile_provider = UrlTileProvider::new(Box::new(tile_source), messenger);
         Self {
             tile_provider: Arc::new(tile_provider),
-            tile_scheme: TileScheme::web(18),
+            tile_scheme,
             tile_renders: RwLock::new(HashMap::new()),
         }
     }
@@ -118,6 +118,10 @@ impl Layer for RasterTileLayer {
         }
     }
 
+    fn set_messenger(&self, messenger: Box<dyn Messenger>) {
+        self.tile_provider.set_messenger(messenger);
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -129,9 +133,7 @@ impl Layer for RasterTileLayer {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<M: Messenger + MaybeSend + MaybeSync> TileProvider<RasterTile>
-    for UrlTileProvider<M, RasterTile>
-{
+impl TileProvider<RasterTile> for UrlTileProvider<RasterTile> {
     fn get_tile(&self, index: TileIndex) -> Option<RasterTile> {
         self.get_tile_int(index)
     }
@@ -159,7 +161,10 @@ impl<M: Messenger + MaybeSend + MaybeSync> TileProvider<RasterTile>
                     .unwrap()
                     .insert(index, TileState::Loaded(tile));
 
-                self.messenger.request_redraw();
+                if let Some(messenger) = &(*self.messenger.read().unwrap()) {
+                    messenger.request_redraw();
+                }
+
                 Ok(())
             }
             Err(e) => {
@@ -167,6 +172,10 @@ impl<M: Messenger + MaybeSend + MaybeSync> TileProvider<RasterTile>
                 Err(e)
             }
         }
+    }
+
+    fn set_messenger(&self, messenger: Box<dyn Messenger>) {
+        *self.messenger.write().unwrap() = Some(messenger.into());
     }
 }
 

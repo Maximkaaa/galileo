@@ -3,7 +3,6 @@ use crate::platform::PlatformService;
 use crate::primitives::DecodedImage;
 use async_trait::async_trait;
 use js_sys::Uint8Array;
-use maybe_sync::{MaybeSend, MaybeSync};
 use std::cell::Cell;
 use std::future::Future;
 use std::pin::Pin;

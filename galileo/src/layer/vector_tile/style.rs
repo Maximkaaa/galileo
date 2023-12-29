@@ -3,7 +3,7 @@ use galileo_mvt::MvtFeature;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct VectorTileStyle {
     pub rules: Vec<StyleRule>,
     pub default_symbol: VectorTileSymbol,

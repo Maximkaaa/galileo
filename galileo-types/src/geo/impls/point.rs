@@ -52,3 +52,10 @@ impl Geometry for GeoPoint2d {
         Some(Geom::Point(projection.project(&self)?))
     }
 }
+
+#[macro_export]
+macro_rules! latlon {
+    ($lat:expr, $lon:expr) => {
+        <galileo_types::geo::impls::point::GeoPoint2d as galileo_types::geo::traits::point::NewGeoPoint<f64>>::latlon($lat, $lon)
+    };
+}

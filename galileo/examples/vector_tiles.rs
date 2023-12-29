@@ -1,160 +1,68 @@
 use galileo::bounding_box::BoundingBox;
-use galileo::control::custom::CustomEventHandler;
-use galileo::control::event_processor::EventProcessor;
-use galileo::control::map::MapController;
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
+use galileo::galileo_map::{MapBuilder, VectorTileProver};
 use galileo::layer::vector_tile::style::VectorTileStyle;
-use galileo::layer::vector_tile::tile_provider::rayon_provider::RayonProvider;
 use galileo::layer::vector_tile::VectorTileLayer;
 use galileo::lod::Lod;
-use galileo::render::Renderer;
 use galileo::tile_scheme::{TileScheme, VerticalDirection};
-use galileo::winit::{WinitInputHandler, WinitMessenger};
 use galileo_types::cartesian::impls::point::Point2d;
-use galileo_types::cartesian::size::Size;
 use galileo_types::geo::crs::Crs;
-use std::path::Path;
 use std::sync::{Arc, RwLock};
-use winit::event_loop::ControlFlow;
-use winit::{
-    event::{Event, WindowEvent},
-    event_loop::EventLoop,
-    window::WindowBuilder,
-};
 
-const STYLE: &str = "galileo/examples/data/vt_style.json";
-
+#[cfg(not(target_arch = "wasm32"))]
 fn get_layer_style() -> Option<VectorTileStyle> {
+    const STYLE: &str = "galileo/examples/data/vt_style.json";
     serde_json::from_reader(std::fs::File::open(STYLE).ok()?).ok()
 }
 
+thread_local!(
+    pub static LAYER: Arc<RwLock<VectorTileLayer<VectorTileProver>>> =
+        Arc::new(RwLock::new(VectorTileLayer::<VectorTileProver>::from_url(
+            |index| {
+                format!(
+                    "https://d1zqyi8v6vm8p9.cloudfront.net/planet/{}/{}/{}.mvt",
+                    index.z, index.x, index.y
+                )
+            },
+            VectorTileStyle::default(),
+            None,
+            tile_scheme(),
+        )));
+);
+
+#[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() {
-    env_logger::init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    run(MapBuilder::new(), get_layer_style().unwrap()).await;
+}
 
-    let event_loop = EventLoop::new().unwrap();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
-    let window = Arc::new(window);
+pub async fn run(builder: MapBuilder, style: VectorTileStyle) {
+    let layer = LAYER.with(|v| v.clone());
+    layer.write().unwrap().update_style(style);
 
-    let messenger = WinitMessenger::new(window.clone());
+    builder
+        .with_layer(layer.clone())
+        .with_event_handler(move |ev, map, _| match ev {
+            UserEvent::Click(MouseButton::Left, mouse_event) => {
+                let view = map.view().clone();
+                let position = map
+                    .view()
+                    .screen_to_map(mouse_event.screen_pointer_position)
+                    .unwrap();
+                let features = layer.read().unwrap().get_features_at(&position, &view);
 
-    let backend = galileo::render::wgpu::WgpuRenderer::create(&window).await;
-    let style = get_layer_style().unwrap();
-    let vt_layer = VectorTileLayer::<RayonProvider>::from_url(
-        |index| {
-            format!(
-                "https://d1zqyi8v6vm8p9.cloudfront.net/planet/{}/{}/{}.mvt",
-                index.z, index.x, index.y
-            )
-        },
-        style,
-        messenger.clone(),
-        tile_scheme(),
-    );
-
-    let map = galileo::map::Map::new(
-        galileo::view::MapView::new_projected(&Point2d::new(0.0, 0.0), 156543.03392800014 / 8.0),
-        vec![Box::new(vt_layer)],
-        messenger.clone(),
-    );
-
-    let map = Arc::new(RwLock::new(map));
-
-    let window_clone = window.clone();
-    let map_clone = map.clone();
-    let mut watcher = notify::recommended_watcher(move |_res| {
-        if let Some(style) = get_layer_style() {
-            map_clone
-                .write()
-                .unwrap()
-                .layer_mut(0)
-                .as_mut()
-                .unwrap()
-                .as_any_mut()
-                .downcast_mut::<VectorTileLayer<RayonProvider>>()
-                .unwrap()
-                .update_style(style);
-            window_clone.request_redraw()
-        }
-    })
-    .unwrap();
-
-    use notify::Watcher;
-    watcher
-        .watch(Path::new(STYLE), notify::RecursiveMode::NonRecursive)
-        .unwrap();
-
-    let mut custom_handler = CustomEventHandler::default();
-    custom_handler.set_input_handler(move |ev, map| match ev {
-        UserEvent::Click(MouseButton::Left, mouse_event) => {
-            let view = map.view().clone();
-            let position = map
-                .view()
-                .screen_to_map(mouse_event.screen_pointer_position)
-                .unwrap();
-            let features = map
-                .layer_mut(0)
-                .as_mut()
-                .unwrap()
-                .as_any_mut()
-                .downcast_mut::<VectorTileLayer<RayonProvider>>()
-                .unwrap()
-                .get_features_at(&position, &view);
-
-            for (layer, feature) in features {
-                println!("{layer}, {:?}", feature.properties);
-            }
-
-            EventPropagation::Stop
-        }
-        _ => EventPropagation::Propagate,
-    });
-
-    let mut input_handler = WinitInputHandler::default();
-    let controller = MapController::default();
-    let mut event_processor = EventProcessor::default();
-    event_processor.add_handler(custom_handler);
-    event_processor.add_handler(controller);
-
-    let backend = Arc::new(RwLock::new(backend));
-
-    event_loop
-        .run(move |event, target| {
-            target.set_control_flow(ControlFlow::Wait);
-
-            match event {
-                Event::WindowEvent { event, window_id } if window_id == window.id() => {
-                    match event {
-                        WindowEvent::CloseRequested => {
-                            eprintln!("The close button was pressed; stopping");
-                            target.exit();
-                        }
-                        WindowEvent::Resized(size) => {
-                            backend.write().unwrap().resize(size);
-                            map.write()
-                                .unwrap()
-                                .set_size(Size::new(size.width as f64, size.height as f64));
-                        }
-                        WindowEvent::RedrawRequested => {
-                            let map = map.read().unwrap();
-                            let cast: Arc<RwLock<dyn Renderer>> = backend.clone();
-                            map.load_layers(&cast);
-                            backend.read().unwrap().render(&map).unwrap();
-                        }
-                        other => {
-                            if let Some(raw_event) = input_handler.process_user_input(&other) {
-                                event_processor.handle(raw_event, &mut map.write().unwrap());
-                            }
-                        }
-                    }
+                for (layer, feature) in features {
+                    println!("{layer}, {:?}", feature.properties);
                 }
-                Event::AboutToWait => {
-                    map.write().unwrap().animate();
-                }
-                _ => (),
+
+                EventPropagation::Stop
             }
+            _ => EventPropagation::Propagate,
         })
-        .unwrap();
+        .build()
+        .await
+        .run();
 }
 
 pub fn tile_scheme() -> TileScheme {

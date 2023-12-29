@@ -45,6 +45,10 @@ impl<Provider: VectorTileProvider + 'static> Layer for VectorTileLayer<Provider>
         }
     }
 
+    fn set_messenger(&self, messenger: Box<dyn Messenger>) {
+        self.tile_provider.set_messenger(messenger);
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -62,7 +66,7 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
     pub fn from_url(
         tile_source: impl TileSource + 'static,
         style: VectorTileStyle,
-        messenger: impl Messenger + 'static,
+        messenger: Option<Box<dyn Messenger>>,
         tile_scheme: TileScheme,
     ) -> Self {
         let tile_provider = Provider::create(messenger, tile_source, tile_scheme.clone());

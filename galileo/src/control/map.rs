@@ -1,5 +1,6 @@
 use crate::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
 use crate::map::Map;
+use crate::render::Renderer;
 use crate::view::MapView;
 use nalgebra::Vector2;
 use std::time::Duration;
@@ -35,7 +36,12 @@ impl Default for MapControllerParameters {
 }
 
 impl UserEventHandler for MapController {
-    fn handle(&self, event: &UserEvent, map: &mut Map) -> EventPropagation {
+    fn handle(
+        &self,
+        event: &UserEvent,
+        map: &mut Map,
+        _backend: &dyn Renderer,
+    ) -> EventPropagation {
         match event {
             UserEvent::DragStarted(button, _)
                 if *button == MouseButton::Left || *button == MouseButton::Right =>

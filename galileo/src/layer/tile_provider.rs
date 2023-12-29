@@ -12,25 +12,26 @@ use std::sync::RwLock;
 pub trait TileProvider<Tile>: MaybeSend + MaybeSync {
     fn get_tile(&self, index: TileIndex) -> Option<Tile>;
     async fn load_tile(&self, index: TileIndex) -> Result<(), GalileoError>;
+    fn set_messenger(&self, messenger: Box<dyn Messenger>);
 }
 
 pub trait TileSource: (Fn(TileIndex) -> String) + MaybeSend + MaybeSync {}
 impl<T: Fn(TileIndex) -> String> TileSource for T where T: MaybeSend + MaybeSync {}
 
-pub struct UrlTileProvider<M: Messenger + MaybeSend + MaybeSync, Tile> {
+pub struct UrlTileProvider<Tile> {
     pub url_source: Box<dyn TileSource>,
     pub platform_service: PlatformServiceImpl,
     pub loaded_tiles: RwLock<HashMap<TileIndex, TileState<Tile>>>,
-    pub messenger: M,
+    pub messenger: RwLock<Option<Box<dyn Messenger>>>,
 }
 
-impl<M: Messenger + MaybeSend + MaybeSync, Tile: Clone> UrlTileProvider<M, Tile> {
-    pub fn new(url_source: Box<dyn TileSource>, messenger: M) -> Self {
+impl<Tile: Clone> UrlTileProvider<Tile> {
+    pub fn new(url_source: Box<dyn TileSource>, messenger: Option<Box<dyn Messenger>>) -> Self {
         Self {
             url_source,
             platform_service: PlatformServiceImpl::new(),
             loaded_tiles: RwLock::new(HashMap::new()),
-            messenger,
+            messenger: RwLock::new(messenger),
         }
     }
 

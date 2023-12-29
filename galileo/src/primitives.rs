@@ -29,7 +29,7 @@ impl DecodedImage {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(from = "String", into = "String"))]
 pub struct Color {

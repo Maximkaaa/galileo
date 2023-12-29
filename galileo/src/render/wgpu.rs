@@ -759,10 +759,6 @@ impl<'a> Canvas for WgpuCanvas<'a> {
                             point_buffers.index.slice(..),
                             wgpu::IndexFormat::Uint32,
                         );
-                        log::info!(
-                            "Rendering {} vertices",
-                            point_buffers.index_count * point_buffers.instance_count
-                        );
                         render_pass.draw_indexed(
                             0..point_buffers.index_count,
                             0,

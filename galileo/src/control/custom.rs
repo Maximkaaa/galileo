@@ -1,13 +1,14 @@
 use crate::control::{EventPropagation, UserEvent, UserEventHandler};
 use crate::map::Map;
+use crate::render::Renderer;
 use maybe_sync::{MaybeSend, MaybeSync};
 
 pub trait EventHandler:
-    (Fn(&UserEvent, &mut Map) -> EventPropagation) + MaybeSend + MaybeSync
+    (Fn(&UserEvent, &mut Map, &dyn Renderer) -> EventPropagation) + MaybeSend + MaybeSync
 {
 }
 
-impl<T: Fn(&UserEvent, &mut Map) -> EventPropagation> EventHandler for T where
+impl<T: Fn(&UserEvent, &mut Map, &dyn Renderer) -> EventPropagation> EventHandler for T where
     T: MaybeSync + MaybeSend
 {
 }
@@ -24,9 +25,9 @@ impl CustomEventHandler {
 }
 
 impl UserEventHandler for CustomEventHandler {
-    fn handle(&self, event: &UserEvent, map: &mut Map) -> EventPropagation {
+    fn handle(&self, event: &UserEvent, map: &mut Map, backend: &dyn Renderer) -> EventPropagation {
         if let Some(handler) = &self.input_handler {
-            handler(event, map)
+            handler(event, map, backend)
         } else {
             EventPropagation::Propagate
         }

@@ -14,7 +14,7 @@ use std::sync::{Arc, RwLock};
 
 #[derive(Clone)]
 pub struct RayonProvider {
-    messenger: Arc<dyn Messenger>,
+    messenger: Arc<RwLock<Option<Box<dyn Messenger>>>>,
     tile_source: Arc<dyn TileSource>,
     tile_schema: TileScheme,
     platform_service: PlatformServiceImpl,
@@ -23,14 +23,14 @@ pub struct RayonProvider {
 
 impl VectorTileProvider for RayonProvider {
     fn create(
-        messenger: impl Messenger + 'static,
+        messenger: Option<Box<dyn Messenger>>,
         tile_source: impl TileSource + 'static,
         tile_scheme: TileScheme,
     ) -> Self {
         let platform_service = PlatformServiceImpl::new();
         Self {
             platform_service,
-            messenger: Arc::new(messenger),
+            messenger: Arc::new(RwLock::new(messenger)),
             tile_source: Arc::new(tile_source),
             tile_schema: tile_scheme,
             tiles: Arc::new(RwLock::new(HashMap::new())),
@@ -77,12 +77,20 @@ impl VectorTileProvider for RayonProvider {
                 *tile_state = TileState::Outdated(tile);
             }
         }
+
+        if let Some(messenger) = &(*self.messenger.read().unwrap()) {
+            messenger.request_redraw();
+        }
     }
 
     fn read(&self) -> LockedTileStore {
         LockedTileStore {
             guard: self.tiles.read().unwrap(),
         }
+    }
+
+    fn set_messenger(&self, messenger: Box<dyn Messenger>) {
+        *self.messenger.write().unwrap() = Some(messenger.into())
     }
 }
 
@@ -114,7 +122,9 @@ impl RayonProvider {
                     log::info!("Tile {index:?} is loaded, but is not needed. Dropped.");
                 } else {
                     tile_store.insert(index, TileState::Loaded(tile));
-                    self.messenger.request_redraw();
+                    if let Some(messenger) = &(*self.messenger.read().unwrap()) {
+                        messenger.request_redraw();
+                    }
                 }
             }
             Err(e) => {

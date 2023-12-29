@@ -1,19 +1,16 @@
-pub mod layer;
-pub mod map;
-pub mod render;
-
+pub mod async_runtime;
 pub mod bounding_box;
+pub mod cache;
+pub mod control;
 pub mod error;
+pub mod galileo_map;
+pub mod layer;
 pub mod lod;
+pub mod map;
+pub mod messenger;
+mod platform;
 pub mod primitives;
+pub mod render;
 pub mod tile_scheme;
 pub mod view;
-
-pub mod control;
-pub mod messenger;
 pub mod winit;
-
-pub mod async_runtime;
-pub mod cache;
-
-mod platform;

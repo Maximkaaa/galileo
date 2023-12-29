@@ -1,3 +1,4 @@
+#[cfg(feature = "tokio")]
 use maybe_sync::MaybeSend;
 use std::future::Future;
 

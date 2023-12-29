@@ -15,6 +15,7 @@ use galileo_types::geometry::{CartesianGeometry2d, Geom, Geometry};
 use maybe_sync::{MaybeSend, MaybeSync};
 use nalgebra::Point3;
 
+use crate::messenger::Messenger;
 use crate::primitives::Color;
 use galileo_types::cartesian::impls::contour::Contour;
 use galileo_types::cartesian::impls::point::Point2d;
@@ -34,6 +35,7 @@ where
     render_bundle: RwLock<Option<Box<dyn PackedBundle>>>,
     feature_render_map: RwLock<Vec<Vec<usize>>>,
     crs: Crs,
+    messenger: RwLock<Option<Box<dyn Messenger>>>,
 }
 
 impl<P, F, S> FeatureLayer<P, F, S>
@@ -48,6 +50,7 @@ where
             render_bundle: RwLock::new(None),
             feature_render_map: RwLock::new(Vec::new()),
             crs,
+            messenger: RwLock::new(None),
         }
     }
 }
@@ -103,8 +106,7 @@ where
     F::Geom: Geometry<Point = P>,
     S: Symbol<F, Geom<P>>,
 {
-    // todo: remove deps on wgpu
-    pub fn update_features(&mut self, indices: &[usize], renderer: &WgpuRenderer) {
+    pub fn update_features(&mut self, indices: &[usize], renderer: &dyn Renderer) {
         let mut bundle_lock = self.render_bundle.write().unwrap();
         let Some(bundle) = bundle_lock.take() else {
             return;
@@ -118,7 +120,13 @@ where
             self.style.update(feature, render_ids, &mut unpacked);
         }
 
-        *bundle_lock = Some(renderer.pack_bundle(unpacked));
+        // todo: remove deps on wgpu
+        let wgpu: &WgpuRenderer = renderer.as_any().downcast_ref().unwrap();
+        *bundle_lock = Some(wgpu.pack_bundle(unpacked));
+
+        if let Some(messenger) = &(*self.messenger.read().unwrap()) {
+            messenger.request_redraw();
+        }
     }
 }
 
@@ -157,7 +165,11 @@ where
     }
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
-        todo!()
+        // do nothing
+    }
+
+    fn set_messenger(&self, messenger: Box<dyn Messenger>) {
+        *self.messenger.write().unwrap() = Some(messenger);
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -209,6 +221,10 @@ where
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
         // do nothing
+    }
+
+    fn set_messenger(&self, messenger: Box<dyn Messenger>) {
+        *self.messenger.write().unwrap() = Some(messenger);
     }
 
     fn as_any(&self) -> &dyn Any {

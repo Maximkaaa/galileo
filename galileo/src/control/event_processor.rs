@@ -2,6 +2,7 @@ use crate::control::{
     EventPropagation, MouseButtonsState, MouseEvent, RawUserEvent, UserEvent, UserEventHandler,
 };
 use crate::map::Map;
+use crate::render::Renderer;
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
 use web_time::SystemTime;
@@ -42,7 +43,7 @@ impl EventProcessor {
         self.handlers.push(Box::new(handler));
     }
 
-    pub fn handle(&mut self, event: RawUserEvent, map: &mut Map) {
+    pub fn handle(&mut self, event: RawUserEvent, map: &mut Map, backend: &dyn Renderer) {
         if let Some(user_events) = self.process(event) {
             for user_event in user_events {
                 let mut drag_start_target = None;
@@ -61,7 +62,7 @@ impl EventProcessor {
                         }
                     }
 
-                    match handler.handle(&user_event, map) {
+                    match handler.handle(&user_event, map, backend) {
                         EventPropagation::Propagate => {}
                         EventPropagation::Stop => break,
                         EventPropagation::Consume => {
@@ -71,6 +72,7 @@ impl EventProcessor {
                                 handler.handle(
                                     &UserEvent::Drag(button, delta.into(), mouse_event),
                                     map,
+                                    backend,
                                 );
                             }
 

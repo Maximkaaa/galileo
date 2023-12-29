@@ -1,4 +1,5 @@
 use crate::map::Map;
+use crate::render::Renderer;
 use galileo_types::cartesian::impls::point::Point2d;
 use nalgebra::Vector2;
 
@@ -7,7 +8,7 @@ pub mod event_processor;
 pub mod map;
 
 pub trait UserEventHandler {
-    fn handle(&self, event: &UserEvent, map: &mut Map) -> EventPropagation;
+    fn handle(&self, event: &UserEvent, map: &mut Map, backend: &dyn Renderer) -> EventPropagation;
 }
 
 pub enum RawUserEvent {
