@@ -187,7 +187,7 @@ impl WgpuRenderer {
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
@@ -204,7 +204,7 @@ impl WgpuRenderer {
             multisample: wgpu::MultisampleState {
                 count: 4,
                 mask: !0,
-                alpha_to_coverage_enabled: true,
+                alpha_to_coverage_enabled: false,
             },
             multiview: None,
         });
@@ -232,7 +232,7 @@ impl WgpuRenderer {
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
@@ -249,7 +249,7 @@ impl WgpuRenderer {
             multisample: wgpu::MultisampleState {
                 count: 4,
                 mask: !0,
-                alpha_to_coverage_enabled: true,
+                alpha_to_coverage_enabled: false,
             },
             multiview: None,
         });
@@ -279,7 +279,7 @@ impl WgpuRenderer {
             map_view_bind_group_layout,
             image_painter,
             multisampling_view,
-            background: Color::rgba(200, 200, 200, 255),
+            background: Color::rgba(255, 255, 255, 255),
         }
     }
 
