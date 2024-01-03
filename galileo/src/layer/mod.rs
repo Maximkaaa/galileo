@@ -11,7 +11,7 @@ pub mod tile_provider;
 pub mod vector_tile;
 
 pub trait Layer: MaybeSend + MaybeSync {
-    fn render<'a>(&self, position: &MapView, canvas: &'a mut dyn Canvas);
+    fn render<'a>(&self, view: &MapView, canvas: &'a mut dyn Canvas);
     fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>);
     fn set_messenger(&self, messenger: Box<dyn Messenger>);
     fn as_any(&self) -> &dyn Any;

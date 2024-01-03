@@ -1,4 +1,3 @@
-use galileo_types::cartesian::rect::Rect;
 use std::any::Any;
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroupLayout, Device, Queue};
@@ -117,7 +116,7 @@ impl ImagePainter {
         device: &Device,
         queue: &Queue,
         image: &DecodedImage,
-        bbox: Rect,
+        vertices: &[ImageVertex; 4],
     ) -> WgpuImage {
         let texture_size = wgpu::Extent3d {
             width: image.dimensions.0,
@@ -167,33 +166,10 @@ impl ImagePainter {
             label: Some("diffuse_bind_group"),
         });
 
-        let vertices = [
-            ImageVertex {
-                position: [bbox.x_min() as f32, bbox.y_min() as f32],
-                opacity: 1.0,
-                tex_coords: [0.0, 1.0],
-            },
-            ImageVertex {
-                position: [bbox.x_min() as f32, bbox.y_max() as f32],
-                opacity: 1.0,
-                tex_coords: [0.0, 0.0],
-            },
-            ImageVertex {
-                position: [bbox.x_max() as f32, bbox.y_min() as f32],
-                opacity: 1.0,
-                tex_coords: [1.0, 1.0],
-            },
-            ImageVertex {
-                position: [bbox.x_max() as f32, bbox.y_max() as f32],
-                opacity: 1.0,
-                tex_coords: [1.0, 0.0],
-            },
-        ];
-
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Image vertex buffer"),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            contents: bytemuck::cast_slice(&vertices),
+            contents: bytemuck::cast_slice(vertices),
         });
 
         WgpuImage {
@@ -222,10 +198,10 @@ impl ImagePainter {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct ImageVertex {
-    position: [f32; 2],
-    opacity: f32,
-    tex_coords: [f32; 2],
+pub struct ImageVertex {
+    pub position: [f32; 2],
+    pub opacity: f32,
+    pub tex_coords: [f32; 2],
 }
 
 impl ImageVertex {

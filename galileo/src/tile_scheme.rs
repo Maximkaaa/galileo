@@ -122,7 +122,7 @@ impl TileScheme {
         let y_max_adj = self.y_adj(top);
         let y_add_one = if (y_max_adj % tile_h) < 0.001 { -1 } else { 0 };
 
-        let y_max = (x_max_adj / tile_h) as i64 + y_add_one;
+        let y_max = (y_max_adj / tile_h) as i64 + y_add_one;
         let y_max = y_max.min(self.max_y_index(lod.resolution()));
 
         Some((x_min..=x_max).flat_map(move |x| {

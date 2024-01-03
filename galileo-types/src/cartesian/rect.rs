@@ -47,12 +47,7 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
     }
 
     pub fn into_contour(self) -> ClosedContour<Point2<N>> {
-        ClosedContour::new(vec![
-            Point2::new(self.x_min, self.y_min),
-            Point2::new(self.x_min, self.y_max),
-            Point2::new(self.x_max, self.y_max),
-            Point2::new(self.x_max, self.y_min),
-        ])
+        ClosedContour::new(Vec::from(self.into_quadrangle()))
     }
 
     pub fn shrink(&self, amount: N) -> Self {
@@ -181,6 +176,15 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
             (self.x_min + self.x_max) / N::from_f64(2.0).unwrap(),
             (self.y_min + self.y_max) / N::from_f64(2.0).unwrap(),
         )
+    }
+
+    pub fn into_quadrangle(self) -> [Point2<N>; 4] {
+        [
+            Point2::new(self.x_min, self.y_min),
+            Point2::new(self.x_min, self.y_max),
+            Point2::new(self.x_max, self.y_max),
+            Point2::new(self.x_max, self.y_min),
+        ]
     }
 }
 

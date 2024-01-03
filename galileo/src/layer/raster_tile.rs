@@ -2,8 +2,8 @@ use crate::error::GalileoError;
 use crate::layer::tile_provider::{TileProvider, TileSource, TileState, UrlTileProvider};
 use crate::messenger::Messenger;
 use crate::platform::PlatformService;
-use crate::primitives::{DecodedImage, Image};
-use crate::render::{Canvas, Renderer};
+use crate::primitives::DecodedImage;
+use crate::render::{Canvas, ImagePaint, PackedBundle, Renderer};
 use crate::tile_scheme::{TileIndex, TileScheme};
 use crate::view::MapView;
 use async_trait::async_trait;
@@ -17,7 +17,7 @@ use super::Layer;
 pub struct RasterTileLayer {
     tile_provider: Arc<dyn TileProvider<RasterTile>>,
     tile_scheme: TileScheme,
-    tile_renders: RwLock<HashMap<TileIndex, Box<dyn Image>>>,
+    tile_renders: RwLock<HashMap<TileIndex, Box<dyn PackedBundle>>>,
 }
 
 impl RasterTileLayer {
@@ -79,24 +79,33 @@ impl Layer for RasterTileLayer {
         let tiles = self.get_tiles_to_draw(view);
 
         let tile_renders = self.tile_renders.try_read().unwrap();
-        let mut renders_to_add: Vec<(TileIndex, Box<dyn Image>)> = Vec::new();
+        let mut renders_to_add: Vec<(TileIndex, Box<dyn PackedBundle>)> = Vec::new();
         let mut to_draw = Vec::new();
         for tile in &tiles {
             if let Some(image) = tile_renders.get(&tile.index) {
                 to_draw.push(image);
             } else {
-                let image = canvas.create_image(
-                    &tile.decoded_image,
-                    self.tile_scheme.tile_bbox(tile.index).unwrap(),
+                let mut bundle = canvas.create_bundle();
+
+                // todo: there should not be clone() here
+                bundle.add_image(
+                    (*tile.decoded_image).clone(),
+                    self.tile_scheme
+                        .tile_bbox(tile.index)
+                        .unwrap()
+                        .into_quadrangle(),
+                    ImagePaint { opacity: 255 },
                 );
-                renders_to_add.push((tile.index, image));
+                let packed = canvas.pack_bundle(bundle);
+                renders_to_add.push((tile.index, packed));
             }
         }
 
-        canvas.draw_images(&to_draw);
+        canvas.draw_bundles(&to_draw);
         if !renders_to_add.is_empty() {
-            let to_add_refs = renders_to_add.iter().map(|(_, v)| v).collect();
-            canvas.draw_images(&to_add_refs);
+            let to_add_refs: Vec<&Box<dyn PackedBundle>> =
+                renders_to_add.iter().map(|(_, v)| v).collect();
+            canvas.draw_bundles(&to_add_refs);
         }
 
         drop(tile_renders);

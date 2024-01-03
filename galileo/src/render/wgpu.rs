@@ -1,7 +1,6 @@
 use galileo_types::cartesian::impls::contour::Contour;
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::cartesian::impls::polygon::Polygon;
-use galileo_types::cartesian::rect::Rect;
 use galileo_types::cartesian::size::Size;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
 use lyon::lyon_tessellation::{
@@ -22,25 +21,24 @@ use std::mem::size_of;
 use std::ops::Range;
 use wgpu::util::DeviceExt;
 use wgpu::{
-    BindGroup, BindGroupLayout, Buffer, Device, Extent3d, Queue, StoreOp, TextureDescriptor,
-    TextureDimension, TextureFormat, TextureUsages, TextureView, TextureViewDescriptor,
+    BindGroup, BindGroupLayout, Buffer, Device, Extent3d, Queue, RenderPass, StoreOp,
+    TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
+    TextureViewDescriptor,
 };
 use winit::dpi::PhysicalSize;
 
 use crate::layer::Layer;
 use crate::map::Map;
-use crate::primitives::{Color, DecodedImage, Image};
-use crate::render::wgpu::image::WgpuImage;
+use crate::primitives::{Color, DecodedImage};
+use crate::render::wgpu::image::{ImageVertex, WgpuImage};
 use crate::view::MapView;
 
 use self::image::ImagePainter;
 
 use super::{
-    Canvas, FacePrerender, LinePaint, LinePrerender, PackedBundle, Paint, PointPaint,
-    PointsPrerender, Prerender, RenderBundle, Renderer, UnpackedBundle,
+    Canvas, ImagePaint, LinePaint, PackedBundle, Paint, PointPaint, RenderBundle, Renderer,
+    UnpackedBundle,
 };
-
-const LINE_K: f32 = 10000.0;
 
 pub struct WgpuRenderer {
     surface: wgpu::Surface,
@@ -71,7 +69,8 @@ impl Renderer for WgpuRenderer {
             cast.vertex_buffers,
             cast.ranges,
             cast.points,
-            &self.device,
+            cast.images,
+            &self,
         ))
     }
 
@@ -84,8 +83,6 @@ impl WgpuRenderer {
     pub async fn create(window: &winit::window::Window) -> Self {
         let size = window.inner_size();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            // backends: wgpu::Backend::Gl.into(),
-            // backends: wgpu::Backend::Vulkan.into(),
             backends: wgpu::Backends::all(),
             flags: Default::default(),
             dx12_shader_compiler: Default::default(),
@@ -418,289 +415,6 @@ impl<'a> Canvas for WgpuCanvas<'a> {
         self.renderer.size()
     }
 
-    fn create_image(&mut self, image: &DecodedImage, bbox: Rect) -> Box<dyn Image> {
-        let wgpu_image = self.renderer.image_painter.create_image(
-            &self.renderer.device,
-            &self.renderer.queue,
-            image,
-            bbox,
-        );
-
-        Box::new(wgpu_image)
-    }
-
-    fn draw_images(&mut self, images: &Vec<&Box<dyn Image>>) {
-        let mut encoder =
-            self.renderer
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.renderer.multisampling_view,
-                    resolve_target: Some(&self.view),
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-
-            for image in images {
-                if let Some(cast) = image.as_any().downcast_ref::<WgpuImage>() {
-                    self.renderer
-                        .image_painter
-                        .draw_image(&mut render_pass, cast, self.renderer);
-                }
-            }
-        }
-
-        self.renderer
-            .queue
-            .submit(std::iter::once(encoder.finish()));
-    }
-
-    fn draw_image(&mut self, image: &Box<dyn Image>) {
-        let mut encoder =
-            self.renderer
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.renderer.multisampling_view,
-                    resolve_target: Some(&self.view),
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-
-            if let Some(cast) = image.as_any().downcast_ref::<WgpuImage>() {
-                self.renderer
-                    .image_painter
-                    .draw_image(&mut render_pass, cast, self.renderer);
-            }
-        }
-
-        self.renderer
-            .queue
-            .submit(std::iter::once(encoder.finish()));
-    }
-
-    fn create_points(&mut self, _points: &[(Point2d, PointPaint)]) -> Box<dyn PointsPrerender> {
-        todo!()
-    }
-
-    fn create_line(&mut self, line: &Contour<Point2d>, paint: LinePaint) -> Box<dyn LinePrerender> {
-        let vertex_constructor = LineVertexConstructor {
-            width: paint.width as f32,
-            offset: paint.offset as f32,
-            color: paint.color.to_f32_array(),
-            resolution: 1.0,
-        };
-
-        // todo: check length of line
-
-        let mut path_builder = Path::builder();
-        let _ = path_builder.begin(point(
-            line.points[0].x() as f32 / LINE_K,
-            line.points[0].y() as f32 / LINE_K,
-        ));
-        for p in line.points.iter().skip(1) {
-            let _ = path_builder.line_to(point(p.x() as f32 / LINE_K, p.y() as f32 / LINE_K));
-        }
-        let _ = path_builder.end(line.is_closed);
-        let path = path_builder.build();
-
-        let mut tesselator = StrokeTessellator::new();
-        let mut output: VertexBuffers<LineVertex, u16> = VertexBuffers::new();
-        tesselator
-            .tessellate(
-                &path,
-                &StrokeOptions::DEFAULT
-                    .with_line_cap(paint.line_cap.into())
-                    .with_line_width(paint.width as f32)
-                    .with_miter_limit(2.0)
-                    .with_tolerance(0.1)
-                    .with_line_join(LineJoin::MiterClip),
-                &mut BuffersBuilder::new(&mut output, vertex_constructor),
-            )
-            .unwrap();
-
-        let index_buffer =
-            self.renderer
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Line index buffer"),
-                    contents: bytemuck::cast_slice(&output.indices),
-                    usage: wgpu::BufferUsages::INDEX,
-                });
-
-        let vertex_buffer =
-            self.renderer
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Line vertex buffer"),
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                    contents: bytemuck::cast_slice(&output.vertices),
-                });
-
-        Box::new(WgpuLinePrerender {
-            index_buffer,
-            vertex_buffer,
-            index_count: output.indices.len(),
-        })
-    }
-
-    fn create_polygon(
-        &mut self,
-        polygon: &Polygon<Point2d>,
-        paint: Paint,
-    ) -> Box<dyn FacePrerender> {
-        // todo: check length of line
-
-        let mut path_builder = Path::builder();
-        for contour in polygon.iter_contours() {
-            let _ = path_builder.begin(point(
-                contour.points[0].x() as f32,
-                contour.points[0].y() as f32,
-            ));
-
-            for p in contour.points.iter().skip(1) {
-                let _ = path_builder.line_to(point(p.x() as f32, p.y() as f32));
-            }
-
-            let _ = path_builder.end(true);
-        }
-
-        let path = path_builder.build();
-
-        let vertex_constructor = PolygonVertexConstructor {
-            color: paint.color.to_f32_array(),
-        };
-        let mut tesselator = FillTessellator::new();
-        let mut output: VertexBuffers<PointVertex, u16> = VertexBuffers::new();
-        tesselator
-            .tessellate(
-                &path,
-                &FillOptions::DEFAULT,
-                &mut BuffersBuilder::new(&mut output, vertex_constructor),
-            )
-            .unwrap();
-
-        let index_buffer =
-            self.renderer
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Line index buffer"),
-                    contents: bytemuck::cast_slice(&output.indices),
-                    usage: wgpu::BufferUsages::INDEX,
-                });
-
-        let vertex_buffer =
-            self.renderer
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Line vertex buffer"),
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                    contents: bytemuck::cast_slice(&output.vertices),
-                });
-
-        Box::new(WgpuFacePrerender {
-            index_buffer,
-            vertex_buffer,
-            index_count: output.indices.len(),
-        })
-    }
-
-    fn draw_points(&mut self, _points: &Box<dyn PointsPrerender>) {
-        todo!()
-    }
-
-    fn draw_line(&mut self, _line: &Box<dyn LinePrerender>) {
-        todo!()
-    }
-
-    fn draw_polygon(&mut self, _polygon: &Box<dyn FacePrerender>) {
-        todo!()
-    }
-
-    fn draw_prerenders(&mut self, prerenders: &[&Prerender]) {
-        let mut encoder =
-            self.renderer
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.renderer.multisampling_view,
-                    resolve_target: Some(&self.view),
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-
-            for prerender in prerenders {
-                match prerender {
-                    Prerender::Points(_) => todo!(),
-                    Prerender::Line(line) => {
-                        if let Some(cast) = line.as_any().downcast_ref::<WgpuLinePrerender>() {
-                            render_pass.set_pipeline(&self.renderer.line_pipeline);
-                            render_pass.set_bind_group(0, &self.renderer.map_view_bind_group, &[]);
-                            render_pass.set_vertex_buffer(0, cast.vertex_buffer.slice(..));
-                            render_pass.set_index_buffer(
-                                cast.index_buffer.slice(..),
-                                wgpu::IndexFormat::Uint16,
-                            );
-                            render_pass.draw_indexed(0..cast.index_count as u32, 0, 0..1);
-                        }
-                    }
-                    Prerender::Face(face) => {
-                        if let Some(cast) = face.as_any().downcast_ref::<WgpuFacePrerender>() {
-                            render_pass.set_pipeline(&self.renderer.point_pipeline);
-                            render_pass.set_bind_group(0, &self.renderer.map_view_bind_group, &[]);
-                            render_pass.set_vertex_buffer(0, cast.vertex_buffer.slice(..));
-                            render_pass.set_index_buffer(
-                                cast.index_buffer.slice(..),
-                                wgpu::IndexFormat::Uint16,
-                            );
-                            render_pass.draw_indexed(0..cast.index_count as u32, 0, 0..1);
-                        }
-                    }
-                }
-            }
-        }
-
-        self.renderer
-            .queue
-            .submit(std::iter::once(encoder.finish()));
-    }
-
     fn create_bundle(&self) -> Box<dyn RenderBundle> {
         Box::new(WgpuRenderBundle::new())
     }
@@ -711,7 +425,8 @@ impl<'a> Canvas for WgpuCanvas<'a> {
             cast.vertex_buffers,
             cast.ranges,
             cast.points,
-            &self.renderer.device,
+            cast.images,
+            &self.renderer,
         ))
     }
 
@@ -741,6 +456,10 @@ impl<'a> Canvas for WgpuCanvas<'a> {
 
             for bundle in bundles {
                 if let Some(cast) = bundle.as_any().downcast_ref::<WgpuPackedBundle>() {
+                    for image in &cast.image_buffers {
+                        self.draw_image(&mut render_pass, image);
+                    }
+
                     render_pass.set_pipeline(&self.renderer.line_pipeline);
                     render_pass.set_bind_group(0, &self.renderer.map_view_bind_group, &[]);
                     render_pass.set_vertex_buffer(0, cast.wgpu_buffers.vertex.slice(..));
@@ -775,11 +494,20 @@ impl<'a> Canvas for WgpuCanvas<'a> {
     }
 }
 
+impl<'a> WgpuCanvas<'a> {
+    fn draw_image(&self, render_pass: &mut RenderPass<'a>, image: &'a WgpuImage) {
+        self.renderer
+            .image_painter
+            .draw_image(render_pass, image, self.renderer)
+    }
+}
+
 #[derive(Debug)]
 pub struct WgpuRenderBundle {
     pub vertex_buffers: VertexBuffers<LineVertex, u32>,
     pub ranges: Vec<Range<usize>>,
     points: Vec<(PointPaint, Vec<PointInstance>)>,
+    images: Vec<(DecodedImage, [ImageVertex; 4])>,
 }
 
 impl WgpuRenderBundle {
@@ -788,11 +516,49 @@ impl WgpuRenderBundle {
             vertex_buffers: VertexBuffers::new(),
             ranges: Vec::new(),
             points: Vec::new(),
+            images: Vec::new(),
         }
     }
 }
 
 impl RenderBundle for WgpuRenderBundle {
+    fn add_image(
+        &mut self,
+        image: DecodedImage,
+        vertices: [Point2d; 4],
+        paint: ImagePaint,
+    ) -> usize {
+        let opacity = paint.opacity as f32 / 255.0;
+        self.images.push((
+            image,
+            [
+                ImageVertex {
+                    position: [vertices[0].x() as f32, vertices[0].y() as f32],
+                    opacity,
+                    tex_coords: [0.0, 1.0],
+                },
+                ImageVertex {
+                    position: [vertices[1].x() as f32, vertices[1].y() as f32],
+                    opacity,
+                    tex_coords: [0.0, 0.0],
+                },
+                ImageVertex {
+                    position: [vertices[3].x() as f32, vertices[3].y() as f32],
+                    opacity,
+                    tex_coords: [1.0, 1.0],
+                },
+                ImageVertex {
+                    position: [vertices[2].x() as f32, vertices[2].y() as f32],
+                    opacity,
+                    tex_coords: [1.0, 0.0],
+                },
+            ],
+        ));
+
+        // todo
+        0
+    }
+
     fn add_points(&mut self, points: &[Point3<f64>], paint: PointPaint) {
         self.points.push((
             paint,
@@ -906,6 +672,7 @@ pub struct WgpuPackedBundle {
     ranges: Vec<Range<usize>>,
     wgpu_buffers: WgpuPolygonBuffers,
     point_buffers: Vec<WgpuPointBuffers>,
+    image_buffers: Vec<WgpuImage>,
 }
 
 struct WgpuPolygonBuffers {
@@ -926,43 +693,55 @@ impl WgpuPackedBundle {
         vertex_buffers: VertexBuffers<LineVertex, u32>,
         ranges: Vec<Range<usize>>,
         points: Vec<(PointPaint, Vec<PointInstance>)>,
-        device: &Device,
+        images: Vec<(DecodedImage, [ImageVertex; 4])>,
+        renderer: &WgpuRenderer,
     ) -> Self {
-        let index = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Line index buffer"),
-            contents: bytemuck::cast_slice(&vertex_buffers.indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
+        let index = renderer
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Line index buffer"),
+                contents: bytemuck::cast_slice(&vertex_buffers.indices),
+                usage: wgpu::BufferUsages::INDEX,
+            });
 
-        let vertex = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Line vertex buffer"),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            contents: bytemuck::cast_slice(&vertex_buffers.vertices),
-        });
+        let vertex = renderer
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Line vertex buffer"),
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                contents: bytemuck::cast_slice(&vertex_buffers.vertices),
+            });
 
         let mut point_buffers = vec![];
 
         for (paint, point_set) in points {
             let (point_indices, point_vertices) = create_point(paint);
-            let point_index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(&point_indices),
-                usage: wgpu::BufferUsages::INDEX,
-            });
+            let point_index_buffer =
+                renderer
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: None,
+                        contents: bytemuck::cast_slice(&point_indices),
+                        usage: wgpu::BufferUsages::INDEX,
+                    });
 
             let point_vertex_buffer =
-                device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: None,
-                    usage: wgpu::BufferUsages::VERTEX,
-                    contents: bytemuck::cast_slice(&point_vertices),
-                });
+                renderer
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: None,
+                        usage: wgpu::BufferUsages::VERTEX,
+                        contents: bytemuck::cast_slice(&point_vertices),
+                    });
 
             let point_instance_buffer =
-                device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: None,
-                    usage: wgpu::BufferUsages::VERTEX,
-                    contents: bytemuck::cast_slice(&point_set),
-                });
+                renderer
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: None,
+                        usage: wgpu::BufferUsages::VERTEX,
+                        contents: bytemuck::cast_slice(&point_set),
+                    });
 
             point_buffers.push(WgpuPointBuffers {
                 index: point_index_buffer,
@@ -973,10 +752,22 @@ impl WgpuPackedBundle {
             });
         }
 
+        let mut image_buffers = vec![];
+        for (image, vertices) in images {
+            let image = renderer.image_painter.create_image(
+                &renderer.device,
+                &renderer.queue,
+                &image,
+                &vertices,
+            );
+            image_buffers.push(image);
+        }
+
         Self {
             vertex_buffers,
             ranges,
             wgpu_buffers: WgpuPolygonBuffers { index, vertex },
+            image_buffers,
             point_buffers,
         }
     }
@@ -1038,6 +829,7 @@ impl PackedBundle for WgpuPackedBundle {
             ranges: self.ranges,
             wgpu_buffers: self.wgpu_buffers,
             point_buffers: self.point_buffers,
+            images: self.image_buffers,
             to_write: Vec::new(),
         })
     }
@@ -1048,6 +840,7 @@ struct WgpuUnpackedBundle {
     ranges: Vec<Range<usize>>,
     wgpu_buffers: WgpuPolygonBuffers,
     point_buffers: Vec<WgpuPointBuffers>,
+    images: Vec<WgpuImage>,
 
     to_write: Vec<Range<usize>>,
 }
@@ -1060,6 +853,7 @@ impl WgpuUnpackedBundle {
             ranges: self.ranges,
             wgpu_buffers: self.wgpu_buffers,
             point_buffers: self.point_buffers,
+            image_buffers: self.images,
         }
     }
     fn write_buffer(&mut self, queue: &Queue) {
@@ -1249,30 +1043,6 @@ impl PointInstance {
                 format: wgpu::VertexFormat::Float32x3,
             }],
         }
-    }
-}
-
-struct WgpuLinePrerender {
-    index_buffer: wgpu::Buffer,
-    vertex_buffer: wgpu::Buffer,
-    index_count: usize,
-}
-
-impl LinePrerender for WgpuLinePrerender {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-struct WgpuFacePrerender {
-    index_buffer: wgpu::Buffer,
-    vertex_buffer: wgpu::Buffer,
-    index_count: usize,
-}
-
-impl FacePrerender for WgpuFacePrerender {
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

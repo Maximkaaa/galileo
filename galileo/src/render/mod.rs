@@ -1,8 +1,7 @@
-use crate::primitives::{Color, DecodedImage, Image};
+use crate::primitives::{Color, DecodedImage};
 use galileo_types::cartesian::impls::contour::Contour;
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::cartesian::impls::polygon::Polygon;
-use galileo_types::cartesian::rect::Rect;
 use galileo_types::cartesian::size::Size;
 use maybe_sync::{MaybeSend, MaybeSync};
 use nalgebra::Point3;
@@ -20,30 +19,18 @@ pub trait Renderer: MaybeSend + MaybeSync {
 
 pub trait Canvas {
     fn size(&self) -> Size;
-    fn create_image(&mut self, image: &DecodedImage, bbox: Rect) -> Box<dyn Image>;
-    fn draw_images(&mut self, images: &Vec<&Box<dyn Image>>);
-    fn draw_image(&mut self, image: &Box<dyn Image>);
-
-    fn create_points(&mut self, points: &[(Point2d, PointPaint)]) -> Box<dyn PointsPrerender>;
-    fn create_line(&mut self, line: &Contour<Point2d>, paint: LinePaint) -> Box<dyn LinePrerender>;
-    fn create_polygon(
-        &mut self,
-        polygon: &Polygon<Point2d>,
-        paint: Paint,
-    ) -> Box<dyn FacePrerender>;
-
-    fn draw_points(&mut self, points: &Box<dyn PointsPrerender>);
-    fn draw_line(&mut self, line: &Box<dyn LinePrerender>);
-    fn draw_polygon(&mut self, polygon: &Box<dyn FacePrerender>);
-
-    fn draw_prerenders(&mut self, prerenders: &[&Prerender]);
-
     fn create_bundle(&self) -> Box<dyn RenderBundle>;
     fn pack_bundle(&self, bundle: Box<dyn RenderBundle>) -> Box<dyn PackedBundle>;
     fn draw_bundles(&mut self, bundles: &[&Box<dyn PackedBundle>]);
 }
 
 pub trait RenderBundle {
+    fn add_image(
+        &mut self,
+        image: DecodedImage,
+        vertices: [Point2d; 4],
+        paint: ImagePaint,
+    ) -> usize;
     fn add_points(&mut self, points: &[Point3<f64>], paint: PointPaint);
     fn add_line(&mut self, line: &Contour<Point2d>, paint: LinePaint, resolution: f64) -> usize;
     fn add_polygon(&mut self, polygon: &Polygon<Point2d>, paint: Paint, resolution: f64) -> usize;
@@ -101,18 +88,6 @@ impl Into<lyon::path::LineCap> for LineCap {
     }
 }
 
-pub trait PointsPrerender: MaybeSend + MaybeSync {
-    fn as_any(&self) -> &dyn Any;
-}
-pub trait LinePrerender: MaybeSend + MaybeSync {
-    fn as_any(&self) -> &dyn Any;
-}
-pub trait FacePrerender {
-    fn as_any(&self) -> &dyn Any;
-}
-
-pub enum Prerender {
-    Points(Box<dyn PointsPrerender>),
-    Line(Box<dyn LinePrerender>),
-    Face(Box<dyn FacePrerender>),
+pub struct ImagePaint {
+    pub opacity: u8,
 }
