@@ -95,11 +95,6 @@ impl MapView {
             Point2::new(self.size.width(), self.size.height()),
         ];
 
-        let points: Vec<Point2<f64>> = points
-            .into_iter()
-            .map(|p| self.screen_to_map(p))
-            .collect::<Option<_>>()?;
-        let bbox = Rect::from_points(points.iter())?;
         let position = self.projected_position?;
         let max_bbox = Rect::new(
             position.x - self.size.half_width() * self.resolution,
@@ -109,7 +104,16 @@ impl MapView {
         )
         .magnify(4.0);
 
-        Some(bbox.limit(max_bbox))
+        if let Some(points) = points
+            .into_iter()
+            .map(|p| self.screen_to_map(p))
+            .collect::<Option<Vec<Point2<f64>>>>()
+        {
+            let bbox = Rect::from_points(points.iter())?;
+            Some(bbox.limit(max_bbox))
+        } else {
+            Some(max_bbox)
+        }
     }
 
     fn map_to_screen_center_transform(&self) -> Option<OMatrix<f64, U4, U4>> {

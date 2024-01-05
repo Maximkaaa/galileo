@@ -58,7 +58,7 @@ impl<F> Symbol<F, Contour<Point3d>> for SimpleContourSymbol {
         vec![id]
     }
 
-    fn update(&self, feature: &F, renders_ids: &[usize], bundle: &mut Box<dyn UnpackedBundle>) {
+    fn update(&self, _feature: &F, _renders_ids: &[usize], _bundle: &mut Box<dyn UnpackedBundle>) {
         todo!()
     }
 }

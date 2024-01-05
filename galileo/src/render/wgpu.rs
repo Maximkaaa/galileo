@@ -8,7 +8,6 @@ use lyon::lyon_tessellation::{
 };
 use lyon::math::point;
 use lyon::path::path::BuilderWithAttributes;
-use lyon::path::Path;
 use lyon::tessellation::{
     FillTessellator, FillVertexConstructor, StrokeTessellator, StrokeVertex,
     StrokeVertexConstructor, VertexBuffers,
@@ -41,10 +40,10 @@ use super::{
 
 pub struct WgpuRenderer {
     surface: wgpu::Surface,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
+    device: Device,
+    queue: Queue,
     config: wgpu::SurfaceConfiguration,
-    size: winit::dpi::PhysicalSize<u32>,
+    size: PhysicalSize<u32>,
 
     line_pipeline: wgpu::RenderPipeline,
     image_painter: ImagePainter,
@@ -126,7 +125,7 @@ impl WgpuRenderer {
             .unwrap_or(surface_caps.formats[0]);
 
         let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            usage: TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
             width: size.width,
             height: size.height,
@@ -139,11 +138,11 @@ impl WgpuRenderer {
 
         let map_view_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Map view buffer"),
-            size: (std::mem::size_of::<ViewUniform>()) as wgpu::BufferAddress,
+            size: (size_of::<ViewUniform>()) as wgpu::BufferAddress,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        println!("View size is {}", std::mem::size_of::<ViewUniform>());
+        println!("View size is {}", size_of::<ViewUniform>());
 
         let map_view_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -320,7 +319,7 @@ impl WgpuRenderer {
 
     pub fn render(&self, map: &Map) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
-        let view = output.texture.create_view(&wgpu::TextureViewDescriptor {
+        let view = output.texture.create_view(&TextureViewDescriptor {
             ..Default::default()
         });
         let mut encoder = self
@@ -445,7 +444,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
                     resolve_target: Some(&self.view),
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
+                        store: StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: None,
