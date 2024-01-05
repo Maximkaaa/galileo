@@ -1,11 +1,11 @@
-use galileo_types::geo::traits::point::GeoPoint;
+use galileo_types::geometry::Geometry;
 
 pub trait Feature {
     type Geom;
     fn geometry(&self) -> &Self::Geom;
 }
 
-impl<T: GeoPoint> Feature for T {
+impl<T: Geometry> Feature for T {
     type Geom = T;
 
     fn geometry(&self) -> &Self::Geom {

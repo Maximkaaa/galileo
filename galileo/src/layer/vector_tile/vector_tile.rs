@@ -4,7 +4,7 @@ use crate::render::{LineCap, LinePaint, PackedBundle, Paint, RenderBundle, Rende
 use crate::tile_scheme::{TileIndex, TileScheme};
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
 use galileo_types::cartesian::impls::contour::Contour;
-use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::cartesian::rect::Rect;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
 use num_traits::ToPrimitive;
@@ -65,7 +65,9 @@ impl VectorTile {
                                             .points
                                             .iter()
                                             .map(|p| {
-                                                Self::transform_point(p, bbox, tile_resolution)
+                                                let point =
+                                                    Self::transform_point(p, bbox, tile_resolution);
+                                                Point3d::new(point.x, point.y, 0.0)
                                             })
                                             .collect(),
                                     },

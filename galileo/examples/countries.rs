@@ -1,9 +1,15 @@
+use data::{load_countries, Country};
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
 use galileo::galileo_map::MapBuilder;
-use galileo::layer::feature::{CirclePointSymbol, FeatureLayer, SimplePolygonSymbol, Symbol};
+use galileo::layer::feature::symbol::contour::SimpleContourSymbol;
+use galileo::layer::feature::symbol::point::CirclePointSymbol;
+use galileo::layer::feature::symbol::polygon::SimplePolygonSymbol;
+use galileo::layer::feature::symbol::Symbol;
+use galileo::layer::feature::FeatureLayer;
 use galileo::primitives::Color;
 use galileo::render::{RenderBundle, UnpackedBundle};
-use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::impls::contour::Contour;
+use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::geo::crs::Crs;
 use galileo_types::geo::impls::point::GeoPoint2d;
 use galileo_types::geo::traits::point::NewGeoPoint;
@@ -12,7 +18,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 
 mod data;
-use data::{load_countries, Country};
 
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
@@ -36,10 +41,30 @@ pub async fn run(builder: MapBuilder) {
         Crs::WGS84,
     );
 
+    let mut points = vec![];
+    for i in 0..100 {
+        let angle = std::f64::consts::PI / 100.0 * i as f64;
+        points.push(Point3d::new(
+            0.0,
+            1_000_000.0 * angle.cos(),
+            1_000_000.0 * angle.sin(),
+        ));
+    }
+
+    let line_layer = FeatureLayer::new(
+        vec![Contour::new(points, false)],
+        SimpleContourSymbol {
+            color: Color::rgba(0, 100, 255, 255),
+            width: 5.0,
+        },
+        Crs::EPSG3857,
+    );
+
     let selected_index = Arc::new(AtomicUsize::new(usize::MAX));
     builder
         .with_layer(feature_layer.clone())
         .with_layer(point_layer)
+        .with_layer(line_layer)
         .with_event_handler(move |ev, map, backend| {
             if let UserEvent::Click(button, event) = ev {
                 if *button == MouseButton::Left {

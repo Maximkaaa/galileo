@@ -1,5 +1,5 @@
 use galileo_types::cartesian::impls::contour::Contour;
-use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::cartesian::impls::polygon::Polygon;
 use galileo_types::cartesian::size::Size;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
@@ -7,8 +7,7 @@ use lyon::lyon_tessellation::{
     BuffersBuilder, FillOptions, FillVertex, LineJoin, Side, StrokeOptions,
 };
 use lyon::math::point;
-use lyon::path::builder::NoAttributes;
-use lyon::path::path::BuilderImpl;
+use lyon::path::path::BuilderWithAttributes;
 use lyon::path::Path;
 use lyon::tessellation::{
     FillTessellator, FillVertexConstructor, StrokeTessellator, StrokeVertex,
@@ -571,7 +570,7 @@ impl RenderBundle for WgpuRenderBundle {
         ))
     }
 
-    fn add_line(&mut self, line: &Contour<Point2d>, paint: LinePaint, resolution: f64) -> usize {
+    fn add_line(&mut self, line: &Contour<Point3d>, paint: LinePaint, resolution: f64) -> usize {
         let resolution = resolution as f32;
         let vertex_constructor = LineVertexConstructor {
             width: paint.width as f32,
@@ -582,17 +581,21 @@ impl RenderBundle for WgpuRenderBundle {
 
         // todo: check length of line
 
-        let builder_impl = BuilderImpl::with_capacity(line.points.len(), line.points.len() - 2);
-        let mut path_builder = NoAttributes::wrap(builder_impl);
+        let mut path_builder = BuilderWithAttributes::new(1);
 
-        let _ = path_builder.begin(point(
-            line.points[0].x() as f32 / resolution,
-            line.points[0].y() as f32 / resolution,
-        ));
+        let _ = path_builder.begin(
+            point(
+                line.points[0].x as f32 / resolution,
+                line.points[0].y as f32 / resolution,
+            ),
+            &[line.points[0].z as f32],
+        );
 
         for p in line.points.iter().skip(1) {
-            let _ =
-                path_builder.line_to(point(p.x() as f32 / resolution, p.y() as f32 / resolution));
+            let _ = path_builder.line_to(
+                point(p.x as f32 / resolution, p.y as f32 / resolution),
+                &[p.z as f32],
+            );
         }
         let _ = path_builder.end(line.is_closed);
         let path = path_builder.build();
@@ -600,7 +603,7 @@ impl RenderBundle for WgpuRenderBundle {
         let mut tesselator = StrokeTessellator::new();
         let start_index = self.vertex_buffers.vertices.len();
         tesselator
-            .tessellate(
+            .tessellate_path(
                 &path,
                 &StrokeOptions::DEFAULT
                     .with_line_cap(paint.line_cap.into())
@@ -621,15 +624,15 @@ impl RenderBundle for WgpuRenderBundle {
     }
 
     fn add_polygon(&mut self, polygon: &Polygon<Point2d>, paint: Paint, _resolution: f64) -> usize {
-        let mut path_builder = Path::builder();
+        let mut path_builder = BuilderWithAttributes::new(1);
         for contour in polygon.iter_contours() {
-            let _ = path_builder.begin(point(
-                contour.points[0].x() as f32,
-                contour.points[0].y() as f32,
-            ));
+            let _ = path_builder.begin(
+                point(contour.points[0].x() as f32, contour.points[0].y() as f32),
+                &[0.0],
+            );
 
             for p in contour.points.iter().skip(1) {
-                let _ = path_builder.line_to(point(p.x() as f32, p.y() as f32));
+                let _ = path_builder.line_to(point(p.x() as f32, p.y() as f32), &[0.0]);
             }
 
             let _ = path_builder.end(true);
@@ -916,7 +919,7 @@ struct LineVertexConstructor {
 }
 
 impl StrokeVertexConstructor<LineVertex> for LineVertexConstructor {
-    fn new_vertex(&mut self, vertex: StrokeVertex) -> LineVertex {
+    fn new_vertex(&mut self, mut vertex: StrokeVertex) -> LineVertex {
         let position = vertex.position_on_path();
         let normal = match vertex.side() {
             Side::Negative => [
@@ -929,7 +932,11 @@ impl StrokeVertexConstructor<LineVertex> for LineVertexConstructor {
             ],
         };
         LineVertex {
-            position: [position.x * self.resolution, position.y * self.resolution],
+            position: [
+                position.x * self.resolution,
+                position.y * self.resolution,
+                vertex.interpolated_attributes()[0],
+            ],
             color: self.color,
             normal,
         }
@@ -956,7 +963,7 @@ struct PolygonVertexConstructorNew {
 impl FillVertexConstructor<LineVertex> for PolygonVertexConstructorNew {
     fn new_vertex(&mut self, vertex: FillVertex) -> LineVertex {
         LineVertex {
-            position: vertex.position().to_array(),
+            position: [vertex.position().x, vertex.position().y, 0.0],
             color: self.color,
             normal: Default::default(),
         }
@@ -966,7 +973,7 @@ impl FillVertexConstructor<LineVertex> for PolygonVertexConstructorNew {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
 pub struct LineVertex {
-    position: [f32; 2],
+    position: [f32; 3],
     color: [f32; 4],
     normal: [f32; 2],
 }
@@ -974,22 +981,21 @@ pub struct LineVertex {
 impl LineVertex {
     fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<LineVertex>() as wgpu::BufferAddress,
+            array_stride: size_of::<LineVertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[
                 wgpu::VertexAttribute {
                     offset: 0,
                     shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x2,
+                    format: wgpu::VertexFormat::Float32x3,
                 },
                 wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
+                    offset: size_of::<[f32; 3]>() as wgpu::BufferAddress,
                     shader_location: 1,
                     format: wgpu::VertexFormat::Float32x4,
                 },
                 wgpu::VertexAttribute {
-                    offset: (std::mem::size_of::<[f32; 2]>() + std::mem::size_of::<[f32; 4]>())
-                        as wgpu::BufferAddress,
+                    offset: (size_of::<[f32; 3]>() + size_of::<[f32; 4]>()) as wgpu::BufferAddress,
                     shader_location: 2,
                     format: wgpu::VertexFormat::Float32x2,
                 },

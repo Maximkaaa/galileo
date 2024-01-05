@@ -40,6 +40,21 @@ impl<Point> Contour<Point> {
             None
         }
     }
+
+    pub fn project_points<P, Proj>(&self, projection: &Proj) -> Option<Contour<P>>
+    where
+        Proj: Projection<InPoint = Point, OutPoint = P>,
+    {
+        let points = self
+            .points
+            .iter()
+            .map(|p| projection.project(p))
+            .collect::<Option<Vec<P>>>()?;
+        Some(Contour {
+            points,
+            is_closed: self.is_closed,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,9 +62,21 @@ pub struct ClosedContour<Point> {
     pub points: Vec<Point>,
 }
 
-impl<P> ClosedContour<P> {
-    pub fn new(points: Vec<P>) -> Self {
+impl<Point> ClosedContour<Point> {
+    pub fn new(points: Vec<Point>) -> Self {
         Self { points }
+    }
+
+    pub fn project_points<P, Proj>(&self, projection: &Proj) -> Option<ClosedContour<P>>
+    where
+        Proj: Projection<InPoint = Point, OutPoint = P>,
+    {
+        let points = self
+            .points
+            .iter()
+            .map(|p| projection.project(p))
+            .collect::<Option<Vec<P>>>()?;
+        Some(ClosedContour { points })
     }
 }
 

@@ -1,10 +1,9 @@
 use crate::primitives::{Color, DecodedImage};
 use galileo_types::cartesian::impls::contour::Contour;
-use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::cartesian::impls::polygon::Polygon;
 use galileo_types::cartesian::size::Size;
 use maybe_sync::{MaybeSend, MaybeSync};
-use nalgebra::Point3;
 use std::any::Any;
 
 #[cfg(feature = "wgpu")]
@@ -31,8 +30,8 @@ pub trait RenderBundle {
         vertices: [Point2d; 4],
         paint: ImagePaint,
     ) -> usize;
-    fn add_points(&mut self, points: &[Point3<f64>], paint: PointPaint);
-    fn add_line(&mut self, line: &Contour<Point2d>, paint: LinePaint, resolution: f64) -> usize;
+    fn add_points(&mut self, points: &[Point3d], paint: PointPaint);
+    fn add_line(&mut self, line: &Contour<Point3d>, paint: LinePaint, resolution: f64) -> usize;
     fn add_polygon(&mut self, polygon: &Polygon<Point2d>, paint: Paint, resolution: f64) -> usize;
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
     fn is_empty(&self) -> bool;

@@ -47,6 +47,14 @@ pub trait CartesianPoint2d {
     }
 }
 
+pub trait CartesianPoint3d {
+    type Num;
+
+    fn x(&self) -> Self::Num;
+    fn y(&self) -> Self::Num;
+    fn z(&self) -> Self::Num;
+}
+
 impl<T> PointHelper<CartesianPointType> for T where
     T: CartesianPoint2d + Point<Type = CartesianPointType>
 {
@@ -54,6 +62,10 @@ impl<T> PointHelper<CartesianPointType> for T where
 
 pub trait NewCartesianPoint2d<Num = f64>: CartesianPoint2d<Num = Num> {
     fn new(x: Num, y: Num) -> Self;
+}
+
+pub trait NewCartesianPoint3d<Num = f64>: CartesianPoint3d<Num = Num> {
+    fn new(x: Num, y: Num, z: Num) -> Self;
 }
 
 pub trait CartesianPoint2dFloat<N: Float = f64>: CartesianPoint2d<Num = N> {

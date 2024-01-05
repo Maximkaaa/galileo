@@ -29,14 +29,6 @@ impl Country {
     }
 }
 
-impl Feature for Country {
-    type Geom = Self;
-
-    fn geometry(&self) -> &Self {
-        &self
-    }
-}
-
 impl Geometry for Country {
     type Point = Point2d;
 
