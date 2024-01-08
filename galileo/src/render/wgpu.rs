@@ -12,7 +12,7 @@ use lyon::tessellation::{
     FillTessellator, FillVertexConstructor, StrokeTessellator, StrokeVertex,
     StrokeVertexConstructor, VertexBuffers,
 };
-use nalgebra::Point3;
+use nalgebra::{Point3, Rotation3, Vector3};
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::mem::size_of;
@@ -390,11 +390,18 @@ struct WgpuCanvas<'a> {
 
 impl<'a> WgpuCanvas<'a> {
     fn new(renderer: &'a WgpuRenderer, view: &'a TextureView, map_view: MapView) -> Self {
+        let rotation_mtx = Rotation3::new(Vector3::new(
+            map_view.rotation_x(),
+            0.0,
+            -map_view.rotation_z(),
+        ))
+        .to_homogeneous();
         renderer.queue.write_buffer(
             &renderer.map_view_buffer,
             0,
             bytemuck::cast_slice(&[ViewUniform {
                 view_proj: map_view.map_to_scene_mtx().unwrap(),
+                view_rotation: rotation_mtx.cast::<f32>().data.0,
                 inv_screen_size: [
                     1.0 / renderer.size.width as f32,
                     1.0 / renderer.size.height as f32,
@@ -1057,6 +1064,7 @@ mod image;
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct ViewUniform {
     view_proj: [[f32; 4]; 4],
+    view_rotation: [[f32; 4]; 4],
     inv_screen_size: [f32; 2],
     resolution: f32,
     _padding: [f32; 1],

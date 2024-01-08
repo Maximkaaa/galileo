@@ -2,6 +2,8 @@
 
 struct ViewUniform {
     view_proj: mat4x4<f32>,
+    view_rotation: mat4x4<f32>,
+    inv_screen_size: vec2<f32>,
     resolution: f32,
 }
 
@@ -27,7 +29,8 @@ fn vs_main(
     out.color = model.color;
 
     var vertex_position = transform.view_proj * vec4<f32>(model.position, 1.0);
-    var norm = vec4<f32>(model.norm * transform.resolution * vertex_position[3] * 2.0, 0.0, 0.0);
+    var norm_scale = vec2<f32>(model.norm[0] * transform.inv_screen_size[0], model.norm[1] * transform.inv_screen_size[1]);
+    var norm = vec4<f32>(norm_scale * vertex_position[3] * 2.0, 0.0, 0.0) * transform.view_rotation;
     out.clip_position = vertex_position + norm;
 
     return out;
