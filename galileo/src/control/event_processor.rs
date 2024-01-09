@@ -1,5 +1,6 @@
 use crate::control::{
-    EventPropagation, MouseButtonsState, MouseEvent, RawUserEvent, UserEvent, UserEventHandler,
+    EventPropagation, MouseButton, MouseButtonsState, MouseEvent, RawUserEvent, TouchId, UserEvent,
+    UserEventHandler,
 };
 use crate::map::Map;
 use crate::render::Renderer;
@@ -11,10 +12,18 @@ const DRAG_THRESHOLD: f64 = 3.0;
 const CLICK_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(200);
 const DBL_CLICK_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(500);
 
+struct TouchInfo {
+    id: TouchId,
+    start_position: Point2d,
+    _start_time: SystemTime,
+    prev_position: Point2d,
+}
+
 pub struct EventProcessor {
     handlers: Vec<Box<dyn UserEventHandler>>,
     pointer_position: Point2d,
     pointer_pressed_position: Point2d,
+    touches: Vec<TouchInfo>,
 
     buttons_state: MouseButtonsState,
 
@@ -30,6 +39,7 @@ impl Default for EventProcessor {
             handlers: vec![],
             pointer_position: Default::default(),
             pointer_pressed_position: Default::default(),
+            touches: Vec::new(),
             buttons_state: Default::default(),
             last_pressed_time: SystemTime::UNIX_EPOCH,
             last_click_time: SystemTime::UNIX_EPOCH,
@@ -48,9 +58,6 @@ impl EventProcessor {
             for user_event in user_events {
                 let mut drag_start_target = None;
 
-                let delta = self.pointer_position - self.pointer_pressed_position;
-                let mouse_event = self.get_mouse_event();
-
                 for (index, handler) in self.handlers.iter_mut().enumerate() {
                     if matches!(user_event, UserEvent::Drag(..) | UserEvent::DragEnded(..)) {
                         if let Some(target) = &self.drag_target {
@@ -66,14 +73,8 @@ impl EventProcessor {
                         EventPropagation::Propagate => {}
                         EventPropagation::Stop => break,
                         EventPropagation::Consume => {
-                            if let UserEvent::DragStarted(button, _) = user_event {
+                            if let UserEvent::DragStarted(..) = user_event {
                                 drag_start_target = Some(index);
-
-                                handler.handle(
-                                    &UserEvent::Drag(button, delta.into(), mouse_event),
-                                    map,
-                                    backend,
-                                );
                             }
 
                             break;
@@ -111,6 +112,7 @@ impl EventProcessor {
 
                 if (now.duration_since(self.last_pressed_time)).unwrap_or_default() < CLICK_TIMEOUT
                 {
+                    log::info!("click position: {:?}", self.pointer_position);
                     events.push(UserEvent::Click(button, self.get_mouse_event()));
 
                     if (now.duration_since(self.last_click_time)).unwrap_or_default()
@@ -134,6 +136,7 @@ impl EventProcessor {
 
                 let mut events = vec![UserEvent::PointerMoved(self.get_mouse_event())];
                 if let Some(button) = self.buttons_state.single_pressed() {
+                    let mut is_dragging = self.drag_target.is_some();
                     if self.drag_target.is_none()
                         && position.taxicab_distance(&self.pointer_pressed_position)
                             > DRAG_THRESHOLD
@@ -142,9 +145,11 @@ impl EventProcessor {
                             button,
                             self.get_mouse_event_pos(self.pointer_pressed_position),
                         ));
+
+                        is_dragging = true;
                     }
 
-                    if self.drag_target.is_some() {
+                    if is_dragging {
                         events.push(UserEvent::Drag(
                             button,
                             (self.pointer_position - prev_position).into(),
@@ -155,13 +160,93 @@ impl EventProcessor {
 
                 Some(events)
             }
-            RawUserEvent::MouseWheel(delta) => {
-                Some(vec![UserEvent::Zoom(delta, self.get_mouse_event())])
+            RawUserEvent::Scroll(delta) => {
+                Some(vec![UserEvent::Scroll(delta, self.get_mouse_event())])
             }
-            // todo
-            RawUserEvent::TouchStart(_touch) => None,
-            RawUserEvent::TouchMove(_touch) => None,
-            RawUserEvent::TouchEnd(_touch) => None,
+            RawUserEvent::TouchStart(touch) => {
+                for i in 0..self.touches.len() {
+                    if self.touches[i].id == touch.touch_id {
+                        // This should never happen, but in case it does, we don't wont a touch to be stuck here forever
+                        self.touches.remove(i);
+                        break;
+                    }
+                }
+
+                self.touches.push(TouchInfo {
+                    id: touch.touch_id,
+                    start_position: touch.position,
+                    _start_time: now,
+                    prev_position: touch.position,
+                });
+
+                None
+            }
+            RawUserEvent::TouchMove(touch) => {
+                let Some(touch_info) = self.touches.iter().find(|t| t.id == touch.touch_id) else {
+                    return None;
+                };
+                let position = touch.position;
+
+                let mut events = vec![];
+
+                if self.touches.len() == 1 {
+                    let mut is_dragging = self.drag_target.is_some();
+                    if self.drag_target.is_none()
+                        && position.taxicab_distance(&touch_info.start_position) > DRAG_THRESHOLD
+                    {
+                        events.push(UserEvent::DragStarted(
+                            MouseButton::Other,
+                            self.get_mouse_event_pos(touch_info.start_position),
+                        ));
+
+                        is_dragging = true
+                    }
+
+                    if is_dragging {
+                        events.push(UserEvent::Drag(
+                            MouseButton::Other,
+                            (position - touch_info.prev_position).into(),
+                            self.get_mouse_event_pos(position),
+                        ));
+                    }
+                } else if self.touches.len() == 2 {
+                    let other_touch = self.touches.iter().find(|t| t.id != touch_info.id).unwrap();
+                    let distance = (other_touch.prev_position - position).magnitude();
+                    let prev_distance =
+                        (other_touch.prev_position - touch_info.prev_position).magnitude();
+                    let zoom = prev_distance / distance;
+
+                    events.push(UserEvent::Zoom(zoom, other_touch.prev_position))
+                }
+
+                for touch_info in &mut self.touches {
+                    if touch_info.id == touch.touch_id {
+                        touch_info.prev_position = position;
+                    }
+                }
+
+                Some(events)
+            }
+            RawUserEvent::TouchEnd(touch) => {
+                for i in 0..self.touches.len() {
+                    if self.touches[i].id == touch.touch_id {
+                        self.touches.remove(i);
+                        break;
+                    }
+                }
+
+                let mut events = vec![];
+
+                if self.drag_target.is_some() && self.touches.is_empty() {
+                    self.drag_target = None;
+                    events.push(UserEvent::DragEnded(
+                        MouseButton::Other,
+                        self.get_mouse_event_pos(touch.position),
+                    ));
+                }
+
+                Some(events)
+            }
         }
     }
 

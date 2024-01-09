@@ -56,6 +56,7 @@ impl GalileoMap {
                                 target.exit();
                             }
                             WindowEvent::Resized(size) => {
+                                log::info!("Window resized to: {size:?}");
                                 backend.write().unwrap().resize(size);
                                 let mut map = map.write().unwrap();
                                 map.set_size(Size::new(size.width as f64, size.height as f64));
@@ -67,7 +68,19 @@ impl GalileoMap {
                                 backend.read().unwrap().render(&map).unwrap();
                             }
                             other => {
-                                if let Some(raw_event) = input_handler.process_user_input(&other) {
+                                // Phone emulator in browsers works funny with scaling, using this code fixes it.
+                                // But my real phone works fine without it, so it's commented out for now, and probably
+                                // should be deleted later, when we know that it's not needed on any devices.
+
+                                // #[cfg(target_arch = "wasm32")]
+                                // let scale = window.scale_factor();
+                                //
+                                // #[cfg(not(target_arch = "wasm32"))]
+                                let scale = 1.0;
+
+                                if let Some(raw_event) =
+                                    input_handler.process_user_input(&other, scale)
+                                {
                                     let mut map = map.write().unwrap();
                                     event_processor.handle(
                                         raw_event,

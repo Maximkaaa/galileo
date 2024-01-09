@@ -7,7 +7,7 @@ use galileo_types::geo::impls::point::GeoPoint2d;
 use galileo_types::geo::traits::point::GeoPoint;
 use nalgebra::{
     Matrix4, OMatrix, Perspective3, Point2, Point3, Rotation3, Scale3, Translation3, Vector2,
-    Vector3, Vector4, U4,
+    Vector3, U4,
 };
 
 #[derive(Debug, Clone)]
@@ -148,17 +148,6 @@ impl MapView {
         .to_homogeneous()
     }
 
-    fn map_to_screen_transform(&self) -> Option<Matrix4<f64>> {
-        let translate = Translation3::new(self.size.half_width(), -self.size.half_height(), 0.0)
-            .to_homogeneous();
-        let scale = Scale3::new(1.0, -1.0, 1.0).to_homogeneous();
-        Some(scale * translate * self.map_to_screen_center_transform()?)
-    }
-
-    fn screen_to_map_transform(&self) -> Option<Matrix4<f64>> {
-        Some(self.map_to_screen_transform()?.try_inverse().unwrap())
-    }
-
     fn map_to_scene_transform(&self) -> Option<OMatrix<f64, U4, U4>> {
         let scale = Scale3::new(1.0, 1.0, 0.5).to_homogeneous();
         Some(scale * self.map_to_screen_center_transform()?)
@@ -234,17 +223,23 @@ impl MapView {
     }
 
     pub fn translate_by_pixels(&self, from: Point2d, to: Point2d) -> Self {
-        let Some(transform) = self.screen_to_map_transform() else {
-            return Self {
-                projected_position: None,
-                crs: self.crs.clone(),
-                ..*self
-            };
+        let Some(from_projected) = self.screen_to_map(from) else {
+            return self.clone();
+        };
+        let Some(to_projected) = self.screen_to_map(to) else {
+            return self.clone();
         };
 
-        let from_projected = transform * Vector4::new(from.x, from.y, 0.0, 1.0);
-        let to_projected = transform * Vector4::new(to.x, to.y, 0.0, 1.0);
-        let delta = to_projected - from_projected;
+        const MAX_TRANSLATE: f64 = 100.0;
+        let max_translate = MAX_TRANSLATE * self.resolution;
+        let mut delta = to_projected - from_projected;
+        if delta.x.abs() > max_translate {
+            delta.x = max_translate * delta.x.signum();
+        }
+        if delta.y.abs() > max_translate {
+            delta.y = max_translate * delta.y.signum();
+        }
+
         self.translate(delta.xy())
     }
 

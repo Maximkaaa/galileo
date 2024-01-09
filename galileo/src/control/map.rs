@@ -44,12 +44,14 @@ impl UserEventHandler for MapController {
     ) -> EventPropagation {
         match event {
             UserEvent::DragStarted(button, _)
-                if *button == MouseButton::Left || *button == MouseButton::Right =>
+                if *button == MouseButton::Left
+                    || *button == MouseButton::Right
+                    || *button == MouseButton::Other =>
             {
                 EventPropagation::Consume
             }
             UserEvent::Drag(button, delta, e) => match button {
-                MouseButton::Left => {
+                MouseButton::Left | MouseButton::Other => {
                     let current_position = e.screen_pointer_position;
                     let prev_position = current_position - delta;
 
@@ -65,12 +67,18 @@ impl UserEventHandler for MapController {
                 }
                 _ => EventPropagation::Propagate,
             },
-            UserEvent::Zoom(delta, mouse_event) => {
+            UserEvent::Scroll(delta, mouse_event) => {
                 let zoom = self.get_zoom(*delta, map.view().resolution());
                 let target = map
                     .target_view()
                     .zoom(zoom, mouse_event.screen_pointer_position);
                 map.animate_to(target, self.parameters.zoom_duration);
+
+                EventPropagation::Stop
+            }
+            UserEvent::Zoom(zoom, center) => {
+                let target = map.view().zoom(*zoom, *center);
+                map.set_view(target);
 
                 EventPropagation::Stop
             }

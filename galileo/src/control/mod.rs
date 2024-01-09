@@ -15,7 +15,7 @@ pub enum RawUserEvent {
     ButtonPressed(MouseButton),
     ButtonReleased(MouseButton),
     PointerMoved(Point2d),
-    MouseWheel(f64),
+    Scroll(f64),
     TouchStart(TouchEvent),
     TouchMove(TouchEvent),
     TouchEnd(TouchEvent),
@@ -33,7 +33,8 @@ pub enum UserEvent {
     Drag(MouseButton, Vector2<f64>, MouseEvent),
     DragEnded(MouseButton, MouseEvent),
 
-    Zoom(f64, MouseEvent),
+    Scroll(f64, MouseEvent),
+    Zoom(f64, Point2d),
 }
 
 pub enum EventPropagation {

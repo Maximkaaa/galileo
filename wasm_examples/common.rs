@@ -22,13 +22,16 @@ pub async fn set_up() -> (Window, EventLoop<()>) {
         })
         .expect("Couldn't create canvas");
 
-    sleep(10).await;
-
     let web_window = web_sys::window().unwrap();
+    let scale = web_window.device_pixel_ratio();
+
     let _ = window.request_inner_size(PhysicalSize::new(
-        web_window.inner_width().unwrap().as_f64().unwrap(),
-        web_window.inner_height().unwrap().as_f64().unwrap(),
+        web_window.inner_width().unwrap().as_f64().unwrap() * scale,
+        web_window.inner_height().unwrap().as_f64().unwrap() * scale,
     ));
+
+    sleep(10).await;
+    log::info!("Canvas size: {:?}", window.inner_size());
 
     (window, event_loop)
 }

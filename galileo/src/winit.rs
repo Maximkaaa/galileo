@@ -9,14 +9,18 @@ use winit::window::Window;
 pub struct WinitInputHandler {}
 
 impl WinitInputHandler {
-    pub fn process_user_input(&mut self, winit_event: &WindowEvent) -> Option<RawUserEvent> {
+    pub fn process_user_input(
+        &mut self,
+        winit_event: &WindowEvent,
+        scale: f64,
+    ) -> Option<RawUserEvent> {
         match winit_event {
             WindowEvent::MouseInput { button, state, .. } => match state {
                 ElementState::Pressed => Some(RawUserEvent::ButtonPressed(button.into())),
                 ElementState::Released => Some(RawUserEvent::ButtonReleased(button.into())),
             },
             WindowEvent::CursorMoved { position, .. } => {
-                let pointer_position = Point2d::new(position.x, position.y);
+                let pointer_position = Point2d::new(position.x / scale, position.y / scale);
                 Some(RawUserEvent::PointerMoved(pointer_position))
             }
             WindowEvent::MouseWheel { delta, .. } => {
@@ -28,23 +32,27 @@ impl WinitInputHandler {
                     return None;
                 }
 
-                Some(RawUserEvent::MouseWheel(zoom))
+                Some(RawUserEvent::Scroll(zoom))
             }
             WindowEvent::Touch(touch) => match touch.phase {
-                TouchPhase::Started => Some(RawUserEvent::TouchStart(self.get_touch_event(touch))),
-                TouchPhase::Moved => Some(RawUserEvent::TouchStart(self.get_touch_event(touch))),
+                TouchPhase::Started => {
+                    Some(RawUserEvent::TouchStart(self.get_touch_event(touch, scale)))
+                }
+                TouchPhase::Moved => {
+                    Some(RawUserEvent::TouchMove(self.get_touch_event(touch, scale)))
+                }
                 TouchPhase::Ended | TouchPhase::Cancelled => {
-                    Some(RawUserEvent::TouchStart(self.get_touch_event(touch)))
+                    Some(RawUserEvent::TouchEnd(self.get_touch_event(touch, scale)))
                 }
             },
             _ => None,
         }
     }
 
-    fn get_touch_event(&mut self, touch: &Touch) -> TouchEvent {
+    fn get_touch_event(&mut self, touch: &Touch, scale: f64) -> TouchEvent {
         TouchEvent {
             touch_id: touch.id,
-            position: Point2d::new(touch.location.x, touch.location.y),
+            position: Point2d::new(touch.location.x / scale, touch.location.y / scale),
         }
     }
 }
