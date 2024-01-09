@@ -1,6 +1,6 @@
 use crate::layer::feature::symbol::Symbol;
 use crate::primitives::Color;
-use crate::render::{LineCap, LinePaint, RenderBundle, UnpackedBundle};
+use crate::render::{LineCap, LinePaint, PrimitiveId, RenderBundle, UnpackedBundle};
 use galileo_types::cartesian::impls::contour::Contour;
 use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::geo::impls::projection::dimensions::AddDimensionProjection;
@@ -16,7 +16,7 @@ impl Symbol<(), Contour<Point2d>> for SimpleContourSymbol {
         _feature: &(),
         geometry: &Contour<Point2d>,
         bundle: &mut Box<dyn RenderBundle>,
-    ) -> Vec<usize> {
+    ) -> Vec<PrimitiveId> {
         let projection = AddDimensionProjection::new(0.0);
         let id = bundle.add_line(
             &geometry.project_points(&projection).unwrap(),
@@ -32,7 +32,12 @@ impl Symbol<(), Contour<Point2d>> for SimpleContourSymbol {
         vec![id]
     }
 
-    fn update(&self, _feature: &(), _renders_ids: &[usize], _bundle: &mut Box<dyn UnpackedBundle>) {
+    fn update(
+        &self,
+        _feature: &(),
+        _renders_ids: &[PrimitiveId],
+        _bundle: &mut Box<dyn UnpackedBundle>,
+    ) {
         todo!()
     }
 }
@@ -43,7 +48,7 @@ impl<F> Symbol<F, Contour<Point3d>> for SimpleContourSymbol {
         _feature: &F,
         geometry: &Contour<Point3d>,
         bundle: &mut Box<dyn RenderBundle>,
-    ) -> Vec<usize> {
+    ) -> Vec<PrimitiveId> {
         let id = bundle.add_line(
             &geometry,
             LinePaint {
@@ -58,7 +63,12 @@ impl<F> Symbol<F, Contour<Point3d>> for SimpleContourSymbol {
         vec![id]
     }
 
-    fn update(&self, _feature: &F, _renders_ids: &[usize], _bundle: &mut Box<dyn UnpackedBundle>) {
+    fn update(
+        &self,
+        _feature: &F,
+        _renders_ids: &[PrimitiveId],
+        _bundle: &mut Box<dyn UnpackedBundle>,
+    ) {
         todo!()
     }
 }

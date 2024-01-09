@@ -15,8 +15,9 @@ pub struct ImagePainter {
 }
 
 pub struct WgpuImage {
-    texture_bind_group: wgpu::BindGroup,
-    vertex_buffer: wgpu::Buffer,
+    pub texture_bind_group: wgpu::BindGroup,
+    pub vertex_buffer: wgpu::Buffer,
+    pub vertices: [ImageVertex; 4],
 }
 
 impl Image for WgpuImage {
@@ -76,7 +77,7 @@ impl ImagePainter {
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format,
-                    blend: Some(wgpu::BlendState::REPLACE),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
@@ -116,7 +117,7 @@ impl ImagePainter {
         device: &Device,
         queue: &Queue,
         image: &DecodedImage,
-        vertices: &[ImageVertex; 4],
+        vertices: [ImageVertex; 4],
     ) -> WgpuImage {
         let texture_size = wgpu::Extent3d {
             width: image.dimensions.0,
@@ -169,12 +170,13 @@ impl ImagePainter {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Image vertex buffer"),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            contents: bytemuck::cast_slice(vertices),
+            contents: bytemuck::cast_slice(&vertices),
         });
 
         WgpuImage {
             texture_bind_group,
             vertex_buffer,
+            vertices,
         }
     }
 

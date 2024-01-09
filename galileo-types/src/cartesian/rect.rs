@@ -186,6 +186,13 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
             Point2::new(self.x_max, self.y_min),
         ]
     }
+
+    pub fn intersects(&self, other: Rect<N>) -> bool {
+        self.x_max >= other.x_min
+            && self.x_min <= other.x_max
+            && self.y_max >= other.y_max
+            && self.y_min <= other.y_max
+    }
 }
 
 impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> FromIterator<Rect<N>> for Rect<N> {

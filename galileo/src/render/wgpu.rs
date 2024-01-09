@@ -34,8 +34,8 @@ use crate::view::MapView;
 use self::image::ImagePainter;
 
 use super::{
-    Canvas, ImagePaint, LinePaint, PackedBundle, Paint, PointPaint, RenderBundle, Renderer,
-    UnpackedBundle,
+    Canvas, ImagePaint, LinePaint, PackedBundle, Paint, PointPaint, PrimitiveId, RenderBundle,
+    Renderer, UnpackedBundle,
 };
 
 pub struct WgpuRenderer {
@@ -65,9 +65,9 @@ impl Renderer for WgpuRenderer {
         let cast = bundle.into_any().downcast::<WgpuRenderBundle>().unwrap();
         Box::new(WgpuPackedBundle::new(
             cast.vertex_buffers,
-            cast.ranges,
             cast.points,
             cast.images,
+            cast.primitives,
             &self,
         ))
     }
@@ -428,11 +428,15 @@ impl<'a> Canvas for WgpuCanvas<'a> {
         let cast = bundle.into_any().downcast::<WgpuRenderBundle>().unwrap();
         Box::new(WgpuPackedBundle::new(
             cast.vertex_buffers,
-            cast.ranges,
             cast.points,
             cast.images,
+            cast.primitives,
             &self.renderer,
         ))
+    }
+
+    fn pack_unpacked(&self, bundle: Box<dyn UnpackedBundle>) -> Box<dyn PackedBundle> {
+        self.renderer.pack_bundle(bundle)
     }
 
     fn draw_bundles(&mut self, bundles: &[&Box<dyn PackedBundle>]) {
@@ -510,18 +514,25 @@ impl<'a> WgpuCanvas<'a> {
 #[derive(Debug)]
 pub struct WgpuRenderBundle {
     pub vertex_buffers: VertexBuffers<LineVertex, u32>,
-    pub ranges: Vec<Range<usize>>,
     points: Vec<(PointPaint, Vec<PointInstance>)>,
     images: Vec<(DecodedImage, [ImageVertex; 4])>,
+    primitives: Vec<PrimitiveInfo>,
+}
+
+#[derive(Debug)]
+enum PrimitiveInfo {
+    Line { vertex_range: Range<usize> },
+    Point,
+    Image { image_index: usize },
 }
 
 impl WgpuRenderBundle {
     pub fn new() -> Self {
         Self {
             vertex_buffers: VertexBuffers::new(),
-            ranges: Vec::new(),
             points: Vec::new(),
             images: Vec::new(),
+            primitives: Vec::new(),
         }
     }
 }
@@ -532,8 +543,9 @@ impl RenderBundle for WgpuRenderBundle {
         image: DecodedImage,
         vertices: [Point2d; 4],
         paint: ImagePaint,
-    ) -> usize {
+    ) -> PrimitiveId {
         let opacity = paint.opacity as f32 / 255.0;
+        let image_index = self.images.len();
         self.images.push((
             image,
             [
@@ -560,11 +572,13 @@ impl RenderBundle for WgpuRenderBundle {
             ],
         ));
 
-        // todo
-        0
+        let id = self.primitives.len();
+        self.primitives.push(PrimitiveInfo::Image { image_index });
+
+        PrimitiveId(id)
     }
 
-    fn add_points(&mut self, points: &[Point3<f64>], paint: PointPaint) {
+    fn add_points(&mut self, points: &[Point3<f64>], paint: PointPaint) -> Vec<PrimitiveId> {
         self.points.push((
             paint,
             points
@@ -573,10 +587,23 @@ impl RenderBundle for WgpuRenderBundle {
                     position: [p.x as f32, p.y as f32, p.z as f32],
                 })
                 .collect(),
-        ))
+        ));
+
+        let mut ids = vec![];
+        for _ in 0..points.len() {
+            ids.push(PrimitiveId(self.primitives.len()));
+            self.primitives.push(PrimitiveInfo::Point);
+        }
+
+        ids
     }
 
-    fn add_line(&mut self, line: &Contour<Point3d>, paint: LinePaint, resolution: f64) -> usize {
+    fn add_line(
+        &mut self,
+        line: &Contour<Point3d>,
+        paint: LinePaint,
+        resolution: f64,
+    ) -> PrimitiveId {
         let resolution = resolution as f32;
         let vertex_constructor = LineVertexConstructor {
             width: paint.width as f32,
@@ -622,14 +649,21 @@ impl RenderBundle for WgpuRenderBundle {
             .unwrap();
 
         let end_index = self.vertex_buffers.vertices.len();
-        let id = self.ranges.len();
+        let id = self.primitives.len();
 
-        self.ranges.push(start_index..end_index);
+        self.primitives.push(PrimitiveInfo::Line {
+            vertex_range: start_index..end_index,
+        });
 
-        id
+        PrimitiveId(id)
     }
 
-    fn add_polygon(&mut self, polygon: &Polygon<Point2d>, paint: Paint, _resolution: f64) -> usize {
+    fn add_polygon(
+        &mut self,
+        polygon: &Polygon<Point2d>,
+        paint: Paint,
+        _resolution: f64,
+    ) -> PrimitiveId {
         let mut path_builder = BuilderWithAttributes::new(1);
         for contour in polygon.iter_contours() {
             let _ = path_builder.begin(
@@ -660,11 +694,13 @@ impl RenderBundle for WgpuRenderBundle {
             .unwrap();
 
         let end_index = self.vertex_buffers.vertices.len();
-        let id = self.ranges.len();
+        let id = self.primitives.len();
 
-        self.ranges.push(start_index..end_index);
+        self.primitives.push(PrimitiveInfo::Line {
+            vertex_range: start_index..end_index,
+        });
 
-        id
+        PrimitiveId(id)
     }
 
     fn into_any(self: Box<Self>) -> Box<dyn Any> {
@@ -672,16 +708,16 @@ impl RenderBundle for WgpuRenderBundle {
     }
 
     fn is_empty(&self) -> bool {
-        self.ranges.is_empty()
+        self.primitives.is_empty()
     }
 }
 
 pub struct WgpuPackedBundle {
     vertex_buffers: VertexBuffers<LineVertex, u32>,
-    ranges: Vec<Range<usize>>,
     wgpu_buffers: WgpuPolygonBuffers,
     point_buffers: Vec<WgpuPointBuffers>,
     image_buffers: Vec<WgpuImage>,
+    primitives: Vec<PrimitiveInfo>,
 }
 
 struct WgpuPolygonBuffers {
@@ -700,9 +736,9 @@ struct WgpuPointBuffers {
 impl WgpuPackedBundle {
     fn new(
         vertex_buffers: VertexBuffers<LineVertex, u32>,
-        ranges: Vec<Range<usize>>,
         points: Vec<(PointPaint, Vec<PointInstance>)>,
         images: Vec<(DecodedImage, [ImageVertex; 4])>,
+        primitives: Vec<PrimitiveInfo>,
         renderer: &WgpuRenderer,
     ) -> Self {
         let index = renderer
@@ -767,17 +803,17 @@ impl WgpuPackedBundle {
                 &renderer.device,
                 &renderer.queue,
                 &image,
-                &vertices,
+                vertices,
             );
             image_buffers.push(image);
         }
 
         Self {
             vertex_buffers,
-            ranges,
             wgpu_buffers: WgpuPolygonBuffers { index, vertex },
             image_buffers,
             point_buffers,
+            primitives,
         }
     }
 
@@ -795,14 +831,17 @@ fn create_point(paint: PointPaint) -> (Vec<u32>, Vec<PointVertex>) {
         position: [0.0, 0.0],
         color: color.to_f32_array(),
     };
-    let steps_count = (4 * size as usize).max(16).min(8);
-    let color_with_alpha = color.with_alpha(150).to_f32_array();
+
+    const TOLERANCE: f32 = 0.25;
+    let r = half_size.max(1.0);
+    let steps_count =
+        (std::f32::consts::PI / ((r - TOLERANCE) / (r + TOLERANCE)).acos()).ceil() as usize;
 
     let mut vertices = vec![
         center,
         PointVertex {
             position: [half_size, 0.0],
-            color: color_with_alpha,
+            color: color.to_f32_array(),
         },
     ];
     let mut indices = vec![];
@@ -816,7 +855,7 @@ fn create_point(paint: PointPaint) -> (Vec<u32>, Vec<PointVertex>) {
         indices.push(vertices.len() as u32);
         vertices.push(PointVertex {
             position: [x, y],
-            color: color_with_alpha,
+            color: color.to_f32_array(),
         });
     }
 
@@ -835,10 +874,10 @@ impl PackedBundle for WgpuPackedBundle {
     fn unpack(self: Box<Self>) -> Box<dyn UnpackedBundle> {
         Box::new(WgpuUnpackedBundle {
             vertex_buffers: self.vertex_buffers,
-            ranges: self.ranges,
             wgpu_buffers: self.wgpu_buffers,
             point_buffers: self.point_buffers,
             images: self.image_buffers,
+            primitives: self.primitives,
             to_write: Vec::new(),
         })
     }
@@ -846,41 +885,47 @@ impl PackedBundle for WgpuPackedBundle {
 
 struct WgpuUnpackedBundle {
     vertex_buffers: VertexBuffers<LineVertex, u32>,
-    ranges: Vec<Range<usize>>,
     wgpu_buffers: WgpuPolygonBuffers,
     point_buffers: Vec<WgpuPointBuffers>,
     images: Vec<WgpuImage>,
+    primitives: Vec<PrimitiveInfo>,
 
-    to_write: Vec<Range<usize>>,
+    to_write: Vec<PrimitiveId>,
 }
 
 impl WgpuUnpackedBundle {
     fn pack(mut self: Box<Self>, queue: &Queue) -> WgpuPackedBundle {
-        self.write_buffer(queue);
+        self.write_triangle_buffers(queue);
+        self.write_image_buffers(queue);
         WgpuPackedBundle {
             vertex_buffers: self.vertex_buffers,
-            ranges: self.ranges,
             wgpu_buffers: self.wgpu_buffers,
             point_buffers: self.point_buffers,
             image_buffers: self.images,
+            primitives: self.primitives,
         }
     }
-    fn write_buffer(&mut self, queue: &Queue) {
-        if self.to_write.is_empty() {
-            return;
-        }
 
-        let mut prev_range = self.to_write[0].clone();
-        for range in &self.to_write[1..] {
-            if range.start == prev_range.end {
-                prev_range = prev_range.start..range.end;
-            } else {
-                self.write_buffer_range(prev_range, queue);
-                prev_range = range.clone();
+    fn write_triangle_buffers(&mut self, queue: &Queue) {
+        let mut prev: Option<Range<usize>> = None;
+        for id in &self.to_write {
+            if let PrimitiveInfo::Line { vertex_range } = &self.primitives[id.0] {
+                if let Some(prev_range) = prev {
+                    if vertex_range.start == prev_range.end {
+                        prev = Some(prev_range.start..vertex_range.end);
+                    } else {
+                        self.write_buffer_range(prev_range, queue);
+                        prev = Some(vertex_range.clone());
+                    }
+                } else {
+                    prev = Some(vertex_range.clone());
+                }
             }
         }
 
-        self.write_buffer_range(prev_range, queue);
+        if let Some(prev_range) = prev {
+            self.write_buffer_range(prev_range, queue);
+        }
     }
 
     fn write_buffer_range(&self, range: Range<usize>, queue: &Queue) {
@@ -890,25 +935,57 @@ impl WgpuUnpackedBundle {
             bytemuck::cast_slice(&self.vertex_buffers.vertices[range]),
         );
     }
+
+    fn write_image_buffers(&self, queue: &Queue) {
+        for id in &self.to_write {
+            if let PrimitiveInfo::Image { image_index } = self.primitives[id.0] {
+                let image = &self.images[image_index];
+                queue.write_buffer(
+                    &image.vertex_buffer,
+                    0,
+                    bytemuck::cast_slice(&image.vertices[..]),
+                )
+            }
+        }
+    }
 }
 
 impl UnpackedBundle for WgpuUnpackedBundle {
-    fn modify_line(&mut self, id: usize, paint: LinePaint) {
-        let range = self.ranges[id].clone();
-        for vertex in &mut self.vertex_buffers.vertices[range.clone()] {
+    fn modify_line(&mut self, id: PrimitiveId, paint: LinePaint) {
+        let Some(PrimitiveInfo::Line { vertex_range }) = self.primitives.get(id.0) else {
+            return;
+        };
+
+        for vertex in &mut self.vertex_buffers.vertices[vertex_range.clone()] {
             vertex.color = paint.color.to_f32_array();
         }
 
-        self.to_write.push(range);
+        self.to_write.push(id);
     }
 
-    fn modify_polygon(&mut self, id: usize, paint: Paint) {
-        let range = self.ranges[id].clone();
-        for vertex in &mut self.vertex_buffers.vertices[range.clone()] {
+    fn modify_polygon(&mut self, id: PrimitiveId, paint: Paint) {
+        let Some(PrimitiveInfo::Line { vertex_range }) = self.primitives.get(id.0) else {
+            return;
+        };
+
+        for vertex in &mut self.vertex_buffers.vertices[vertex_range.clone()] {
             vertex.color = paint.color.to_f32_array();
         }
 
-        self.to_write.push(range);
+        self.to_write.push(id);
+    }
+
+    fn modify_image(&mut self, id: PrimitiveId, paint: ImagePaint) {
+        let Some(PrimitiveInfo::Image { image_index }) = self.primitives.get(id.0) else {
+            return;
+        };
+
+        let image = &mut self.images[*image_index];
+        for vertex in image.vertices.iter_mut() {
+            vertex.opacity = paint.opacity as f32 / 255.0;
+        }
+
+        self.to_write.push(id);
     }
 
     fn into_any(self: Box<Self>) -> Box<dyn Any> {

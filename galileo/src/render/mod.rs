@@ -9,6 +9,9 @@ use std::any::Any;
 #[cfg(feature = "wgpu")]
 pub mod wgpu;
 
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub struct PrimitiveId(usize);
+
 pub trait Renderer: MaybeSend + MaybeSync {
     fn create_bundle(&self) -> Box<dyn RenderBundle>;
     fn pack_bundle(&self, bundle: Box<dyn RenderBundle>) -> Box<dyn PackedBundle>;
@@ -20,6 +23,7 @@ pub trait Canvas {
     fn size(&self) -> Size;
     fn create_bundle(&self) -> Box<dyn RenderBundle>;
     fn pack_bundle(&self, bundle: Box<dyn RenderBundle>) -> Box<dyn PackedBundle>;
+    fn pack_unpacked(&self, bundle: Box<dyn UnpackedBundle>) -> Box<dyn PackedBundle>;
     fn draw_bundles(&mut self, bundles: &[&Box<dyn PackedBundle>]);
 }
 
@@ -29,10 +33,21 @@ pub trait RenderBundle {
         image: DecodedImage,
         vertices: [Point2d; 4],
         paint: ImagePaint,
-    ) -> usize;
-    fn add_points(&mut self, points: &[Point3d], paint: PointPaint);
-    fn add_line(&mut self, line: &Contour<Point3d>, paint: LinePaint, resolution: f64) -> usize;
-    fn add_polygon(&mut self, polygon: &Polygon<Point2d>, paint: Paint, resolution: f64) -> usize;
+    ) -> PrimitiveId;
+    fn add_points(&mut self, points: &[Point3d], paint: PointPaint) -> Vec<PrimitiveId>;
+    fn add_line(
+        &mut self,
+        line: &Contour<Point3d>,
+        paint: LinePaint,
+        resolution: f64,
+    ) -> PrimitiveId;
+    fn add_polygon(
+        &mut self,
+        polygon: &Polygon<Point2d>,
+        paint: Paint,
+        resolution: f64,
+    ) -> PrimitiveId;
+
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
     fn is_empty(&self) -> bool;
 }
@@ -43,8 +58,9 @@ pub trait PackedBundle: MaybeSend + MaybeSync {
 }
 
 pub trait UnpackedBundle {
-    fn modify_line(&mut self, id: usize, paint: LinePaint);
-    fn modify_polygon(&mut self, id: usize, paint: Paint);
+    fn modify_line(&mut self, id: PrimitiveId, paint: LinePaint);
+    fn modify_polygon(&mut self, id: PrimitiveId, paint: Paint);
+    fn modify_image(&mut self, id: PrimitiveId, image: ImagePaint);
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
 

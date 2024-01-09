@@ -137,7 +137,12 @@ impl TileScheme {
 
     pub fn get_substitutes(&self, index: TileIndex) -> Option<impl Iterator<Item = TileIndex>> {
         let lod = self.lod_over(index.z)?;
-        self.iter_tiles_over_bbox(lod.resolution(), self.tile_bbox(index)?)
+        // todo: we don't really need shrink here, but .iter_tiles_over_bbox return extra tiles
+        // when borders of tiles are exactly on bbox border.
+        self.iter_tiles_over_bbox(
+            lod.resolution(),
+            self.tile_bbox(index)?.shrink(lod.resolution()),
+        )
     }
 
     /// Returns lod one z-level over the given.

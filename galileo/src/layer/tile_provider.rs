@@ -13,6 +13,7 @@ pub trait TileProvider<Tile>: MaybeSend + MaybeSync {
     fn get_tile(&self, index: TileIndex) -> Option<Tile>;
     async fn load_tile(&self, index: TileIndex) -> Result<(), GalileoError>;
     fn set_messenger(&self, messenger: Box<dyn Messenger>);
+    fn request_redraw(&self);
 }
 
 pub trait TileSource: (Fn(TileIndex) -> String) + MaybeSend + MaybeSync {}

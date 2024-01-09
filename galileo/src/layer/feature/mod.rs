@@ -3,7 +3,7 @@ use crate::layer::feature::symbol::Symbol;
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::wgpu::WgpuRenderer;
-use crate::render::{Canvas, PackedBundle, Renderer};
+use crate::render::{Canvas, PackedBundle, PrimitiveId, Renderer};
 use crate::view::MapView;
 use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
@@ -27,7 +27,7 @@ where
     features: Vec<F>,
     style: S,
     render_bundle: RwLock<Option<Box<dyn PackedBundle>>>,
-    feature_render_map: RwLock<Vec<Vec<usize>>>,
+    feature_render_map: RwLock<Vec<Vec<PrimitiveId>>>,
     crs: Crs,
     messenger: RwLock<Option<Box<dyn Messenger>>>,
 }

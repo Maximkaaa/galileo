@@ -1,6 +1,6 @@
 use crate::layer::feature::symbol::Symbol;
 use crate::primitives::Color;
-use crate::render::{PointPaint, RenderBundle, UnpackedBundle};
+use crate::render::{PointPaint, PrimitiveId, RenderBundle, UnpackedBundle};
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
 use galileo_types::geometry::Geom;
@@ -17,7 +17,7 @@ impl<T> Symbol<T, Vec<Point3<f64>>> for CirclePointSymbol {
         _feature: &T,
         geometry: &Vec<Point3<f64>>,
         bundle: &mut Box<dyn RenderBundle>,
-    ) -> Vec<usize> {
+    ) -> Vec<PrimitiveId> {
         let paint = PointPaint {
             color: self.color,
             size: self.size,
@@ -27,7 +27,12 @@ impl<T> Symbol<T, Vec<Point3<f64>>> for CirclePointSymbol {
         vec![]
     }
 
-    fn update(&self, _feature: &T, _renders_ids: &[usize], _bundle: &mut Box<dyn UnpackedBundle>) {
+    fn update(
+        &self,
+        _feature: &T,
+        _renders_ids: &[PrimitiveId],
+        _bundle: &mut Box<dyn UnpackedBundle>,
+    ) {
         todo!()
     }
 }
@@ -38,7 +43,7 @@ impl<T> Symbol<T, Geom<Point2d>> for CirclePointSymbol {
         _feature: &T,
         geometry: &Geom<Point2d>,
         bundle: &mut Box<dyn RenderBundle>,
-    ) -> Vec<usize> {
+    ) -> Vec<PrimitiveId> {
         let paint = PointPaint {
             color: self.color,
             size: self.size,
@@ -50,7 +55,12 @@ impl<T> Symbol<T, Geom<Point2d>> for CirclePointSymbol {
         vec![]
     }
 
-    fn update(&self, _feature: &T, _renders_ids: &[usize], _bundle: &mut Box<dyn UnpackedBundle>) {
+    fn update(
+        &self,
+        _feature: &T,
+        _renders_ids: &[PrimitiveId],
+        _bundle: &mut Box<dyn UnpackedBundle>,
+    ) {
         todo!()
     }
 }

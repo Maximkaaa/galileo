@@ -7,7 +7,7 @@ use galileo::layer::feature::symbol::polygon::SimplePolygonSymbol;
 use galileo::layer::feature::symbol::Symbol;
 use galileo::layer::feature::FeatureLayer;
 use galileo::primitives::Color;
-use galileo::render::{RenderBundle, UnpackedBundle};
+use galileo::render::{PrimitiveId, RenderBundle, UnpackedBundle};
 use galileo_types::cartesian::impls::contour::Contour;
 use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::geo::crs::Crs;
@@ -151,7 +151,7 @@ impl Symbol<Country, Geom<Point2d>> for CountrySymbol {
         feature: &Country,
         geometry: &Geom<Point2d>,
         bundle: &mut Box<dyn RenderBundle>,
-    ) -> Vec<usize> {
+    ) -> Vec<PrimitiveId> {
         let mut ids = vec![];
         let Geom::MultiPolygon(geometry) = geometry else {
             return ids;
@@ -171,7 +171,7 @@ impl Symbol<Country, Geom<Point2d>> for CountrySymbol {
     fn update(
         &self,
         feature: &Country,
-        render_ids: &[usize],
+        render_ids: &[PrimitiveId],
         bundle: &mut Box<dyn UnpackedBundle>,
     ) {
         let renders_by_feature = render_ids.len() / feature.geometry.parts().len();
