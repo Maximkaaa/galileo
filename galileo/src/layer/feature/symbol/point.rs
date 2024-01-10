@@ -1,8 +1,7 @@
 use crate::layer::feature::symbol::Symbol;
 use crate::primitives::Color;
 use crate::render::{PointPaint, PrimitiveId, RenderBundle, UnpackedBundle};
-use galileo_types::cartesian::impls::point::Point2d;
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
+use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::geometry::Geom;
 use nalgebra::Point3;
 
@@ -11,20 +10,41 @@ pub struct CirclePointSymbol {
     pub size: f64,
 }
 
-impl<T> Symbol<T, Vec<Point3<f64>>> for CirclePointSymbol {
+impl<T> Symbol<T, Point3<f64>> for CirclePointSymbol {
     fn render(
         &self,
         _feature: &T,
-        geometry: &Vec<Point3<f64>>,
+        geometry: &Point3<f64>,
         bundle: &mut Box<dyn RenderBundle>,
     ) -> Vec<PrimitiveId> {
         let paint = PointPaint {
             color: self.color,
             size: self.size,
         };
-        bundle.add_points(geometry, paint);
+        vec![bundle.add_point(geometry, paint)]
+    }
 
-        vec![]
+    fn update(
+        &self,
+        _feature: &T,
+        _renders_ids: &[PrimitiveId],
+        _bundle: &mut Box<dyn UnpackedBundle>,
+    ) {
+        todo!()
+    }
+}
+
+impl<T> Symbol<T, Geom<Point3d>> for CirclePointSymbol {
+    fn render(
+        &self,
+        feature: &T,
+        geometry: &Geom<Point3d>,
+        bundle: &mut Box<dyn RenderBundle>,
+    ) -> Vec<PrimitiveId> {
+        match geometry {
+            Geom::Point(p) => self.render(feature, p, bundle),
+            _ => vec![],
+        }
     }
 
     fn update(
@@ -40,19 +60,14 @@ impl<T> Symbol<T, Vec<Point3<f64>>> for CirclePointSymbol {
 impl<T> Symbol<T, Geom<Point2d>> for CirclePointSymbol {
     fn render(
         &self,
-        _feature: &T,
+        feature: &T,
         geometry: &Geom<Point2d>,
         bundle: &mut Box<dyn RenderBundle>,
     ) -> Vec<PrimitiveId> {
-        let paint = PointPaint {
-            color: self.color,
-            size: self.size,
-        };
-        if let Geom::Point(p) = geometry {
-            bundle.add_points(&vec![Point3::new(p.x(), p.y(), 0.0)], paint);
+        match geometry {
+            Geom::Point(p) => self.render(feature, &Point3d::new(p.x, p.y, 0.0), bundle),
+            _ => vec![],
         }
-
-        vec![]
     }
 
     fn update(

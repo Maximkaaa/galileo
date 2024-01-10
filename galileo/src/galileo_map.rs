@@ -104,6 +104,7 @@ impl GalileoMap {
 pub struct MapBuilder {
     position: GeoPoint2d,
     resolution: f64,
+    view: Option<MapView>,
     layers: Vec<Box<dyn Layer>>,
     event_handlers: Vec<CustomEventHandler>,
     window: Option<Window>,
@@ -115,6 +116,7 @@ impl MapBuilder {
         Self {
             position: GeoPoint2d::default(),
             resolution: 156543.03392800014 / 16.0,
+            view: None,
             layers: vec![],
             event_handlers: vec![],
             window: None,
@@ -176,6 +178,11 @@ impl MapBuilder {
         self
     }
 
+    pub fn with_view(mut self, view: MapView) -> Self {
+        self.view = Some(view);
+        self
+    }
+
     pub fn with_raster_tiles(
         mut self,
         tile_source: impl TileSource + 'static,
@@ -222,11 +229,11 @@ impl MapBuilder {
             layer.set_messenger(Box::new(messenger.clone()))
         }
 
-        let map = Map::new(
-            MapView::new(&self.position, self.resolution),
-            self.layers,
-            messenger,
-        );
+        let view = self
+            .view
+            .unwrap_or_else(|| MapView::new(&self.position, self.resolution));
+
+        let map = Map::new(view, self.layers, messenger);
 
         Arc::new(RwLock::new(map))
     }

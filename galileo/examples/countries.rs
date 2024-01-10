@@ -1,18 +1,14 @@
-use data::{load_countries, Country};
+use crate::data::City;
+use data::Country;
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
 use galileo::galileo_map::MapBuilder;
-use galileo::layer::feature::symbol::contour::SimpleContourSymbol;
-use galileo::layer::feature::symbol::point::CirclePointSymbol;
 use galileo::layer::feature::symbol::polygon::SimplePolygonSymbol;
 use galileo::layer::feature::symbol::Symbol;
 use galileo::layer::feature::FeatureLayer;
 use galileo::primitives::Color;
-use galileo::render::{PrimitiveId, RenderBundle, UnpackedBundle};
-use galileo_types::cartesian::impls::contour::Contour;
+use galileo::render::{PointPaint, PrimitiveId, RenderBundle, UnpackedBundle};
 use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::geo::crs::Crs;
-use galileo_types::geo::impls::point::GeoPoint2d;
-use galileo_types::geo::traits::point::NewGeoPoint;
 use galileo_types::geometry::Geom;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
@@ -26,45 +22,42 @@ async fn main() {
     run(MapBuilder::new()).await;
 }
 
+pub fn load_countries() -> Vec<Country> {
+    bincode::deserialize(include_bytes!("data/countries.data")).unwrap()
+}
+
+pub fn load_cities() -> Vec<City> {
+    let mut reader = csv::Reader::from_reader(&include_bytes!("data/worldcities.csv")[..]);
+    let mut cities: Vec<City> = reader.deserialize().filter_map(|res| res.ok()).collect();
+    cities.sort_by(|a, b| {
+        if a.capital == b.capital {
+            return std::cmp::Ordering::Equal;
+        };
+
+        match &a.capital[..] {
+            "primary" => std::cmp::Ordering::Greater,
+            "admin" if &b.capital != "primary" => std::cmp::Ordering::Greater,
+            "minor" if &b.capital != "primary" && &b.capital != "admin" => {
+                std::cmp::Ordering::Greater
+            }
+            _ => std::cmp::Ordering::Less,
+        }
+    });
+    cities
+}
+
 pub async fn run(builder: MapBuilder) {
     let countries = load_countries();
 
     let feature_layer = FeatureLayer::new(countries, CountrySymbol {}, Crs::EPSG3857);
     let feature_layer = Arc::new(RwLock::new(feature_layer));
 
-    let point_layer = FeatureLayer::new(
-        vec![GeoPoint2d::latlon(55.0, 37.0)],
-        CirclePointSymbol {
-            color: Color::rgba(255, 0, 0, 255),
-            size: 20.0,
-        },
-        Crs::WGS84,
-    );
-
-    let mut points = vec![];
-    for i in 0..100 {
-        let angle = std::f64::consts::PI / 100.0 * i as f64;
-        points.push(Point3d::new(
-            0.0,
-            1_000_000.0 * angle.cos(),
-            1_000_000.0 * angle.sin(),
-        ));
-    }
-
-    let line_layer = FeatureLayer::new(
-        vec![Contour::new(points, false)],
-        SimpleContourSymbol {
-            color: Color::rgba(0, 100, 255, 255),
-            width: 5.0,
-        },
-        Crs::EPSG3857,
-    );
+    let point_layer = FeatureLayer::new(load_cities(), CitySymbol {}, Crs::WGS84);
 
     let selected_index = Arc::new(AtomicUsize::new(usize::MAX));
     builder
         .with_layer(feature_layer.clone())
         .with_layer(point_layer)
-        .with_layer(line_layer)
         .with_event_handler(move |ev, map, backend| {
             if let UserEvent::Click(button, event) = ev {
                 if *button == MouseButton::Left {
@@ -185,5 +178,45 @@ impl Symbol<Country, Geom<Point2d>> for CountrySymbol {
 
             next_index += renders_by_feature;
         }
+    }
+}
+
+struct CitySymbol {}
+
+impl Symbol<City, Geom<Point2d>> for CitySymbol {
+    fn render(
+        &self,
+        feature: &City,
+        geometry: &Geom<Point2d>,
+        bundle: &mut Box<dyn RenderBundle>,
+    ) -> Vec<PrimitiveId> {
+        let size = (feature.population / 1000.0).log2() / 2.0;
+        let color = match &feature.capital[..] {
+            "primary" => Color::try_from_hex("#a323d1"),
+            "admin" => Color::try_from_hex("#f5009b"),
+            "minor" => Color::try_from_hex("#00e8db"),
+            _ => Color::try_from_hex("#4e00de"),
+        }
+        .unwrap();
+
+        let mut ids = vec![];
+        let Geom::Point(point) = geometry else {
+            return ids;
+        };
+        let point = Point3d::new(point.x, point.y, 0.0);
+
+        if &feature.capital == "primary" {
+            ids.push(bundle.add_point(
+                &point,
+                PointPaint {
+                    color: Color::rgba(255, 255, 255, 255),
+                    size: size + 4.0,
+                },
+            ));
+        }
+
+        ids.push(bundle.add_point(&point, PointPaint { color, size }));
+
+        ids
     }
 }

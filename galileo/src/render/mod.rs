@@ -34,7 +34,7 @@ pub trait RenderBundle {
         vertices: [Point2d; 4],
         paint: ImagePaint,
     ) -> PrimitiveId;
-    fn add_points(&mut self, points: &[Point3d], paint: PointPaint) -> Vec<PrimitiveId>;
+    fn add_point(&mut self, point: &Point3d, paint: PointPaint) -> PrimitiveId;
     fn add_line(
         &mut self,
         line: &Contour<Point3d>,
@@ -60,7 +60,8 @@ pub trait PackedBundle: MaybeSend + MaybeSync {
 pub trait UnpackedBundle {
     fn modify_line(&mut self, id: PrimitiveId, paint: LinePaint);
     fn modify_polygon(&mut self, id: PrimitiveId, paint: Paint);
-    fn modify_image(&mut self, id: PrimitiveId, image: ImagePaint);
+    fn modify_image(&mut self, id: PrimitiveId, paint: ImagePaint);
+    fn modify_point(&mut self, id: PrimitiveId, paint: PointPaint);
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
 

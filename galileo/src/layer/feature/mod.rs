@@ -92,6 +92,10 @@ where
     pub fn features_mut(&mut self) -> impl Iterator<Item = &'_ mut F> + '_ {
         self.features.iter_mut()
     }
+
+    pub fn crs(&self) -> &Crs {
+        &self.crs
+    }
 }
 
 impl<P, F, S> FeatureLayer<P, F, S>

@@ -4,6 +4,13 @@ pub trait Projection {
 
     fn project(&self, input: &Self::InPoint) -> Option<Self::OutPoint>;
     fn unproject(&self, input: &Self::OutPoint) -> Option<Self::InPoint>;
+
+    fn inverse(self: Box<Self>) -> InvertedProjection<Self::InPoint, Self::OutPoint>
+    where
+        Self: Sized + 'static,
+    {
+        InvertedProjection::new(self)
+    }
 }
 
 pub struct InvertedProjection<IN, OUT> {

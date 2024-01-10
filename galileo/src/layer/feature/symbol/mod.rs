@@ -13,8 +13,10 @@ pub trait Symbol<F, G> {
     ) -> Vec<PrimitiveId>;
     fn update(
         &self,
-        feature: &F,
-        renders_ids: &[PrimitiveId],
-        bundle: &mut Box<dyn UnpackedBundle>,
-    );
+        _feature: &F,
+        _renders_ids: &[PrimitiveId],
+        _bundle: &mut Box<dyn UnpackedBundle>,
+    ) {
+        // provide implementation to make features editable
+    }
 }

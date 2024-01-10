@@ -4,6 +4,8 @@ use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::cartesian::impls::polygon::Polygon;
 use galileo_types::cartesian::rect::Rect;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
+use galileo_types::geo::impls::point::GeoPoint2d;
+use galileo_types::geo::traits::point::{GeoPoint, NewGeoPoint};
 use galileo_types::geo::traits::projection::Projection;
 use galileo_types::geometry::{CartesianGeometry2d, Geom, Geometry};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -57,6 +59,33 @@ impl CartesianGeometry2d<Point2d> for Country {
     }
 }
 
-pub fn load_countries() -> Vec<Country> {
-    bincode::deserialize(include_bytes!("countries.data")).unwrap()
+#[derive(Debug, Deserialize)]
+pub struct City {
+    lat: f64,
+    lng: f64,
+    pub capital: String,
+    pub population: f64,
+}
+
+impl GeoPoint for City {
+    type Num = f64;
+
+    fn lat(&self) -> Self::Num {
+        self.lat
+    }
+
+    fn lon(&self) -> Self::Num {
+        self.lng
+    }
+}
+
+impl Geometry for City {
+    type Point = GeoPoint2d;
+
+    fn project<P: Projection<InPoint = Self::Point> + ?Sized>(
+        &self,
+        projection: &P,
+    ) -> Option<Geom<P::OutPoint>> {
+        GeoPoint2d::latlon(self.lat, self.lng).project(projection)
+    }
 }

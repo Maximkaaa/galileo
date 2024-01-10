@@ -11,9 +11,10 @@ struct ViewUniform {
 var<uniform> transform: ViewUniform;
 
 struct VertexInput {
-    @location(0) vertex_position: vec2<f32>,
-    @location(1) color: vec4<f32>,
+    @location(0) vertex_norm: vec2<f32>,
     @location(2) instance_position: vec3<f32>,
+    @location(3) instance_size: f32,
+    @location(4) instance_color: vec4<f32>,
 }
 
 struct VertexOutput {
@@ -26,9 +27,9 @@ fn vs_main(
     model: VertexInput,
 ) -> VertexOutput {
     var out: VertexOutput;
-    out.color = model.color;
+    out.color = model.instance_color;
     var instance_position = transform.view_proj * vec4<f32>(model.instance_position, 1.0);
-    var vertex_delta = vec4<f32>(model.vertex_position * transform.inv_screen_size * 2.0 * instance_position[3], 0.0, 0.0);
+    var vertex_delta = vec4<f32>(model.vertex_norm * model.instance_size * transform.inv_screen_size * 2.0 * instance_position[3], 0.0, 0.0);
 
     out.clip_position = instance_position + vertex_delta;
 

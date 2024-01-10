@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MultiPolygon<P> {
-    parts: Vec<Polygon<P>>,
+    pub parts: Vec<Polygon<P>>,
 }
 
 impl<P> From<Vec<Polygon<P>>> for MultiPolygon<P> {
