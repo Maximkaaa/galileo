@@ -1,5 +1,4 @@
-use crate::data::City;
-use data::Country;
+use data::{City, Country};
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
 use galileo::galileo_map::MapBuilder;
 use galileo::layer::feature::symbol::polygon::SimplePolygonSymbol;

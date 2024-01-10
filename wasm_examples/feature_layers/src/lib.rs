@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 #[path = "../../common.rs"]
 mod common;
 
-#[path = "../../../galileo/examples/countries.rs"]
+#[path = "../../../galileo/examples/feature_layers.rs"]
 mod example;
 
 #[wasm_bindgen]

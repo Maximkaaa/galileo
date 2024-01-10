@@ -7,7 +7,15 @@ members = [
 ]
 
 exclude = [
-    "wasm_examples/simple_map",
+    "wasm_examples/raster_tiles",
     "wasm_examples/vector_tiles",
-    "wasm_examples/countries",
+    "wasm_examples/feature_layers",
+    "wasm_examples/many_points",
+    "wasm_examples/lambert",
 ]
+
+[workspace.package]
+version = "0.0.1"
+authors = ["Maxim Gritsenko <maxim@gritsenko.biz>"]
+edition = "2021"
+repository = "https://github.com/Maximkaaa/galileo"

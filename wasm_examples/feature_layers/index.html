@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple map</title>
+</head>
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+</style>
+<body id="map">
+<script src="./pkg/feature_layers.js"></script>
+
+<script>
+    const {init} = wasm_bindgen;
+
+    async function run_wasm() {
+        await wasm_bindgen();
+
+        init().then(() => {
+            console.log("WASM loaded");
+        })
+    }
+
+    run_wasm();
+    document.addEventListener('contextmenu', event => event.preventDefault());
+</script>
+</body>
+</html>

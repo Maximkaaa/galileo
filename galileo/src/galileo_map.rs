@@ -15,6 +15,7 @@ use crate::winit::{WinitInputHandler, WinitMessenger};
 use galileo_types::cartesian::size::Size;
 use galileo_types::geo::impls::point::GeoPoint2d;
 use std::sync::{Arc, RwLock};
+use winit::dpi::PhysicalSize;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
@@ -129,10 +130,15 @@ impl MapBuilder {
             .event_loop
             .take()
             .unwrap_or_else(|| EventLoop::new().unwrap());
-        let window = self
-            .window
-            .take()
-            .unwrap_or_else(|| WindowBuilder::new().build(&event_loop).unwrap());
+        let window = self.window.take().unwrap_or_else(|| {
+            WindowBuilder::new()
+                .with_inner_size(PhysicalSize {
+                    width: 1024,
+                    height: 1024,
+                })
+                .build(&event_loop)
+                .unwrap()
+        });
 
         let window = Arc::new(window);
         let messenger = WinitMessenger::new(window.clone());

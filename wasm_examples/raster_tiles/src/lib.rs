@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 #[path = "../../common.rs"]
 mod common;
 
-#[path = "../../../galileo/examples/simple_map.rs"]
+#[path = "../../../galileo/examples/raster_tiles.rs"]
 mod example;
 
 #[wasm_bindgen]

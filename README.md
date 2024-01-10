@@ -3,18 +3,24 @@
 # Web examples
 
 ![Raster tile layer](https://maximkaaa.github.io/galileo/osm_256.png)
-![Vector tile layer](https://maximkaaa.github.io/galileo/vector_tiles_256.png)
-![Feature layer](https://maximkaaa.github.io/galileo/feature_layer_256.png)
+![Lambert projection](https://maximkaaa.github.io/galileo/lambert_sm.png)
+![Feature layers](https://maximkaaa.github.io/galileo/countries_sm.png)
+![Many points](https://maximkaaa.github.io/galileo/many_points.gif)
 
-* [Raster tile layer (OSM)](https://maximkaaa.github.io/galileo/simple_map/)
+* [Raster tile layer (OSM)](https://maximkaaa.github.io/galileo/raster_tiles/)
 * [Vector tile layer (Maplibre)](https://maximkaaa.github.io/galileo/vector_tiles/)
   * Use buttons at the top to change the style of the map
   * Click on any object to get information about it
-* [Feature layer](https://maximkaaa.github.io/galileo/countries/)
-  * NOTE! Contains large dataset (~10 MB), might take some time to load
-  * Draws 250 countries' borders, consisting of ~4000 polygons with ~500K vertices
-  * Move mouse pointer to highlight any country
+* [Feature layer](https://maximkaaa.github.io/galileo/feature_layers/)
+  * NOTE! Contains large dataset (~16 MB), might take some time to load
+  * Draws 250 countries' borders, consisting of ~4000 polygons with ~500K vertices, plus 40K city points
+  * Move mouse pointer to highlight any country, click on a country to write its name into console
+* [Map in Lambert Equal Area projection](https://maximkaaa.github.io/galileo/lambert/)
+  * Takes data set (country borders) in Mercator projection and draws it to the map in LAEA projection
+* [Very many points](https://maximkaaa.github.io/galileo/many_points/)
+  * Enjoy 3.6 million points heat up your room with GPU.
 
+# Overview
 
 ## General purpose
 
@@ -29,8 +35,8 @@ applications. **Galileo** is designed in such a way as to allow the user of the
 library to make all the relevant decisions and not to force one way.
 
 It also does not make any assumptions about tile layer schemas, CRS and datums.
-Supporting coordinate transformations for layers on the fly is planned but not yet
-implemented.
+Feature layers support transparent re-projecting into the map CRS (support for
+projecting tile layers is planned but not implemented yet).
 
 ## Cross-platform
 
@@ -45,13 +51,14 @@ try other promising backends (like [vello](https://github.com/linebender/vello))
 
 # Features
 
-Galileo is an active WIP, here is the list of the features that are already present
-(mostly as POC at the moment):
+Galileo is an active WIP, here is the list of the features that are already present:
 * raster tile layers
 * vector tile layers with styling
 * vector geo-data layers (feature layers) with styling
 * 3d view and 3d object rendering
 * user-input handling on layers (mouse only at the moment, touch is WIP)
+* support for different projections and tile schemes
+* high performance
 
 # Running examples
 
@@ -87,9 +94,19 @@ And then build it:
 cargo build --target x86_64-px-windows-gnu
 ```
 
+# Sponsoring
+
+If you think this library can be useful to you or someone you love, consider supporting its development. Sponsoring
+comes with additional advantages:
+* Increase development speed. All funds will be spent on development.
+* Make your needs our priority.
+* See your logo on the project's page.
+
+Please, contact the maintainer of the project with any questions related to sponsoring.
+
 # License
 
-Licensed under either of
+You can use this library without any worries as it is licensed under either of
 
 * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
 * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
@@ -98,8 +115,8 @@ at your option.
 
 # Contributing
 
-The project is in architecture design stage ATM. If you have a suggestion about high-level
-stuff, please, open an issue and lay out your ideas. Also, if you want to create
-examples and test stuff on Android, MacOS or iOS, PRs are welcome.
+Feature requests, pull requests, bug reports, comments, questions and discussion are welcome. Please, follow the code
+of conduct when contributing.
 
-If you want to report a bug, be patient. You will have plenty opportunities in the future.
+Note, that since the library is still in early stages of development, any part may change at any moment. So before
+starting any major undertaking with it or within it, open a discussion to sync your ideas with others' ideas.
