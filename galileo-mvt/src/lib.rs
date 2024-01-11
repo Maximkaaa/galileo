@@ -13,9 +13,13 @@ use std::fmt::{Display, Formatter};
 
 pub mod error;
 
+#[cfg(feature = "generate_proto")]
 mod vector_tile {
-    // include!(concat!(env!("OUT_DIR"), "/vector_tile.rs"));
+    include!(concat!(env!("OUT_DIR"), "/vector_tile.rs"));
+}
 
+#[cfg(not(feature = "generate_proto"))]
+mod vector_tile {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Tile {
@@ -618,8 +622,8 @@ impl<T: Iterator<Item = u32>> CommandIterator<T> {
 
     fn read_vals<const COUNT: usize>(&mut self) -> Result<[u32; COUNT], GalileoMvtError> {
         let mut result = [0; COUNT];
-        for i in 0..COUNT {
-            result[i] = match self.inner.next() {
+        for val in result.iter_mut() {
+            *val = match self.inner.next() {
                 Some(v) => v,
                 None => {
                     return Err(GalileoMvtError::Generic(

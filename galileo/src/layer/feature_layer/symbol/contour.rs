@@ -1,4 +1,4 @@
-use crate::layer::feature::symbol::Symbol;
+use crate::layer::feature_layer::symbol::Symbol;
 use crate::primitives::Color;
 use crate::render::{LineCap, LinePaint, PrimitiveId, RenderBundle, UnpackedBundle};
 use galileo_types::cartesian::impls::contour::Contour;
@@ -50,7 +50,7 @@ impl<F> Symbol<F, Contour<Point3d>> for SimpleContourSymbol {
         bundle: &mut Box<dyn RenderBundle>,
     ) -> Vec<PrimitiveId> {
         let id = bundle.add_line(
-            &geometry,
+            geometry,
             LinePaint {
                 color: self.color,
                 width: self.width,

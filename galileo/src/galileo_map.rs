@@ -3,8 +3,8 @@ use crate::control::event_processor::EventProcessor;
 use crate::control::map::MapController;
 use crate::layer::raster_tile::RasterTileLayer;
 use crate::layer::tile_provider::TileSource;
-use crate::layer::vector_tile::style::VectorTileStyle;
-use crate::layer::vector_tile::VectorTileLayer;
+use crate::layer::vector_tile_layer::style::VectorTileStyle;
+use crate::layer::vector_tile_layer::VectorTileLayer;
 use crate::layer::Layer;
 use crate::map::Map;
 use crate::render::wgpu::WgpuRenderer;
@@ -21,10 +21,11 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 
 #[cfg(not(target_arch = "wasm32"))]
-pub type VectorTileProver = crate::layer::vector_tile::tile_provider::rayon_provider::RayonProvider;
+pub type VectorTileProver =
+    crate::layer::vector_tile_layer::tile_provider::rayon_provider::RayonProvider;
 #[cfg(target_arch = "wasm32")]
 pub type VectorTileProver =
-    crate::layer::vector_tile::tile_provider::web_worker_provider::WebWorkerVectorTileProvider;
+    crate::layer::vector_tile_layer::tile_provider::web_worker_provider::WebWorkerVectorTileProvider;
 
 pub struct GalileoMap {
     window: Arc<Window>,
@@ -110,6 +111,12 @@ pub struct MapBuilder {
     event_handlers: Vec<CustomEventHandler>,
     window: Option<Window>,
     event_loop: Option<EventLoop<()>>,
+}
+
+impl Default for MapBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MapBuilder {

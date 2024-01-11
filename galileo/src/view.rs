@@ -267,7 +267,7 @@ impl MapView {
         let new_position = base_point.and_then(|base_point| {
             self.projected_position.map(|position| {
                 let position2d = Point2::new(position.x, position.y);
-                let result = base_point.add(((position2d - base_point) * zoom).into());
+                let result = base_point.add((position2d - base_point) * zoom);
                 Point3::new(result.x, result.y, position.z)
             })
         });

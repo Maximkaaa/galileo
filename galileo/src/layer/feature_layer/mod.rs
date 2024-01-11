@@ -1,5 +1,5 @@
-use crate::layer::feature::feature::Feature;
-use crate::layer::feature::symbol::Symbol;
+use crate::layer::feature_layer::feature::Feature;
+use crate::layer::feature_layer::symbol::Symbol;
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::wgpu::WgpuRenderer;
@@ -134,7 +134,7 @@ where
     F::Geom: Geometry<Point = GeoPoint2d>,
     S: Symbol<F, Geom<Point2d>> + MaybeSend + MaybeSync,
 {
-    fn render<'a>(&self, position: &MapView, canvas: &'a mut dyn Canvas) {
+    fn render(&self, position: &MapView, canvas: &mut dyn Canvas) {
         if self.render_bundle.read().unwrap().is_none() {
             let mut bundle = canvas.create_bundle();
             let mut render_map = self.feature_render_map.write().unwrap();
@@ -154,7 +154,7 @@ where
             *self.render_bundle.write().unwrap() = Some(packed);
         }
 
-        canvas.draw_bundles(&[self.render_bundle.read().unwrap().as_ref().unwrap()]);
+        canvas.draw_bundles(&[&**self.render_bundle.read().unwrap().as_ref().unwrap()]);
     }
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
@@ -180,7 +180,7 @@ where
     F::Geom: Geometry<Point = Point2d>,
     S: Symbol<F, Geom<Point2d>> + MaybeSend + MaybeSync,
 {
-    fn render<'a>(&self, view: &MapView, canvas: &'a mut dyn Canvas) {
+    fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         if self.render_bundle.read().unwrap().is_none() {
             let mut bundle = canvas.create_bundle();
             let mut render_map = self.feature_render_map.write().unwrap();
@@ -209,7 +209,7 @@ where
             *self.render_bundle.write().unwrap() = Some(packed);
         }
 
-        canvas.draw_bundles(&[self.render_bundle.read().unwrap().as_ref().unwrap()]);
+        canvas.draw_bundles(&[&**self.render_bundle.read().unwrap().as_ref().unwrap()]);
     }
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
@@ -235,7 +235,7 @@ where
     F::Geom: Geometry<Point = Point3d>,
     S: Symbol<F, F::Geom> + MaybeSend + MaybeSync,
 {
-    fn render<'a>(&self, view: &MapView, canvas: &'a mut dyn Canvas) {
+    fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         if view.crs() != &self.crs {
             // not supported at the moment for 3d coordiantes
             return;
@@ -254,7 +254,7 @@ where
             *self.render_bundle.write().unwrap() = Some(packed);
         }
 
-        canvas.draw_bundles(&[self.render_bundle.read().unwrap().as_ref().unwrap()]);
+        canvas.draw_bundles(&[&**self.render_bundle.read().unwrap().as_ref().unwrap()]);
     }
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {

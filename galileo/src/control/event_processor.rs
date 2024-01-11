@@ -152,7 +152,7 @@ impl EventProcessor {
                     if is_dragging {
                         events.push(UserEvent::Drag(
                             button,
-                            (self.pointer_position - prev_position).into(),
+                            self.pointer_position - prev_position,
                             self.get_mouse_event(),
                         ));
                     }
@@ -205,7 +205,7 @@ impl EventProcessor {
                     if is_dragging {
                         events.push(UserEvent::Drag(
                             MouseButton::Other,
-                            (position - touch_info.prev_position).into(),
+                            position - touch_info.prev_position,
                             self.get_mouse_event_pos(position),
                         ));
                     }

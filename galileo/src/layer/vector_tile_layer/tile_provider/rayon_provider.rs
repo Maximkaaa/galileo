@@ -1,8 +1,10 @@
 use crate::error::GalileoError;
 use crate::layer::tile_provider::TileSource;
-use crate::layer::vector_tile::style::VectorTileStyle;
-use crate::layer::vector_tile::tile_provider::{LockedTileStore, TileState, VectorTileProvider};
-use crate::layer::vector_tile::vector_tile::VectorTile;
+use crate::layer::vector_tile_layer::style::VectorTileStyle;
+use crate::layer::vector_tile_layer::tile_provider::{
+    LockedTileStore, TileState, VectorTileProvider,
+};
+use crate::layer::vector_tile_layer::vector_tile::VectorTile;
 use crate::messenger::Messenger;
 use crate::platform::{PlatformService, PlatformServiceImpl};
 use crate::render::Renderer;
@@ -90,7 +92,7 @@ impl VectorTileProvider for RayonProvider {
     }
 
     fn set_messenger(&self, messenger: Box<dyn Messenger>) {
-        *self.messenger.write().unwrap() = Some(messenger.into())
+        *self.messenger.write().unwrap() = Some(messenger)
     }
 }
 
