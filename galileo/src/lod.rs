@@ -37,7 +37,7 @@ impl Eq for Lod {}
 
 impl PartialOrd for Lod {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.resolution.partial_cmp(&other.resolution)
+        Some(self.cmp(other))
     }
 }
 

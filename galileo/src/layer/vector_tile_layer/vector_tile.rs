@@ -113,7 +113,7 @@ impl VectorTile {
         };
 
         let symbol = rule.symbol.line.as_ref()?;
-        
+
         Some(LinePaint {
             width: symbol.width,
             color: symbol.stroke_color,
