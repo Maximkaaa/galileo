@@ -68,7 +68,7 @@ impl Renderer for WgpuRenderer {
             cast.points,
             cast.images,
             cast.primitives,
-            &self,
+            self,
         ))
     }
 
@@ -363,13 +363,13 @@ impl WgpuRenderer {
     fn render_map(&self, map: &Map, texture_view: &TextureView) {
         let view = map.view();
         for layer in map.layers() {
-            self.render_layer(layer, view, texture_view);
+            self.render_layer(&(**layer), view, texture_view);
         }
     }
 
-    fn render_layer(&self, layer: &Box<dyn Layer>, view: &MapView, texture_view: &TextureView) {
+    fn render_layer(&self, layer: &dyn Layer, view: &MapView, texture_view: &TextureView) {
         let mut canvas = WgpuCanvas::new(self, texture_view, view.clone());
-        layer.render(&view, &mut canvas);
+        layer.render(view, &mut canvas);
     }
 
     pub fn size(&self) -> Size {
@@ -431,7 +431,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
             cast.points,
             cast.images,
             cast.primitives,
-            &self.renderer,
+            self.renderer,
         ))
     }
 
@@ -439,7 +439,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
         self.renderer.pack_bundle(bundle)
     }
 
-    fn draw_bundles(&mut self, bundles: &[&Box<dyn PackedBundle>]) {
+    fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle]) {
         let mut encoder =
             self.renderer
                 .device
@@ -452,7 +452,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &self.renderer.multisampling_view,
-                    resolve_target: Some(&self.view),
+                    resolve_target: Some(self.view),
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
                         store: StoreOp::Store,
@@ -525,6 +525,12 @@ enum PrimitiveInfo {
     Line { vertex_range: Range<usize> },
     Point { point_index: usize },
     Image { image_index: usize },
+}
+
+impl Default for WgpuRenderBundle {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl WgpuRenderBundle {
@@ -625,7 +631,7 @@ impl RenderBundle for WgpuRenderBundle {
                 &[p.z as f32],
             );
         }
-        let _ = path_builder.end(line.is_closed);
+        path_builder.end(line.is_closed);
         let path = path_builder.build();
 
         let mut tesselator = StrokeTessellator::new();
@@ -670,7 +676,7 @@ impl RenderBundle for WgpuRenderBundle {
                 let _ = path_builder.line_to(point(p.x() as f32, p.y() as f32), &[0.0]);
             }
 
-            let _ = path_builder.end(true);
+            path_builder.end(true);
         }
 
         let path = path_builder.build();

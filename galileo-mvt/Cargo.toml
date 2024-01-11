@@ -5,6 +5,10 @@ edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+generate_proto = []
+
 [dependencies]
 bytes = "1.5.0"
 prost = "0.12.2"

@@ -12,19 +12,14 @@ pub struct VectorTileStyle {
 
 impl VectorTileStyle {
     pub fn get_style_rule(&self, layer_name: &str, feature: &MvtFeature) -> Option<&StyleRule> {
-        for rule in &self.rules {
-            if (rule.layer_name.is_none() || rule.layer_name.as_ref().unwrap() == layer_name)
+        self.rules.iter().find(|&rule| {
+            (rule.layer_name.is_none() || rule.layer_name.as_ref().unwrap() == layer_name)
                 && (rule.properties.is_empty()
                     || rule.properties.iter().all(|(key, value)| {
                         feature.properties.get(key).map(|v| v.to_string())
                             == Some(value.to_string())
                     }))
-            {
-                return Some(rule);
-            }
-        }
-
-        None
+        })
     }
 }
 

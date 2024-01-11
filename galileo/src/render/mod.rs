@@ -24,7 +24,7 @@ pub trait Canvas {
     fn create_bundle(&self) -> Box<dyn RenderBundle>;
     fn pack_bundle(&self, bundle: Box<dyn RenderBundle>) -> Box<dyn PackedBundle>;
     fn pack_unpacked(&self, bundle: Box<dyn UnpackedBundle>) -> Box<dyn PackedBundle>;
-    fn draw_bundles(&mut self, bundles: &[&Box<dyn PackedBundle>]);
+    fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle]);
 }
 
 pub trait RenderBundle {
@@ -95,9 +95,9 @@ pub enum LineCap {
     Butt,
 }
 
-impl Into<lyon::path::LineCap> for LineCap {
-    fn into(self) -> lyon::lyon_tessellation::LineCap {
-        match self {
+impl From<LineCap> for lyon::path::LineCap {
+    fn from(val: LineCap) -> Self {
+        match val {
             LineCap::Round => lyon::lyon_tessellation::LineCap::Round,
             LineCap::Butt => lyon::lyon_tessellation::LineCap::Butt,
         }

@@ -5,13 +5,13 @@ use maybe_sync::{MaybeSend, MaybeSync};
 use std::any::Any;
 use std::sync::{Arc, RwLock};
 
-pub mod feature;
+pub mod feature_layer;
 pub mod raster_tile;
 pub mod tile_provider;
-pub mod vector_tile;
+pub mod vector_tile_layer;
 
 pub trait Layer: MaybeSend + MaybeSync {
-    fn render<'a>(&self, view: &MapView, canvas: &'a mut dyn Canvas);
+    fn render(&self, view: &MapView, canvas: &mut dyn Canvas);
     fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>);
     fn set_messenger(&self, messenger: Box<dyn Messenger>);
     fn as_any(&self) -> &dyn Any;
@@ -19,7 +19,7 @@ pub trait Layer: MaybeSend + MaybeSync {
 }
 
 impl<T: Layer> Layer for Arc<RwLock<T>> {
-    fn render<'a>(&self, position: &MapView, canvas: &'a mut dyn Canvas) {
+    fn render(&self, position: &MapView, canvas: &mut dyn Canvas) {
         self.read().unwrap().render(position, canvas)
     }
 

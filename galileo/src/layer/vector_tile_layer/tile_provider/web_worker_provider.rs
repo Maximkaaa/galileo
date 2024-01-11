@@ -1,7 +1,7 @@
 use crate::error::GalileoError;
 use crate::layer::tile_provider::TileSource;
-use crate::layer::vector_tile::style::VectorTileStyle;
-use crate::layer::vector_tile::tile_provider::{
+use crate::layer::vector_tile_layer::style::VectorTileStyle;
+use crate::layer::vector_tile_layer::tile_provider::{
     LockedTileStore, TileState, VectorTile, VectorTileProvider,
 };
 use crate::messenger::Messenger;

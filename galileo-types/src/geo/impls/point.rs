@@ -49,7 +49,7 @@ impl Geometry for GeoPoint2d {
         &self,
         projection: &P,
     ) -> Option<Geom<P::OutPoint>> {
-        Some(Geom::Point(projection.project(&self)?))
+        Some(Geom::Point(projection.project(self)?))
     }
 }
 

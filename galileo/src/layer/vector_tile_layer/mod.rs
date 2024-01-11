@@ -9,9 +9,9 @@ use std::any::Any;
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 
-use crate::layer::vector_tile::style::VectorTileStyle;
-use crate::layer::vector_tile::tile_provider::{LockedTileStore, VectorTileProvider};
-use crate::layer::vector_tile::vector_tile::VectorTile;
+use crate::layer::vector_tile_layer::style::VectorTileStyle;
+use crate::layer::vector_tile_layer::tile_provider::{LockedTileStore, VectorTileProvider};
+use crate::layer::vector_tile_layer::vector_tile::VectorTile;
 use galileo_mvt::{MvtFeature, MvtGeometry};
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
 use galileo_types::geometry::CartesianGeometry2d;
@@ -27,10 +27,10 @@ pub struct VectorTileLayer<Provider: VectorTileProvider> {
 }
 
 impl<Provider: VectorTileProvider + 'static> Layer for VectorTileLayer<Provider> {
-    fn render<'a>(&self, view: &MapView, canvas: &'a mut dyn Canvas) {
+    fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         let tiles_store = self.tile_provider.read();
         let tiles = self.get_tiles_to_draw(view, &tiles_store);
-        let to_render: Vec<&Box<dyn PackedBundle>> = tiles.iter().map(|v| &v.bundle).collect();
+        let to_render: Vec<&dyn PackedBundle> = tiles.iter().map(|v| &*v.bundle).collect();
 
         canvas.draw_bundles(&to_render);
     }

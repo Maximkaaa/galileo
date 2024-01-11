@@ -148,7 +148,7 @@ impl TileScheme {
     /// Returns lod one z-level over the given.
     fn lod_over(&self, z: u32) -> Option<&Lod> {
         let mut lod_iter = self.lods.iter();
-        while let Some(lod) = lod_iter.next() {
+        for lod in lod_iter.by_ref() {
             if lod.z_index() == z {
                 break;
             }

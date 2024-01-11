@@ -47,7 +47,7 @@ impl RasterTileLayer {
         }
     }
 
-    fn get_tiles_to_draw<'a>(&self, view: &MapView) -> Vec<RasterTile> {
+    fn get_tiles_to_draw(&self, view: &MapView) -> Vec<RasterTile> {
         let mut tiles = vec![];
         let Some(tile_iter) = self.tile_scheme.iter_tiles(view) else {
             return vec![];
@@ -126,7 +126,7 @@ impl RasterTileLayer {
         tiles.into_iter().map(|(_, tile)| tile).collect()
     }
 
-    fn prepare_tile_renders<'a>(&self, tiles: &[RasterTile], canvas: &'a mut dyn Canvas) {
+    fn prepare_tile_renders(&self, tiles: &[RasterTile], canvas: &mut dyn Canvas) {
         let mut tile_renders = self.tile_renders.write().unwrap();
         let mut requires_redraw = false;
 
@@ -134,7 +134,7 @@ impl RasterTileLayer {
         for tile in tiles {
             if tile_renders
                 .get(&tile.index)
-                .and_then(|t| (!t.is_opaque).then(|| ()))
+                .and_then(|t| (!t.is_opaque).then_some(()))
                 .is_some()
             {
                 let render = tile_renders.remove(&tile.index).unwrap();
@@ -206,7 +206,7 @@ impl RasterTileLayer {
 
 #[async_trait]
 impl Layer for RasterTileLayer {
-    fn render<'a>(&self, view: &MapView, canvas: &'a mut dyn Canvas) {
+    fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         let tiles = self.get_tiles_to_draw(view);
         self.prepare_tile_renders(&tiles, canvas);
 
@@ -214,7 +214,7 @@ impl Layer for RasterTileLayer {
         let mut to_draw = Vec::new();
         for tile in &tiles {
             if let Some(rendered) = tile_renders.get(&tile.index) {
-                to_draw.push(&rendered.bundle);
+                to_draw.push(&*rendered.bundle);
             }
         }
 
@@ -288,7 +288,7 @@ impl TileProvider<RasterTile> for UrlTileProvider<RasterTile> {
     }
 
     fn set_messenger(&self, messenger: Box<dyn Messenger>) {
-        *self.messenger.write().unwrap() = Some(messenger.into());
+        *self.messenger.write().unwrap() = Some(messenger);
     }
 
     fn request_redraw(&self) {

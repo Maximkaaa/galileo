@@ -1,4 +1,4 @@
-use crate::layer::feature::symbol::Symbol;
+use crate::layer::feature_layer::symbol::Symbol;
 use crate::primitives::Color;
 use crate::render::{LineCap, LinePaint, Paint, PrimitiveId, RenderBundle, UnpackedBundle};
 use galileo_types::cartesian::impls::point::Point2d;

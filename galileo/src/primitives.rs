@@ -45,9 +45,9 @@ impl From<String> for Color {
     }
 }
 
-impl Into<String> for Color {
-    fn into(self) -> String {
-        self.to_hex()
+impl From<Color> for String {
+    fn from(val: Color) -> Self {
+        val.to_hex()
     }
 }
 

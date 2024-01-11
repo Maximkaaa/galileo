@@ -17,15 +17,15 @@ impl<P> Polygon<P> {
         std::iter::once(&self.outer_contour).chain(self.inner_contours.iter())
     }
 
-    pub fn cast_points<T>(&self, cast: impl Fn(&P) -> T) -> Polygon<T> {
+    pub fn cast_points<T>(&self, mut cast: impl Fn(&P) -> T) -> Polygon<T> {
         Polygon {
             outer_contour: ClosedContour::new(
-                self.outer_contour.points.iter().map(|p| cast(p)).collect(),
+                self.outer_contour.points.iter().map(&mut cast).collect(),
             ),
             inner_contours: self
                 .inner_contours
                 .iter()
-                .map(|c| ClosedContour::new(c.points.iter().map(|p| cast(p)).collect()))
+                .map(|c| ClosedContour::new(c.points.iter().map(&mut cast).collect()))
                 .collect(),
         }
     }

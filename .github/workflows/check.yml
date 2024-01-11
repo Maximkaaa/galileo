@@ -25,12 +25,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Rustfmt check
         run: cargo fmt --all -- --check
 
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - run: rustup component add clippy
       - uses: actions/checkout@v3
+      - run: rustup component add clippy
+      - name: Clippy check
         run: cargo clippy --all -- -D warnings

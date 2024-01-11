@@ -1,13 +1,16 @@
-use std::marker::PhantomData;
 use crate::geo::traits::projection::Projection;
+use std::marker::PhantomData;
 
+#[derive(Default)]
 pub struct IdentityProjection<P> {
     phantom: PhantomData<P>,
 }
 
 impl<P> IdentityProjection<P> {
     pub fn new() -> Self {
-        Self {phantom: Default::default()}
+        Self {
+            phantom: Default::default(),
+        }
     }
 }
 

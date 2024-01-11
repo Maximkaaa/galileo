@@ -1,5 +1,5 @@
 use crate::error::GalileoError;
-use crate::layer::vector_tile::style::VectorTileStyle;
+use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::render::{LineCap, LinePaint, PackedBundle, Paint, RenderBundle, Renderer};
 use crate::tile_scheme::{TileIndex, TileScheme};
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
@@ -113,12 +113,13 @@ impl VectorTile {
         };
 
         let symbol = rule.symbol.line.as_ref()?;
-        return Some(LinePaint {
+
+        Some(LinePaint {
             width: symbol.width,
             color: symbol.stroke_color,
             offset: 0.0,
             line_cap: LineCap::Butt,
-        });
+        })
     }
 
     fn get_polygon_symbol(

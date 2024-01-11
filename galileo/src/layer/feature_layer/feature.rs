@@ -9,6 +9,6 @@ impl<T: Geometry> Feature for T {
     type Geom = T;
 
     fn geometry(&self) -> &Self::Geom {
-        &self
+        self
     }
 }

@@ -1,9 +1,9 @@
 use data::{City, Country};
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
 use galileo::galileo_map::MapBuilder;
-use galileo::layer::feature::symbol::polygon::SimplePolygonSymbol;
-use galileo::layer::feature::symbol::Symbol;
-use galileo::layer::feature::FeatureLayer;
+use galileo::layer::feature_layer::symbol::polygon::SimplePolygonSymbol;
+use galileo::layer::feature_layer::symbol::Symbol;
+use galileo::layer::feature_layer::FeatureLayer;
 use galileo::primitives::Color;
 use galileo::render::{PointPaint, PrimitiveId, RenderBundle, UnpackedBundle};
 use galileo_types::cartesian::impls::point::{Point2d, Point3d};

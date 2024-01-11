@@ -10,7 +10,7 @@ impl<'a, P: CartesianPoint2d> Segment<'a, P> {
         &self,
         point: &Point,
     ) -> P::Num {
-        if self.0.equal(&self.1) {
+        if self.0.equal(self.1) {
             return self.0.distance_sq(point);
         }
 
@@ -68,6 +68,6 @@ impl<'a, P: CartesianPoint2d> Segment<'a, P> {
             return true;
         }
 
-        return false;
+        false
     }
 }

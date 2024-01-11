@@ -1,8 +1,8 @@
 use galileo::bounding_box::BoundingBox;
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
 use galileo::galileo_map::{MapBuilder, VectorTileProver};
-use galileo::layer::vector_tile::style::VectorTileStyle;
-use galileo::layer::vector_tile::VectorTileLayer;
+use galileo::layer::vector_tile_layer::style::VectorTileStyle;
+use galileo::layer::vector_tile_layer::VectorTileLayer;
 use galileo::lod::Lod;
 use galileo::tile_scheme::{TileScheme, VerticalDirection};
 use galileo_types::cartesian::impls::point::Point2d;

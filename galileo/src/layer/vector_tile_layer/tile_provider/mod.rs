@@ -1,6 +1,6 @@
 use crate::layer::tile_provider::TileSource;
-use crate::layer::vector_tile::style::VectorTileStyle;
-use crate::layer::vector_tile::vector_tile::VectorTile;
+use crate::layer::vector_tile_layer::style::VectorTileStyle;
+use crate::layer::vector_tile_layer::vector_tile::VectorTile;
 use crate::messenger::Messenger;
 use crate::render::Renderer;
 use crate::tile_scheme::{TileIndex, TileScheme};

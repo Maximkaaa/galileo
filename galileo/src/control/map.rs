@@ -62,7 +62,7 @@ impl UserEventHandler for MapController {
                     EventPropagation::Stop
                 }
                 MouseButton::Right => {
-                    map.set_view(self.get_rotation(map.view(), (*delta).into()));
+                    map.set_view(self.get_rotation(map.view(), *delta));
                     EventPropagation::Stop
                 }
                 _ => EventPropagation::Propagate,

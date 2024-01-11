@@ -37,13 +37,15 @@ impl Eq for Lod {}
 
 impl PartialOrd for Lod {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.resolution.partial_cmp(&other.resolution)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Lod {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+        self.resolution
+            .partial_cmp(&other.resolution)
+            .unwrap_or_else(|| self.z_index.cmp(&other.z_index))
     }
 }
 
