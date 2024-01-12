@@ -2,8 +2,8 @@ use crate::cartesian::impls::contour::ClosedContour;
 use crate::cartesian::rect::Rect;
 use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
 use crate::cartesian::traits::polygon::CartesianPolygon;
-use crate::geo::traits::projection::Projection;
-use crate::geometry::{CartesianGeometry2d, Geom, Geometry};
+use crate::geometry::CartesianGeometry2d;
+use crate::geometry_type::{GeometryType, PolygonGeometryType};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,14 +31,14 @@ impl<P> Polygon<P> {
     }
 }
 
-impl<P> crate::cartesian::traits::polygon::Polygon for Polygon<P> {
+impl<P> crate::polygon::Polygon for Polygon<P> {
     type Contour = ClosedContour<P>;
 
     fn outer_contour(&self) -> &Self::Contour {
         &self.outer_contour
     }
 
-    fn inner_contours(&self) -> Box<dyn Iterator<Item = &'_ Self::Contour> + '_> {
+    fn inner_contours(&self) -> impl Iterator<Item = &'_ Self::Contour> {
         Box::new(self.inner_contours.iter())
     }
 }
@@ -52,34 +52,12 @@ impl<P> From<ClosedContour<P>> for Polygon<P> {
     }
 }
 
-impl<P> Geometry for Polygon<P> {
-    type Point = P;
-
-    fn project<Proj: Projection<InPoint = Self::Point> + ?Sized>(
-        &self,
-        projection: &Proj,
-    ) -> Option<Geom<Proj::OutPoint>> {
-        let Geom::Line(outer_contour) = self.outer_contour.project(projection)? else {
-            return None;
-        };
-        let inner_contours = self
-            .inner_contours
-            .iter()
-            .map(|c| {
-                c.project(projection).and_then(|c| match c {
-                    Geom::Line(contour) => contour.into_closed(),
-                    _ => None,
-                })
-            })
-            .collect::<Option<Vec<ClosedContour<Proj::OutPoint>>>>()?;
-        Some(Geom::Polygon(Polygon {
-            outer_contour: outer_contour.into_closed()?,
-            inner_contours,
-        }))
-    }
+impl<P: GeometryType> GeometryType for Polygon<P> {
+    type Type = PolygonGeometryType;
+    type Space = P::Space;
 }
 
-impl<P> CartesianGeometry2d<P> for Polygon<P>
+impl<P: GeometryType> CartesianGeometry2d<P> for Polygon<P>
 where
     P: CartesianPoint2d,
 {

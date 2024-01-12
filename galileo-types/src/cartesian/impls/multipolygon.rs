@@ -1,8 +1,8 @@
 use crate::cartesian::impls::polygon::Polygon;
 use crate::cartesian::rect::Rect;
 use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
-use crate::geo::traits::projection::Projection;
-use crate::geometry::{CartesianGeometry2d, Geom, Geometry};
+use crate::geometry::CartesianGeometry2d;
+use crate::geometry_type::{GeometryType, MultiPolygonGeometryType};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -22,29 +22,20 @@ impl<P> MultiPolygon<P> {
     }
 }
 
-impl<P> Geometry for MultiPolygon<P> {
-    type Point = P;
+impl<P> crate::multi_polygon::MultiPolygon for MultiPolygon<P> {
+    type Polygon = Polygon<P>;
 
-    fn project<Proj: Projection<InPoint = Self::Point> + ?Sized>(
-        &self,
-        projection: &Proj,
-    ) -> Option<Geom<Proj::OutPoint>> {
-        Some(Geom::MultiPolygon(MultiPolygon {
-            parts: self
-                .parts
-                .iter()
-                .map(|p| {
-                    p.project(projection).and_then(|p| match p {
-                        Geom::Polygon(v) => Some(v),
-                        _ => None,
-                    })
-                })
-                .collect::<Option<Vec<Polygon<Proj::OutPoint>>>>()?,
-        }))
+    fn polygons(&self) -> impl Iterator<Item = &Self::Polygon> {
+        self.parts.iter()
     }
 }
 
-impl<P> CartesianGeometry2d<P> for MultiPolygon<P>
+impl<P: GeometryType> GeometryType for MultiPolygon<P> {
+    type Type = MultiPolygonGeometryType;
+    type Space = P::Space;
+}
+
+impl<P: GeometryType> CartesianGeometry2d<P> for MultiPolygon<P>
 where
     P: CartesianPoint2d,
 {

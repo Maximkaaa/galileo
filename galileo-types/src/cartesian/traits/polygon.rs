@@ -1,24 +1,8 @@
 use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
-use crate::cartesian::traits::contour::{ClosedContour, Contour};
+use crate::contour::ClosedContour;
+use crate::polygon::Polygon;
 use crate::segment::Segment;
 use nalgebra::Point2;
-
-pub trait Polygon {
-    type Contour: ClosedContour;
-
-    fn outer_contour(&self) -> &Self::Contour;
-    fn inner_contours(&self) -> Box<dyn Iterator<Item = &'_ Self::Contour> + '_>;
-
-    fn iter_contours(&self) -> Box<dyn Iterator<Item = &'_ Self::Contour> + '_> {
-        Box::new(std::iter::once(self.outer_contour()).chain(self.inner_contours()))
-    }
-
-    fn iter_segments(
-        &self,
-    ) -> Box<dyn Iterator<Item = Segment<'_, <Self::Contour as Contour>::Point>> + '_> {
-        Box::new(self.iter_contours().flat_map(Self::Contour::iter_segments))
-    }
-}
 
 pub trait CartesianPolygon {
     type Point: CartesianPoint2d;
@@ -74,8 +58,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::cartesian::impls::point::Point2d;
+    use crate::cartesian::traits::polygon::*;
 
     #[test]
     fn contains_point() {

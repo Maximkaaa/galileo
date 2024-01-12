@@ -52,7 +52,13 @@ impl From<Color> for String {
 }
 
 impl Color {
-    pub fn rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
+    pub const RED: Color = Color::rgba(255, 0, 0, 255);
+    pub const GREEN: Color = Color::rgba(0, 255, 0, 255);
+    pub const BLUE: Color = Color::rgba(0, 0, 255, 255);
+    pub const WHITE: Color = Color::rgba(255, 255, 255, 255);
+    pub const BLACK: Color = Color::rgba(0, 0, 0, 255);
+
+    pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self { r, g, b, a }
     }
 

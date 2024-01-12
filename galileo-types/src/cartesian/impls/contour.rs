@@ -2,7 +2,8 @@ use crate::cartesian::rect::Rect;
 use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
 use crate::cartesian::traits::contour::CartesianContour;
 use crate::geo::traits::projection::Projection;
-use crate::geometry::{CartesianGeometry2d, Geom, Geometry};
+use crate::geometry::CartesianGeometry2d;
+use crate::geometry_type::{ContourGeometryType, GeometryType};
 use num_traits::Float;
 use serde::{Deserialize, Serialize};
 
@@ -89,11 +90,11 @@ impl<P> From<ClosedContour<P>> for Contour<P> {
     }
 }
 
-impl<P> crate::cartesian::traits::contour::ClosedContour for ClosedContour<P> {
+impl<P> crate::contour::ClosedContour for ClosedContour<P> {
     type Point = P;
 
-    fn iter_points(&self) -> Box<dyn Iterator<Item = &'_ P> + '_> {
-        Box::new(self.points.iter())
+    fn iter_points(&self) -> impl Iterator<Item = &'_ P> {
+        self.points.iter()
     }
 }
 
@@ -103,15 +104,15 @@ impl<P> crate::cartesian::traits::contour::ClosedContour for ClosedContour<P> {
 //     }
 // }
 
-impl<P> crate::cartesian::traits::contour::Contour for Contour<P> {
+impl<P> crate::contour::Contour for Contour<P> {
     type Point = P;
 
     fn is_closed(&self) -> bool {
         self.is_closed
     }
 
-    fn iter_points(&self) -> Box<dyn Iterator<Item = &P> + '_> {
-        Box::new(self.points.iter())
+    fn iter_points(&self) -> impl Iterator<Item = &P> {
+        self.points.iter()
     }
 }
 
@@ -120,45 +121,17 @@ impl<P> crate::cartesian::traits::contour::Contour for Contour<P> {
 // {
 // }
 
-impl<P> Geometry for ClosedContour<P> {
-    type Point = P;
-
-    fn project<Proj: Projection<InPoint = Self::Point> + ?Sized>(
-        &self,
-        projection: &Proj,
-    ) -> Option<Geom<Proj::OutPoint>> {
-        let points = self
-            .points
-            .iter()
-            .map(|p| projection.project(p))
-            .collect::<Option<Vec<Proj::OutPoint>>>()?;
-        Some(Geom::Line(Contour {
-            points,
-            is_closed: true,
-        }))
-    }
+impl<P: GeometryType> GeometryType for Contour<P> {
+    type Type = ContourGeometryType;
+    type Space = P::Space;
 }
 
-impl<P> Geometry for Contour<P> {
-    type Point = P;
-
-    fn project<Proj: Projection<InPoint = Self::Point> + ?Sized>(
-        &self,
-        projection: &Proj,
-    ) -> Option<Geom<Proj::OutPoint>> {
-        let points = self
-            .points
-            .iter()
-            .map(|p| projection.project(p))
-            .collect::<Option<Vec<Proj::OutPoint>>>()?;
-        Some(Geom::Line(Contour {
-            points,
-            is_closed: true,
-        }))
-    }
+impl<P: GeometryType> GeometryType for ClosedContour<P> {
+    type Type = ContourGeometryType;
+    type Space = P::Space;
 }
 
-impl<N, P> CartesianGeometry2d<P> for Contour<P>
+impl<N, P: GeometryType> CartesianGeometry2d<P> for Contour<P>
 where
     N: Float,
     P: CartesianPoint2d<Num = N>,

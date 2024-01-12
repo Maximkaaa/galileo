@@ -1,3 +1,6 @@
+use crate::geo::traits::projection::Projection;
+use crate::geometry::{Geom, GeometrySpecialization};
+use crate::geometry_type::{CartesianSpace2d, GeometryType, PointGeometryType};
 use crate::point::{CartesianPointType, Point, PointHelper};
 use nalgebra::{Point2, Scalar, Vector2};
 use num_traits::{Bounded, Float, FromPrimitive, Num};
@@ -75,3 +78,17 @@ pub trait CartesianPoint2dFloat<N: Float = f64>: CartesianPoint2d<Num = N> {
 }
 
 impl<N: Float, T: CartesianPoint2d<Num = N>> CartesianPoint2dFloat<N> for T {}
+
+impl<P> GeometrySpecialization<PointGeometryType, CartesianSpace2d> for P
+where
+    P: CartesianPoint2d + GeometryType<Type = PointGeometryType, Space = CartesianSpace2d>,
+{
+    type Point = P;
+
+    fn project<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
+    where
+        Proj: Projection<InPoint = Self::Point> + ?Sized,
+    {
+        Some(Geom::Point(projection.project(self)?))
+    }
+}
