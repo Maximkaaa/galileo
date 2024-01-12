@@ -5,8 +5,6 @@ use galileo::primitives::Color;
 use galileo::tile_scheme::TileScheme;
 use galileo_types::disambig::{Disambig, Disambiguate};
 use galileo_types::geo::crs::Crs;
-use galileo_types::geo::impls::point::GeoPoint2d;
-use galileo_types::geometry::Geometry;
 use galileo_types::geometry_type::GeoSpace2d;
 use galileo_types::latlon;
 use geozero::geojson::GeoJson;

@@ -82,6 +82,7 @@ mod tests {
     use crate::cartesian::impls::contour::ClosedContour;
     use crate::cartesian::impls::point::Point2d;
     use crate::contour::Contour;
+    use crate::segment::Segment;
 
     #[test]
     fn iter_points_closing() {
