@@ -478,8 +478,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
                     );
                     render_pass.draw_indexed(0..cast.index_count(), 0, 0..1);
 
-                    if cast.point_buffers.index_count > 0 {
-                        let point_buffers = &cast.point_buffers;
+                    if let Some(point_buffers) = &cast.point_buffers {
                         render_pass.set_pipeline(&self.renderer.point_pipeline);
                         render_pass.set_bind_group(0, &self.renderer.map_view_bind_group, &[]);
                         render_pass.set_vertex_buffer(0, point_buffers.vertex.slice(..));
@@ -716,7 +715,7 @@ impl RenderBundle for WgpuRenderBundle {
 pub struct WgpuPackedBundle {
     vertex_buffers: VertexBuffers<LineVertex, u32>,
     wgpu_buffers: WgpuPolygonBuffers,
-    point_buffers: WgpuPointBuffers,
+    point_buffers: Option<WgpuPointBuffers>,
     image_buffers: Vec<WgpuImage>,
     primitives: Vec<PrimitiveInfo>,
 }
@@ -759,43 +758,47 @@ impl WgpuPackedBundle {
                 contents: bytemuck::cast_slice(&vertex_buffers.vertices),
             });
 
-        let max_point_size = points.iter().fold(0f32, |v, p| v.max(p.size));
-        let (point_indices, point_vertices) = create_point(max_point_size);
+        let point_buffers = if !points.is_empty() {
+            let max_point_size = points.iter().fold(0f32, |v, p| v.max(p.size));
+            let (point_indices, point_vertices) = create_point(max_point_size);
 
-        let point_index_buffer =
-            renderer
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: None,
-                    contents: bytemuck::cast_slice(&point_indices),
-                    usage: wgpu::BufferUsages::INDEX,
-                });
+            let point_index_buffer =
+                renderer
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: None,
+                        contents: bytemuck::cast_slice(&point_indices),
+                        usage: wgpu::BufferUsages::INDEX,
+                    });
 
-        let point_vertex_buffer =
-            renderer
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: None,
-                    usage: wgpu::BufferUsages::VERTEX,
-                    contents: bytemuck::cast_slice(&point_vertices),
-                });
+            let point_vertex_buffer =
+                renderer
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: None,
+                        usage: wgpu::BufferUsages::VERTEX,
+                        contents: bytemuck::cast_slice(&point_vertices),
+                    });
 
-        let point_instance_buffer =
-            renderer
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: None,
-                    usage: wgpu::BufferUsages::VERTEX,
-                    contents: bytemuck::cast_slice(&points),
-                });
+            let point_instance_buffer =
+                renderer
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: None,
+                        usage: wgpu::BufferUsages::VERTEX,
+                        contents: bytemuck::cast_slice(&points),
+                    });
 
-        let point_buffers = WgpuPointBuffers {
-            index: point_index_buffer,
-            vertex: point_vertex_buffer,
-            instance: point_instance_buffer,
-            index_count: point_indices.len() as u32,
-            instance_count: points.len() as u32,
-            vertices: points,
+            Some(WgpuPointBuffers {
+                index: point_index_buffer,
+                vertex: point_vertex_buffer,
+                instance: point_instance_buffer,
+                index_count: point_indices.len() as u32,
+                instance_count: points.len() as u32,
+                vertices: points,
+            })
+        } else {
+            None
         };
 
         let mut image_buffers = vec![];
@@ -828,7 +831,7 @@ fn create_point(max_size: f32) -> (Vec<u32>, Vec<PointVertex>) {
 
     let center = PointVertex { norm: [0.0, 0.0] };
 
-    const TOLERANCE: f32 = 0.25;
+    const TOLERANCE: f32 = 0.1;
     let r = half_size.max(1.0);
     let steps_count =
         (std::f32::consts::PI / ((r - TOLERANCE) / (r + TOLERANCE)).acos()).ceil() as usize;
@@ -873,7 +876,7 @@ impl PackedBundle for WgpuPackedBundle {
 struct WgpuUnpackedBundle {
     vertex_buffers: VertexBuffers<LineVertex, u32>,
     wgpu_buffers: WgpuPolygonBuffers,
-    point_buffers: WgpuPointBuffers,
+    point_buffers: Option<WgpuPointBuffers>,
     images: Vec<WgpuImage>,
     primitives: Vec<PrimitiveInfo>,
 
@@ -989,8 +992,11 @@ impl UnpackedBundle for WgpuUnpackedBundle {
         let Some(PrimitiveInfo::Point { point_index }) = self.primitives.get(id.0) else {
             return;
         };
+        let Some(point_buffers) = &mut self.point_buffers else {
+            return;
+        };
 
-        let point = &mut self.point_buffers.vertices[*point_index];
+        let point = &mut point_buffers.vertices[*point_index];
         point.color = paint.color.to_f32_array();
         point.size = paint.size as f32;
 

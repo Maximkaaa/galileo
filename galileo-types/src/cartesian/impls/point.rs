@@ -3,6 +3,7 @@ use crate::cartesian::traits::cartesian_point::{
 };
 use crate::geo::traits::projection::Projection;
 use crate::geometry::{Geom, Geometry};
+use crate::geometry_type::{CartesianSpace2d, GeometryType, PointGeometryType};
 use crate::point::{CartesianPointType, Point};
 pub use nalgebra::Point2;
 use nalgebra::{Point3, Scalar};
@@ -60,15 +61,9 @@ impl<Num: Scalar + Copy> NewCartesianPoint3d<Num> for Point3<Num> {
     }
 }
 
-impl<Num: Scalar> Geometry for Point2<Num> {
-    type Point = Point2<Num>;
-
-    fn project<P: Projection<InPoint = Self::Point> + ?Sized>(
-        &self,
-        projection: &P,
-    ) -> Option<Geom<P::OutPoint>> {
-        Some(Geom::Point(projection.project(self)?))
-    }
+impl<Num: Scalar> GeometryType for Point2<Num> {
+    type Type = PointGeometryType;
+    type Space = CartesianSpace2d;
 }
 
 impl<Num: Scalar> Geometry for Point3<Num> {

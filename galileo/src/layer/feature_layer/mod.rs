@@ -5,21 +5,25 @@ use crate::messenger::Messenger;
 use crate::render::wgpu::WgpuRenderer;
 use crate::render::{Canvas, PackedBundle, PrimitiveId, Renderer};
 use crate::view::MapView;
-use galileo_types::cartesian::impls::point::{Point2d, Point3d};
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
+use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::traits::cartesian_point::{
+    CartesianPoint2d, NewCartesianPoint2d, NewCartesianPoint3d,
+};
 use galileo_types::geo::crs::Crs;
 use galileo_types::geo::impls::point::GeoPoint2d;
 use galileo_types::geo::impls::projection::identity::IdentityProjection;
+use galileo_types::geo::traits::point::NewGeoPoint;
 use galileo_types::geo::traits::projection::{ChainProjection, InvertedProjection, Projection};
 use galileo_types::geometry::{CartesianGeometry2d, Geom, Geometry};
+use galileo_types::geometry_type::{CartesianSpace2d, CartesianSpace3d, GeoSpace2d};
 use maybe_sync::{MaybeSend, MaybeSync};
-use std::any::Any;
+use std::marker::PhantomData;
 use std::sync::{Arc, RwLock};
 
 pub mod feature;
 pub mod symbol;
 
-pub struct FeatureLayer<P, F, S>
+pub struct FeatureLayer<P, F, S, Space>
 where
     F: Feature,
     F::Geom: Geometry<Point = P>,
@@ -30,9 +34,11 @@ where
     feature_render_map: RwLock<Vec<Vec<PrimitiveId>>>,
     crs: Crs,
     messenger: RwLock<Option<Box<dyn Messenger>>>,
+
+    space: PhantomData<Space>,
 }
 
-impl<P, F, S> FeatureLayer<P, F, S>
+impl<P, F, S, Space> FeatureLayer<P, F, S, Space>
 where
     F: Feature,
     F::Geom: Geometry<Point = P>,
@@ -45,11 +51,12 @@ where
             feature_render_map: RwLock::new(Vec::new()),
             crs,
             messenger: RwLock::new(None),
+            space: Default::default(),
         }
     }
 }
 
-impl<P, F, S> FeatureLayer<P, F, S>
+impl<P, F, S, Space> FeatureLayer<P, F, S, Space>
 where
     P: CartesianPoint2d,
     F: Feature,
@@ -98,7 +105,7 @@ where
     }
 }
 
-impl<P, F, S> FeatureLayer<P, F, S>
+impl<P, F, S, Space> FeatureLayer<P, F, S, Space>
 where
     F: Feature,
     F::Geom: Geometry<Point = P>,
@@ -128,20 +135,18 @@ where
     }
 }
 
-impl<F, S> Layer for FeatureLayer<GeoPoint2d, F, S>
+impl<P, F, S> Layer for FeatureLayer<P, F, S, GeoSpace2d>
 where
+    P: NewGeoPoint + 'static,
     F: Feature + MaybeSend + MaybeSync,
-    F::Geom: Geometry<Point = GeoPoint2d>,
+    F::Geom: Geometry<Point = P>,
     S: Symbol<F, Geom<Point2d>> + MaybeSend + MaybeSync,
 {
     fn render(&self, position: &MapView, canvas: &mut dyn Canvas) {
         if self.render_bundle.read().unwrap().is_none() {
             let mut bundle = canvas.create_bundle();
             let mut render_map = self.feature_render_map.write().unwrap();
-            let crs = position
-                .crs()
-                .get_projection::<GeoPoint2d, Point2d>()
-                .unwrap();
+            let crs = position.crs().get_projection::<P, Point2d>().unwrap();
             for feature in &self.features {
                 let Some(projected) = feature.geometry().project(&(*crs)) else {
                     continue;
@@ -164,21 +169,14 @@ where
     fn set_messenger(&self, messenger: Box<dyn Messenger>) {
         *self.messenger.write().unwrap() = Some(messenger);
     }
-
-    fn as_any(&self) -> &dyn Any {
-        todo!()
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        todo!()
-    }
 }
 
-impl<F, S> Layer for FeatureLayer<Point2d, F, S>
+impl<P, F, S> Layer for FeatureLayer<P, F, S, CartesianSpace2d>
 where
+    P: NewCartesianPoint2d + Clone + 'static,
     F: Feature + MaybeSend + MaybeSync,
-    F::Geom: Geometry<Point = Point2d>,
-    S: Symbol<F, Geom<Point2d>> + MaybeSend + MaybeSync,
+    F::Geom: Geometry<Point = P>,
+    S: Symbol<F, Geom<P>> + MaybeSend + MaybeSync,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         if self.render_bundle.read().unwrap().is_none() {
@@ -187,9 +185,9 @@ where
 
             let projection: Box<dyn Projection<InPoint = _, OutPoint = _>> =
                 if view.crs() == &self.crs {
-                    Box::new(IdentityProjection::new())
+                    Box::new(IdentityProjection::<P, P, _>::new())
                 } else {
-                    let self_proj = self.crs.get_projection::<GeoPoint2d, Point2d>().unwrap();
+                    let self_proj = self.crs.get_projection::<GeoPoint2d, P>().unwrap();
                     let view_proj = view.crs().get_projection().unwrap();
                     Box::new(ChainProjection::new(
                         Box::new(InvertedProjection::new(self_proj)),
@@ -219,20 +217,13 @@ where
     fn set_messenger(&self, messenger: Box<dyn Messenger>) {
         *self.messenger.write().unwrap() = Some(messenger);
     }
-
-    fn as_any(&self) -> &dyn Any {
-        todo!()
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        todo!()
-    }
 }
 
-impl<F, S> Layer for FeatureLayer<Point3d, F, S>
+impl<P, F, S> Layer for FeatureLayer<P, F, S, CartesianSpace3d>
 where
+    P: NewCartesianPoint3d,
     F: Feature + MaybeSend + MaybeSync,
-    F::Geom: Geometry<Point = Point3d>,
+    F::Geom: Geometry<Point = P>,
     S: Symbol<F, F::Geom> + MaybeSend + MaybeSync,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
@@ -263,13 +254,5 @@ where
 
     fn set_messenger(&self, messenger: Box<dyn Messenger>) {
         *self.messenger.write().unwrap() = Some(messenger);
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        todo!()
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        todo!()
     }
 }

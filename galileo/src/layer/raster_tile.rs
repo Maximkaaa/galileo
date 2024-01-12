@@ -8,7 +8,6 @@ use crate::tile_scheme::{TileIndex, TileScheme};
 use crate::view::MapView;
 use async_trait::async_trait;
 use maybe_sync::Mutex;
-use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
@@ -233,14 +232,6 @@ impl Layer for RasterTileLayer {
 
     fn set_messenger(&self, messenger: Box<dyn Messenger>) {
         self.tile_provider.set_messenger(messenger);
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        todo!()
     }
 }
 

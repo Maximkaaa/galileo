@@ -7,8 +7,10 @@ use galileo::layer::feature_layer::FeatureLayer;
 use galileo::primitives::Color;
 use galileo::render::{PointPaint, PrimitiveId, RenderBundle, UnpackedBundle};
 use galileo_types::cartesian::impls::point::{Point2d, Point3d};
+use galileo_types::cartesian::impls::polygon::Polygon;
 use galileo_types::geo::crs::Crs;
 use galileo_types::geometry::Geom;
+use galileo_types::geometry_type::CartesianSpace2d;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -122,18 +124,16 @@ pub async fn run(builder: MapBuilder) {
 struct CountrySymbol {}
 
 impl CountrySymbol {
-    fn get_polygon_symbol(&self, feature: &Country) -> SimplePolygonSymbol {
+    fn get_polygon_symbol(&self, feature: &Country) -> SimplePolygonSymbol<CartesianSpace2d> {
         let stroke_color = feature.color;
         let fill_color = Color {
             a: if feature.is_selected() { 255 } else { 150 },
             ..stroke_color
         };
-        SimplePolygonSymbol {
-            fill_color,
-            stroke_color,
-            stroke_width: 1.0,
-            stroke_offset: -0.5,
-        }
+        SimplePolygonSymbol::new(fill_color)
+            .with_stroke_color(stroke_color)
+            .with_stroke_width(1.0)
+            .with_stroke_offset(-0.5)
     }
 }
 
@@ -153,7 +153,7 @@ impl Symbol<Country, Geom<Point2d>> for CountrySymbol {
             ids.append(
                 &mut self
                     .get_polygon_symbol(feature)
-                    .render(&(), &polygon, bundle),
+                    .render(&(), polygon, bundle),
             )
         }
 
@@ -169,7 +169,9 @@ impl Symbol<Country, Geom<Point2d>> for CountrySymbol {
         let renders_by_feature = render_ids.len() / feature.geometry.parts().len();
         let mut next_index = 0;
         for _ in feature.geometry.parts() {
-            self.get_polygon_symbol(feature).update(
+            let polygon_symbol = self.get_polygon_symbol(feature);
+            <SimplePolygonSymbol<CartesianSpace2d> as Symbol<(), Polygon<Point2d>>>::update(
+                &polygon_symbol,
                 &(),
                 &render_ids[next_index..next_index + renders_by_feature],
                 bundle,
