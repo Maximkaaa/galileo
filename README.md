@@ -49,7 +49,7 @@ it can be used on any platform that `wgpu` supports:
 Still, the backend is not integral part of the Galileo design, so we will probably
 try other promising backends (like [vello](https://github.com/linebender/vello)).
 
-# Features
+## Features
 
 Galileo is an active WIP, here is the list of the features that are already present:
 * raster tile layers
@@ -59,6 +59,32 @@ Galileo is an active WIP, here is the list of the features that are already pres
 * user-input handling on layers (mouse only at the moment, touch is WIP)
 * support for different projections and tile schemes
 * high performance
+
+# Roadmap
+
+There are so many things that we all want from mapping engine, but it's impossible to have
+them all done at the same time. So here's our current plan and priorities:
+
+### v0.1 - usabilitification
+
+* Architecture and basic building blocks of the library
+* Basic styling to be able to use Galileo for simple but useful applications
+* Support main source types (TMS tiles, 2d geometries, MVT)
+* Basic support for projections
+
+### v0.2 - bueautification
+
+* Advanced styling for features and vector tiles (image points, gradients, etc.)
+* Support for more source and style formats
+* Text label rendering
+* Advanced feature layers (clusters, heatmaps, etc.)
+
+### v0.3 - 3d-fication
+
+* 3d globe, atmosphere and stars around to make your dark hours brighter
+* Terrain rendering to draw every mountain you climbed
+* 3d models to put your house on those mountains
+* Advanced support for projections and CRSs
 
 # Running examples
 
