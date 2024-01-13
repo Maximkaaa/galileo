@@ -15,7 +15,10 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.0.1"
+version = "0.1.0-alpha.0"
 authors = ["Maxim Gritsenko <maxim@gritsenko.biz>"]
 edition = "2021"
 repository = "https://github.com/Maximkaaa/galileo"
+license = "MIT OR Apache-2.0"
+keywords = ["gis", "map", "rendering"]
+categories = ["science::geo"]

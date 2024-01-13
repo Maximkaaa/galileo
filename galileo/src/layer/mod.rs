@@ -9,6 +9,10 @@ pub mod raster_tile;
 pub mod tile_provider;
 pub mod vector_tile_layer;
 
+pub use feature_layer::FeatureLayer;
+pub use raster_tile::RasterTileLayer;
+pub use vector_tile_layer::VectorTileLayer;
+
 pub trait Layer: MaybeSend + MaybeSync {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas);
     fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>);

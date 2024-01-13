@@ -4,6 +4,10 @@ pub mod contour;
 pub mod point;
 pub mod polygon;
 
+pub use contour::SimpleContourSymbol;
+pub use point::CirclePointSymbol;
+pub use polygon::SimplePolygonSymbol;
+
 pub trait Symbol<F, G> {
     fn render(
         &self,

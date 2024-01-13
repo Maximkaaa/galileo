@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+documentation = "https://docs.rs/galileo-types"
+description = "Trait based geo geometries and algorithms"
 
 [features]
 default = ["geo-types"]

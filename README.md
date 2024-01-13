@@ -1,3 +1,6 @@
+[![Galileo on Crates.io](https://img.shields.io/crates/v/galileo.svg?color=brightgreen)](https://crates.io/crates/galileo)
+[![Documentation](https://img.shields.io/docsrs/galileo/latest.svg)](https://docs.rs/galileo)
+
 **Galileo** is a general purpose cross-platform geo-rendering library.
 
 # Web examples
