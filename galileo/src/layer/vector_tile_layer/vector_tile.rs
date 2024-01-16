@@ -24,7 +24,8 @@ impl VectorTile {
         style: &VectorTileStyle,
         tile_scheme: &TileScheme,
     ) -> Result<Self, GalileoError> {
-        let mut bundle = renderer.create_bundle();
+        let lod_resolution = tile_scheme.lod_resolution(index.z).unwrap();
+        let mut bundle = renderer.create_bundle(&Some(vec![lod_resolution as f32]));
         Self::prepare(&mvt_tile, &mut bundle, index, style, tile_scheme)?;
         let bundle = renderer.pack_bundle(bundle);
 
@@ -42,16 +43,19 @@ impl VectorTile {
         let lod_resolution = tile_scheme.lod_resolution(index.z).unwrap();
         let tile_resolution = lod_resolution * tile_scheme.tile_width() as f64;
 
+        let bounds = Polygon::new(
+            ClosedContour::new(vec![
+                Point3d::new(bbox.x_min, bbox.y_min, 0.0),
+                Point3d::new(bbox.x_min, bbox.y_max, 0.0),
+                Point3d::new(bbox.x_max, bbox.y_max, 0.0),
+                Point3d::new(bbox.x_max, bbox.y_min, 0.0),
+            ]),
+            vec![],
+        );
+        bundle.clip_area(&bounds);
+
         bundle.add_polygon(
-            &Polygon::new(
-                ClosedContour::new(vec![
-                    Point3d::new(bbox.x_min, bbox.y_min, 0.0),
-                    Point3d::new(bbox.x_min, bbox.y_max, 0.0),
-                    Point3d::new(bbox.x_max, bbox.y_max, 0.0),
-                    Point3d::new(bbox.x_max, bbox.y_min, 0.0),
-                ]),
-                vec![],
-            ),
+            &bounds,
             Paint {
                 color: style.background,
             },

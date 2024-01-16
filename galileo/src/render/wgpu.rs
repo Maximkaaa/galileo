@@ -1,13 +1,15 @@
 use galileo_types::cartesian::size::Size;
+use lyon::tessellation::VertexBuffers;
 use nalgebra::{Rotation3, Vector3};
 use std::any::Any;
 use std::mem::size_of;
 use std::ops::Range;
 use wgpu::util::DeviceExt;
 use wgpu::{
-    BindGroup, BindGroupLayout, Buffer, Device, Extent3d, Queue, RenderPass, StoreOp,
-    TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
-    TextureViewDescriptor,
+    BindGroup, BindGroupLayout, Buffer, CompareFunction, DepthStencilState, Device, Extent3d,
+    Queue, RenderPass, RenderPassDepthStencilAttachment, StencilFaceState, StencilOperation,
+    StencilState, StoreOp, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+    TextureView, TextureViewDescriptor,
 };
 use winit::dpi::PhysicalSize;
 
@@ -45,16 +47,22 @@ pub struct WgpuRenderer {
     pub point_pipeline: wgpu::RenderPipeline,
 
     background: Color,
+    pub stencil_view: TextureView,
+    pub clip_pipeline: wgpu::RenderPipeline,
 }
 
 impl Renderer for WgpuRenderer {
-    fn create_bundle(&self) -> RenderBundle {
-        RenderBundle::Tessellating(TessellatingRenderBundle::new())
+    fn create_bundle(&self, lods: &Option<Vec<f32>>) -> RenderBundle {
+        match lods {
+            Some(v) => RenderBundle::Tessellating(TessellatingRenderBundle::with_lods(v)),
+            None => RenderBundle::Tessellating(TessellatingRenderBundle::new()),
+        }
     }
 
     fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle> {
         match bundle {
             RenderBundle::Tessellating(inner) => Box::new(WgpuPackedBundle::new(
+                inner.clip_area,
                 inner.poly_tessellation,
                 inner.points,
                 inner.images,
@@ -160,7 +168,20 @@ impl WgpuRenderer {
                 push_constant_ranges: &[],
             });
 
-        let line_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let poly_stencil_state = StencilFaceState {
+            compare: CompareFunction::Equal,
+            fail_op: StencilOperation::Keep,
+            depth_fail_op: StencilOperation::Keep,
+            pass_op: StencilOperation::Keep,
+        };
+
+        let targets = [Some(wgpu::ColorTargetState {
+            format: config.format,
+            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+            write_mask: wgpu::ColorWrites::ALL,
+        })];
+
+        let poly_pipeline_desc = wgpu::RenderPipelineDescriptor {
             label: Some("Line Render Pipeline"),
             layout: Some(&line_render_pipeline_layout),
             vertex: wgpu::VertexState {
@@ -171,11 +192,7 @@ impl WgpuRenderer {
             fragment: Some(wgpu::FragmentState {
                 module: &line_shader,
                 entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
+                targets: &targets,
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -186,14 +203,50 @@ impl WgpuRenderer {
                 unclipped_depth: false,
                 conservative: false,
             },
-            depth_stencil: None,
+            depth_stencil: Some(DepthStencilState {
+                format: TextureFormat::Depth24PlusStencil8,
+                depth_write_enabled: false,
+                depth_compare: CompareFunction::Always,
+                stencil: StencilState {
+                    front: poly_stencil_state,
+                    back: poly_stencil_state,
+                    read_mask: 0xff,
+                    write_mask: 0xff,
+                },
+                bias: Default::default(),
+            }),
             multisample: wgpu::MultisampleState {
                 count: 4,
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
             multiview: None,
-        });
+        };
+
+        let line_pipeline = device.create_render_pipeline(&poly_pipeline_desc);
+
+        let clip_stencil_state = StencilFaceState {
+            compare: CompareFunction::Never,
+            fail_op: StencilOperation::Replace,
+            depth_fail_op: StencilOperation::Keep,
+            pass_op: StencilOperation::Keep,
+        };
+        let clip_pipeline_desc = wgpu::RenderPipelineDescriptor {
+            depth_stencil: Some(DepthStencilState {
+                format: TextureFormat::Depth24PlusStencil8,
+                depth_write_enabled: false,
+                depth_compare: CompareFunction::Always,
+                stencil: StencilState {
+                    front: clip_stencil_state,
+                    back: clip_stencil_state,
+                    read_mask: 0xff,
+                    write_mask: 0xff,
+                },
+                bias: Default::default(),
+            }),
+            ..poly_pipeline_desc
+        };
+        let clip_pipeline = device.create_render_pipeline(&clip_pipeline_desc);
 
         let point_shader =
             device.create_shader_module(wgpu::include_wgsl!("./wgpu_shaders/point.wgsl"));
@@ -231,7 +284,18 @@ impl WgpuRenderer {
                 unclipped_depth: false,
                 conservative: false,
             },
-            depth_stencil: None,
+            depth_stencil: Some(DepthStencilState {
+                format: TextureFormat::Depth24PlusStencil8,
+                depth_write_enabled: false,
+                depth_compare: CompareFunction::Always,
+                stencil: StencilState {
+                    front: poly_stencil_state,
+                    back: poly_stencil_state,
+                    read_mask: 0xff,
+                    write_mask: 0xff,
+                },
+                bias: Default::default(),
+            }),
             multisample: wgpu::MultisampleState {
                 count: 4,
                 mask: !0,
@@ -251,6 +315,7 @@ impl WgpuRenderer {
 
         let image_painter = ImagePainter::new(&device, config.format, &map_view_bind_group_layout);
         let multisampling_view = Self::create_multisample_texture(&device, size, config.format);
+        let stencil_view = Self::create_stencil_texture(&device, size);
 
         Self {
             surface,
@@ -259,12 +324,14 @@ impl WgpuRenderer {
             config,
             size,
             line_pipeline,
+            clip_pipeline,
             point_pipeline,
             map_view_buffer,
             map_view_bind_group,
             map_view_bind_group_layout,
             image_painter,
             multisampling_view,
+            stencil_view,
             background: Color::rgba(255, 255, 255, 255),
         }
     }
@@ -296,6 +363,25 @@ impl WgpuRenderer {
         multisampling_texture.create_view(&TextureViewDescriptor::default())
     }
 
+    fn create_stencil_texture(device: &Device, size: PhysicalSize<u32>) -> TextureView {
+        let texture = device.create_texture(&TextureDescriptor {
+            label: Some("Stencil/depth texture"),
+            size: Extent3d {
+                width: size.width,
+                height: size.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 4,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Depth24PlusStencil8,
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        texture.create_view(&TextureViewDescriptor::default())
+    }
+
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.size = new_size;
@@ -305,6 +391,7 @@ impl WgpuRenderer {
 
             self.multisampling_view =
                 Self::create_multisample_texture(&self.device, new_size, self.config.format);
+            self.stencil_view = Self::create_stencil_texture(&self.device, new_size);
         }
     }
 
@@ -412,15 +499,13 @@ impl<'a> Canvas for WgpuCanvas<'a> {
     }
 
     fn create_bundle(&self, lods: &Option<Vec<f32>>) -> RenderBundle {
-        match lods {
-            Some(v) => RenderBundle::Tessellating(TessellatingRenderBundle::with_lods(v)),
-            None => RenderBundle::Tessellating(TessellatingRenderBundle::new()),
-        }
+        self.renderer.create_bundle(lods)
     }
 
     fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle> {
         match bundle {
             RenderBundle::Tessellating(inner) => Box::new(WgpuPackedBundle::new(
+                inner.clip_area,
                 inner.poly_tessellation,
                 inner.points,
                 inner.images,
@@ -453,13 +538,32 @@ impl<'a> Canvas for WgpuCanvas<'a> {
                         store: StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                    view: &self.renderer.stencil_view,
+                    depth_ops: None,
+                    stencil_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(0),
+                        store: StoreOp::Discard,
+                    }),
+                }),
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
 
             for bundle in bundles {
                 if let Some(cast) = bundle.as_any().downcast_ref::<WgpuPackedBundle>() {
+                    if let Some(clip_area_buffers) = &cast.clip_area_buffers {
+                        render_pass.set_stencil_reference(1);
+                        render_pass.set_pipeline(&self.renderer.clip_pipeline);
+                        render_pass.set_bind_group(0, &self.renderer.map_view_bind_group, &[]);
+                        render_pass.set_vertex_buffer(0, clip_area_buffers.vertex.slice(..));
+                        render_pass.set_index_buffer(
+                            clip_area_buffers.index.slice(..),
+                            wgpu::IndexFormat::Uint32,
+                        );
+                        render_pass.draw_indexed(0..clip_area_buffers.index_count, 0, 0..1);
+                    }
+
                     for image in &cast.image_buffers {
                         self.draw_image(&mut render_pass, image);
                     }
@@ -488,6 +592,18 @@ impl<'a> Canvas for WgpuCanvas<'a> {
                             0..point_buffers.instance_count,
                         );
                     }
+
+                    if let Some(clip_area_buffers) = &cast.clip_area_buffers {
+                        render_pass.set_stencil_reference(0);
+                        render_pass.set_pipeline(&self.renderer.clip_pipeline);
+                        render_pass.set_bind_group(0, &self.renderer.map_view_bind_group, &[]);
+                        render_pass.set_vertex_buffer(0, clip_area_buffers.vertex.slice(..));
+                        render_pass.set_index_buffer(
+                            clip_area_buffers.index.slice(..),
+                            wgpu::IndexFormat::Uint32,
+                        );
+                        render_pass.draw_indexed(0..clip_area_buffers.index_count, 0, 0..1);
+                    }
                 }
             }
         }
@@ -507,6 +623,7 @@ impl<'a> WgpuCanvas<'a> {
 }
 
 pub struct WgpuPackedBundle {
+    clip_area_buffers: Option<WgpuPolygonBuffers>,
     poly_tessellation: Vec<LodTessellation>,
     poly_buffers: Vec<WgpuPolygonBuffers>,
     point_buffers: Option<WgpuPointBuffers>,
@@ -531,35 +648,18 @@ struct WgpuPointBuffers {
 
 impl WgpuPackedBundle {
     fn new(
+        clip_area: Option<VertexBuffers<PolyVertex, u32>>,
         poly_tessellation: Vec<LodTessellation>,
         points: Vec<PointInstance>,
         images: Vec<(DecodedImage, [ImageVertex; 4])>,
         primitives: Vec<PrimitiveInfo>,
         renderer: &WgpuRenderer,
     ) -> Self {
+        let clip_area_buffers = clip_area.map(|v| Self::write_poly_buffers(&v, renderer));
+
         let mut poly_buffers = vec![];
         for lod in &poly_tessellation {
-            let index = renderer
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Line index buffer"),
-                    contents: bytemuck::cast_slice(&lod.tessellation.indices),
-                    usage: wgpu::BufferUsages::INDEX,
-                });
-
-            let vertex = renderer
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Line vertex buffer"),
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                    contents: bytemuck::cast_slice(&lod.tessellation.vertices),
-                });
-
-            poly_buffers.push(WgpuPolygonBuffers {
-                index,
-                vertex,
-                index_count: lod.tessellation.indices.len() as u32,
-            });
+            poly_buffers.push(Self::write_poly_buffers(&lod.tessellation, renderer));
         }
 
         let point_buffers = if !points.is_empty() {
@@ -617,6 +717,7 @@ impl WgpuPackedBundle {
         }
 
         Self {
+            clip_area_buffers,
             poly_tessellation,
             poly_buffers,
             image_buffers,
@@ -633,6 +734,33 @@ impl WgpuPackedBundle {
         }
 
         &self.poly_buffers[self.poly_buffers.len() - 1]
+    }
+
+    fn write_poly_buffers(
+        tessellation: &VertexBuffers<PolyVertex, u32>,
+        renderer: &WgpuRenderer,
+    ) -> WgpuPolygonBuffers {
+        let index = renderer
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::cast_slice(&tessellation.indices),
+                usage: wgpu::BufferUsages::INDEX,
+            });
+
+        let vertex = renderer
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                contents: bytemuck::cast_slice(&tessellation.vertices),
+            });
+
+        WgpuPolygonBuffers {
+            index,
+            vertex,
+            index_count: tessellation.indices.len() as u32,
+        }
     }
 }
 
@@ -673,6 +801,7 @@ impl PackedBundle for WgpuPackedBundle {
 
     fn unpack(self: Box<Self>) -> Box<dyn UnpackedBundle> {
         Box::new(WgpuUnpackedBundle {
+            clip_area_buffers: self.clip_area_buffers,
             poly_tessellation: self.poly_tessellation,
             poly_buffers: self.poly_buffers,
             point_buffers: self.point_buffers,
@@ -684,6 +813,7 @@ impl PackedBundle for WgpuPackedBundle {
 }
 
 struct WgpuUnpackedBundle {
+    clip_area_buffers: Option<WgpuPolygonBuffers>,
     poly_tessellation: Vec<LodTessellation>,
     poly_buffers: Vec<WgpuPolygonBuffers>,
     point_buffers: Option<WgpuPointBuffers>,
@@ -700,6 +830,7 @@ impl WgpuUnpackedBundle {
         self.write_point_buffers(queue);
 
         WgpuPackedBundle {
+            clip_area_buffers: self.clip_area_buffers,
             poly_tessellation: self.poly_tessellation,
             poly_buffers: self.poly_buffers,
             point_buffers: self.point_buffers,
