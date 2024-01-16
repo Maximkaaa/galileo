@@ -15,6 +15,18 @@ pub enum RenderBundle {
 }
 
 impl RenderBundle {
+    pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly)
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+        Poly: Polygon,
+        Poly::Contour: Contour<Point = P>,
+    {
+        match self {
+            RenderBundle::Tessellating(inner) => inner.clip_area(polygon),
+        }
+    }
+
     pub fn add_image(
         &mut self,
         image: DecodedImage,

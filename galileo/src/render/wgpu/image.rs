@@ -3,7 +3,10 @@ use crate::render::render_bundle::tessellating::ImageVertex;
 use crate::render::wgpu::WgpuRenderer;
 use std::any::Any;
 use wgpu::util::DeviceExt;
-use wgpu::{BindGroupLayout, Device, Queue};
+use wgpu::{
+    BindGroupLayout, CompareFunction, DepthStencilState, Device, Queue, StencilFaceState,
+    StencilOperation, StencilState, TextureFormat,
+};
 
 const INDICES: &[u16] = &[1, 0, 2, 1, 2, 3];
 
@@ -64,6 +67,12 @@ impl ImagePainter {
                 push_constant_ranges: &[],
             });
 
+        let poly_stencil_state = StencilFaceState {
+            compare: CompareFunction::Equal,
+            fail_op: StencilOperation::Keep,
+            depth_fail_op: StencilOperation::Keep,
+            pass_op: StencilOperation::Keep,
+        };
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Image Render Pipeline"),
             layout: Some(&render_pipeline_layout),
@@ -90,7 +99,18 @@ impl ImagePainter {
                 unclipped_depth: false,
                 conservative: false,
             },
-            depth_stencil: None,
+            depth_stencil: Some(DepthStencilState {
+                format: TextureFormat::Depth24PlusStencil8,
+                depth_write_enabled: false,
+                depth_compare: CompareFunction::Always,
+                stencil: StencilState {
+                    front: poly_stencil_state,
+                    back: poly_stencil_state,
+                    read_mask: 0xff,
+                    write_mask: 0xff,
+                },
+                bias: Default::default(),
+            }),
             multisample: wgpu::MultisampleState {
                 count: 4,
                 mask: !0,

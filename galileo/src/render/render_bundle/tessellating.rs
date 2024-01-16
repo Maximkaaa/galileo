@@ -1,5 +1,6 @@
 use crate::primitives::DecodedImage;
 use crate::render::{ImagePaint, LinePaint, Paint, PointPaint, PrimitiveId};
+use crate::Color;
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::cartesian::traits::cartesian_point::{CartesianPoint2d, CartesianPoint3d};
 use galileo_types::contour::Contour;
@@ -22,6 +23,7 @@ pub struct TessellatingRenderBundle {
     pub points: Vec<PointInstance>,
     pub images: Vec<(DecodedImage, [ImageVertex; 4])>,
     pub primitives: Vec<PrimitiveInfo>,
+    pub clip_area: Option<VertexBuffers<PolyVertex, u32>>,
 }
 
 #[derive(Debug)]
@@ -53,6 +55,7 @@ impl TessellatingRenderBundle {
             points: Vec::new(),
             images: Vec::new(),
             primitives: Vec::new(),
+            clip_area: None,
         }
     }
 
@@ -68,11 +71,30 @@ impl TessellatingRenderBundle {
             points: Vec::new(),
             images: Vec::new(),
             primitives: Vec::new(),
+            clip_area: None,
         }
     }
 }
 
 impl TessellatingRenderBundle {
+    pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly)
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+        Poly: Polygon,
+        Poly::Contour: Contour<Point = P>,
+    {
+        let mut tessellation = VertexBuffers::new();
+        Self::tessellate_polygon(
+            polygon,
+            Paint {
+                color: Color::BLACK,
+            },
+            &mut tessellation,
+        );
+        self.clip_area = Some(tessellation);
+    }
+
     pub fn add_image(
         &mut self,
         image: DecodedImage,
@@ -251,6 +273,28 @@ impl TessellatingRenderBundle {
         Poly::Contour: Contour<Point = P>,
     {
         let lod = &mut self.poly_tessellation[lod_index];
+        let start_index = lod.tessellation.vertices.len();
+
+        Self::tessellate_polygon(polygon, paint, &mut lod.tessellation);
+
+        let end_index = lod.tessellation.vertices.len();
+        start_index..end_index
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.primitives.is_empty()
+    }
+
+    fn tessellate_polygon<N, P, Poly>(
+        polygon: &Poly,
+        paint: Paint,
+        tessellation: &mut VertexBuffers<PolyVertex, u32>,
+    ) where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+        Poly: Polygon,
+        Poly::Contour: Contour<Point = P>,
+    {
         let mut path_builder = BuilderWithAttributes::new(1);
         for contour in polygon.iter_contours() {
             let mut iterator = contour.iter_points();
@@ -261,7 +305,7 @@ impl TessellatingRenderBundle {
                     &[first_point.z().as_()],
                 );
             } else {
-                return 0..0;
+                return;
             }
 
             for p in iterator {
@@ -277,26 +321,14 @@ impl TessellatingRenderBundle {
             color: paint.color.to_f32_array(),
         };
         let mut tesselator = FillTessellator::new();
-        let start_index = lod.tessellation.vertices.len();
-        let tolerance = match lod.min_resolution / 10.0 {
-            v if v.is_finite() => v,
-            _ => f32::MIN,
-        };
 
         tesselator
             .tessellate(
                 &path,
-                &FillOptions::DEFAULT.with_tolerance(tolerance),
-                &mut BuffersBuilder::new(&mut lod.tessellation, vertex_constructor),
+                &FillOptions::DEFAULT,
+                &mut BuffersBuilder::new(tessellation, vertex_constructor),
             )
             .unwrap();
-
-        let end_index = lod.tessellation.vertices.len();
-        start_index..end_index
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.primitives.is_empty()
     }
 }
 
@@ -323,7 +355,7 @@ impl<'a> StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'a> {
             ],
         };
 
-        let norm_limit_sq = if let VertexSource::Endpoint { id } = vertex.source() {
+        let norm_limit = if let VertexSource::Endpoint { id } = vertex.source() {
             let mut prev_id = id.0.saturating_sub(1);
             while self.path[EndpointId(prev_id)] == Default::default() && prev_id > 0 {
                 prev_id -= 1;
@@ -337,10 +369,10 @@ impl<'a> StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'a> {
                 let dy = from.y - to.y;
                 (dx * dx + dy * dy).sqrt() * 2.0 * self.resolution
             } else {
-                self.width
+                f32::MAX
             }
         } else {
-            self.width
+            f32::MAX
         };
 
         PolyVertex {
@@ -351,7 +383,7 @@ impl<'a> StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'a> {
             ],
             color: self.color,
             normal,
-            norm_limit_sq,
+            norm_limit,
         }
     }
 }
@@ -366,7 +398,7 @@ impl FillVertexConstructor<PolyVertex> for PolygonVertexConstructor {
             position: [vertex.position().x, vertex.position().y, 0.0],
             color: self.color,
             normal: Default::default(),
-            norm_limit_sq: 1.0,
+            norm_limit: 1.0,
         }
     }
 }
@@ -377,7 +409,7 @@ pub struct PolyVertex {
     pub position: [f32; 3],
     pub color: [f32; 4],
     pub normal: [f32; 2],
-    pub norm_limit_sq: f32,
+    pub norm_limit: f32,
 }
 
 #[repr(C)]
