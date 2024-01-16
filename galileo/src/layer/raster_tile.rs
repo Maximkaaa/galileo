@@ -171,7 +171,7 @@ impl RasterTileLayer {
             }
 
             if tile_renders.get(&tile.index).is_none() {
-                let mut bundle = canvas.create_bundle();
+                let mut bundle = canvas.create_bundle(&None);
 
                 // todo: there should not be clone() here
                 let id = bundle.add_image(
@@ -217,7 +217,7 @@ impl Layer for RasterTileLayer {
             }
         }
 
-        canvas.draw_bundles(&to_draw);
+        canvas.draw_bundles(&to_draw, view.resolution() as f32);
         *self.prev_drawn_tiles.lock() = tiles.iter().map(|t| t.index).collect();
     }
 

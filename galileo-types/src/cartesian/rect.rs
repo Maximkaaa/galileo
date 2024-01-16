@@ -3,6 +3,7 @@ use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
 use nalgebra::{Point2, Scalar};
 use num_traits::{FromPrimitive, Num};
 use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Rect<N = f64> {
@@ -93,16 +94,17 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
         }
     }
 
-    pub fn from_points<'a, P: CartesianPoint2d<Num = N> + 'a>(
-        mut points: impl Iterator<Item = &'a P>,
+    pub fn from_points<'a, P: CartesianPoint2d<Num = N> + 'a, T: Deref<Target = P> + 'a>(
+        points: impl IntoIterator<Item = T>,
     ) -> Option<Self> {
-        let first = points.next()?;
+        let mut iterator = points.into_iter();
+        let first = iterator.next()?;
         let mut x_min = first.x();
         let mut y_min = first.y();
         let mut x_max = first.x();
         let mut y_max = first.y();
 
-        for p in points {
+        for p in iterator {
             if x_min > p.x() {
                 x_min = p.x();
             }

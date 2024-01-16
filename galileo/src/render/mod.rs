@@ -12,10 +12,6 @@ pub mod render_bundle;
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct PrimitiveId(usize);
 
-impl PrimitiveId {
-    const INVALID: PrimitiveId = PrimitiveId(usize::MAX);
-}
-
 pub trait Renderer: MaybeSend + MaybeSync {
     fn create_bundle(&self) -> RenderBundle;
     fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle>;
@@ -25,10 +21,10 @@ pub trait Renderer: MaybeSend + MaybeSync {
 
 pub trait Canvas {
     fn size(&self) -> Size;
-    fn create_bundle(&self) -> RenderBundle;
+    fn create_bundle(&self, lods: &Option<Vec<f32>>) -> RenderBundle;
     fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle>;
     fn pack_unpacked(&self, bundle: Box<dyn UnpackedBundle>) -> Box<dyn PackedBundle>;
-    fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle]);
+    fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle], resolution: f32);
 }
 
 pub trait PackedBundle: MaybeSend + MaybeSync {

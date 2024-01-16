@@ -55,7 +55,6 @@ impl VectorTile {
             Paint {
                 color: style.background,
             },
-            lod_resolution,
         );
 
         for layer in &mvt_tile.layers {
@@ -80,7 +79,6 @@ impl VectorTile {
                                             .collect(),
                                     },
                                     paint,
-                                    lod_resolution,
                                 );
                             }
                         }
@@ -93,7 +91,6 @@ impl VectorTile {
                                         Self::transform_point(p, bbox, tile_resolution)
                                     }),
                                     paint,
-                                    lod_resolution,
                                 );
                             }
                         }

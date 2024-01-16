@@ -33,10 +33,10 @@ impl<F> Symbol<F> for SimpleContourSymbol {
         };
 
         match geometry {
-            Geom::Contour(contour) => vec![bundle.add_line(contour, paint, 10000.0)],
+            Geom::Contour(contour) => vec![bundle.add_line(contour, paint)],
             Geom::MultiContour(contours) => contours
                 .contours()
-                .map(|contour| bundle.add_line(contour, paint, 10000.0))
+                .map(|contour| bundle.add_line(contour, paint))
                 .collect(),
             _ => vec![],
         }
