@@ -1,31 +1,28 @@
 use crate::layer::feature_layer::symbol::Symbol;
 use crate::primitives::Color;
-use crate::render::{LineCap, LinePaint, Paint, PrimitiveId, RenderBundle, UnpackedBundle};
-use galileo_types::cartesian::impls::point::Point2d;
+use crate::render::render_bundle::RenderBundle;
+use crate::render::{LineCap, LinePaint, Paint, PrimitiveId, UnpackedBundle};
 use galileo_types::cartesian::impls::polygon::Polygon;
-use galileo_types::geo::impls::projection::dimensions::AddDimensionProjection;
+use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geometry::Geom;
-use galileo_types::geometry_type::CartesianSpace2d;
 use galileo_types::multi_polygon::MultiPolygon;
-use std::marker::PhantomData;
+use num_traits::AsPrimitive;
 
 #[derive(Debug, Clone, Copy)]
-pub struct SimplePolygonSymbol<Space> {
+pub struct SimplePolygonSymbol {
     pub fill_color: Color,
     pub stroke_color: Color,
     pub stroke_width: f64,
     pub stroke_offset: f64,
-    space: PhantomData<Space>,
 }
 
-impl<Space> SimplePolygonSymbol<Space> {
+impl SimplePolygonSymbol {
     pub fn new(fill_color: Color) -> Self {
         Self {
             fill_color,
             stroke_color: Default::default(),
             stroke_width: 0.0,
             stroke_offset: 0.0,
-            space: Default::default(),
         }
     }
 
@@ -50,10 +47,10 @@ impl<Space> SimplePolygonSymbol<Space> {
         }
     }
 
-    fn render_internal(
+    fn render_poly<N: AsPrimitive<f32>, P: CartesianPoint3d<Num = N>>(
         &self,
-        polygon: &Polygon<Point2d>,
-        bundle: &mut Box<dyn RenderBundle>,
+        polygon: &Polygon<P>,
+        bundle: &mut RenderBundle,
     ) -> Vec<PrimitiveId> {
         let mut ids = vec![];
         let id = bundle.add_polygon(
@@ -73,13 +70,8 @@ impl<Space> SimplePolygonSymbol<Space> {
             line_cap: LineCap::Butt,
         };
 
-        let projection = AddDimensionProjection::new(0.0);
         for contour in polygon.iter_contours() {
-            ids.push(bundle.add_line(
-                &contour.project_points(&projection).unwrap().into(),
-                line_paint,
-                1000.0,
-            ));
+            ids.push(bundle.add_line(contour, line_paint, 10000.0));
         }
 
         ids
@@ -104,40 +96,21 @@ impl<Space> SimplePolygonSymbol<Space> {
     }
 }
 
-impl<F> Symbol<F, Geom<Point2d>> for SimplePolygonSymbol<CartesianSpace2d> {
-    fn render(
+impl<F> Symbol<F> for SimplePolygonSymbol {
+    fn render<N: AsPrimitive<f32>, P: CartesianPoint3d<Num = N>>(
         &self,
         _feature: &F,
-        geometry: &Geom<Point2d>,
-        bundle: &mut Box<dyn RenderBundle>,
+        geometry: &Geom<P>,
+        bundle: &mut RenderBundle,
     ) -> Vec<PrimitiveId> {
         match geometry {
-            Geom::Polygon(polygon) => self.render_internal(polygon, bundle),
+            Geom::Polygon(poly) => self.render_poly(poly, bundle),
             Geom::MultiPolygon(polygons) => polygons
                 .polygons()
-                .flat_map(|p| self.render_internal(p, bundle))
+                .flat_map(|polygon| self.render_poly(polygon, bundle))
                 .collect(),
             _ => vec![],
         }
-    }
-
-    fn update(
-        &self,
-        _feature: &F,
-        renders_ids: &[PrimitiveId],
-        bundle: &mut Box<dyn UnpackedBundle>,
-    ) {
-        self.update_internal(renders_ids, bundle)
-    }
-}
-impl<F> Symbol<F, Polygon<Point2d>> for SimplePolygonSymbol<CartesianSpace2d> {
-    fn render(
-        &self,
-        _feature: &F,
-        geometry: &Polygon<Point2d>,
-        bundle: &mut Box<dyn RenderBundle>,
-    ) -> Vec<PrimitiveId> {
-        self.render_internal(geometry, bundle)
     }
 
     fn update(

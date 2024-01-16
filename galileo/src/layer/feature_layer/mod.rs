@@ -5,18 +5,20 @@ use crate::messenger::Messenger;
 use crate::render::wgpu::WgpuRenderer;
 use crate::render::{Canvas, PackedBundle, PrimitiveId, Renderer};
 use crate::view::MapView;
-use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::cartesian::traits::cartesian_point::{
     CartesianPoint2d, NewCartesianPoint2d, NewCartesianPoint3d,
 };
 use galileo_types::geo::crs::Crs;
 use galileo_types::geo::impls::point::GeoPoint2d;
+use galileo_types::geo::impls::projection::dimensions::AddDimensionProjection;
 use galileo_types::geo::impls::projection::identity::IdentityProjection;
 use galileo_types::geo::traits::point::NewGeoPoint;
 use galileo_types::geo::traits::projection::{ChainProjection, InvertedProjection, Projection};
 use galileo_types::geometry::{CartesianGeometry2d, Geom, Geometry};
 use galileo_types::geometry_type::{CartesianSpace2d, CartesianSpace3d, GeoSpace2d};
 use maybe_sync::{MaybeSend, MaybeSync};
+use num_traits::AsPrimitive;
 use std::marker::PhantomData;
 use std::sync::{Arc, RwLock};
 
@@ -29,7 +31,7 @@ where
     F::Geom: Geometry<Point = P>,
 {
     features: Vec<F>,
-    style: S,
+    symbol: S,
     render_bundle: RwLock<Option<Box<dyn PackedBundle>>>,
     feature_render_map: RwLock<Vec<Vec<PrimitiveId>>>,
     crs: Crs,
@@ -46,7 +48,7 @@ where
     pub fn new(features: Vec<F>, style: S, crs: Crs) -> Self {
         Self {
             features,
-            style,
+            symbol: style,
             render_bundle: RwLock::new(None),
             feature_render_map: RwLock::new(Vec::new()),
             crs,
@@ -109,7 +111,7 @@ impl<P, F, S, Space> FeatureLayer<P, F, S, Space>
 where
     F: Feature,
     F::Geom: Geometry<Point = P>,
-    S: Symbol<F, Geom<P>>,
+    S: Symbol<F>,
 {
     pub fn update_features(&mut self, indices: &[usize], renderer: &dyn Renderer) {
         let mut bundle_lock = self.render_bundle.write().unwrap();
@@ -122,7 +124,7 @@ where
         for index in indices {
             let feature = self.features.get(*index).unwrap();
             let render_ids = feature_render_map.get(*index).unwrap();
-            self.style.update(feature, render_ids, &mut unpacked);
+            self.symbol.update(feature, render_ids, &mut unpacked);
         }
 
         // todo: remove deps on wgpu
@@ -140,18 +142,24 @@ where
     P: NewGeoPoint + 'static,
     F: Feature + MaybeSend + MaybeSync,
     F::Geom: Geometry<Point = P>,
-    S: Symbol<F, Geom<Point2d>> + MaybeSend + MaybeSync,
+    S: Symbol<F> + MaybeSend + MaybeSync,
 {
     fn render(&self, position: &MapView, canvas: &mut dyn Canvas) {
         if self.render_bundle.read().unwrap().is_none() {
             let mut bundle = canvas.create_bundle();
             let mut render_map = self.feature_render_map.write().unwrap();
-            let crs = position.crs().get_projection::<P, Point2d>().unwrap();
+            let projection = ChainProjection::new(
+                position.crs().get_projection::<P, Point2d>().unwrap(),
+                Box::new(AddDimensionProjection::new(0.0)),
+            );
+
             for feature in &self.features {
-                let Some(projected) = feature.geometry().project(&(*crs)) else {
+                let Some(projected): Option<Geom<Point3d>> =
+                    feature.geometry().project(&projection)
+                else {
                     continue;
                 };
-                let ids = self.style.render(feature, &projected, &mut bundle);
+                let ids = self.symbol.render(feature, &projected, &mut bundle);
                 render_map.push(ids)
             }
 
@@ -176,22 +184,26 @@ where
     P: NewCartesianPoint2d + Clone + 'static,
     F: Feature + MaybeSend + MaybeSync,
     F::Geom: Geometry<Point = P>,
-    S: Symbol<F, Geom<P>> + MaybeSend + MaybeSync,
+    S: Symbol<F> + MaybeSend + MaybeSync,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         if self.render_bundle.read().unwrap().is_none() {
             let mut bundle = canvas.create_bundle();
             let mut render_map = self.feature_render_map.write().unwrap();
 
-            let projection: Box<dyn Projection<InPoint = _, OutPoint = _>> =
+            let projection: Box<dyn Projection<InPoint = _, OutPoint = Point3d>> =
                 if view.crs() == &self.crs {
-                    Box::new(IdentityProjection::<P, P, _>::new())
+                    Box::new(AddDimensionProjection::new(0.0))
                 } else {
                     let self_proj = self.crs.get_projection::<GeoPoint2d, P>().unwrap();
-                    let view_proj = view.crs().get_projection().unwrap();
+                    let view_proj: Box<dyn Projection<InPoint = _, OutPoint = Point2d>> =
+                        view.crs().get_projection().unwrap();
                     Box::new(ChainProjection::new(
-                        Box::new(InvertedProjection::new(self_proj)),
-                        view_proj,
+                        Box::new(ChainProjection::new(
+                            Box::new(InvertedProjection::new(self_proj)),
+                            view_proj,
+                        )),
+                        Box::new(AddDimensionProjection::new(0.0)),
                     ))
                 };
 
@@ -199,7 +211,7 @@ where
                 let Some(geom) = feature.geometry().project(&*projection) else {
                     continue;
                 };
-                let ids = self.style.render(feature, &geom, &mut bundle);
+                let ids = self.symbol.render(feature, &geom, &mut bundle);
                 render_map.push(ids)
             }
 
@@ -222,9 +234,10 @@ where
 impl<P, F, S> Layer for FeatureLayer<P, F, S, CartesianSpace3d>
 where
     P: NewCartesianPoint3d,
+    P::Num: AsPrimitive<f32>,
     F: Feature + MaybeSend + MaybeSync,
     F::Geom: Geometry<Point = P>,
-    S: Symbol<F, F::Geom> + MaybeSend + MaybeSync,
+    S: Symbol<F> + MaybeSend + MaybeSync,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         if view.crs() != &self.crs {
@@ -237,8 +250,13 @@ where
             let mut render_map = self.feature_render_map.write().unwrap();
 
             for feature in &self.features {
-                let ids = self.style.render(feature, feature.geometry(), &mut bundle);
-                render_map.push(ids)
+                let projection = IdentityProjection::<_, Point3d, _>::new();
+                if let Some(geometry) = feature.geometry().project(&projection) {
+                    let ids = self.symbol.render(feature, &geometry, &mut bundle);
+                    render_map.push(ids)
+                } else {
+                    render_map.push(vec![])
+                };
             }
 
             let packed = canvas.pack_bundle(bundle);

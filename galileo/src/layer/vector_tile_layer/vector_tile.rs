@@ -1,10 +1,12 @@
 use crate::error::GalileoError;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::render::{LineCap, LinePaint, PackedBundle, Paint, RenderBundle, Renderer};
+use crate::render::render_bundle::RenderBundle;
+use crate::render::{LineCap, LinePaint, PackedBundle, Paint, Renderer};
 use crate::tile_scheme::{TileIndex, TileScheme};
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
-use galileo_types::cartesian::impls::contour::Contour;
-use galileo_types::cartesian::impls::point::{Point2d, Point3d};
+use galileo_types::cartesian::impls::contour::{ClosedContour, Contour};
+use galileo_types::cartesian::impls::point::Point3d;
+use galileo_types::cartesian::impls::polygon::Polygon;
 use galileo_types::cartesian::rect::Rect;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
 use num_traits::ToPrimitive;
@@ -31,7 +33,7 @@ impl VectorTile {
 
     pub fn prepare(
         mvt_tile: &MvtTile,
-        bundle: &mut Box<dyn RenderBundle>,
+        bundle: &mut RenderBundle,
         index: TileIndex,
         style: &VectorTileStyle,
         tile_scheme: &TileScheme,
@@ -41,7 +43,15 @@ impl VectorTile {
         let tile_resolution = lod_resolution * tile_scheme.tile_width() as f64;
 
         bundle.add_polygon(
-            &bbox.into_contour().into(),
+            &Polygon::new(
+                ClosedContour::new(vec![
+                    Point3d::new(bbox.x_min, bbox.y_min, 0.0),
+                    Point3d::new(bbox.x_min, bbox.y_max, 0.0),
+                    Point3d::new(bbox.x_max, bbox.y_max, 0.0),
+                    Point3d::new(bbox.x_max, bbox.y_min, 0.0),
+                ]),
+                vec![],
+            ),
             Paint {
                 color: style.background,
             },
@@ -65,9 +75,7 @@ impl VectorTile {
                                             .points
                                             .iter()
                                             .map(|p| {
-                                                let point =
-                                                    Self::transform_point(p, bbox, tile_resolution);
-                                                Point3d::new(point.x, point.y, 0.0)
+                                                Self::transform_point(p, bbox, tile_resolution)
                                             })
                                             .collect(),
                                     },
@@ -142,9 +150,9 @@ impl VectorTile {
         p_in: &impl CartesianPoint2d<Num = Num>,
         tile_bbox: Rect,
         tile_resolution: f64,
-    ) -> Point2d {
+    ) -> Point3d {
         let x = tile_bbox.x_min() + p_in.x().to_f64().unwrap() * tile_resolution;
         let y = tile_bbox.y_max() - p_in.y().to_f64().unwrap() * tile_resolution;
-        Point2d::new(x, y)
+        Point3d::new(x, y, 0.0)
     }
 }

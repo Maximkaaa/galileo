@@ -5,12 +5,12 @@ use galileo::layer::feature_layer::symbol::polygon::SimplePolygonSymbol;
 use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::FeatureLayer;
 use galileo::primitives::Color;
-use galileo::render::{PointPaint, PrimitiveId, RenderBundle, UnpackedBundle};
-use galileo_types::cartesian::impls::point::{Point2d, Point3d};
-use galileo_types::cartesian::impls::polygon::Polygon;
+use galileo::render::render_bundle::RenderBundle;
+use galileo::render::{PointPaint, PrimitiveId, UnpackedBundle};
+use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geo::crs::Crs;
 use galileo_types::geometry::Geom;
-use galileo_types::geometry_type::CartesianSpace2d;
+use num_traits::AsPrimitive;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -124,7 +124,7 @@ pub async fn run(builder: MapBuilder) {
 struct CountrySymbol {}
 
 impl CountrySymbol {
-    fn get_polygon_symbol(&self, feature: &Country) -> SimplePolygonSymbol<CartesianSpace2d> {
+    fn get_polygon_symbol(&self, feature: &Country) -> SimplePolygonSymbol {
         let stroke_color = feature.color;
         let fill_color = Color {
             a: if feature.is_selected() { 255 } else { 150 },
@@ -137,27 +137,15 @@ impl CountrySymbol {
     }
 }
 
-impl Symbol<Country, Geom<Point2d>> for CountrySymbol {
-    fn render(
+impl Symbol<Country> for CountrySymbol {
+    fn render<N: AsPrimitive<f32>, P: CartesianPoint3d<Num = N>>(
         &self,
         feature: &Country,
-        geometry: &Geom<Point2d>,
-        bundle: &mut Box<dyn RenderBundle>,
+        geometry: &Geom<P>,
+        bundle: &mut RenderBundle,
     ) -> Vec<PrimitiveId> {
-        let mut ids = vec![];
-        let Geom::MultiPolygon(geometry) = geometry else {
-            return ids;
-        };
-
-        for polygon in geometry.parts() {
-            ids.append(
-                &mut self
-                    .get_polygon_symbol(feature)
-                    .render(&(), polygon, bundle),
-            )
-        }
-
-        ids
+        self.get_polygon_symbol(feature)
+            .render(&(), geometry, bundle)
     }
 
     fn update(
@@ -170,7 +158,7 @@ impl Symbol<Country, Geom<Point2d>> for CountrySymbol {
         let mut next_index = 0;
         for _ in feature.geometry.parts() {
             let polygon_symbol = self.get_polygon_symbol(feature);
-            <SimplePolygonSymbol<CartesianSpace2d> as Symbol<(), Polygon<Point2d>>>::update(
+            <SimplePolygonSymbol as Symbol<()>>::update(
                 &polygon_symbol,
                 &(),
                 &render_ids[next_index..next_index + renders_by_feature],
@@ -184,12 +172,12 @@ impl Symbol<Country, Geom<Point2d>> for CountrySymbol {
 
 struct CitySymbol {}
 
-impl Symbol<City, Geom<Point2d>> for CitySymbol {
-    fn render(
+impl Symbol<City> for CitySymbol {
+    fn render<N: AsPrimitive<f32>, P: CartesianPoint3d<Num = N>>(
         &self,
         feature: &City,
-        geometry: &Geom<Point2d>,
-        bundle: &mut Box<dyn RenderBundle>,
+        geometry: &Geom<P>,
+        bundle: &mut RenderBundle,
     ) -> Vec<PrimitiveId> {
         let size = (feature.population / 1000.0).log2() / 2.0;
         let color = match &feature.capital[..] {
@@ -204,11 +192,10 @@ impl Symbol<City, Geom<Point2d>> for CitySymbol {
         let Geom::Point(point) = geometry else {
             return ids;
         };
-        let point = Point3d::new(point.x, point.y, 0.0);
 
         if &feature.capital == "primary" {
             ids.push(bundle.add_point(
-                &point,
+                point,
                 PointPaint {
                     color: Color::rgba(255, 255, 255, 255),
                     size: size + 4.0,
@@ -216,7 +203,7 @@ impl Symbol<City, Geom<Point2d>> for CitySymbol {
             ));
         }
 
-        ids.push(bundle.add_point(&point, PointPaint { color, size }));
+        ids.push(bundle.add_point(point, PointPaint { color, size }));
 
         ids
     }

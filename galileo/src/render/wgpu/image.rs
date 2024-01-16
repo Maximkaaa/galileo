@@ -1,9 +1,9 @@
+use crate::primitives::{DecodedImage, Image};
+use crate::render::render_bundle::tessellating::ImageVertex;
+use crate::render::wgpu::WgpuRenderer;
 use std::any::Any;
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroupLayout, Device, Queue};
-
-use crate::primitives::{DecodedImage, Image};
-use crate::render::wgpu::WgpuRenderer;
 
 const INDICES: &[u16] = &[1, 0, 2, 1, 2, 3];
 
@@ -70,7 +70,7 @@ impl ImagePainter {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[ImageVertex::desc()],
+                buffers: &[ImageVertex::wgpu_desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -198,16 +198,8 @@ impl ImagePainter {
     }
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct ImageVertex {
-    pub position: [f32; 2],
-    pub opacity: f32,
-    pub tex_coords: [f32; 2],
-}
-
 impl ImageVertex {
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
+    fn wgpu_desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<ImageVertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,

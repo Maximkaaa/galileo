@@ -13,6 +13,13 @@ pub struct Polygon<P> {
 }
 
 impl<P> Polygon<P> {
+    pub fn new(outer_contour: ClosedContour<P>, inner_contours: Vec<ClosedContour<P>>) -> Self {
+        Self {
+            outer_contour,
+            inner_contours,
+        }
+    }
+
     pub fn iter_contours(&self) -> impl Iterator<Item = &ClosedContour<P>> {
         std::iter::once(&self.outer_contour).chain(self.inner_contours.iter())
     }
