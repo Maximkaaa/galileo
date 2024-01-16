@@ -3,10 +3,14 @@ use galileo::layer::feature_layer::feature::Feature;
 use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::FeatureLayer;
 use galileo::primitives::Color;
-use galileo::render::{PointPaint, PrimitiveId, RenderBundle};
+use galileo::render::render_bundle::RenderBundle;
+use galileo::render::{PointPaint, PrimitiveId};
 use galileo::tile_scheme::TileScheme;
 use galileo_types::cartesian::impls::point::Point3d;
+use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geo::crs::Crs;
+use galileo_types::geometry::Geom;
+use num_traits::AsPrimitive;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
@@ -29,20 +33,24 @@ impl Feature for ColoredPoint {
 }
 
 struct ColoredPointSymbol {}
-impl Symbol<ColoredPoint, Point3d> for ColoredPointSymbol {
-    fn render(
+impl Symbol<ColoredPoint> for ColoredPointSymbol {
+    fn render<N: AsPrimitive<f32>, P: CartesianPoint3d<Num = N>>(
         &self,
         feature: &ColoredPoint,
-        geometry: &Point3d,
-        bundle: &mut Box<dyn RenderBundle>,
+        geometry: &Geom<P>,
+        bundle: &mut RenderBundle,
     ) -> Vec<PrimitiveId> {
-        vec![bundle.add_point(
-            geometry,
-            PointPaint {
-                color: feature.color,
-                size: 3.0,
-            },
-        )]
+        if let Geom::Point(point) = geometry {
+            vec![bundle.add_point(
+                point,
+                PointPaint {
+                    color: feature.color,
+                    size: 3.0,
+                },
+            )]
+        } else {
+            vec![]
+        }
     }
 }
 

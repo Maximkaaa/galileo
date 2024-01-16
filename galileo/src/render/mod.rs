@@ -1,55 +1,34 @@
-use crate::primitives::{Color, DecodedImage};
-use galileo_types::cartesian::impls::contour::Contour;
-use galileo_types::cartesian::impls::point::{Point2d, Point3d};
-use galileo_types::cartesian::impls::polygon::Polygon;
+use crate::primitives::Color;
 use galileo_types::cartesian::size::Size;
 use maybe_sync::{MaybeSend, MaybeSync};
+use render_bundle::RenderBundle;
 use std::any::Any;
 
 #[cfg(feature = "wgpu")]
 pub mod wgpu;
 
+pub mod render_bundle;
+
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct PrimitiveId(usize);
 
+impl PrimitiveId {
+    const INVALID: PrimitiveId = PrimitiveId(usize::MAX);
+}
+
 pub trait Renderer: MaybeSend + MaybeSync {
-    fn create_bundle(&self) -> Box<dyn RenderBundle>;
-    fn pack_bundle(&self, bundle: Box<dyn RenderBundle>) -> Box<dyn PackedBundle>;
+    fn create_bundle(&self) -> RenderBundle;
+    fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle>;
 
     fn as_any(&self) -> &dyn Any;
 }
 
 pub trait Canvas {
     fn size(&self) -> Size;
-    fn create_bundle(&self) -> Box<dyn RenderBundle>;
-    fn pack_bundle(&self, bundle: Box<dyn RenderBundle>) -> Box<dyn PackedBundle>;
+    fn create_bundle(&self) -> RenderBundle;
+    fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle>;
     fn pack_unpacked(&self, bundle: Box<dyn UnpackedBundle>) -> Box<dyn PackedBundle>;
     fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle]);
-}
-
-pub trait RenderBundle {
-    fn add_image(
-        &mut self,
-        image: DecodedImage,
-        vertices: [Point2d; 4],
-        paint: ImagePaint,
-    ) -> PrimitiveId;
-    fn add_point(&mut self, point: &Point3d, paint: PointPaint) -> PrimitiveId;
-    fn add_line(
-        &mut self,
-        line: &Contour<Point3d>,
-        paint: LinePaint,
-        resolution: f64,
-    ) -> PrimitiveId;
-    fn add_polygon(
-        &mut self,
-        polygon: &Polygon<Point2d>,
-        paint: Paint,
-        resolution: f64,
-    ) -> PrimitiveId;
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any>;
-    fn is_empty(&self) -> bool;
 }
 
 pub trait PackedBundle: MaybeSend + MaybeSync {

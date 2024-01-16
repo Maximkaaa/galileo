@@ -1,19 +1,6 @@
-use galileo_types::cartesian::impls::contour::Contour;
-use galileo_types::cartesian::impls::point::{Point2d, Point3d};
-use galileo_types::cartesian::impls::polygon::Polygon;
 use galileo_types::cartesian::size::Size;
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
-use lyon::lyon_tessellation::{
-    BuffersBuilder, FillOptions, FillVertex, LineJoin, Side, StrokeOptions,
-};
-use lyon::math::point;
-use lyon::path::path::BuilderWithAttributes;
-use lyon::tessellation::{
-    FillTessellator, FillVertexConstructor, StrokeTessellator, StrokeVertex,
-    StrokeVertexConstructor, VertexBuffers,
-};
+use lyon::tessellation::VertexBuffers;
 use nalgebra::{Rotation3, Vector3};
-use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::mem::size_of;
 use std::ops::Range;
@@ -28,14 +15,18 @@ use winit::dpi::PhysicalSize;
 use crate::layer::Layer;
 use crate::map::Map;
 use crate::primitives::{Color, DecodedImage};
-use crate::render::wgpu::image::{ImageVertex, WgpuImage};
+use crate::render::render_bundle::tessellating::{
+    ImageVertex, LineVertex, PointInstance, PrimitiveInfo, TessellatingRenderBundle,
+};
+use crate::render::render_bundle::RenderBundle;
+use crate::render::wgpu::image::WgpuImage;
 use crate::view::MapView;
 
 use self::image::ImagePainter;
 
 use super::{
-    Canvas, ImagePaint, LinePaint, PackedBundle, Paint, PointPaint, PrimitiveId, RenderBundle,
-    Renderer, UnpackedBundle,
+    Canvas, ImagePaint, LinePaint, PackedBundle, Paint, PointPaint, PrimitiveId, Renderer,
+    UnpackedBundle,
 };
 
 pub struct WgpuRenderer {
@@ -57,19 +48,20 @@ pub struct WgpuRenderer {
 }
 
 impl Renderer for WgpuRenderer {
-    fn create_bundle(&self) -> Box<dyn RenderBundle> {
-        Box::new(WgpuRenderBundle::new())
+    fn create_bundle(&self) -> RenderBundle {
+        RenderBundle::Tessellating(TessellatingRenderBundle::new())
     }
 
-    fn pack_bundle(&self, bundle: Box<dyn RenderBundle>) -> Box<dyn PackedBundle> {
-        let cast = bundle.into_any().downcast::<WgpuRenderBundle>().unwrap();
-        Box::new(WgpuPackedBundle::new(
-            cast.vertex_buffers,
-            cast.points,
-            cast.images,
-            cast.primitives,
-            self,
-        ))
+    fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle> {
+        match bundle {
+            RenderBundle::Tessellating(inner) => Box::new(WgpuPackedBundle::new(
+                inner.vertex_buffers,
+                inner.points,
+                inner.images,
+                inner.primitives,
+                self,
+            )),
+        }
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -138,7 +130,7 @@ impl WgpuRenderer {
 
         let map_view_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Map view buffer"),
-            size: (size_of::<ViewUniform>()) as wgpu::BufferAddress,
+            size: size_of::<ViewUniform>() as wgpu::BufferAddress,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -175,7 +167,7 @@ impl WgpuRenderer {
             vertex: wgpu::VertexState {
                 module: &line_shader,
                 entry_point: "vs_main",
-                buffers: &[LineVertex::desc()],
+                buffers: &[LineVertex::wgpu_desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &line_shader,
@@ -220,7 +212,7 @@ impl WgpuRenderer {
             vertex: wgpu::VertexState {
                 module: &point_shader,
                 entry_point: "vs_main",
-                buffers: &[PointVertex::desc(), PointInstance::desc()],
+                buffers: &[PointVertex::wgpu_desc(), PointInstance::wgpu_desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &point_shader,
@@ -420,19 +412,20 @@ impl<'a> Canvas for WgpuCanvas<'a> {
         self.renderer.size()
     }
 
-    fn create_bundle(&self) -> Box<dyn RenderBundle> {
-        Box::new(WgpuRenderBundle::new())
+    fn create_bundle(&self) -> RenderBundle {
+        RenderBundle::Tessellating(TessellatingRenderBundle::new())
     }
 
-    fn pack_bundle(&self, bundle: Box<dyn RenderBundle>) -> Box<dyn PackedBundle> {
-        let cast = bundle.into_any().downcast::<WgpuRenderBundle>().unwrap();
-        Box::new(WgpuPackedBundle::new(
-            cast.vertex_buffers,
-            cast.points,
-            cast.images,
-            cast.primitives,
-            self.renderer,
-        ))
+    fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle> {
+        match bundle {
+            RenderBundle::Tessellating(inner) => Box::new(WgpuPackedBundle::new(
+                inner.vertex_buffers,
+                inner.points,
+                inner.images,
+                inner.primitives,
+                self.renderer,
+            )),
+        }
     }
 
     fn pack_unpacked(&self, bundle: Box<dyn UnpackedBundle>) -> Box<dyn PackedBundle> {
@@ -508,207 +501,6 @@ impl<'a> WgpuCanvas<'a> {
         self.renderer
             .image_painter
             .draw_image(render_pass, image, self.renderer)
-    }
-}
-
-#[derive(Debug)]
-pub struct WgpuRenderBundle {
-    pub vertex_buffers: VertexBuffers<LineVertex, u32>,
-    points: Vec<PointInstance>,
-    images: Vec<(DecodedImage, [ImageVertex; 4])>,
-    primitives: Vec<PrimitiveInfo>,
-}
-
-#[derive(Debug)]
-enum PrimitiveInfo {
-    Line { vertex_range: Range<usize> },
-    Point { point_index: usize },
-    Image { image_index: usize },
-}
-
-impl Default for WgpuRenderBundle {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl WgpuRenderBundle {
-    pub fn new() -> Self {
-        Self {
-            vertex_buffers: VertexBuffers::new(),
-            points: Vec::new(),
-            images: Vec::new(),
-            primitives: Vec::new(),
-        }
-    }
-}
-
-impl RenderBundle for WgpuRenderBundle {
-    fn add_image(
-        &mut self,
-        image: DecodedImage,
-        vertices: [Point2d; 4],
-        paint: ImagePaint,
-    ) -> PrimitiveId {
-        let opacity = paint.opacity as f32 / 255.0;
-        let image_index = self.images.len();
-        self.images.push((
-            image,
-            [
-                ImageVertex {
-                    position: [vertices[0].x() as f32, vertices[0].y() as f32],
-                    opacity,
-                    tex_coords: [0.0, 1.0],
-                },
-                ImageVertex {
-                    position: [vertices[1].x() as f32, vertices[1].y() as f32],
-                    opacity,
-                    tex_coords: [0.0, 0.0],
-                },
-                ImageVertex {
-                    position: [vertices[3].x() as f32, vertices[3].y() as f32],
-                    opacity,
-                    tex_coords: [1.0, 1.0],
-                },
-                ImageVertex {
-                    position: [vertices[2].x() as f32, vertices[2].y() as f32],
-                    opacity,
-                    tex_coords: [1.0, 0.0],
-                },
-            ],
-        ));
-
-        let id = self.primitives.len();
-        self.primitives.push(PrimitiveInfo::Image { image_index });
-
-        PrimitiveId(id)
-    }
-
-    fn add_point(&mut self, point: &Point3d, paint: PointPaint) -> PrimitiveId {
-        let id = self.primitives.len();
-        let index = self.points.len();
-        self.points.push(PointInstance {
-            position: [point.x as f32, point.y as f32, point.z as f32],
-            size: paint.size as f32,
-            color: paint.color.to_f32_array(),
-        });
-
-        self.primitives
-            .push(PrimitiveInfo::Point { point_index: index });
-        PrimitiveId(id)
-    }
-
-    fn add_line(
-        &mut self,
-        line: &Contour<Point3d>,
-        paint: LinePaint,
-        resolution: f64,
-    ) -> PrimitiveId {
-        let resolution = resolution as f32;
-        let vertex_constructor = LineVertexConstructor {
-            width: paint.width as f32,
-            offset: paint.offset as f32,
-            color: paint.color.to_f32_array(),
-            resolution,
-        };
-
-        // todo: check length of line
-
-        let mut path_builder = BuilderWithAttributes::new(1);
-
-        let _ = path_builder.begin(
-            point(
-                line.points[0].x as f32 / resolution,
-                line.points[0].y as f32 / resolution,
-            ),
-            &[line.points[0].z as f32],
-        );
-
-        for p in line.points.iter().skip(1) {
-            let _ = path_builder.line_to(
-                point(p.x as f32 / resolution, p.y as f32 / resolution),
-                &[p.z as f32],
-            );
-        }
-        path_builder.end(line.is_closed);
-        let path = path_builder.build();
-
-        let mut tesselator = StrokeTessellator::new();
-        let start_index = self.vertex_buffers.vertices.len();
-        tesselator
-            .tessellate_path(
-                &path,
-                &StrokeOptions::DEFAULT
-                    .with_line_cap(paint.line_cap.into())
-                    .with_line_width(paint.width as f32)
-                    .with_miter_limit(2.0)
-                    .with_tolerance(0.1)
-                    .with_line_join(LineJoin::MiterClip),
-                &mut BuffersBuilder::new(&mut self.vertex_buffers, vertex_constructor),
-            )
-            .unwrap();
-
-        let end_index = self.vertex_buffers.vertices.len();
-        let id = self.primitives.len();
-
-        self.primitives.push(PrimitiveInfo::Line {
-            vertex_range: start_index..end_index,
-        });
-
-        PrimitiveId(id)
-    }
-
-    fn add_polygon(
-        &mut self,
-        polygon: &Polygon<Point2d>,
-        paint: Paint,
-        _resolution: f64,
-    ) -> PrimitiveId {
-        let mut path_builder = BuilderWithAttributes::new(1);
-        for contour in polygon.iter_contours() {
-            let _ = path_builder.begin(
-                point(contour.points[0].x() as f32, contour.points[0].y() as f32),
-                &[0.0],
-            );
-
-            for p in contour.points.iter().skip(1) {
-                let _ = path_builder.line_to(point(p.x() as f32, p.y() as f32), &[0.0]);
-            }
-
-            path_builder.end(true);
-        }
-
-        let path = path_builder.build();
-
-        let vertex_constructor = PolygonVertexConstructor {
-            color: paint.color.to_f32_array(),
-        };
-        let mut tesselator = FillTessellator::new();
-        let start_index = self.vertex_buffers.vertices.len();
-        tesselator
-            .tessellate(
-                &path,
-                &FillOptions::DEFAULT,
-                &mut BuffersBuilder::new(&mut self.vertex_buffers, vertex_constructor),
-            )
-            .unwrap();
-
-        let end_index = self.vertex_buffers.vertices.len();
-        let id = self.primitives.len();
-
-        self.primitives.push(PrimitiveInfo::Line {
-            vertex_range: start_index..end_index,
-        });
-
-        PrimitiveId(id)
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        self
-    }
-
-    fn is_empty(&self) -> bool {
-        self.primitives.is_empty()
     }
 }
 
@@ -1008,87 +800,6 @@ impl UnpackedBundle for WgpuUnpackedBundle {
     }
 }
 
-#[allow(dead_code)]
-struct LineVertexConstructor {
-    width: f32,
-    offset: f32,
-    color: [f32; 4],
-    resolution: f32,
-}
-
-impl StrokeVertexConstructor<LineVertex> for LineVertexConstructor {
-    fn new_vertex(&mut self, mut vertex: StrokeVertex) -> LineVertex {
-        let position = vertex.position_on_path();
-        let normal = match vertex.side() {
-            Side::Negative => [
-                vertex.normal().x * (vertex.line_width() - self.offset * 2.0),
-                vertex.normal().y * (vertex.line_width() - self.offset * 2.0),
-            ],
-            Side::Positive => [
-                vertex.normal().x * (vertex.line_width() + self.offset * 2.0),
-                vertex.normal().y * (vertex.line_width() + self.offset * 2.0),
-            ],
-        };
-        LineVertex {
-            position: [
-                position.x * self.resolution,
-                position.y * self.resolution,
-                vertex.interpolated_attributes()[0],
-            ],
-            color: self.color,
-            normal,
-        }
-    }
-}
-
-struct PolygonVertexConstructor {
-    color: [f32; 4],
-}
-
-impl FillVertexConstructor<LineVertex> for PolygonVertexConstructor {
-    fn new_vertex(&mut self, vertex: FillVertex) -> LineVertex {
-        LineVertex {
-            position: [vertex.position().x, vertex.position().y, 0.0],
-            color: self.color,
-            normal: Default::default(),
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
-pub struct LineVertex {
-    position: [f32; 3],
-    color: [f32; 4],
-    normal: [f32; 2],
-}
-
-impl LineVertex {
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: size_of::<LineVertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x4,
-                },
-                wgpu::VertexAttribute {
-                    offset: (size_of::<[f32; 3]>() + size_of::<[f32; 4]>()) as wgpu::BufferAddress,
-                    shader_location: 2,
-                    format: wgpu::VertexFormat::Float32x2,
-                },
-            ],
-        }
-    }
-}
-
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct PointVertex {
@@ -1096,7 +807,7 @@ struct PointVertex {
 }
 
 impl PointVertex {
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
+    fn wgpu_desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: size_of::<PointVertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
@@ -1109,16 +820,20 @@ impl PointVertex {
     }
 }
 
+mod image;
+
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct PointInstance {
-    position: [f32; 3],
-    size: f32,
-    color: [f32; 4],
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct ViewUniform {
+    view_proj: [[f32; 4]; 4],
+    view_rotation: [[f32; 4]; 4],
+    inv_screen_size: [f32; 2],
+    resolution: f32,
+    _padding: [f32; 1],
 }
 
 impl PointInstance {
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
+    fn wgpu_desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: size_of::<PointInstance>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
@@ -1143,14 +858,28 @@ impl PointInstance {
     }
 }
 
-mod image;
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct ViewUniform {
-    view_proj: [[f32; 4]; 4],
-    view_rotation: [[f32; 4]; 4],
-    inv_screen_size: [f32; 2],
-    resolution: f32,
-    _padding: [f32; 1],
+impl LineVertex {
+    fn wgpu_desc() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: size_of::<LineVertex>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+                wgpu::VertexAttribute {
+                    offset: size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: (size_of::<[f32; 3]>() + size_of::<[f32; 4]>()) as wgpu::BufferAddress,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+            ],
+        }
+    }
 }

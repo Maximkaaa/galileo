@@ -6,8 +6,9 @@ use crate::layer::vector_tile_layer::tile_provider::{
 };
 use crate::messenger::Messenger;
 use crate::platform::{PlatformService, PlatformServiceImpl};
-use crate::render::wgpu::WgpuRenderBundle;
-use crate::render::{RenderBundle, Renderer};
+use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
+use crate::render::render_bundle::RenderBundle;
+use crate::render::Renderer;
 use crate::tile_scheme::{TileIndex, TileScheme};
 use galileo_mvt::MvtTile;
 use lyon::lyon_tessellation::VertexBuffers;
@@ -207,7 +208,7 @@ impl WebWorkerVectorTileProvider {
                         indices,
                     }) => match store.get(&index) {
                         Some(TileState::Loading(renderer) | TileState::Updating(_, renderer)) => {
-                            let mut bundle = WgpuRenderBundle::new();
+                            let mut bundle = TessellatingRenderBundle::new();
 
                             let vertices_cast = bytemuck::cast_slice(&vertices).into();
                             let indices_cast = bytemuck::cast_slice(&indices).into();
@@ -300,7 +301,7 @@ pub async fn load_tile(data: JsValue) -> JsValue {
 
 async fn try_load_tile(payload: LoadTilePayload) -> Result<WorkerOutput, GalileoError> {
     let mvt_tile = download_tile(payload.index, &payload.url).await?;
-    let mut bundle: Box<dyn RenderBundle> = Box::new(WgpuRenderBundle::new());
+    let mut bundle: Box<dyn RenderBundle> = Box::new(TessellatingRenderBundle::new());
     VectorTile::prepare(
         &mvt_tile,
         &mut bundle,
@@ -309,7 +310,7 @@ async fn try_load_tile(payload: LoadTilePayload) -> Result<WorkerOutput, Galileo
         &payload.tile_scheme,
     )?;
 
-    let bundle: Box<WgpuRenderBundle> = bundle.into_any().downcast().unwrap();
+    let bundle: Box<TessellatingRenderBundle> = bundle.into_any().downcast().unwrap();
     let VertexBuffers { vertices, indices } = bundle.vertex_buffers;
     let vertices_bytes: Vec<u8> = bytemuck::cast_slice(&vertices[..]).into();
     let index_bytes: Vec<u8> = bytemuck::cast_slice(&indices[..]).into();
