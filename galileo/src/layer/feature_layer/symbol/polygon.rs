@@ -58,7 +58,6 @@ impl SimplePolygonSymbol {
             Paint {
                 color: self.fill_color,
             },
-            10000.0,
         );
 
         ids.push(id);
@@ -71,7 +70,7 @@ impl SimplePolygonSymbol {
         };
 
         for contour in polygon.iter_contours() {
-            ids.push(bundle.add_line(contour, line_paint, 10000.0));
+            ids.push(bundle.add_line(contour, line_paint));
         }
 
         ids

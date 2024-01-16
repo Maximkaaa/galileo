@@ -50,7 +50,12 @@ pub fn load_cities() -> Vec<City> {
 pub async fn run(builder: MapBuilder) {
     let countries = load_countries();
 
-    let feature_layer = FeatureLayer::new(countries, CountrySymbol {}, Crs::EPSG3857);
+    let feature_layer = FeatureLayer::with_lods(
+        countries,
+        CountrySymbol {},
+        Crs::EPSG3857,
+        vec![8000.0, 1000.0, 1.0],
+    );
     let feature_layer = Arc::new(RwLock::new(feature_layer));
 
     let point_layer = FeatureLayer::new(load_cities(), CitySymbol {}, Crs::WGS84);
@@ -132,8 +137,8 @@ impl CountrySymbol {
         };
         SimplePolygonSymbol::new(fill_color)
             .with_stroke_color(stroke_color)
-            .with_stroke_width(1.0)
-            .with_stroke_offset(-0.5)
+            .with_stroke_width(2.0)
+            .with_stroke_offset(-1.0)
     }
 }
 

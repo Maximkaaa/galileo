@@ -35,6 +35,7 @@ where
     render_bundle: RwLock<Option<Box<dyn PackedBundle>>>,
     feature_render_map: RwLock<Vec<Vec<PrimitiveId>>>,
     crs: Crs,
+    lods: Option<Vec<f32>>,
     messenger: RwLock<Option<Box<dyn Messenger>>>,
 
     space: PhantomData<Space>,
@@ -53,6 +54,20 @@ where
             feature_render_map: RwLock::new(Vec::new()),
             crs,
             messenger: RwLock::new(None),
+            lods: None,
+            space: Default::default(),
+        }
+    }
+
+    pub fn with_lods(features: Vec<F>, style: S, crs: Crs, lods: Vec<f32>) -> Self {
+        Self {
+            features,
+            symbol: style,
+            render_bundle: RwLock::new(None),
+            feature_render_map: RwLock::new(Vec::new()),
+            crs,
+            messenger: RwLock::new(None),
+            lods: Some(lods),
             space: Default::default(),
         }
     }
@@ -144,12 +159,12 @@ where
     F::Geom: Geometry<Point = P>,
     S: Symbol<F> + MaybeSend + MaybeSync,
 {
-    fn render(&self, position: &MapView, canvas: &mut dyn Canvas) {
+    fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         if self.render_bundle.read().unwrap().is_none() {
-            let mut bundle = canvas.create_bundle();
+            let mut bundle = canvas.create_bundle(&self.lods);
             let mut render_map = self.feature_render_map.write().unwrap();
             let projection = ChainProjection::new(
-                position.crs().get_projection::<P, Point2d>().unwrap(),
+                view.crs().get_projection::<P, Point2d>().unwrap(),
                 Box::new(AddDimensionProjection::new(0.0)),
             );
 
@@ -167,7 +182,10 @@ where
             *self.render_bundle.write().unwrap() = Some(packed);
         }
 
-        canvas.draw_bundles(&[&**self.render_bundle.read().unwrap().as_ref().unwrap()]);
+        canvas.draw_bundles(
+            &[&**self.render_bundle.read().unwrap().as_ref().unwrap()],
+            view.resolution() as f32,
+        );
     }
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
@@ -188,7 +206,7 @@ where
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         if self.render_bundle.read().unwrap().is_none() {
-            let mut bundle = canvas.create_bundle();
+            let mut bundle = canvas.create_bundle(&self.lods);
             let mut render_map = self.feature_render_map.write().unwrap();
 
             let projection: Box<dyn Projection<InPoint = _, OutPoint = Point3d>> =
@@ -219,7 +237,10 @@ where
             *self.render_bundle.write().unwrap() = Some(packed);
         }
 
-        canvas.draw_bundles(&[&**self.render_bundle.read().unwrap().as_ref().unwrap()]);
+        canvas.draw_bundles(
+            &[&**self.render_bundle.read().unwrap().as_ref().unwrap()],
+            view.resolution() as f32,
+        );
     }
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
@@ -246,7 +267,7 @@ where
         }
 
         if self.render_bundle.read().unwrap().is_none() {
-            let mut bundle = canvas.create_bundle();
+            let mut bundle = canvas.create_bundle(&self.lods);
             let mut render_map = self.feature_render_map.write().unwrap();
 
             for feature in &self.features {
@@ -263,7 +284,10 @@ where
             *self.render_bundle.write().unwrap() = Some(packed);
         }
 
-        canvas.draw_bundles(&[&**self.render_bundle.read().unwrap().as_ref().unwrap()]);
+        canvas.draw_bundles(
+            &[&**self.render_bundle.read().unwrap().as_ref().unwrap()],
+            view.resolution() as f32,
+        );
     }
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {

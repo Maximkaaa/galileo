@@ -116,8 +116,8 @@ impl CountrySymbol {
         };
         SimplePolygonSymbol::new(fill_color)
             .with_stroke_color(stroke_color)
-            .with_stroke_width(1.0)
-            .with_stroke_offset(-0.5)
+            .with_stroke_width(2.0)
+            .with_stroke_offset(-1.0)
     }
 }
 
