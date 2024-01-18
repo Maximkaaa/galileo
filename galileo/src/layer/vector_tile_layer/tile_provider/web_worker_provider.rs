@@ -6,12 +6,13 @@ use crate::layer::vector_tile_layer::tile_provider::{
 };
 use crate::messenger::Messenger;
 use crate::platform::{PlatformService, PlatformServiceImpl};
+use crate::render::render_bundle::tessellating::serialization::TessellatingRenderBundleBytes;
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::Renderer;
 use crate::tile_scheme::{TileIndex, TileScheme};
+use bytes::Bytes;
 use galileo_mvt::MvtTile;
-use lyon::lyon_tessellation::VertexBuffers;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -197,48 +198,26 @@ impl WebWorkerVectorTileProvider {
                     return;
                 }
 
-                let result: Result<WorkerOutput, (TileIndex, String)> =
-                    serde_wasm_bindgen::from_value(event.data()).unwrap();
-                let mut store = tiles_store.write().unwrap();
-                match result {
-                    Ok(WorkerOutput {
-                        index,
-                        mvt_tile,
-                        vertices,
-                        indices,
-                    }) => match store.get(&index) {
-                        Some(TileState::Loading(renderer) | TileState::Updating(_, renderer)) => {
-                            let mut bundle = TessellatingRenderBundle::new();
+                let worker_output = match serde_wasm_bindgen::from_value(event.data()) {
+                    Ok(v) => v,
+                    Err(err) => {
+                        log::warn!("Failed to deserialize worker message: {err:?}");
+                        return;
+                    }
+                };
 
-                            let vertices_cast = bytemuck::cast_slice(&vertices).into();
-                            let indices_cast = bytemuck::cast_slice(&indices).into();
-                            bundle.vertex_buffers.vertices = vertices_cast;
-                            bundle.vertex_buffers.indices = indices_cast;
-                            let mvt_tile = bincode::deserialize(&mvt_tile).unwrap();
-
-                            let packed = renderer.read().unwrap().pack_bundle(Box::new(bundle));
-                            store.insert(
-                                index,
-                                TileState::Loaded(VectorTile {
-                                    bundle: packed,
-                                    mvt_tile,
-                                }),
-                            );
-
-                            log::info!("Tile {:?} is stored", index);
-                            if let Some(messenger) = &(*messenger.read().unwrap()) {
-                                messenger.request_redraw();
+                match worker_output {
+                    WorkerOutput::VectorTile(result) => {
+                        let mut store = tiles_store.write().unwrap();
+                        match result {
+                            Ok(decoded_vector_tile) => {
+                                store_vector_tile(decoded_vector_tile, &mut store, &messenger)
+                            }
+                            Err((index, message)) => {
+                                log::info!("Failed to load tile {index:?}: {message}");
+                                store.insert(index, TileState::Error);
                             }
                         }
-                        _ => {
-                            store.insert(index, TileState::Error);
-
-                            log::info!("Tile {:?} loaded, but is not needed anymore", index);
-                        }
-                    },
-                    Err((index, message)) => {
-                        log::info!("Failed to load tile {index:?}: {message}");
-                        store.insert(index, TileState::Error);
                     }
                 }
             });
@@ -254,19 +233,58 @@ impl WebWorkerVectorTileProvider {
     }
 }
 
+fn store_vector_tile(
+    decoded_vector_tile: DecodedVectorTile,
+    store: &mut HashMap<TileIndex, TileState>,
+    messenger: &Arc<RwLock<Option<Box<dyn Messenger>>>>,
+) {
+    let DecodedVectorTile {
+        index,
+        mvt_tile,
+        bundle_bytes,
+    } = decoded_vector_tile;
+    match store.get(&index) {
+        Some(TileState::Loading(renderer) | TileState::Updating(_, renderer)) => {
+            let converted: TessellatingRenderBundleBytes =
+                bincode::deserialize(&bundle_bytes).unwrap();
+            let bundle = TessellatingRenderBundle::from_bytes_unchecked(converted);
+            let mvt_tile = MvtTile::decode(bytes::Bytes::from(mvt_tile), true).unwrap();
+
+            let packed = renderer
+                .read()
+                .unwrap()
+                .pack_bundle(RenderBundle::Tessellating(bundle));
+            store.insert(
+                index,
+                TileState::Loaded(VectorTile {
+                    bundle: packed,
+                    mvt_tile,
+                }),
+            );
+
+            if let Some(messenger) = &(*messenger.read().unwrap()) {
+                messenger.request_redraw();
+            }
+        }
+        _ => {}
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
-struct WorkerOutput {
+enum WorkerOutput {
+    VectorTile(Result<DecodedVectorTile, (TileIndex, String)>),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct DecodedVectorTile {
     index: TileIndex,
     #[serde(with = "serde_bytes")]
     mvt_tile: Vec<u8>,
     #[serde(with = "serde_bytes")]
-    vertices: Vec<u8>,
-    #[serde(with = "serde_bytes")]
-    indices: Vec<u8>,
+    bundle_bytes: Vec<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[wasm_bindgen]
 pub struct LoadTilePayload {
     index: TileIndex,
     url: String,
@@ -296,12 +314,22 @@ pub async fn load_tile(data: JsValue) -> JsValue {
         .await
         .map_err(|err| (index, format!("{err:?}")));
 
-    serde_wasm_bindgen::to_value(&result).unwrap()
+    let output = WorkerOutput::VectorTile(result);
+    serde_wasm_bindgen::to_value(&output).unwrap()
 }
 
-async fn try_load_tile(payload: LoadTilePayload) -> Result<WorkerOutput, GalileoError> {
-    let mvt_tile = download_tile(payload.index, &payload.url).await?;
-    let mut bundle: Box<dyn RenderBundle> = Box::new(TessellatingRenderBundle::new());
+async fn try_load_tile(payload: LoadTilePayload) -> Result<DecodedVectorTile, GalileoError> {
+    let mvt_tile_bytes = download_tile(payload.index, &payload.url).await?;
+
+    let mvt_tile = match MvtTile::decode(mvt_tile_bytes.clone(), false) {
+        Ok(v) => v,
+        Err(e) => {
+            log::info!("Failed to decode tile {:?}: {e:?}", payload.index);
+            return Err(GalileoError::IO);
+        }
+    };
+
+    let mut bundle = RenderBundle::Tessellating(TessellatingRenderBundle::new());
     VectorTile::prepare(
         &mvt_tile,
         &mut bundle,
@@ -310,35 +338,20 @@ async fn try_load_tile(payload: LoadTilePayload) -> Result<WorkerOutput, Galileo
         &payload.tile_scheme,
     )?;
 
-    let bundle: Box<TessellatingRenderBundle> = bundle.into_any().downcast().unwrap();
-    let VertexBuffers { vertices, indices } = bundle.vertex_buffers;
-    let vertices_bytes: Vec<u8> = bytemuck::cast_slice(&vertices[..]).into();
-    let index_bytes: Vec<u8> = bytemuck::cast_slice(&indices[..]).into();
+    let RenderBundle::Tessellating(bundle) = bundle;
+    let serialized = bincode::serialize(&bundle.into_bytes()).unwrap();
 
-    let tile_bytes = bincode::serialize(&mvt_tile).unwrap();
-
-    Ok(WorkerOutput {
+    Ok(DecodedVectorTile {
         index: payload.index,
-        vertices: vertices_bytes,
-        indices: index_bytes,
-        mvt_tile: tile_bytes,
+        mvt_tile: mvt_tile_bytes.to_vec(),
+        bundle_bytes: serialized,
     })
 }
 
-async fn download_tile(index: TileIndex, url: &str) -> Result<MvtTile, GalileoError> {
+async fn download_tile(index: TileIndex, url: &str) -> Result<Bytes, GalileoError> {
     let platform_service = PlatformServiceImpl::new();
     match platform_service.load_bytes_from_url(url).await {
-        Ok(bytes) => {
-            let mvt_tile = match MvtTile::decode(bytes, false) {
-                Ok(v) => v,
-                Err(e) => {
-                    log::info!("Failed to decode tile {index:?}: {e:?}");
-                    return Err(GalileoError::IO);
-                }
-            };
-
-            Ok(mvt_tile)
-        }
+        Ok(bytes) => Ok(bytes),
         Err(e) => {
             log::info!("Failed to load tile {index:?}");
             Err(e)

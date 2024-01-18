@@ -9,7 +9,7 @@ async function init_worker() {
 
     self.onmessage = async event => {
         let result = await load_tile(event.data);
-        self.postMessage(result);
+        self.postMessage(result, null, [result]);
     }
 }
 

@@ -4,6 +4,7 @@ use crate::platform::{PlatformService, PlatformServiceImpl};
 use crate::tile_scheme::TileIndex;
 use async_trait::async_trait;
 use maybe_sync::{MaybeSend, MaybeSync};
+use quick_cache::sync::Cache;
 use std::collections::HashMap;
 use std::sync::RwLock;
 
@@ -24,6 +25,7 @@ pub struct UrlTileProvider<Tile> {
     pub platform_service: PlatformServiceImpl,
     pub loaded_tiles: RwLock<HashMap<TileIndex, TileState<Tile>>>,
     pub messenger: RwLock<Option<Box<dyn Messenger>>>,
+    pub tile_cache: Cache<TileIndex, TileState<Tile>>,
 }
 
 impl<Tile: Clone> UrlTileProvider<Tile> {
@@ -33,6 +35,7 @@ impl<Tile: Clone> UrlTileProvider<Tile> {
             platform_service: PlatformServiceImpl::new(),
             loaded_tiles: RwLock::new(HashMap::new()),
             messenger: RwLock::new(messenger),
+            tile_cache: Cache::new(1),
         }
     }
 

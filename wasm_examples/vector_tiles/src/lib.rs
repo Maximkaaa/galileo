@@ -1,5 +1,5 @@
 use galileo::galileo_map::MapBuilder;
-use galileo::layer::vector_tile::style::VectorTileStyle;
+use galileo::layer::vector_tile_layer::style::VectorTileStyle;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
