@@ -192,7 +192,7 @@ where
         // do nothing
     }
 
-    fn set_messenger(&self, messenger: Box<dyn Messenger>) {
+    fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
         *self.messenger.write().unwrap() = Some(messenger);
     }
 }
@@ -247,7 +247,7 @@ where
         // do nothing
     }
 
-    fn set_messenger(&self, messenger: Box<dyn Messenger>) {
+    fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
         *self.messenger.write().unwrap() = Some(messenger);
     }
 }
@@ -294,7 +294,7 @@ where
         // do nothing
     }
 
-    fn set_messenger(&self, messenger: Box<dyn Messenger>) {
+    fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
         *self.messenger.write().unwrap() = Some(messenger);
     }
 }

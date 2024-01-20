@@ -44,7 +44,7 @@ impl<Provider: VectorTileProvider + 'static> Layer for VectorTileLayer<Provider>
         }
     }
 
-    fn set_messenger(&self, messenger: Box<dyn Messenger>) {
+    fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
         self.tile_provider.set_messenger(messenger);
     }
 }

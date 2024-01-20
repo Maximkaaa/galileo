@@ -1,6 +1,8 @@
 use crate::control::custom::{CustomEventHandler, EventHandler};
 use crate::control::event_processor::EventProcessor;
 use crate::control::map::MapController;
+use crate::layer::data_provider::file_cache::FileCacheController;
+use crate::layer::data_provider::url_image_provider::{UrlImageProvider, UrlSource};
 use crate::layer::raster_tile::RasterTileLayer;
 use crate::layer::tile_provider::TileSource;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
@@ -9,7 +11,7 @@ use crate::layer::Layer;
 use crate::map::Map;
 use crate::render::wgpu::WgpuRenderer;
 use crate::render::Renderer;
-use crate::tile_scheme::TileScheme;
+use crate::tile_scheme::{TileIndex, TileScheme};
 use crate::view::MapView;
 use crate::winit::{WinitInputHandler, WinitMessenger};
 use galileo_types::cartesian::size::Size;
@@ -198,12 +200,18 @@ impl MapBuilder {
 
     pub fn with_raster_tiles(
         mut self,
-        tile_source: impl TileSource + 'static,
+        tile_source: impl UrlSource<TileIndex> + 'static,
         tile_scheme: TileScheme,
     ) -> Self {
-        self.layers.push(Box::new(RasterTileLayer::from_url(
-            tile_source,
+        #[cfg(not(target = "wasm32-unknown-unknown"))]
+        let cache_controller = Some(FileCacheController::new(".tile_cache"));
+        #[cfg(target = "wasm32-unknown-unknown")]
+        let cache_controller = None;
+
+        let tile_provider = UrlImageProvider::new(tile_source, cache_controller);
+        self.layers.push(Box::new(RasterTileLayer::new(
             tile_scheme,
+            tile_provider,
             None,
         )));
         self

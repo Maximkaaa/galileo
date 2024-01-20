@@ -3,6 +3,7 @@ use maybe_sync::{MaybeSend, MaybeSync};
 use std::any::Any;
 use std::ops::Deref;
 
+use crate::error::GalileoError;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -17,15 +18,15 @@ pub struct DecodedImage {
 }
 
 impl DecodedImage {
-    pub fn new(bytes: &[u8]) -> Self {
-        let decoded = image::load_from_memory(bytes).unwrap();
+    pub fn new(bytes: &[u8]) -> Result<Self, GalileoError> {
+        let decoded = image::load_from_memory(bytes)?;
         let bytes = decoded.to_rgba8();
         let dimensions = decoded.dimensions();
 
-        Self {
+        Ok(Self {
             bytes: Vec::from(bytes.deref()),
             dimensions,
-        }
+        })
     }
 }
 
