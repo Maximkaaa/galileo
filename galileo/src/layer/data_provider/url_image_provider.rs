@@ -47,17 +47,17 @@ impl<Key, Cache> UrlImageProvider<Key, Cache> {
     }
 }
 
-impl<Key, Cache> DataProvider<Key, DecodedImage> for UrlImageProvider<Key, Cache>
+impl<Key, Cache> DataProvider<Key, DecodedImage, ()> for UrlImageProvider<Key, Cache>
 where
     Key: MaybeSend + MaybeSync,
     Cache: PersistentCacheController<str, Bytes> + MaybeSend + MaybeSync,
 {
-    async fn load(&self, key: &Key) -> Result<DecodedImage, GalileoError> {
+    async fn load_raw(&self, key: &Key) -> Result<Bytes, GalileoError> {
         let url = (self.url_source)(key);
 
         if let Some(cache) = &self.cache {
             if let Some(data) = cache.get(&url) {
-                return Ok(DecodedImage::new(&data)?);
+                return Ok(data);
             }
         }
 
@@ -72,7 +72,11 @@ where
             }
         }
 
-        DecodedImage::new(&data)
+        Ok(data)
+    }
+
+    fn decode(&self, bytes: Bytes, _context: ()) -> Result<DecodedImage, GalileoError> {
+        DecodedImage::new(&bytes)
     }
 }
 

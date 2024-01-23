@@ -1,12 +1,11 @@
-use crate::layer::tile_provider::TileSource;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::vector_tile::VectorTile;
 use crate::messenger::Messenger;
 use crate::render::Renderer;
-use crate::tile_scheme::{TileIndex, TileScheme};
+use crate::tile_scheme::TileIndex;
 use maybe_sync::{MaybeSend, MaybeSync};
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
+use quick_cache::unsync::Cache;
+use std::sync::{Arc, MutexGuard, RwLock};
 
 #[cfg(target_arch = "wasm32")]
 pub mod web_worker_provider;
@@ -14,13 +13,9 @@ pub mod web_worker_provider;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod rayon_provider;
 
-pub trait VectorTileProvider: MaybeSend + MaybeSync {
-    fn create(
-        messenger: Option<Box<dyn Messenger>>,
-        tile_source: impl TileSource + 'static,
-        tile_scheme: TileScheme,
-    ) -> Self;
+pub mod vt_processor;
 
+pub trait VectorTileProvider: MaybeSend + MaybeSync {
     fn supports(&self, renderer: &RwLock<dyn Renderer>) -> bool;
     fn load_tile(
         &self,
@@ -34,7 +29,7 @@ pub trait VectorTileProvider: MaybeSend + MaybeSync {
 }
 
 pub struct LockedTileStore<'a> {
-    guard: RwLockReadGuard<'a, HashMap<TileIndex, TileState>>,
+    guard: MutexGuard<'a, Cache<TileIndex, TileState>>,
 }
 
 impl<'a> LockedTileStore<'a> {

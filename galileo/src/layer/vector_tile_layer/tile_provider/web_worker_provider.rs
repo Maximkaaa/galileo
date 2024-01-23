@@ -1,6 +1,10 @@
 use crate::error::GalileoError;
-use crate::layer::tile_provider::TileSource;
+use crate::layer::data_provider::url_data_provider::{UrlDataProvider, UrlSource};
+use crate::layer::data_provider::{DataProvider, EmptyCache};
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
+use crate::layer::vector_tile_layer::tile_provider::vt_processor::{
+    VectorTileDecodeContext, VtProcessor,
+};
 use crate::layer::vector_tile_layer::tile_provider::{
     LockedTileStore, TileState, VectorTile, VectorTileProvider,
 };
@@ -13,12 +17,12 @@ use crate::render::Renderer;
 use crate::tile_scheme::{TileIndex, TileScheme};
 use bytes::Bytes;
 use galileo_mvt::MvtTile;
+use quick_cache::unsync::Cache;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
 const WORKER_URL: &str = "./vt_worker.js";
@@ -28,9 +32,9 @@ const READY_MESSAGE: f64 = 42.0;
 pub struct WebWorkerVectorTileProvider {
     worker_pool: Vec<Rc<RefCell<WorkerState>>>,
     next_worker: AtomicUsize,
-    tiles: Arc<RwLock<HashMap<TileIndex, TileState>>>,
+    tiles: Arc<Mutex<Cache<TileIndex, TileState>>>,
     messenger: Arc<RwLock<Option<Box<dyn Messenger>>>>,
-    tile_source: Box<dyn TileSource>,
+    tile_source: Box<dyn UrlSource<TileIndex>>,
     tile_scheme: TileScheme,
 }
 
@@ -40,19 +44,6 @@ struct WorkerState {
 }
 
 impl VectorTileProvider for WebWorkerVectorTileProvider {
-    fn create(
-        messenger: Option<Box<dyn Messenger>>,
-        tile_source: impl TileSource + 'static,
-        tile_scheme: TileScheme,
-    ) -> Self {
-        Self::new(
-            DEFAULT_WORKER_COUNT,
-            messenger,
-            Box::new(tile_source),
-            tile_scheme,
-        )
-    }
-
     fn supports(&self, _renderer: &RwLock<dyn Renderer>) -> bool {
         // todo
         true
@@ -68,13 +59,21 @@ impl VectorTileProvider for WebWorkerVectorTileProvider {
     }
 
     fn update_style(&self) {
-        let mut tiles = self.tiles.write().unwrap();
-        for (_, tile_state) in tiles.iter_mut() {
-            if matches!(tile_state, TileState::Loaded(_)) {
+        let mut tiles = self.tiles.lock().expect("tile store mutex is poisoned");
+        let indices: Vec<_> = tiles.iter().map(|(index, _)| index.clone()).collect();
+
+        for index in indices {
+            let Some(mut entry) = tiles.get_mut(&index) else {
+                continue;
+            };
+            let tile_state = &mut *entry;
+            if matches!(*tile_state, TileState::Loaded(_)) {
                 let TileState::Loaded(tile) = std::mem::replace(tile_state, TileState::Error)
                 else {
-                    panic!("Type of value changed unexpectingly");
+                    log::error!("Type of value changed unexpectedly during updating style.");
+                    continue;
                 };
+
                 *tile_state = TileState::Outdated(tile);
             }
         }
@@ -85,9 +84,8 @@ impl VectorTileProvider for WebWorkerVectorTileProvider {
     }
 
     fn read(&self) -> LockedTileStore {
-        LockedTileStore {
-            guard: self.tiles.read().unwrap(),
-        }
+        let guard = self.tiles.lock().expect("tile store mutex is poisoned");
+        LockedTileStore { guard }
     }
 
     fn set_messenger(&self, messenger: Box<dyn Messenger>) {
@@ -99,15 +97,15 @@ impl WebWorkerVectorTileProvider {
     pub fn new(
         pool_size: usize,
         messenger: Option<Box<dyn Messenger>>,
-        tile_source: Box<dyn TileSource>,
+        source: impl UrlSource<TileIndex> + 'static,
         tile_scheme: TileScheme,
     ) -> Self {
         let mut provider = Self {
             worker_pool: Vec::with_capacity(pool_size),
             next_worker: Default::default(),
-            tiles: Arc::new(RwLock::new(HashMap::new())),
+            tiles: Arc::new(Mutex::new(Cache::new(1000))),
             messenger: Arc::new(RwLock::new(messenger)),
-            tile_source,
+            tile_source: Box::new(source),
             tile_scheme,
         };
 
@@ -130,26 +128,11 @@ impl WebWorkerVectorTileProvider {
             return;
         }
 
-        {
-            let mut tiles = self.tiles.write().unwrap();
-            match tiles.get_mut(&index) {
-                None => {
-                    tiles.insert(index, TileState::Loading(renderer.clone()));
-                }
-                Some(state @ TileState::Outdated(..)) => {
-                    let TileState::Outdated(tile) = std::mem::replace(state, TileState::Error)
-                    else {
-                        panic!("Type of value changed unexpectingly");
-                    };
-                    *state = TileState::Updating(tile, renderer.clone());
-                }
-                _ => {
-                    return;
-                }
-            }
+        if !self.set_loading_state(index, renderer) {
+            return;
         }
 
-        let url = (*self.tile_source)(index);
+        let url = (*self.tile_source)(&index);
         loop {
             let worker_index =
                 self.next_worker.fetch_add(1, Ordering::Relaxed) % self.worker_pool.len();
@@ -171,6 +154,30 @@ impl WebWorkerVectorTileProvider {
                 .unwrap();
             return;
         }
+    }
+
+    fn set_loading_state(&self, index: TileIndex, renderer: &Arc<RwLock<dyn Renderer>>) -> bool {
+        let mut tiles = self.tiles.lock().expect("tile store mutex is poisoned");
+        let has_entry = tiles.peek(&index).is_some();
+        if has_entry {
+            if let Some(mut entry) = tiles.get_mut(&index) {
+                let value = &mut *entry;
+                if !matches!(value, TileState::Outdated(..)) {
+                    return false;
+                }
+
+                let TileState::Outdated(tile) = std::mem::replace(value, TileState::Error) else {
+                    log::error!("Type of value changed unexpectedly during loading.");
+                    return false;
+                };
+
+                *value = TileState::Updating(tile, renderer.clone());
+            }
+        } else {
+            tiles.insert(index, TileState::Loading(renderer.clone()));
+        }
+
+        true
     }
 
     fn spawn_worker(&mut self) {
@@ -208,7 +215,7 @@ impl WebWorkerVectorTileProvider {
 
                 match worker_output {
                     WorkerOutput::VectorTile(result) => {
-                        let mut store = tiles_store.write().unwrap();
+                        let mut store = tiles_store.lock().expect("tiles mutex is poisoned");
                         match result {
                             Ok(decoded_vector_tile) => {
                                 store_vector_tile(decoded_vector_tile, &mut store, &messenger)
@@ -235,7 +242,7 @@ impl WebWorkerVectorTileProvider {
 
 fn store_vector_tile(
     decoded_vector_tile: DecodedVectorTile,
-    store: &mut HashMap<TileIndex, TileState>,
+    store: &mut Cache<TileIndex, TileState>,
     messenger: &Arc<RwLock<Option<Box<dyn Messenger>>>>,
 ) {
     let DecodedVectorTile {
@@ -306,6 +313,10 @@ pub fn init_vt_worker() {
         .unwrap();
 }
 
+fn vt_data_provider() -> UrlDataProvider<str, VtProcessor, EmptyCache> {
+    UrlDataProvider::new(|v: &str| v.to_string(), VtProcessor {}, EmptyCache {})
+}
+
 #[wasm_bindgen]
 pub async fn load_tile(data: JsValue) -> JsValue {
     let payload: LoadTilePayload = serde_wasm_bindgen::from_value(data).unwrap();
@@ -319,31 +330,23 @@ pub async fn load_tile(data: JsValue) -> JsValue {
 }
 
 async fn try_load_tile(payload: LoadTilePayload) -> Result<DecodedVectorTile, GalileoError> {
-    let mvt_tile_bytes = download_tile(payload.index, &payload.url).await?;
-
-    let mvt_tile = match MvtTile::decode(mvt_tile_bytes.clone(), false) {
-        Ok(v) => v,
-        Err(e) => {
-            log::info!("Failed to decode tile {:?}: {e:?}", payload.index);
-            return Err(GalileoError::IO);
-        }
+    let data_provider = vt_data_provider();
+    let context = VectorTileDecodeContext {
+        index: payload.index,
+        style: payload.style,
+        tile_scheme: payload.tile_scheme,
+        bundle: RenderBundle::Tessellating(TessellatingRenderBundle::new()),
     };
 
-    let mut bundle = RenderBundle::Tessellating(TessellatingRenderBundle::new());
-    VectorTile::prepare(
-        &mvt_tile,
-        &mut bundle,
-        payload.index,
-        &payload.style,
-        &payload.tile_scheme,
-    )?;
-
+    let bytes = data_provider.load_raw(&payload.url).await?;
+    let (bundle, _) = data_provider.decode(bytes.clone(), context)?;
     let RenderBundle::Tessellating(bundle) = bundle;
+
     let serialized = bincode::serialize(&bundle.into_bytes()).unwrap();
 
     Ok(DecodedVectorTile {
         index: payload.index,
-        mvt_tile: mvt_tile_bytes.to_vec(),
+        mvt_tile: bytes.to_vec(),
         bundle_bytes: serialized,
     })
 }

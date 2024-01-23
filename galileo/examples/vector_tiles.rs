@@ -1,10 +1,10 @@
 use galileo::bounding_box::BoundingBox;
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
-use galileo::galileo_map::{MapBuilder, VectorTileProver};
+use galileo::galileo_map::{MapBuilder, VectorTileProvider};
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
 use galileo::layer::vector_tile_layer::VectorTileLayer;
 use galileo::lod::Lod;
-use galileo::tile_scheme::{TileScheme, VerticalDirection};
+use galileo::tile_scheme::{TileIndex, TileScheme, VerticalDirection};
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::geo::crs::Crs;
 use std::sync::{Arc, RwLock};
@@ -16,17 +16,16 @@ fn get_layer_style() -> Option<VectorTileStyle> {
 }
 
 thread_local!(
-    pub static LAYER: Arc<RwLock<VectorTileLayer<VectorTileProver>>> =
-        Arc::new(RwLock::new(VectorTileLayer::<VectorTileProver>::from_url(
-            |index| {
+    pub static LAYER: Arc<RwLock<VectorTileLayer<VectorTileProvider>>> =
+        Arc::new(RwLock::new(MapBuilder::create_vector_tile_layer(
+            |&index: &TileIndex| {
                 format!(
                     "https://d1zqyi8v6vm8p9.cloudfront.net/planet/{}/{}/{}.mvt",
                     index.z, index.x, index.y
                 )
             },
-            VectorTileStyle::default(),
-            None,
             tile_scheme(),
+            VectorTileStyle::default(),
         )));
 );
 

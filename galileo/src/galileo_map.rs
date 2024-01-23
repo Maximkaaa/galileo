@@ -2,10 +2,11 @@ use crate::control::custom::{CustomEventHandler, EventHandler};
 use crate::control::event_processor::EventProcessor;
 use crate::control::map::MapController;
 use crate::layer::data_provider::file_cache::FileCacheController;
+use crate::layer::data_provider::url_data_provider::UrlDataProvider;
 use crate::layer::data_provider::url_image_provider::{UrlImageProvider, UrlSource};
 use crate::layer::raster_tile::RasterTileLayer;
-use crate::layer::tile_provider::TileSource;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
+use crate::layer::vector_tile_layer::tile_provider::vt_processor::VtProcessor;
 use crate::layer::vector_tile_layer::VectorTileLayer;
 use crate::layer::Layer;
 use crate::map::Map;
@@ -23,10 +24,13 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 
 #[cfg(not(target_arch = "wasm32"))]
-pub type VectorTileProver =
-    crate::layer::vector_tile_layer::tile_provider::rayon_provider::RayonProvider;
+pub type VectorTileProvider =
+    crate::layer::vector_tile_layer::tile_provider::rayon_provider::RayonProvider<
+        UrlDataProvider<TileIndex, VtProcessor, FileCacheController>,
+    >;
+
 #[cfg(target_arch = "wasm32")]
-pub type VectorTileProver =
+pub type VectorTileProvider =
     crate::layer::vector_tile_layer::tile_provider::web_worker_provider::WebWorkerVectorTileProvider;
 
 pub struct GalileoMap {
@@ -217,19 +221,38 @@ impl MapBuilder {
         self
     }
 
+    pub fn create_vector_tile_layer(
+        tile_source: impl UrlSource<TileIndex> + 'static,
+        tile_scheme: TileScheme,
+        style: VectorTileStyle,
+    ) -> VectorTileLayer<VectorTileProvider> {
+        #[cfg(not(target_arch = "wasm32"))]
+        let tile_provider = VectorTileProvider::new(
+            None,
+            tile_scheme.clone(),
+            UrlDataProvider::new(
+                tile_source,
+                VtProcessor {},
+                FileCacheController::new(".tile_cache"),
+            ),
+        );
+
+        #[cfg(target_arch = "wasm32")]
+        let tile_provider = VectorTileProvider::new(4, None, tile_source, tile_scheme.clone());
+        VectorTileLayer::from_url(tile_provider, style, tile_scheme)
+    }
+
     pub fn with_vector_tiles(
         mut self,
-        tile_source: impl TileSource + 'static,
+        tile_source: impl UrlSource<TileIndex> + 'static,
         tile_scheme: TileScheme,
         style: VectorTileStyle,
     ) -> Self {
-        self.layers
-            .push(Box::new(VectorTileLayer::<VectorTileProver>::from_url(
-                tile_source,
-                style,
-                None,
-                tile_scheme,
-            )));
+        self.layers.push(Box::new(Self::create_vector_tile_layer(
+            tile_source,
+            tile_scheme,
+            style,
+        )));
         self
     }
 

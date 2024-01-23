@@ -1,4 +1,3 @@
-use crate::layer::tile_provider::TileSource;
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, PackedBundle, Renderer};
@@ -55,13 +54,10 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
     }
 
     pub fn from_url(
-        tile_source: impl TileSource + 'static,
+        tile_provider: Provider,
         style: VectorTileStyle,
-        messenger: Option<Box<dyn Messenger>>,
         tile_scheme: TileScheme,
     ) -> Self {
-        let tile_provider = Provider::create(messenger, tile_source, tile_scheme.clone());
-
         Self {
             tile_provider,
             tile_scheme,

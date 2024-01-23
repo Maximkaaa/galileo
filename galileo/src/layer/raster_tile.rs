@@ -15,7 +15,7 @@ use super::Layer;
 
 pub struct RasterTileLayer<Provider>
 where
-    Provider: DataProvider<TileIndex, DecodedImage> + MaybeSync + MaybeSend,
+    Provider: DataProvider<TileIndex, DecodedImage, ()> + MaybeSync + MaybeSend,
 {
     tile_provider: Arc<Provider>,
     tile_scheme: TileScheme,
@@ -41,7 +41,7 @@ struct RenderedTile {
 
 impl<Provider> RasterTileLayer<Provider>
 where
-    Provider: DataProvider<TileIndex, DecodedImage> + MaybeSync + MaybeSend,
+    Provider: DataProvider<TileIndex, DecodedImage, ()> + MaybeSync + MaybeSend,
 {
     pub fn new(
         tile_scheme: TileScheme,
@@ -261,7 +261,7 @@ where
             Ok(_) => return,
             Err(guard) => {
                 let _ = guard.insert(Arc::new(TileState::Loading));
-                let load_result = tile_provider.load(&index).await;
+                let load_result = tile_provider.load(&index, ()).await;
 
                 match load_result {
                     Ok(decoded_image) => {
@@ -284,7 +284,7 @@ where
 #[async_trait]
 impl<Provider> Layer for RasterTileLayer<Provider>
 where
-    Provider: DataProvider<TileIndex, DecodedImage> + MaybeSync + MaybeSend + 'static,
+    Provider: DataProvider<TileIndex, DecodedImage, ()> + MaybeSync + MaybeSend + 'static,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         let tiles = self.get_tiles_to_draw(view);

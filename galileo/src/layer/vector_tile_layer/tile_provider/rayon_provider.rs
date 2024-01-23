@@ -1,44 +1,58 @@
 use crate::error::GalileoError;
-use crate::layer::tile_provider::TileSource;
+use crate::layer::data_provider::DataProvider;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
+use crate::layer::vector_tile_layer::tile_provider::vt_processor::VectorTileDecodeContext;
 use crate::layer::vector_tile_layer::tile_provider::{
     LockedTileStore, TileState, VectorTileProvider,
 };
 use crate::layer::vector_tile_layer::vector_tile::VectorTile;
 use crate::messenger::Messenger;
-use crate::platform::{PlatformService, PlatformServiceImpl};
+use crate::render::render_bundle::RenderBundle;
 use crate::render::Renderer;
 use crate::tile_scheme::{TileIndex, TileScheme};
 use bytes::Bytes;
 use galileo_mvt::MvtTile;
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use maybe_sync::{MaybeSend, MaybeSync};
+use quick_cache::unsync::Cache;
+use std::sync::{Arc, Mutex, RwLock};
 
-#[derive(Clone)]
-pub struct RayonProvider {
+pub struct RayonProvider<Provider>
+where
+    Provider: DataProvider<TileIndex, (RenderBundle, MvtTile), VectorTileDecodeContext>
+        + MaybeSend
+        + MaybeSync
+        + 'static,
+{
     messenger: Arc<RwLock<Option<Box<dyn Messenger>>>>,
-    tile_source: Arc<dyn TileSource>,
     tile_schema: TileScheme,
-    platform_service: PlatformServiceImpl,
-    tiles: Arc<RwLock<HashMap<TileIndex, TileState>>>,
+    data_provider: Arc<Provider>,
+    tiles: Arc<Mutex<Cache<TileIndex, TileState>>>,
 }
 
-impl VectorTileProvider for RayonProvider {
-    fn create(
-        messenger: Option<Box<dyn Messenger>>,
-        tile_source: impl TileSource + 'static,
-        tile_scheme: TileScheme,
-    ) -> Self {
-        let platform_service = PlatformServiceImpl::new();
+impl<Provider> Clone for RayonProvider<Provider>
+where
+    Provider: DataProvider<TileIndex, (RenderBundle, MvtTile), VectorTileDecodeContext>
+        + MaybeSend
+        + MaybeSync
+        + 'static,
+{
+    fn clone(&self) -> Self {
         Self {
-            platform_service,
-            messenger: Arc::new(RwLock::new(messenger)),
-            tile_source: Arc::new(tile_source),
-            tile_schema: tile_scheme,
-            tiles: Arc::new(RwLock::new(HashMap::new())),
+            messenger: self.messenger.clone(),
+            tile_schema: self.tile_schema.clone(),
+            data_provider: self.data_provider.clone(),
+            tiles: self.tiles.clone(),
         }
     }
+}
 
+impl<Provider> VectorTileProvider for RayonProvider<Provider>
+where
+    Provider: DataProvider<TileIndex, (RenderBundle, MvtTile), VectorTileDecodeContext>
+        + MaybeSend
+        + MaybeSync
+        + 'static,
+{
     fn supports(&self, _renderer: &RwLock<dyn Renderer>) -> bool {
         true
     }
@@ -49,33 +63,27 @@ impl VectorTileProvider for RayonProvider {
         style: &VectorTileStyle,
         renderer: &Arc<RwLock<dyn Renderer>>,
     ) {
-        let mut tiles = self.tiles.write().unwrap();
-        match tiles.get_mut(&index) {
-            None => {
-                tiles.insert(index, TileState::Loading(renderer.clone()));
-            }
-            Some(state @ TileState::Outdated(..)) => {
-                let TileState::Outdated(tile) = std::mem::replace(state, TileState::Error) else {
-                    panic!("Type of value changed unexpectingly");
-                };
-                *state = TileState::Updating(tile, renderer.clone());
-            }
-            _ => {
-                return;
-            }
+        if self.set_loading_state(index, renderer) {
+            self.load_tile_internal(index, style);
         }
-
-        self.load_tile_async(index, style);
     }
 
     fn update_style(&self) {
-        let mut tiles = self.tiles.write().unwrap();
-        for (_, tile_state) in tiles.iter_mut() {
-            if matches!(tile_state, TileState::Loaded(_)) {
+        let mut tiles = self.tiles.lock().expect("tile store mutex is poisoned");
+        let indices: Vec<_> = tiles.iter().map(|(index, _)| index.clone()).collect();
+
+        for index in indices {
+            let Some(mut entry) = tiles.get_mut(&index) else {
+                continue;
+            };
+            let tile_state = &mut *entry;
+            if matches!(*tile_state, TileState::Loaded(_)) {
                 let TileState::Loaded(tile) = std::mem::replace(tile_state, TileState::Error)
                 else {
-                    panic!("Type of value changed unexpectingly");
+                    log::error!("Type of value changed unexpectedly during updating style.");
+                    continue;
                 };
+
                 *tile_state = TileState::Outdated(tile);
             }
         }
@@ -87,7 +95,7 @@ impl VectorTileProvider for RayonProvider {
 
     fn read(&self) -> LockedTileStore {
         LockedTileStore {
-            guard: self.tiles.read().unwrap(),
+            guard: self.tiles.lock().expect("tile store mutex is poisoned"),
         }
     }
 
@@ -96,47 +104,88 @@ impl VectorTileProvider for RayonProvider {
     }
 }
 
-impl RayonProvider {
-    fn load_tile_async(&self, index: TileIndex, style: &VectorTileStyle) {
-        let provider = self.clone();
-        let style = style.clone();
-        crate::async_runtime::spawn(async move { provider.prepare_tile(index, style).await });
+impl<Provider> RayonProvider<Provider>
+where
+    Provider: DataProvider<TileIndex, (RenderBundle, MvtTile), VectorTileDecodeContext>
+        + MaybeSend
+        + MaybeSync
+        + 'static,
+{
+    pub fn new(
+        messenger: Option<Box<dyn Messenger>>,
+        tile_scheme: TileScheme,
+        data_provider: Provider,
+    ) -> Self {
+        Self {
+            messenger: Arc::new(RwLock::new(messenger)),
+            tile_schema: tile_scheme,
+            data_provider: Arc::new(data_provider),
+            tiles: Arc::new(Mutex::new(Cache::new(1000))),
+        }
     }
 
-    async fn prepare_tile(self, index: TileIndex, style: VectorTileStyle) {
-        let bytes = match self.download_tile(index).await {
-            Ok(bytes) => bytes,
-            Err(e) => {
-                log::info!("Error while loading tile {index:?}: {e:?}");
-                let mut tile_store = self.tiles.write().unwrap();
-                if !matches!(tile_store.get(&index), Some(TileState::Outdated(..))) {
-                    tile_store.insert(index, TileState::Error);
+    fn set_loading_state(&self, index: TileIndex, renderer: &Arc<RwLock<dyn Renderer>>) -> bool {
+        let mut tiles = self.tiles.lock().expect("tile store mutex is poisoned");
+        let has_entry = tiles.peek(&index).is_some();
+        if has_entry {
+            if let Some(mut entry) = tiles.get_mut(&index) {
+                let value = &mut *entry;
+                if !matches!(value, TileState::Outdated(..)) {
+                    return false;
                 }
 
-                return;
-            }
-        };
+                let TileState::Outdated(tile) = std::mem::replace(value, TileState::Error) else {
+                    log::error!("Type of value changed unexpectedly during loading.");
+                    return false;
+                };
 
-        rayon::spawn(move || match self.try_prepare_tile(bytes, index, &style) {
-            Ok(tile) => {
-                let mut tile_store = self.tiles.write().unwrap();
-                if matches!(tile_store.get(&index), Some(TileState::Outdated(..))) {
-                    log::info!("Tile {index:?} is loaded, but is not needed. Dropped.");
-                } else {
-                    tile_store.insert(index, TileState::Loaded(tile));
-                    if let Some(messenger) = &(*self.messenger.read().unwrap()) {
+                *value = TileState::Updating(tile, renderer.clone());
+            }
+        } else {
+            tiles.insert(index, TileState::Loading(renderer.clone()));
+        }
+
+        true
+    }
+
+    fn load_tile_internal(&self, index: TileIndex, style: &VectorTileStyle) {
+        let provider: RayonProvider<Provider> = (*self).clone();
+        let style = style.clone();
+        crate::async_runtime::spawn(async move {
+            match provider.clone().load_tile_async(index, style).await {
+                Ok(tile) => {
+                    let mut tiles = provider.tiles.lock().expect("tile store mutex is poisoned");
+                    tiles.insert(index, TileState::Loaded(tile));
+                    if let Some(messenger) = &*provider
+                        .messenger
+                        .read()
+                        .expect("messenger mutex is poisoned")
+                    {
                         messenger.request_redraw();
                     }
                 }
-            }
-            Err(e) => {
-                log::info!("Error while loading tile {index:?}: {e:?}");
-                let mut tile_store = self.tiles.write().unwrap();
-                if !matches!(tile_store.get(&index), Some(TileState::Outdated(..))) {
-                    tile_store.insert(index, TileState::Error);
+                Err(err) => {
+                    log::info!("Failed to load tile: {err:?}");
+                    let mut tiles = provider.tiles.lock().expect("tile store mutex is poisoned");
+                    tiles.insert(index, TileState::Error);
                 }
             }
         });
+    }
+
+    async fn load_tile_async(
+        self,
+        index: TileIndex,
+        style: VectorTileStyle,
+    ) -> Result<VectorTile, GalileoError> {
+        let bytes = self.download_tile(index).await?;
+        tokio::task::spawn_blocking(move || self.try_prepare_tile(bytes, index, &style))
+            .await
+            .unwrap_or_else(|err| {
+                Err(GalileoError::Generic(format!(
+                    "Failed to load tile: {err:?}"
+                )))
+            })
     }
 
     fn try_prepare_tile(
@@ -145,22 +194,40 @@ impl RayonProvider {
         index: TileIndex,
         style: &VectorTileStyle,
     ) -> Result<VectorTile, GalileoError> {
-        let mvt_tile = MvtTile::decode(bytes, false)?;
-
-        match self.tiles.read().unwrap().get(&index) {
-            Some(TileState::Loading(renderer) | TileState::Updating(_, renderer)) => {
-                let renderer = renderer.read().unwrap();
-                let tile =
-                    VectorTile::create(mvt_tile, &*renderer, index, style, &self.tile_schema)?;
-
-                Ok(tile)
+        let renderer = {
+            let mut tiles = self.tiles.lock().expect("tile store mutex is poisoned");
+            match tiles.get(&index) {
+                Some(TileState::Loading(renderer)) | Some(TileState::Updating(_, renderer)) => {
+                    renderer.clone()
+                }
+                _ => {
+                    tiles.remove(&index);
+                    return Err(GalileoError::Generic("tile was in invalid state".into()));
+                }
             }
-            _ => Err(GalileoError::IO),
-        }
+
+            // drop mutex before doing expensive computations
+        };
+
+        let renderer = renderer.read().expect("renderer lock is poisoned");
+
+        let bundle = renderer.create_bundle(&None);
+        let context = VectorTileDecodeContext {
+            index,
+            style: style.clone(),
+            tile_scheme: self.tile_schema.clone(),
+            bundle,
+        };
+        let (bundle, mvt_tile) = self.data_provider.decode(bytes, context)?;
+        let packed_bundle = renderer.pack_bundle(bundle);
+
+        Ok(VectorTile {
+            bundle: packed_bundle,
+            mvt_tile,
+        })
     }
 
     async fn download_tile(&self, index: TileIndex) -> Result<Bytes, GalileoError> {
-        let url = (self.tile_source)(index);
-        self.platform_service.load_bytes_from_url(&url).await
+        self.data_provider.load_raw(&index).await
     }
 }

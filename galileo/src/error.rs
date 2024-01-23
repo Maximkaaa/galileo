@@ -15,6 +15,8 @@ pub enum GalileoError {
     NotFound,
     #[error("image decode error: {0:?}")]
     ImageDecode(#[from] ImageError),
+    #[error("{0}")]
+    Generic(String),
 }
 
 #[cfg(not(target_arch = "wasm32"))]
