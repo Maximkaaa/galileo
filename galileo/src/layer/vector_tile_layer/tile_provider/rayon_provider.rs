@@ -70,7 +70,7 @@ where
 
     fn update_style(&self) {
         let mut tiles = self.tiles.lock().expect("tile store mutex is poisoned");
-        let indices: Vec<_> = tiles.iter().map(|(index, _)| index.clone()).collect();
+        let indices: Vec<_> = tiles.iter().map(|(index, _)| index).collect();
 
         for index in indices {
             let Some(mut entry) = tiles.get_mut(&index) else {

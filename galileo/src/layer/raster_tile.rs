@@ -258,7 +258,7 @@ where
         messenger: Option<Arc<dyn Messenger>>,
     ) {
         match tiles.get_value_or_guard_async(&index).await {
-            Ok(_) => return,
+            Ok(_) => {}
             Err(guard) => {
                 let _ = guard.insert(Arc::new(TileState::Loading));
                 let load_result = tile_provider.load(&index, ()).await;
@@ -318,7 +318,7 @@ where
                 let tiles = self.tiles.clone();
                 let messenger = self.messenger.clone();
                 crate::async_runtime::spawn(async move {
-                    Self::load_tile(index, tile_provider, &*tiles, messenger).await;
+                    Self::load_tile(index, tile_provider, &tiles, messenger).await;
                 });
             }
         }
