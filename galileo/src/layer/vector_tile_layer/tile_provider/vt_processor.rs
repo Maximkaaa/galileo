@@ -1,8 +1,11 @@
 use crate::error::GalileoError;
+use crate::layer::data_provider::DataProcessor;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::render::render_bundle::RenderBundle;
-use crate::render::{LineCap, LinePaint, PackedBundle, Paint};
-use crate::tile_scheme::{TileIndex, TileScheme};
+use crate::render::{LineCap, LinePaint, Paint};
+use crate::tile_scheme::TileIndex;
+use crate::TileScheme;
+use bytes::Bytes;
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
 use galileo_types::cartesian::impls::contour::{ClosedContour, Contour};
 use galileo_types::cartesian::impls::point::Point3d;
@@ -11,13 +14,40 @@ use galileo_types::cartesian::rect::Rect;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
 use num_traits::ToPrimitive;
 
-pub struct VectorTile {
-    pub mvt_tile: MvtTile,
-    pub bundle: Box<dyn PackedBundle>,
+pub struct VtProcessor {}
+
+pub struct VectorTileDecodeContext {
+    pub index: TileIndex,
+    pub style: VectorTileStyle,
+    pub tile_scheme: TileScheme,
+    pub bundle: RenderBundle,
 }
 
-impl VectorTile {
-    pub fn prepare(
+impl DataProcessor for VtProcessor {
+    type Input = Bytes;
+    type Output = (RenderBundle, MvtTile);
+    type Context = VectorTileDecodeContext;
+
+    fn process(
+        &self,
+        input: Self::Input,
+        context: Self::Context,
+    ) -> Result<Self::Output, GalileoError> {
+        let mvt_tile = MvtTile::decode(input, false)?;
+        let VectorTileDecodeContext {
+            mut bundle,
+            index,
+            style,
+            tile_scheme,
+        } = context;
+        Self::prepare(&mvt_tile, &mut bundle, index, &style, &tile_scheme)?;
+
+        Ok((bundle, mvt_tile))
+    }
+}
+
+impl VtProcessor {
+    fn prepare(
         mvt_tile: &MvtTile,
         bundle: &mut RenderBundle,
         index: TileIndex,

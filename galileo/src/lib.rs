@@ -71,7 +71,6 @@
 
 pub mod async_runtime;
 pub mod bounding_box;
-pub mod cache;
 pub mod control;
 pub mod error;
 pub mod galileo_map;

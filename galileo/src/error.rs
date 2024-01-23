@@ -1,4 +1,6 @@
 use galileo_mvt::error::GalileoMvtError;
+use image::ImageError;
+use std::io::Error;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -9,11 +11,23 @@ pub enum GalileoError {
     Decoding(#[from] GalileoMvtError),
     #[error("wasm error: {0:?}")]
     Wasm(Option<String>),
+    #[error("item not found")]
+    NotFound,
+    #[error("image decode error: {0:?}")]
+    ImageDecode(#[from] ImageError),
+    #[error("{0}")]
+    Generic(String),
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 impl From<reqwest::Error> for GalileoError {
     fn from(_value: reqwest::Error) -> Self {
+        Self::IO
+    }
+}
+
+impl From<std::io::Error> for GalileoError {
+    fn from(_value: Error) -> Self {
         Self::IO
     }
 }

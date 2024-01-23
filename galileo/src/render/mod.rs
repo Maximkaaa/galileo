@@ -40,6 +40,27 @@ pub trait UnpackedBundle {
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
 
+pub struct EmptyBundle {}
+impl PackedBundle for EmptyBundle {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn unpack(self: Box<Self>) -> Box<dyn UnpackedBundle> {
+        self
+    }
+}
+
+impl UnpackedBundle for EmptyBundle {
+    fn modify_line(&mut self, _id: PrimitiveId, _paint: LinePaint) {}
+    fn modify_polygon(&mut self, _id: PrimitiveId, _paint: Paint) {}
+    fn modify_image(&mut self, _id: PrimitiveId, _paint: ImagePaint) {}
+    fn modify_point(&mut self, _id: PrimitiveId, _paint: PointPaint) {}
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Paint {
     pub color: Color,

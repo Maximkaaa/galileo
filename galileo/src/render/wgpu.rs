@@ -375,7 +375,7 @@ impl WgpuRenderer {
             sample_count: 4,
             dimension: TextureDimension::D2,
             format: TextureFormat::Depth24PlusStencil8,
-            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+            usage: TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[],
         });
 
