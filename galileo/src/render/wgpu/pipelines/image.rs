@@ -1,21 +1,14 @@
-use crate::primitives::{DecodedImage, Image};
+use crate::primitives::DecodedImage;
 use crate::render::render_bundle::tessellating::ImageVertex;
-use crate::render::wgpu::WgpuRenderer;
-use std::any::Any;
+use crate::render::wgpu::pipelines;
+use crate::render::wgpu::pipelines::default_targets;
 use wgpu::util::DeviceExt;
 use wgpu::{
-    BindGroupLayout, CompareFunction, DepthStencilState, Device, Queue, StencilFaceState,
-    StencilOperation, StencilState, TextureFormat,
+    BindGroupLayout, Device, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
+    TextureFormat,
 };
 
 const INDICES: &[u16] = &[1, 0, 2, 1, 2, 3];
-
-pub struct ImagePainter {
-    pipeline: wgpu::RenderPipeline,
-
-    index_buffer: wgpu::Buffer,
-    pub texture_bind_group_layout: wgpu::BindGroupLayout,
-}
 
 pub struct WgpuImage {
     pub texture_bind_group: wgpu::BindGroup,
@@ -23,19 +16,19 @@ pub struct WgpuImage {
     pub vertices: [ImageVertex; 4],
 }
 
-impl Image for WgpuImage {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
+pub struct ImagePipeline {
+    wgpu_pipeline: RenderPipeline,
+    index_buffer: wgpu::Buffer,
+    texture_bind_group_layout: BindGroupLayout,
 }
 
-impl ImagePainter {
-    pub fn new(
-        device: &wgpu::Device,
-        format: wgpu::TextureFormat,
-        map_view_bind_group_layout: &BindGroupLayout,
+impl ImagePipeline {
+    pub fn create(
+        device: &Device,
+        format: TextureFormat,
+        map_view_layout: &BindGroupLayout,
     ) -> Self {
-        let shader = device.create_shader_module(wgpu::include_wgsl!("../wgpu_shaders/image.wgsl"));
+        let shader = device.create_shader_module(wgpu::include_wgsl!("./shaders/image.wgsl"));
 
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -59,65 +52,20 @@ impl ImagePainter {
                 ],
                 label: Some("texture_bind_group_label"),
             });
+        let buffers = [ImageVertex::wgpu_desc()];
 
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Image Render Pipeline Layout"),
-                bind_group_layouts: &[&texture_bind_group_layout, map_view_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-        let poly_stencil_state = StencilFaceState {
-            compare: CompareFunction::Equal,
-            fail_op: StencilOperation::Keep,
-            depth_fail_op: StencilOperation::Keep,
-            pass_op: StencilOperation::Keep,
-        };
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Image Render Pipeline"),
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[ImageVertex::wgpu_desc()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: Some(DepthStencilState {
-                format: TextureFormat::Depth24PlusStencil8,
-                depth_write_enabled: false,
-                depth_compare: CompareFunction::Always,
-                stencil: StencilState {
-                    front: poly_stencil_state,
-                    back: poly_stencil_state,
-                    read_mask: 0xff,
-                    write_mask: 0xff,
-                },
-                bias: Default::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: 4,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
+        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[&map_view_layout, &texture_bind_group_layout],
+            push_constant_ranges: &[],
         });
+
+        let targets = default_targets(format);
+        let desc = RenderPipelineDescriptor {
+            ..pipelines::default_pipeline_descriptor(&layout, &shader, &targets, &buffers)
+        };
+
+        let wgpu_pipeline = device.create_render_pipeline(&desc);
 
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Image index buffer"),
@@ -126,9 +74,9 @@ impl ImagePainter {
         });
 
         Self {
-            pipeline,
-            index_buffer,
+            wgpu_pipeline,
             texture_bind_group_layout,
+            index_buffer,
         }
     }
 
@@ -200,19 +148,10 @@ impl ImagePainter {
         }
     }
 
-    pub fn draw_image<'painter, 'pass, 'image>(
-        &'painter self,
-        render_pass: &mut wgpu::RenderPass<'pass>,
-        image: &'image WgpuImage,
-        renderer: &'pass WgpuRenderer,
-    ) where
-        'painter: 'pass,
-        'image: 'pass,
-    {
-        render_pass.set_pipeline(&self.pipeline);
-        render_pass.set_bind_group(0, &image.texture_bind_group, &[]);
-        render_pass.set_bind_group(1, &renderer.map_view_bind_group, &[]);
-        render_pass.set_vertex_buffer(0, image.vertex_buffer.slice(..));
+    pub fn render<'a>(&'a self, buffers: &'a WgpuImage, render_pass: &mut RenderPass<'a>) {
+        render_pass.set_pipeline(&self.wgpu_pipeline);
+        render_pass.set_bind_group(1, &buffers.texture_bind_group, &[]);
+        render_pass.set_vertex_buffer(0, buffers.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         render_pass.draw_indexed(0..INDICES.len() as u32, 0, 0..1);
     }

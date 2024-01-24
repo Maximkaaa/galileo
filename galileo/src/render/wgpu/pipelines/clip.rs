@@ -1,0 +1,78 @@
+use crate::render::render_bundle::tessellating::PolyVertex;
+use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
+use crate::render::wgpu::WgpuPolygonBuffers;
+use wgpu::{
+    BindGroupLayout, CompareFunction, DepthStencilState, Device, RenderPass, RenderPipeline,
+    RenderPipelineDescriptor, StencilFaceState, StencilOperation, StencilState, TextureFormat,
+};
+
+pub struct ClipPipeline {
+    wgpu_pipeline: RenderPipeline,
+}
+
+impl ClipPipeline {
+    const UNCLIP_REFERENCE: u32 = 0;
+    const CLIP_STENCIL_VALUE: u32 = 1;
+
+    pub fn create(
+        device: &Device,
+        format: TextureFormat,
+        map_view_layout: &BindGroupLayout,
+    ) -> Self {
+        let buffers = [PolyVertex::wgpu_desc()];
+        let shader = device.create_shader_module(wgpu::include_wgsl!("./shaders/map_ref.wgsl"));
+
+        let clip_stencil_state = StencilFaceState {
+            compare: CompareFunction::Never,
+            fail_op: StencilOperation::Replace,
+            depth_fail_op: StencilOperation::Keep,
+            pass_op: StencilOperation::Keep,
+        };
+        let targets = default_targets(format);
+        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[&map_view_layout],
+            push_constant_ranges: &[],
+        });
+
+        let desc = RenderPipelineDescriptor {
+            depth_stencil: Some(DepthStencilState {
+                format: TextureFormat::Depth24PlusStencil8,
+                depth_write_enabled: false,
+                depth_compare: CompareFunction::Always,
+                stencil: StencilState {
+                    front: clip_stencil_state,
+                    back: clip_stencil_state,
+                    read_mask: 0xff,
+                    write_mask: 0xff,
+                },
+                bias: Default::default(),
+            }),
+            ..default_pipeline_descriptor(&layout, &shader, &targets, &buffers)
+        };
+
+        let wgpu_pipeline = device.create_render_pipeline(&desc);
+        Self { wgpu_pipeline }
+    }
+
+    pub fn clip<'a>(&'a self, buffers: &'a WgpuPolygonBuffers, render_pass: &mut RenderPass<'a>) {
+        self.render(buffers, render_pass, Self::CLIP_STENCIL_VALUE);
+    }
+
+    pub fn unclip<'a>(&'a self, buffers: &'a WgpuPolygonBuffers, render_pass: &mut RenderPass<'a>) {
+        self.render(buffers, render_pass, Self::UNCLIP_REFERENCE);
+    }
+
+    fn render<'a>(
+        &'a self,
+        buffers: &'a WgpuPolygonBuffers,
+        render_pass: &mut RenderPass<'a>,
+        stencil_reference: u32,
+    ) {
+        render_pass.set_stencil_reference(stencil_reference);
+        render_pass.set_pipeline(&self.wgpu_pipeline);
+        render_pass.set_vertex_buffer(0, buffers.vertex.slice(..));
+        render_pass.set_index_buffer(buffers.index.slice(..), wgpu::IndexFormat::Uint32);
+        render_pass.draw_indexed(0..buffers.index_count, 0, 0..1);
+    }
+}
