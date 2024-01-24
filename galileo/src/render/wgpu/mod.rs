@@ -6,10 +6,8 @@ use std::mem::size_of;
 use std::ops::Range;
 use wgpu::util::DeviceExt;
 use wgpu::{
-    BindGroup, BindGroupLayout, Buffer, CompareFunction, DepthStencilState, Device, Extent3d,
-    Queue, RenderPass, RenderPassDepthStencilAttachment, StencilFaceState, StencilOperation,
-    StencilState, StoreOp, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
-    TextureView, TextureViewDescriptor,
+    Buffer, Device, Extent3d, Queue, RenderPassDepthStencilAttachment, StoreOp, TextureDescriptor,
+    TextureDimension, TextureFormat, TextureUsages, TextureView, TextureViewDescriptor,
 };
 use winit::dpi::PhysicalSize;
 
@@ -21,15 +19,16 @@ use crate::render::render_bundle::tessellating::{
     TessellatingRenderBundle,
 };
 use crate::render::render_bundle::RenderBundle;
-use crate::render::wgpu::image::WgpuImage;
+use crate::render::wgpu::pipelines::image::WgpuImage;
+use crate::render::wgpu::pipelines::Pipelines;
 use crate::view::MapView;
-
-use self::image::ImagePainter;
 
 use super::{
     Canvas, ImagePaint, LinePaint, PackedBundle, Paint, PointPaint, PrimitiveId, Renderer,
     UnpackedBundle,
 };
+
+mod pipelines;
 
 pub struct WgpuRenderer {
     surface: wgpu::Surface,
@@ -37,18 +36,10 @@ pub struct WgpuRenderer {
     queue: Queue,
     config: wgpu::SurfaceConfiguration,
     size: PhysicalSize<u32>,
-
-    line_pipeline: wgpu::RenderPipeline,
-    image_painter: ImagePainter,
-    map_view_buffer: Buffer,
-    map_view_bind_group: BindGroup,
-    pub map_view_bind_group_layout: BindGroupLayout,
-    pub multisampling_view: TextureView,
-    pub point_pipeline: wgpu::RenderPipeline,
-
+    pipelines: Pipelines,
+    multisampling_view: TextureView,
     background: Color,
-    pub stencil_view: TextureView,
-    pub clip_pipeline: wgpu::RenderPipeline,
+    stencil_view: TextureView,
 }
 
 impl Renderer for WgpuRenderer {
@@ -135,187 +126,10 @@ impl WgpuRenderer {
         };
 
         surface.configure(&device, &config);
-
-        let map_view_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Map view buffer"),
-            size: size_of::<ViewUniform>() as wgpu::BufferAddress,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
-        let map_view_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-                label: Some("map_view_bind_group_layout"),
-            });
-
-        let line_shader =
-            device.create_shader_module(wgpu::include_wgsl!("./wgpu_shaders/line.wgsl"));
-
-        let line_render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Line Render Pipeline Layout"),
-                bind_group_layouts: &[&map_view_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-        let poly_stencil_state = StencilFaceState {
-            compare: CompareFunction::Equal,
-            fail_op: StencilOperation::Keep,
-            depth_fail_op: StencilOperation::Keep,
-            pass_op: StencilOperation::Keep,
-        };
-
-        let targets = [Some(wgpu::ColorTargetState {
-            format: config.format,
-            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-            write_mask: wgpu::ColorWrites::ALL,
-        })];
-
-        let poly_pipeline_desc = wgpu::RenderPipelineDescriptor {
-            label: Some("Line Render Pipeline"),
-            layout: Some(&line_render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &line_shader,
-                entry_point: "vs_main",
-                buffers: &[PolyVertex::wgpu_desc()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &line_shader,
-                entry_point: "fs_main",
-                targets: &targets,
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: Some(DepthStencilState {
-                format: TextureFormat::Depth24PlusStencil8,
-                depth_write_enabled: false,
-                depth_compare: CompareFunction::Always,
-                stencil: StencilState {
-                    front: poly_stencil_state,
-                    back: poly_stencil_state,
-                    read_mask: 0xff,
-                    write_mask: 0xff,
-                },
-                bias: Default::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: 4,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-        };
-
-        let line_pipeline = device.create_render_pipeline(&poly_pipeline_desc);
-
-        let clip_stencil_state = StencilFaceState {
-            compare: CompareFunction::Never,
-            fail_op: StencilOperation::Replace,
-            depth_fail_op: StencilOperation::Keep,
-            pass_op: StencilOperation::Keep,
-        };
-        let clip_pipeline_desc = wgpu::RenderPipelineDescriptor {
-            depth_stencil: Some(DepthStencilState {
-                format: TextureFormat::Depth24PlusStencil8,
-                depth_write_enabled: false,
-                depth_compare: CompareFunction::Always,
-                stencil: StencilState {
-                    front: clip_stencil_state,
-                    back: clip_stencil_state,
-                    read_mask: 0xff,
-                    write_mask: 0xff,
-                },
-                bias: Default::default(),
-            }),
-            ..poly_pipeline_desc
-        };
-        let clip_pipeline = device.create_render_pipeline(&clip_pipeline_desc);
-
-        let point_shader =
-            device.create_shader_module(wgpu::include_wgsl!("./wgpu_shaders/point.wgsl"));
-
-        let point_render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Point Render Pipeline Layout"),
-                bind_group_layouts: &[&map_view_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-        let point_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Point Render Pipeline"),
-            layout: Some(&point_render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &point_shader,
-                entry_point: "vs_main",
-                buffers: &[PointVertex::wgpu_desc(), PointInstance::wgpu_desc()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &point_shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: Some(DepthStencilState {
-                format: TextureFormat::Depth24PlusStencil8,
-                depth_write_enabled: false,
-                depth_compare: CompareFunction::Always,
-                stencil: StencilState {
-                    front: poly_stencil_state,
-                    back: poly_stencil_state,
-                    read_mask: 0xff,
-                    write_mask: 0xff,
-                },
-                bias: Default::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: 4,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-        });
-
-        let map_view_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &map_view_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: map_view_buffer.as_entire_binding(),
-            }],
-            label: Some("view_bind_group"),
-        });
-
-        let image_painter = ImagePainter::new(&device, config.format, &map_view_bind_group_layout);
         let multisampling_view = Self::create_multisample_texture(&device, size, config.format);
         let stencil_view = Self::create_stencil_texture(&device, size);
+
+        let pipelines = Pipelines::create(&device, surface_format);
 
         Self {
             surface,
@@ -323,13 +137,7 @@ impl WgpuRenderer {
             queue,
             config,
             size,
-            line_pipeline,
-            clip_pipeline,
-            point_pipeline,
-            map_view_buffer,
-            map_view_bind_group,
-            map_view_bind_group_layout,
-            image_painter,
+            pipelines,
             multisampling_view,
             stencil_view,
             background: Color::rgba(255, 255, 255, 255),
@@ -475,7 +283,7 @@ impl<'a> WgpuCanvas<'a> {
         ))
         .to_homogeneous();
         renderer.queue.write_buffer(
-            &renderer.map_view_buffer,
+            renderer.pipelines.map_view_buffer(),
             0,
             bytemuck::cast_slice(&[ViewUniform {
                 view_proj: map_view.map_to_scene_mtx().unwrap(),
@@ -551,59 +359,10 @@ impl<'a> Canvas for WgpuCanvas<'a> {
             });
 
             for bundle in bundles {
-                if let Some(cast) = bundle.as_any().downcast_ref::<WgpuPackedBundle>() {
-                    if let Some(clip_area_buffers) = &cast.clip_area_buffers {
-                        render_pass.set_stencil_reference(1);
-                        render_pass.set_pipeline(&self.renderer.clip_pipeline);
-                        render_pass.set_bind_group(0, &self.renderer.map_view_bind_group, &[]);
-                        render_pass.set_vertex_buffer(0, clip_area_buffers.vertex.slice(..));
-                        render_pass.set_index_buffer(
-                            clip_area_buffers.index.slice(..),
-                            wgpu::IndexFormat::Uint32,
-                        );
-                        render_pass.draw_indexed(0..clip_area_buffers.index_count, 0, 0..1);
-                    }
-
-                    for image in &cast.image_buffers {
-                        self.draw_image(&mut render_pass, image);
-                    }
-
-                    let buffers = cast.select_poly_buffers(resolution);
-
-                    render_pass.set_pipeline(&self.renderer.line_pipeline);
-                    render_pass.set_bind_group(0, &self.renderer.map_view_bind_group, &[]);
-                    render_pass.set_vertex_buffer(0, buffers.vertex.slice(..));
-                    render_pass
-                        .set_index_buffer(buffers.index.slice(..), wgpu::IndexFormat::Uint32);
-                    render_pass.draw_indexed(0..buffers.index_count, 0, 0..1);
-
-                    if let Some(point_buffers) = &cast.point_buffers {
-                        render_pass.set_pipeline(&self.renderer.point_pipeline);
-                        render_pass.set_bind_group(0, &self.renderer.map_view_bind_group, &[]);
-                        render_pass.set_vertex_buffer(0, point_buffers.vertex.slice(..));
-                        render_pass.set_vertex_buffer(1, point_buffers.instance.slice(..));
-                        render_pass.set_index_buffer(
-                            point_buffers.index.slice(..),
-                            wgpu::IndexFormat::Uint32,
-                        );
-                        render_pass.draw_indexed(
-                            0..point_buffers.index_count,
-                            0,
-                            0..point_buffers.instance_count,
-                        );
-                    }
-
-                    if let Some(clip_area_buffers) = &cast.clip_area_buffers {
-                        render_pass.set_stencil_reference(0);
-                        render_pass.set_pipeline(&self.renderer.clip_pipeline);
-                        render_pass.set_bind_group(0, &self.renderer.map_view_bind_group, &[]);
-                        render_pass.set_vertex_buffer(0, clip_area_buffers.vertex.slice(..));
-                        render_pass.set_index_buffer(
-                            clip_area_buffers.index.slice(..),
-                            wgpu::IndexFormat::Uint32,
-                        );
-                        render_pass.draw_indexed(0..clip_area_buffers.index_count, 0, 0..1);
-                    }
+                if let Some(cast) = bundle.as_any().downcast_ref() {
+                    self.renderer
+                        .pipelines
+                        .render(&mut render_pass, cast, resolution);
                 }
             }
         }
@@ -611,14 +370,6 @@ impl<'a> Canvas for WgpuCanvas<'a> {
         self.renderer
             .queue
             .submit(std::iter::once(encoder.finish()));
-    }
-}
-
-impl<'a> WgpuCanvas<'a> {
-    fn draw_image(&self, render_pass: &mut RenderPass<'a>, image: &'a WgpuImage) {
-        self.renderer
-            .image_painter
-            .draw_image(render_pass, image, self.renderer)
     }
 }
 
@@ -707,7 +458,7 @@ impl WgpuPackedBundle {
 
         let mut image_buffers = vec![];
         for (image, vertices) in images {
-            let image = renderer.image_painter.create_image(
+            let image = renderer.pipelines.image_pipeline().create_image(
                 &renderer.device,
                 &renderer.queue,
                 &image,
@@ -975,8 +726,6 @@ impl PointVertex {
         }
     }
 }
-
-mod image;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
