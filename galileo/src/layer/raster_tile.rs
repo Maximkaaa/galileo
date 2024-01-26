@@ -1,7 +1,9 @@
 use crate::layer::data_provider::DataProvider;
 use crate::messenger::Messenger;
 use crate::primitives::DecodedImage;
-use crate::render::{Canvas, EmptyBundle, ImagePaint, PackedBundle, PrimitiveId, Renderer};
+use crate::render::{
+    Canvas, EmptyBundle, ImagePaint, PackedBundle, PrimitiveId, RenderOptions, Renderer,
+};
 use crate::tile_scheme::{TileIndex, TileScheme};
 use crate::view::MapView;
 use async_trait::async_trait;
@@ -307,6 +309,7 @@ where
                 .map(|guard| &*guard.bundle)
                 .collect::<Vec<_>>(),
             view.resolution() as f32,
+            RenderOptions::default(),
         );
         *self.prev_drawn_tiles.lock() = tiles.iter().map(|(index, _)| *index).collect();
     }

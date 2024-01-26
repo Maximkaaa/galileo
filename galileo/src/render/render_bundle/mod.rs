@@ -1,5 +1,6 @@
 use crate::primitives::DecodedImage;
-use crate::render::{ImagePaint, LinePaint, Paint, PointPaint, PrimitiveId};
+use crate::render::point_paint::PointPaint;
+use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::contour::Contour;
@@ -59,7 +60,7 @@ impl RenderBundle {
         }
     }
 
-    pub fn add_polygon<N, P, Poly>(&mut self, polygon: &Poly, paint: Paint) -> PrimitiveId
+    pub fn add_polygon<N, P, Poly>(&mut self, polygon: &Poly, paint: PolygonPaint) -> PrimitiveId
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,

@@ -2,7 +2,7 @@ use crate::error::GalileoError;
 use crate::layer::data_provider::DataProcessor;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::render::render_bundle::RenderBundle;
-use crate::render::{LineCap, LinePaint, Paint};
+use crate::render::{LineCap, LinePaint, PolygonPaint};
 use crate::tile_scheme::TileIndex;
 use crate::TileScheme;
 use bytes::Bytes;
@@ -71,7 +71,7 @@ impl VtProcessor {
 
         bundle.add_polygon(
             &bounds,
-            Paint {
+            PolygonPaint {
                 color: style.background,
             },
         );
@@ -150,14 +150,14 @@ impl VtProcessor {
         style: &VectorTileStyle,
         layer_name: &str,
         feature: &MvtFeature,
-    ) -> Option<Paint> {
+    ) -> Option<PolygonPaint> {
         let Some(rule) = style.get_style_rule(layer_name, feature) else {
-            return Some(Paint {
+            return Some(PolygonPaint {
                 color: style.default_symbol.polygon.as_ref()?.fill_color,
             });
         };
 
-        Some(Paint {
+        Some(PolygonPaint {
             color: rule.symbol.polygon.as_ref()?.fill_color,
         })
     }

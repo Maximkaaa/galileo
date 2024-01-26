@@ -4,9 +4,10 @@ use galileo::galileo_map::MapBuilder;
 use galileo::layer::feature_layer::symbol::polygon::SimplePolygonSymbol;
 use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::FeatureLayer;
-use galileo::primitives::Color;
+use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderBundle;
-use galileo::render::{PointPaint, PrimitiveId, UnpackedBundle};
+use galileo::render::{PrimitiveId, UnpackedBundle};
+use galileo::Color;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geo::crs::Crs;
 use galileo_types::geometry::Geom;
@@ -184,31 +185,53 @@ impl Symbol<City> for CitySymbol {
         geometry: &Geom<P>,
         bundle: &mut RenderBundle,
     ) -> Vec<PrimitiveId> {
-        let size = (feature.population / 1000.0).log2() / 2.0;
-        let color = match &feature.capital[..] {
-            "primary" => Color::try_from_hex("#a323d1"),
-            "admin" => Color::try_from_hex("#f5009b"),
-            "minor" => Color::try_from_hex("#00e8db"),
-            _ => Color::try_from_hex("#4e00de"),
-        }
-        .unwrap();
-
-        let mut ids = vec![];
+        let size = (feature.population / 1000.0).log2() as f32;
+        let ids = vec![];
         let Geom::Point(point) = geometry else {
             return ids;
         };
 
-        if &feature.capital == "primary" {
-            ids.push(bundle.add_point(
+        let _ = match &feature.capital[..] {
+            "primary" => {
+                bundle.add_point(point, PointPaint::circle(Color::BLACK, size * 2.0 + 4.0));
+                bundle.add_point(
+                    point,
+                    PointPaint::sector(
+                        Color::from_hex("#ff8000"),
+                        size * 2.0,
+                        -5f32.to_radians(),
+                        135f32.to_radians(),
+                    ),
+                );
+                bundle.add_point(
+                    point,
+                    PointPaint::sector(
+                        Color::from_hex("#ffff00"),
+                        size * 2.0,
+                        130f32.to_radians(),
+                        270f32.to_radians(),
+                    ),
+                );
+                bundle.add_point(
+                    point,
+                    PointPaint::sector(
+                        Color::from_hex("#00ffff"),
+                        size * 2.0,
+                        265f32.to_radians(),
+                        360f32.to_radians(),
+                    ),
+                )
+            }
+            "admin" => {
+                bundle.add_point(point, PointPaint::circle(Color::from_hex("#f5009b"), size))
+            }
+            "minor" => bundle.add_point(
                 point,
-                PointPaint {
-                    color: Color::rgba(255, 255, 255, 255),
-                    size: size + 4.0,
-                },
-            ));
-        }
-
-        ids.push(bundle.add_point(point, PointPaint { color, size }));
+                PointPaint::square(Color::from_hex("#0a85ed"), size)
+                    .with_outline(Color::from_hex("#0d4101"), 2.0),
+            ),
+            _ => bundle.add_point(point, PointPaint::circle(Color::from_hex("#4e00de"), size)),
+        };
 
         ids
     }

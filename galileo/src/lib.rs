@@ -9,11 +9,12 @@
 //! You can create a simple interactive map with two layers by this code:
 //!
 //! ```no_run
-//! use galileo::{MapBuilder, TileScheme, Color};
+//! use galileo::{MapBuilder, TileScheme };
 //! use galileo::layer::FeatureLayer;
 //! use galileo::symbol::CirclePointSymbol;
 //! use galileo::galileo_types::latlon;
 //! use galileo_types::geo::crs::Crs;
+//! use galileo::Color;
 //!
 //! # tokio_test::block_on(async {
 //! MapBuilder::new()
@@ -71,6 +72,7 @@
 
 pub mod async_runtime;
 pub mod bounding_box;
+pub mod color;
 pub mod control;
 pub mod error;
 pub mod galileo_map;
@@ -85,9 +87,9 @@ pub mod tile_scheme;
 pub mod view;
 pub mod winit;
 
+pub use color::Color;
 pub use galileo_map::MapBuilder;
 pub use layer::feature_layer::symbol;
-pub use primitives::Color;
 pub use tile_scheme::TileScheme;
 
 // Reexport galileo_types

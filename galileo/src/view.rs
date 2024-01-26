@@ -142,7 +142,7 @@ impl MapView {
         Perspective3::new(
             self.size.width() / self.size.height(),
             std::f64::consts::PI / 2.0,
-            1.0 / self.size.height(),
+            10.0,
             self.size.height(),
         )
         .to_homogeneous()
@@ -414,7 +414,7 @@ mod tests {
 
         assert_abs_diff_eq!(
             projected.unscale(projected.w),
-            Point3::new(-1.0, 1.0, 0.5).to_homogeneous(),
+            Point3::new(-1.0, 1.0, 0.388).to_homogeneous(),
             epsilon = 0.01
         );
 
@@ -422,11 +422,9 @@ mod tests {
         let transform = view.map_to_scene_transform().unwrap();
         let projected = transform * point;
 
-        println!("{projected}");
-
         assert_abs_diff_eq!(
             projected.unscale(projected.w),
-            Point3::new(0.0, 0.0, 0.5).to_homogeneous(),
+            Point3::new(0.0, 0.0, 0.3888).to_homogeneous(),
             epsilon = 0.01
         );
     }

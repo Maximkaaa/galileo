@@ -1,4 +1,4 @@
-use crate::primitives::Color;
+use crate::Color;
 use galileo_mvt::MvtFeature;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

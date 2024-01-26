@@ -3,7 +3,7 @@ use crate::layer::feature_layer::symbol::Symbol;
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::wgpu::WgpuRenderer;
-use crate::render::{Canvas, PackedBundle, PrimitiveId, Renderer};
+use crate::render::{Canvas, PackedBundle, PrimitiveId, RenderOptions, Renderer};
 use crate::view::MapView;
 use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::cartesian::traits::cartesian_point::{
@@ -185,6 +185,7 @@ where
         canvas.draw_bundles(
             &[&**self.render_bundle.read().unwrap().as_ref().unwrap()],
             view.resolution() as f32,
+            RenderOptions::default(),
         );
     }
 
@@ -240,6 +241,7 @@ where
         canvas.draw_bundles(
             &[&**self.render_bundle.read().unwrap().as_ref().unwrap()],
             view.resolution() as f32,
+            RenderOptions::default(),
         );
     }
 
@@ -284,9 +286,14 @@ where
             *self.render_bundle.write().unwrap() = Some(packed);
         }
 
+        let options = RenderOptions {
+            antialias: self.symbol.use_antialiasing(),
+        };
+
         canvas.draw_bundles(
             &[&**self.render_bundle.read().unwrap().as_ref().unwrap()],
             view.resolution() as f32,
+            options,
         );
     }
 

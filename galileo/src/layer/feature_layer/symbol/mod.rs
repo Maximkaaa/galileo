@@ -28,4 +28,8 @@ pub trait Symbol<F> {
     ) {
         // provide implementation to make features editable
     }
+
+    fn use_antialiasing(&self) -> bool {
+        true
+    }
 }

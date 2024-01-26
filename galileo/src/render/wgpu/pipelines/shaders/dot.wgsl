@@ -12,8 +12,7 @@ var<uniform> transform: ViewUniform;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
-    @location(1) normal: vec2<f32>,
-    @location(2) color: vec4<u32>,
+    @location(1) color: vec4<u32>,
 }
 
 struct VertexOutput {
@@ -27,14 +26,10 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
     out.color = vec4<f32>(model.color) / 255.0;
-    var point_position = transform.view_proj * vec4<f32>(model.position, 1.0);
-    var vertex_delta = vec4<f32>(model.normal * transform.inv_screen_size * point_position[3] * 2.0, 0.0, 0.0);
-
-    out.clip_position = point_position + vertex_delta;
+    out.clip_position = transform.view_proj * vec4<f32>(model.position, 1.0);
 
     return out;
 }
-
 
 // Fragment shader
 

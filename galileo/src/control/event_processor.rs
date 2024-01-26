@@ -58,6 +58,18 @@ impl EventProcessor {
             for user_event in user_events {
                 let mut drag_start_target = None;
 
+                if let UserEvent::Click(
+                    _,
+                    MouseEvent {
+                        screen_pointer_position,
+                        ..
+                    },
+                ) = user_event
+                {
+                    let map_position = map.view().screen_to_map(screen_pointer_position);
+                    log::info!("click position: {map_position:?}");
+                }
+
                 for (index, handler) in self.handlers.iter_mut().enumerate() {
                     if matches!(user_event, UserEvent::Drag(..) | UserEvent::DragEnded(..)) {
                         if let Some(target) = &self.drag_target {

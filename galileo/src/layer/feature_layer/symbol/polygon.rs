@@ -1,7 +1,7 @@
 use crate::layer::feature_layer::symbol::Symbol;
-use crate::primitives::Color;
 use crate::render::render_bundle::RenderBundle;
-use crate::render::{LineCap, LinePaint, Paint, PrimitiveId, UnpackedBundle};
+use crate::render::{LineCap, LinePaint, PolygonPaint, PrimitiveId, UnpackedBundle};
+use crate::Color;
 use galileo_types::cartesian::impls::polygon::Polygon;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geometry::Geom;
@@ -55,7 +55,7 @@ impl SimplePolygonSymbol {
         let mut ids = vec![];
         let id = bundle.add_polygon(
             polygon,
-            Paint {
+            PolygonPaint {
                 color: self.fill_color,
             },
         );
@@ -77,7 +77,7 @@ impl SimplePolygonSymbol {
     }
 
     fn update_internal(&self, renders_ids: &[PrimitiveId], bundle: &mut Box<dyn UnpackedBundle>) {
-        let poly_paint = Paint {
+        let poly_paint = PolygonPaint {
             color: self.fill_color,
         };
 

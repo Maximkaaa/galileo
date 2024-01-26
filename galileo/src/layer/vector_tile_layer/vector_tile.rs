@@ -1,7 +1,7 @@
 use crate::error::GalileoError;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::render::render_bundle::RenderBundle;
-use crate::render::{LineCap, LinePaint, PackedBundle, Paint};
+use crate::render::{LineCap, LinePaint, PackedBundle, PolygonPaint};
 use crate::tile_scheme::{TileIndex, TileScheme};
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
 use galileo_types::cartesian::impls::contour::{ClosedContour, Contour};
@@ -41,7 +41,7 @@ impl VectorTile {
 
         bundle.add_polygon(
             &bounds,
-            Paint {
+            PolygonPaint {
                 color: style.background,
             },
         );
@@ -120,14 +120,14 @@ impl VectorTile {
         style: &VectorTileStyle,
         layer_name: &str,
         feature: &MvtFeature,
-    ) -> Option<Paint> {
+    ) -> Option<PolygonPaint> {
         let Some(rule) = style.get_style_rule(layer_name, feature) else {
-            return Some(Paint {
+            return Some(PolygonPaint {
                 color: style.default_symbol.polygon.as_ref()?.fill_color,
             });
         };
 
-        Some(Paint {
+        Some(PolygonPaint {
             color: rule.symbol.polygon.as_ref()?.fill_color,
         })
     }

@@ -9,13 +9,11 @@ use crate::layer::vector_tile_layer::tile_provider::{
     LockedTileStore, TileState, VectorTile, VectorTileProvider,
 };
 use crate::messenger::Messenger;
-use crate::platform::{PlatformService, PlatformServiceImpl};
 use crate::render::render_bundle::tessellating::serialization::TessellatingRenderBundleBytes;
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::Renderer;
 use crate::tile_scheme::{TileIndex, TileScheme};
-use bytes::Bytes;
 use galileo_mvt::MvtTile;
 use quick_cache::unsync::Cache;
 use serde::{Deserialize, Serialize};
@@ -26,7 +24,6 @@ use std::sync::{Arc, Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
 const WORKER_URL: &str = "./vt_worker.js";
-const DEFAULT_WORKER_COUNT: usize = 4;
 const READY_MESSAGE: f64 = 42.0;
 
 pub struct WebWorkerVectorTileProvider {
@@ -349,15 +346,4 @@ async fn try_load_tile(payload: LoadTilePayload) -> Result<DecodedVectorTile, Ga
         mvt_tile: bytes.to_vec(),
         bundle_bytes: serialized,
     })
-}
-
-async fn download_tile(index: TileIndex, url: &str) -> Result<Bytes, GalileoError> {
-    let platform_service = PlatformServiceImpl::new();
-    match platform_service.load_bytes_from_url(url).await {
-        Ok(bytes) => Ok(bytes),
-        Err(e) => {
-            log::info!("Failed to load tile {index:?}");
-            Err(e)
-        }
-    }
 }

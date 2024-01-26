@@ -86,3 +86,4 @@ geo = "0.27"
 csv = "1.3"
 geo-types = "0.7"
 geozero = "0.11"
+las = { version = "0.8", features = ["laz"] }
