@@ -3,3 +3,6 @@ target
 .tile_cache
 **/pkg
 Cargo.lock
+
+# Ignore large sample files
+**/*.laz

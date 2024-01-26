@@ -95,7 +95,10 @@ impl WgpuRenderer {
                             ..wgpu::Limits::downlevel_webgl2_defaults()
                         }
                     } else {
-                        wgpu::Limits::default()
+                        wgpu::Limits {
+                            max_buffer_size: 256 << 22,
+                            ..wgpu::Limits::default()
+                        }
                     },
                     label: None,
                 },
