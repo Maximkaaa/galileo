@@ -1,6 +1,8 @@
 use crate::primitives::DecodedImage;
-use crate::render::{ImagePaint, LinePaint, Paint, PointPaint, PrimitiveId};
+use crate::render::point_paint::{CircleFill, PointPaint, PointShape, SectorParameters};
+use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
 use crate::Color;
+use galileo_types::cartesian::impls::contour::ClosedContour;
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::cartesian::traits::cartesian_point::{CartesianPoint2d, CartesianPoint3d};
 use galileo_types::contour::Contour;
@@ -10,9 +12,11 @@ use lyon::lyon_tessellation::{
     Side, StrokeOptions, StrokeTessellator, StrokeVertex, StrokeVertexConstructor, VertexBuffers,
 };
 use lyon::math::point;
+use lyon::path::builder::PathBuilder;
 use lyon::path::path::BuilderWithAttributes;
 use lyon::path::{EndpointId, Path};
 use lyon::tessellation::VertexSource;
+use nalgebra::{Point2, Vector2};
 use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
 use std::ops::Range;
@@ -21,9 +25,20 @@ use std::ops::Range;
 pub struct TessellatingRenderBundle {
     pub poly_tessellation: Vec<LodTessellation>,
     pub points: Vec<PointInstance>,
+    pub screen_ref: ScreenRefTessellation,
     pub images: Vec<(DecodedImage, [ImageVertex; 4])>,
     pub primitives: Vec<PrimitiveInfo>,
     pub clip_area: Option<VertexBuffers<PolyVertex, u32>>,
+}
+
+pub(crate) type ScreenRefTessellation = VertexBuffers<ScreenRefVertex, u32>;
+
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct ScreenRefVertex {
+    position: [f32; 3],
+    normal: [f32; 2],
+    color: [u8; 4],
 }
 
 #[derive(Debug)]
@@ -34,8 +49,10 @@ pub struct LodTessellation {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum PrimitiveInfo {
-    Poly { vertex_ranges: Vec<Range<usize>> },
-    Point { point_index: usize },
+    Invalid,
+    MapRef { vertex_ranges: Vec<Range<usize>> },
+    ScreenRef { vertex_range: Range<usize> },
+    Dot { point_index: usize },
     Image { image_index: usize },
 }
 
@@ -53,6 +70,7 @@ impl TessellatingRenderBundle {
                 tessellation: VertexBuffers::new(),
             }],
             points: Vec::new(),
+            screen_ref: VertexBuffers::new(),
             images: Vec::new(),
             primitives: Vec::new(),
             clip_area: None,
@@ -69,6 +87,7 @@ impl TessellatingRenderBundle {
                 })
                 .collect(),
             points: Vec::new(),
+            screen_ref: VertexBuffers::new(),
             images: Vec::new(),
             primitives: Vec::new(),
             clip_area: None,
@@ -87,7 +106,7 @@ impl TessellatingRenderBundle {
         let mut tessellation = VertexBuffers::new();
         Self::tessellate_polygon(
             polygon,
-            Paint {
+            PolygonPaint {
                 color: Color::BLACK,
             },
             &mut tessellation,
@@ -140,17 +159,56 @@ impl TessellatingRenderBundle {
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
-        let id = self.primitives.len();
-        let index = self.points.len();
-        self.points.push(PointInstance {
-            position: [point.x().as_(), point.y().as_(), point.z().as_()],
-            size: paint.size as f32,
-            color: paint.color.to_f32_array(),
-        });
+        let start_index = self.screen_ref.vertices.len();
+        let id = PrimitiveId(self.primitives.len());
+        match &paint.shape {
+            PointShape::Dot { color } => {
+                self.add_dot(point, *color, paint.offset);
+                self.primitives.push(PrimitiveInfo::Dot {
+                    point_index: self.points.len() - 1,
+                });
+            }
+            PointShape::_Image { .. } => todo!(),
+            PointShape::Circle {
+                fill,
+                radius,
+                outline,
+            } => {
+                self.add_circle(point, *fill, *radius, *outline, paint.offset);
+                self.primitives.push(PrimitiveInfo::ScreenRef {
+                    vertex_range: start_index..self.screen_ref.vertices.len(),
+                });
+            }
+            PointShape::Sector(parameters) => {
+                self.add_circle_sector(point, *parameters, paint.offset);
+                self.primitives.push(PrimitiveInfo::ScreenRef {
+                    vertex_range: start_index..self.screen_ref.vertices.len(),
+                });
+            }
+            PointShape::Square {
+                fill,
+                size,
+                outline,
+            } => {
+                self.add_shape(point, *fill, *size, *outline, &square_shape(), paint.offset);
+                self.primitives.push(PrimitiveInfo::ScreenRef {
+                    vertex_range: start_index..self.screen_ref.vertices.len(),
+                });
+            }
+            PointShape::FreeShape {
+                fill,
+                scale,
+                outline,
+                shape,
+            } => {
+                self.add_shape(point, *fill, *scale, *outline, shape, paint.offset);
+                self.primitives.push(PrimitiveInfo::ScreenRef {
+                    vertex_range: start_index..self.screen_ref.vertices.len(),
+                });
+            }
+        }
 
-        self.primitives
-            .push(PrimitiveInfo::Point { point_index: index });
-        PrimitiveId(id)
+        id
     }
 
     pub fn add_line<N, P, C>(&mut self, line: &C, paint: LinePaint) -> PrimitiveId
@@ -165,7 +223,7 @@ impl TessellatingRenderBundle {
         }
 
         let id = self.primitives.len();
-        self.primitives.push(PrimitiveInfo::Poly {
+        self.primitives.push(PrimitiveInfo::MapRef {
             vertex_ranges: ranges,
         });
 
@@ -240,7 +298,7 @@ impl TessellatingRenderBundle {
         start_index..end_index
     }
 
-    pub fn add_polygon<N, P, Poly>(&mut self, polygon: &Poly, paint: Paint) -> PrimitiveId
+    pub fn add_polygon<N, P, Poly>(&mut self, polygon: &Poly, paint: PolygonPaint) -> PrimitiveId
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
@@ -253,7 +311,7 @@ impl TessellatingRenderBundle {
         }
 
         let id = self.primitives.len();
-        self.primitives.push(PrimitiveInfo::Poly {
+        self.primitives.push(PrimitiveInfo::MapRef {
             vertex_ranges: ranges,
         });
 
@@ -263,7 +321,7 @@ impl TessellatingRenderBundle {
     fn add_polygon_lod<N, P, Poly>(
         &mut self,
         polygon: &Poly,
-        paint: Paint,
+        paint: PolygonPaint,
         lod_index: usize,
     ) -> Range<usize>
     where
@@ -287,7 +345,7 @@ impl TessellatingRenderBundle {
 
     fn tessellate_polygon<N, P, Poly>(
         polygon: &Poly,
-        paint: Paint,
+        paint: PolygonPaint,
         tessellation: &mut VertexBuffers<PolyVertex, u32>,
     ) where
         N: AsPrimitive<f32>,
@@ -330,6 +388,229 @@ impl TessellatingRenderBundle {
             )
             .unwrap();
     }
+
+    pub fn add_shape<N, P>(
+        &mut self,
+        position: &P,
+        fill: Color,
+        scale: f32,
+        outline: Option<LinePaint>,
+        shape: &ClosedContour<Point2<f32>>,
+        offset: Vector2<f32>,
+    ) where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+    {
+        let mut path_builder = BuilderWithAttributes::new(0);
+        build_contour_path(&mut path_builder, shape, scale);
+        let path = path_builder.build();
+
+        if let Some(outline) = outline {
+            let vertex_constructor = ScreenRefVertexConstructor {
+                color: outline.color.to_u8_array(),
+                position: [position.x().as_(), position.y().as_(), position.z().as_()],
+                offset,
+            };
+
+            if let Err(err) = StrokeTessellator::new().tessellate(
+                &path,
+                &StrokeOptions::DEFAULT.with_line_width(outline.width as f32 * 2.0),
+                &mut BuffersBuilder::new(&mut self.screen_ref, vertex_constructor),
+            ) {
+                log::warn!("Shape tessellation failed: {err:?}");
+                return;
+            }
+        }
+
+        if !fill.is_transparent() {
+            let vertex_constructor = ScreenRefVertexConstructor {
+                color: fill.to_u8_array(),
+                position: [position.x().as_(), position.y().as_(), position.z().as_()],
+                offset,
+            };
+
+            if let Err(err) = FillTessellator::new().tessellate(
+                &path,
+                &FillOptions::DEFAULT,
+                &mut BuffersBuilder::new(&mut self.screen_ref, vertex_constructor),
+            ) {
+                log::warn!("Shape tessellation failed: {err:?}");
+            }
+        }
+    }
+
+    fn add_circle<N, P>(
+        &mut self,
+        position: &P,
+        fill: CircleFill,
+        radius: f32,
+        outline: Option<LinePaint>,
+        offset: Vector2<f32>,
+    ) where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+    {
+        self.add_circle_sector(
+            position,
+            SectorParameters {
+                fill,
+                radius,
+                start_angle: 0.0,
+                end_angle: std::f32::consts::PI * 2.0,
+                outline,
+            },
+            offset,
+        )
+    }
+
+    fn add_circle_sector<N, P>(
+        &mut self,
+        position: &P,
+        parameters: SectorParameters,
+        offset: Vector2<f32>,
+    ) where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+    {
+        let SectorParameters {
+            fill,
+            radius,
+            start_angle,
+            end_angle,
+            outline,
+        } = parameters;
+        const TOLERANCE: f32 = 0.1;
+        let dr = (end_angle - start_angle)
+            .abs()
+            .min(std::f32::consts::PI * 2.0);
+
+        let center = ScreenRefVertex {
+            position: [position.x().as_(), position.y().as_(), position.z().as_()],
+            normal: [offset.x, offset.y],
+            color: fill.center_color.to_u8_array(),
+        };
+
+        let is_full_circle = (dr - std::f32::consts::PI * 2.0).abs() < TOLERANCE;
+
+        let mut contour = get_circle_sector(radius, start_angle, end_angle);
+        let first_index = self.screen_ref.vertices.len() as u32;
+
+        let mut vertices = vec![center];
+        let mut indices = vec![];
+        for point in &contour {
+            if vertices.len() > 1 {
+                indices.push(first_index);
+                indices.push(vertices.len() as u32 - 1 + first_index);
+                indices.push(vertices.len() as u32 + first_index);
+            }
+
+            vertices.push(ScreenRefVertex {
+                position: [position.x().as_(), position.y().as_(), position.z().as_()],
+                normal: (point + offset).coords.into(),
+                color: fill.side_color.to_u8_array(),
+            });
+        }
+
+        if is_full_circle {
+            indices.push(first_index);
+            indices.push(vertices.len() as u32 - 1 + first_index);
+            indices.push(1 + first_index);
+        }
+
+        self.screen_ref.vertices.append(&mut vertices);
+        self.screen_ref.indices.append(&mut indices);
+
+        if outline.is_some() {
+            if !is_full_circle {
+                contour.push(Point2::new(0.0, 0.0));
+            }
+            self.add_shape(
+                position,
+                Color::TRANSPARENT,
+                radius,
+                outline,
+                &ClosedContour::new(contour),
+                offset,
+            );
+        }
+    }
+
+    fn add_dot<P, N>(&mut self, point: &P, color: Color, offset: Vector2<f32>)
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+    {
+        let position = [
+            point.x().as_() + offset.x,
+            point.y().as_() + offset.y,
+            point.z().as_(),
+        ];
+        self.points.push(PointInstance {
+            position,
+            color: color.to_u8_array(),
+        })
+    }
+}
+
+fn get_circle_sector(radius: f32, start_angle: f32, end_angle: f32) -> Vec<Point2<f32>> {
+    const TOLERANCE: f32 = 0.1;
+
+    let mut contour = vec![];
+
+    if radius <= TOLERANCE {
+        return contour;
+    }
+
+    let dr = (end_angle - start_angle)
+        .abs()
+        .min(std::f32::consts::PI * 2.0);
+
+    let circle_steps_count =
+        std::f32::consts::PI / ((radius - TOLERANCE) / (radius + TOLERANCE)).acos();
+
+    let segment_steps_count =
+        ((dr / std::f32::consts::PI * 2.0) * circle_steps_count).ceil() as usize;
+    let angle_step = (end_angle - start_angle) / segment_steps_count as f32;
+
+    for step in 0..segment_steps_count {
+        let angle = start_angle + angle_step * step as f32;
+        let x = angle.cos() * radius;
+        let y = angle.sin() * radius;
+        contour.push(Point2::new(x, y));
+    }
+
+    contour
+}
+
+fn square_shape() -> ClosedContour<Point2<f32>> {
+    ClosedContour::new(vec![
+        Point2::new(-0.5, -0.5),
+        Point2::new(-0.5, 0.5),
+        Point2::new(0.5, 0.5),
+        Point2::new(0.5, -0.5),
+    ])
+}
+
+fn build_contour_path(
+    path_builder: &mut impl PathBuilder,
+    contour: &impl Contour<Point = Point2<f32>>,
+    scale: f32,
+) -> Option<()> {
+    let mut iterator = contour.iter_points();
+
+    if let Some(first_point) = iterator.next() {
+        let _ = path_builder.begin(point(first_point.x() * scale, first_point.y() * scale), &[]);
+    } else {
+        return None;
+    }
+
+    for p in iterator {
+        let _ = path_builder.line_to(point(p.x() * scale, p.y() * scale), &[]);
+    }
+
+    path_builder.end(contour.is_closed());
+
+    Some(())
 }
 
 #[allow(dead_code)]
@@ -403,6 +684,34 @@ impl FillVertexConstructor<PolyVertex> for PolygonVertexConstructor {
     }
 }
 
+struct ScreenRefVertexConstructor {
+    color: [u8; 4],
+    position: [f32; 3],
+    offset: Vector2<f32>,
+}
+
+impl ScreenRefVertexConstructor {
+    fn create_vertex(&self, position: lyon::math::Point) -> ScreenRefVertex {
+        ScreenRefVertex {
+            position: self.position,
+            normal: [position.x + self.offset.x, position.y + self.offset.y],
+            color: self.color,
+        }
+    }
+}
+
+impl StrokeVertexConstructor<ScreenRefVertex> for ScreenRefVertexConstructor {
+    fn new_vertex(&mut self, vertex: StrokeVertex) -> ScreenRefVertex {
+        self.create_vertex(vertex.position())
+    }
+}
+
+impl FillVertexConstructor<ScreenRefVertex> for ScreenRefVertexConstructor {
+    fn new_vertex(&mut self, vertex: FillVertex) -> ScreenRefVertex {
+        self.create_vertex(vertex.position())
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
 pub struct PolyVertex {
@@ -416,8 +725,7 @@ pub struct PolyVertex {
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct PointInstance {
     pub position: [f32; 3],
-    pub size: f32,
-    pub color: [f32; 4],
+    pub color: [u8; 4],
 }
 
 #[repr(C)]
@@ -429,133 +737,4 @@ pub struct ImageVertex {
 }
 
 #[cfg(feature = "byte-conversion")]
-pub(crate) mod serialization {
-    use crate::primitives::DecodedImage;
-    use crate::render::render_bundle::tessellating::{
-        LodTessellation, PolyVertex, PrimitiveInfo, TessellatingRenderBundle,
-    };
-    use lyon::lyon_tessellation::VertexBuffers;
-    use serde::{Deserialize, Serialize};
-    use std::mem::size_of;
-
-    #[derive(Debug, Deserialize, Serialize)]
-    pub(crate) struct TessellatingRenderBundleBytes {
-        pub poly_tessellation: Vec<LodTessellationBytes>,
-        pub points: Vec<u32>,
-        pub images: Vec<ImageBytes>,
-        pub primitives: Vec<PrimitiveInfo>,
-        pub clip_area: Option<VertexBuffersBytes>,
-    }
-
-    #[derive(Debug, Deserialize, Serialize)]
-    pub(crate) struct ImageBytes {
-        image_bytes: Vec<u8>,
-        dimensions: (u32, u32),
-        vertices: Vec<u32>,
-    }
-
-    const POLY_VERTEX_BLOCKS: usize = size_of::<PolyVertex>() / size_of::<u32>();
-    type PolyVertexShim = [u32; POLY_VERTEX_BLOCKS];
-
-    #[derive(Debug, Deserialize, Serialize)]
-    pub(crate) struct VertexBuffersBytes {
-        vertices: Vec<PolyVertexShim>,
-        indices: Vec<u32>,
-    }
-
-    impl From<VertexBuffers<PolyVertex, u32>> for VertexBuffersBytes {
-        fn from(value: VertexBuffers<PolyVertex, u32>) -> Self {
-            Self {
-                vertices: bytemuck::cast_vec(value.vertices),
-                indices: bytemuck::cast_vec(value.indices),
-            }
-        }
-    }
-
-    impl VertexBuffersBytes {
-        fn into_typed_unchecked(self) -> VertexBuffers<PolyVertex, u32> {
-            let vertices = bytemuck::cast_vec(self.vertices);
-            let indices = bytemuck::cast_vec(self.indices);
-
-            VertexBuffers { vertices, indices }
-        }
-    }
-
-    #[derive(Debug, Deserialize, Serialize)]
-    pub(crate) struct LodTessellationBytes {
-        pub min_resolution: f32,
-        pub tessellation: VertexBuffersBytes,
-    }
-
-    impl From<LodTessellation> for LodTessellationBytes {
-        fn from(value: LodTessellation) -> Self {
-            Self {
-                min_resolution: value.min_resolution,
-                tessellation: value.tessellation.into(),
-            }
-        }
-    }
-
-    impl LodTessellation {
-        fn from_bytes_unchecked(lod: LodTessellationBytes) -> Self {
-            Self {
-                min_resolution: lod.min_resolution,
-                tessellation: lod.tessellation.into_typed_unchecked(),
-            }
-        }
-    }
-
-    impl TessellatingRenderBundle {
-        pub(crate) fn into_bytes(self) -> TessellatingRenderBundleBytes {
-            let converted = TessellatingRenderBundleBytes {
-                poly_tessellation: self
-                    .poly_tessellation
-                    .into_iter()
-                    .map(|v| v.into())
-                    .collect(),
-                points: bytemuck::cast_vec(self.points),
-                images: self
-                    .images
-                    .into_iter()
-                    .map(|(image, vertices)| ImageBytes {
-                        image_bytes: bytemuck::cast_vec(image.bytes),
-                        dimensions: image.dimensions,
-                        vertices: bytemuck::cast_vec(vertices.to_vec()),
-                    })
-                    .collect(),
-                primitives: self.primitives,
-                clip_area: self.clip_area.map(|v| v.into()),
-            };
-
-            converted
-        }
-
-        pub(crate) fn from_bytes_unchecked(bundle: TessellatingRenderBundleBytes) -> Self {
-            Self {
-                poly_tessellation: bundle
-                    .poly_tessellation
-                    .into_iter()
-                    .map(|v| LodTessellation::from_bytes_unchecked(v))
-                    .collect(),
-                points: bytemuck::cast_vec(bundle.points),
-                images: bundle
-                    .images
-                    .into_iter()
-                    .map(|v| {
-                        let decoded_image = DecodedImage {
-                            bytes: v.image_bytes,
-                            dimensions: v.dimensions,
-                        };
-                        let vertices = bytemuck::cast_vec(v.vertices)
-                            .try_into()
-                            .expect("invalid vector length");
-
-                        (decoded_image, vertices)
-                    })
-                    .collect(),
-                primitives: bundle.primitives,
-                clip_area: bundle.clip_area.map(|v| v.into_typed_unchecked()),
-            }
-        }
-    }
-}
+pub(crate) mod serialization;

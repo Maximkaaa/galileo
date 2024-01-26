@@ -2,6 +2,7 @@ use crate::primitives::DecodedImage;
 use crate::render::render_bundle::tessellating::ImageVertex;
 use crate::render::wgpu::pipelines;
 use crate::render::wgpu::pipelines::default_targets;
+use crate::render::RenderOptions;
 use wgpu::util::DeviceExt;
 use wgpu::{
     BindGroupLayout, Device, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
@@ -20,6 +21,7 @@ pub struct ImagePipeline {
     wgpu_pipeline: RenderPipeline,
     index_buffer: wgpu::Buffer,
     texture_bind_group_layout: BindGroupLayout,
+    pub wgpu_pipeline_antialias: RenderPipeline,
 }
 
 impl ImagePipeline {
@@ -61,11 +63,13 @@ impl ImagePipeline {
         });
 
         let targets = default_targets(format);
-        let desc = RenderPipelineDescriptor {
-            ..pipelines::default_pipeline_descriptor(&layout, &shader, &targets, &buffers)
+        let mut desc = RenderPipelineDescriptor {
+            ..pipelines::default_pipeline_descriptor(&layout, &shader, &targets, &buffers, false)
         };
 
         let wgpu_pipeline = device.create_render_pipeline(&desc);
+        desc.multisample.count = 4;
+        let wgpu_pipeline_antialias = device.create_render_pipeline(&desc);
 
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Image index buffer"),
@@ -75,6 +79,7 @@ impl ImagePipeline {
 
         Self {
             wgpu_pipeline,
+            wgpu_pipeline_antialias,
             texture_bind_group_layout,
             index_buffer,
         }
@@ -148,8 +153,18 @@ impl ImagePipeline {
         }
     }
 
-    pub fn render<'a>(&'a self, buffers: &'a WgpuImage, render_pass: &mut RenderPass<'a>) {
-        render_pass.set_pipeline(&self.wgpu_pipeline);
+    pub fn render<'a>(
+        &'a self,
+        buffers: &'a WgpuImage,
+        render_pass: &mut RenderPass<'a>,
+        render_options: RenderOptions,
+    ) {
+        if render_options.antialias {
+            render_pass.set_pipeline(&self.wgpu_pipeline_antialias);
+        } else {
+            render_pass.set_pipeline(&self.wgpu_pipeline);
+        }
+
         render_pass.set_bind_group(1, &buffers.texture_bind_group, &[]);
         render_pass.set_vertex_buffer(0, buffers.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);

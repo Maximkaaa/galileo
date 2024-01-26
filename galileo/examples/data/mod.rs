@@ -1,4 +1,4 @@
-use galileo::primitives::Color;
+use galileo::Color;
 use galileo_types::cartesian::impls::multipolygon::MultiPolygon;
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::cartesian::impls::polygon::Polygon;

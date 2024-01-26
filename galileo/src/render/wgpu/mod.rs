@@ -13,22 +13,25 @@ use winit::dpi::PhysicalSize;
 
 use crate::layer::Layer;
 use crate::map::Map;
-use crate::primitives::{Color, DecodedImage};
+use crate::render::point_paint::PointPaint;
 use crate::render::render_bundle::tessellating::{
-    ImageVertex, LodTessellation, PointInstance, PolyVertex, PrimitiveInfo,
+    LodTessellation, PointInstance, PolyVertex, PrimitiveInfo, ScreenRefVertex,
     TessellatingRenderBundle,
 };
 use crate::render::render_bundle::RenderBundle;
 use crate::render::wgpu::pipelines::image::WgpuImage;
 use crate::render::wgpu::pipelines::Pipelines;
 use crate::view::MapView;
+use crate::Color;
 
 use super::{
-    Canvas, ImagePaint, LinePaint, PackedBundle, Paint, PointPaint, PrimitiveId, Renderer,
-    UnpackedBundle,
+    Canvas, ImagePaint, LinePaint, PackedBundle, PolygonPaint, PrimitiveId, RenderOptions,
+    Renderer, UnpackedBundle,
 };
 
 mod pipelines;
+
+const DEPTH_FORMAT: TextureFormat = TextureFormat::Depth24PlusStencil8;
 
 pub struct WgpuRenderer {
     surface: wgpu::Surface,
@@ -39,6 +42,7 @@ pub struct WgpuRenderer {
     pipelines: Pipelines,
     multisampling_view: TextureView,
     background: Color,
+    stencil_view_multisample: TextureView,
     stencil_view: TextureView,
 }
 
@@ -52,14 +56,7 @@ impl Renderer for WgpuRenderer {
 
     fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle> {
         match bundle {
-            RenderBundle::Tessellating(inner) => Box::new(WgpuPackedBundle::new(
-                inner.clip_area,
-                inner.poly_tessellation,
-                inner.points,
-                inner.images,
-                inner.primitives,
-                self,
-            )),
+            RenderBundle::Tessellating(inner) => Box::new(WgpuPackedBundle::new(inner, self)),
         }
     }
 
@@ -127,7 +124,8 @@ impl WgpuRenderer {
 
         surface.configure(&device, &config);
         let multisampling_view = Self::create_multisample_texture(&device, size, config.format);
-        let stencil_view = Self::create_stencil_texture(&device, size);
+        let stencil_view_multisample = Self::create_stencil_texture(&device, size, 4);
+        let stencil_view = Self::create_stencil_texture(&device, size, 1);
 
         let pipelines = Pipelines::create(&device, surface_format);
 
@@ -139,6 +137,7 @@ impl WgpuRenderer {
             size,
             pipelines,
             multisampling_view,
+            stencil_view_multisample,
             stencil_view,
             background: Color::rgba(255, 255, 255, 255),
         }
@@ -171,7 +170,11 @@ impl WgpuRenderer {
         multisampling_texture.create_view(&TextureViewDescriptor::default())
     }
 
-    fn create_stencil_texture(device: &Device, size: PhysicalSize<u32>) -> TextureView {
+    fn create_stencil_texture(
+        device: &Device,
+        size: PhysicalSize<u32>,
+        sample_count: u32,
+    ) -> TextureView {
         let texture = device.create_texture(&TextureDescriptor {
             label: Some("Stencil/depth texture"),
             size: Extent3d {
@@ -180,9 +183,9 @@ impl WgpuRenderer {
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
-            sample_count: 4,
+            sample_count,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Depth24PlusStencil8,
+            format: DEPTH_FORMAT,
             usage: TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[],
         });
@@ -199,7 +202,8 @@ impl WgpuRenderer {
 
             self.multisampling_view =
                 Self::create_multisample_texture(&self.device, new_size, self.config.format);
-            self.stencil_view = Self::create_stencil_texture(&self.device, new_size);
+            self.stencil_view_multisample = Self::create_stencil_texture(&self.device, new_size, 4);
+            self.stencil_view = Self::create_stencil_texture(&self.device, new_size, 1);
         }
     }
 
@@ -312,14 +316,9 @@ impl<'a> Canvas for WgpuCanvas<'a> {
 
     fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle> {
         match bundle {
-            RenderBundle::Tessellating(inner) => Box::new(WgpuPackedBundle::new(
-                inner.clip_area,
-                inner.poly_tessellation,
-                inner.points,
-                inner.images,
-                inner.primitives,
-                self.renderer,
-            )),
+            RenderBundle::Tessellating(inner) => {
+                Box::new(WgpuPackedBundle::new(inner, self.renderer))
+            }
         }
     }
 
@@ -327,7 +326,12 @@ impl<'a> Canvas for WgpuCanvas<'a> {
         self.renderer.pack_bundle(bundle)
     }
 
-    fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle], resolution: f32) {
+    fn draw_bundles(
+        &mut self,
+        bundles: &[&dyn PackedBundle],
+        resolution: f32,
+        options: RenderOptions,
+    ) {
         let mut encoder =
             self.renderer
                 .device
@@ -336,19 +340,32 @@ impl<'a> Canvas for WgpuCanvas<'a> {
                 });
 
         {
+            let (view, resolve_target, depth_view) = if options.antialias {
+                (
+                    &self.renderer.multisampling_view,
+                    Some(self.view),
+                    &self.renderer.stencil_view_multisample,
+                )
+            } else {
+                (self.view, None, &self.renderer.stencil_view)
+            };
+
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.renderer.multisampling_view,
-                    resolve_target: Some(self.view),
+                    view,
+                    resolve_target,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
                         store: StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                    view: &self.renderer.stencil_view,
-                    depth_ops: None,
+                    view: depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: StoreOp::Discard,
+                    }),
                     stencil_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(0),
                         store: StoreOp::Discard,
@@ -362,7 +379,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
                 if let Some(cast) = bundle.as_any().downcast_ref() {
                     self.renderer
                         .pipelines
-                        .render(&mut render_pass, cast, resolution);
+                        .render(&mut render_pass, cast, resolution, options);
                 }
             }
         }
@@ -375,10 +392,11 @@ impl<'a> Canvas for WgpuCanvas<'a> {
 
 pub struct WgpuPackedBundle {
     clip_area_buffers: Option<WgpuPolygonBuffers>,
-    poly_tessellation: Vec<LodTessellation>,
-    poly_buffers: Vec<WgpuPolygonBuffers>,
-    point_buffers: Option<WgpuPointBuffers>,
+    map_ref_buffers: Vec<WgpuPolygonBuffers>,
+    screen_ref_buffers: Option<ScreenRefBuffers>,
+    dot_buffers: Option<WgpuDotBuffers>,
     image_buffers: Vec<WgpuImage>,
+    poly_tessellation: Vec<LodTessellation>,
     primitives: Vec<PrimitiveInfo>,
 }
 
@@ -388,24 +406,30 @@ struct WgpuPolygonBuffers {
     index_count: u32,
 }
 
-struct WgpuPointBuffers {
+struct ScreenRefBuffers {
     vertex: Buffer,
     index: Buffer,
-    instance: Buffer,
-    vertices: Vec<PointInstance>,
+    _vertices: Vec<ScreenRefVertex>,
     index_count: u32,
-    instance_count: u32,
+}
+
+struct WgpuDotBuffers {
+    buffer: Buffer,
+    _points: Vec<PointInstance>,
+    point_count: u32,
 }
 
 impl WgpuPackedBundle {
-    fn new(
-        clip_area: Option<VertexBuffers<PolyVertex, u32>>,
-        poly_tessellation: Vec<LodTessellation>,
-        points: Vec<PointInstance>,
-        images: Vec<(DecodedImage, [ImageVertex; 4])>,
-        primitives: Vec<PrimitiveInfo>,
-        renderer: &WgpuRenderer,
-    ) -> Self {
+    fn new(bundle: TessellatingRenderBundle, renderer: &WgpuRenderer) -> Self {
+        let TessellatingRenderBundle {
+            poly_tessellation,
+            points,
+            screen_ref,
+            images,
+            primitives,
+            clip_area,
+        } = bundle;
+
         let clip_area_buffers = clip_area.map(|v| Self::write_poly_buffers(&v, renderer));
 
         let mut poly_buffers = vec![];
@@ -413,28 +437,36 @@ impl WgpuPackedBundle {
             poly_buffers.push(Self::write_poly_buffers(&lod.tessellation, renderer));
         }
 
-        let point_buffers = if !points.is_empty() {
-            let max_point_size = points.iter().fold(0f32, |v, p| v.max(p.size));
-            let (point_indices, point_vertices) = create_point(max_point_size);
+        let screen_ref_buffers = if !screen_ref.vertices.is_empty() {
+            let index = renderer
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: bytemuck::cast_slice(&screen_ref.indices),
+                    usage: wgpu::BufferUsages::INDEX,
+                });
 
-            let point_index_buffer =
-                renderer
-                    .device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: None,
-                        contents: bytemuck::cast_slice(&point_indices),
-                        usage: wgpu::BufferUsages::INDEX,
-                    });
+            let vertex = renderer
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    usage: wgpu::BufferUsages::VERTEX,
+                    contents: bytemuck::cast_slice(&screen_ref.vertices),
+                });
 
-            let point_vertex_buffer =
-                renderer
-                    .device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: None,
-                        usage: wgpu::BufferUsages::VERTEX,
-                        contents: bytemuck::cast_slice(&point_vertices),
-                    });
+            Some(ScreenRefBuffers {
+                index,
+                vertex,
+                index_count: screen_ref.indices.len() as u32,
+                _vertices: screen_ref.vertices,
+            })
+        } else {
+            None
+        };
 
+        let dot_buffers = if points.is_empty() {
+            None
+        } else {
             let point_instance_buffer =
                 renderer
                     .device
@@ -443,17 +475,12 @@ impl WgpuPackedBundle {
                         usage: wgpu::BufferUsages::VERTEX,
                         contents: bytemuck::cast_slice(&points),
                     });
-
-            Some(WgpuPointBuffers {
-                index: point_index_buffer,
-                vertex: point_vertex_buffer,
-                instance: point_instance_buffer,
-                index_count: point_indices.len() as u32,
-                instance_count: points.len() as u32,
-                vertices: points,
+            let count = points.len();
+            Some(WgpuDotBuffers {
+                buffer: point_instance_buffer,
+                _points: points,
+                point_count: count as u32,
             })
-        } else {
-            None
         };
 
         let mut image_buffers = vec![];
@@ -470,21 +497,22 @@ impl WgpuPackedBundle {
         Self {
             clip_area_buffers,
             poly_tessellation,
-            poly_buffers,
+            map_ref_buffers: poly_buffers,
             image_buffers,
-            point_buffers,
+            screen_ref_buffers,
+            dot_buffers,
             primitives,
         }
     }
 
     fn select_poly_buffers(&self, resolution: f32) -> &WgpuPolygonBuffers {
-        for i in 0..self.poly_buffers.len() {
+        for i in 0..self.map_ref_buffers.len() {
             if self.poly_tessellation[i].min_resolution <= resolution {
-                return &self.poly_buffers[i];
+                return &self.map_ref_buffers[i];
             }
         }
 
-        &self.poly_buffers[self.poly_buffers.len() - 1]
+        &self.map_ref_buffers[self.map_ref_buffers.len() - 1]
     }
 
     fn write_poly_buffers(
@@ -515,36 +543,6 @@ impl WgpuPackedBundle {
     }
 }
 
-fn create_point(max_size: f32) -> (Vec<u32>, Vec<PointVertex>) {
-    let half_size = max_size / 2.0;
-
-    let center = PointVertex { norm: [0.0, 0.0] };
-
-    const TOLERANCE: f32 = 0.1;
-    let r = half_size.max(1.0);
-    let steps_count =
-        (std::f32::consts::PI / ((r - TOLERANCE) / (r + TOLERANCE)).acos()).ceil() as usize;
-
-    let mut vertices = vec![center, PointVertex { norm: [1.0, 0.0] }];
-    let mut indices = vec![];
-    for step in 1..steps_count {
-        let angle = 2.0 * std::f32::consts::PI / steps_count as f32 * step as f32;
-        let x = angle.cos();
-        let y = angle.sin();
-
-        indices.push(0);
-        indices.push(vertices.len() as u32 - 1);
-        indices.push(vertices.len() as u32);
-        vertices.push(PointVertex { norm: [x, y] });
-    }
-
-    indices.push(0);
-    indices.push(vertices.len() as u32 - 1);
-    indices.push(1);
-
-    (indices, vertices)
-}
-
 impl PackedBundle for WgpuPackedBundle {
     fn as_any(&self) -> &dyn Any {
         self
@@ -554,9 +552,10 @@ impl PackedBundle for WgpuPackedBundle {
         Box::new(WgpuUnpackedBundle {
             clip_area_buffers: self.clip_area_buffers,
             poly_tessellation: self.poly_tessellation,
-            poly_buffers: self.poly_buffers,
-            point_buffers: self.point_buffers,
+            poly_buffers: self.map_ref_buffers,
+            point_buffers: self.screen_ref_buffers,
             images: self.image_buffers,
+            dot_buffers: self.dot_buffers,
             primitives: self.primitives,
             to_write: Vec::new(),
         })
@@ -567,8 +566,9 @@ struct WgpuUnpackedBundle {
     clip_area_buffers: Option<WgpuPolygonBuffers>,
     poly_tessellation: Vec<LodTessellation>,
     poly_buffers: Vec<WgpuPolygonBuffers>,
-    point_buffers: Option<WgpuPointBuffers>,
+    point_buffers: Option<ScreenRefBuffers>,
     images: Vec<WgpuImage>,
+    dot_buffers: Option<WgpuDotBuffers>,
     primitives: Vec<PrimitiveInfo>,
 
     to_write: Vec<PrimitiveId>,
@@ -583,9 +583,10 @@ impl WgpuUnpackedBundle {
         WgpuPackedBundle {
             clip_area_buffers: self.clip_area_buffers,
             poly_tessellation: self.poly_tessellation,
-            poly_buffers: self.poly_buffers,
-            point_buffers: self.point_buffers,
+            map_ref_buffers: self.poly_buffers,
+            screen_ref_buffers: self.point_buffers,
             image_buffers: self.images,
+            dot_buffers: self.dot_buffers,
             primitives: self.primitives,
         }
     }
@@ -594,7 +595,7 @@ impl WgpuUnpackedBundle {
         for (index, _) in self.poly_tessellation.iter().enumerate() {
             let mut prev: Option<Range<usize>> = None;
             for id in &self.to_write {
-                if let PrimitiveInfo::Poly { vertex_ranges } = &self.primitives[id.0] {
+                if let PrimitiveInfo::MapRef { vertex_ranges } = &self.primitives[id.0] {
                     let vertex_range = &vertex_ranges[index];
                     if let Some(prev_range) = prev {
                         if vertex_range.start == prev_range.end {
@@ -638,7 +639,7 @@ impl WgpuUnpackedBundle {
 
     fn write_point_buffers(&self, _queue: &Queue) {
         for id in &self.to_write {
-            if let PrimitiveInfo::Point { .. } = self.primitives[id.0] {
+            if let PrimitiveInfo::ScreenRef { .. } = self.primitives[id.0] {
                 todo!()
             }
         }
@@ -647,7 +648,7 @@ impl WgpuUnpackedBundle {
 
 impl UnpackedBundle for WgpuUnpackedBundle {
     fn modify_line(&mut self, id: PrimitiveId, paint: LinePaint) {
-        let Some(PrimitiveInfo::Poly { vertex_ranges }) = self.primitives.get(id.0) else {
+        let Some(PrimitiveInfo::MapRef { vertex_ranges }) = self.primitives.get(id.0) else {
             return;
         };
 
@@ -660,8 +661,8 @@ impl UnpackedBundle for WgpuUnpackedBundle {
         self.to_write.push(id);
     }
 
-    fn modify_polygon(&mut self, id: PrimitiveId, paint: Paint) {
-        let Some(PrimitiveInfo::Poly { vertex_ranges }) = self.primitives.get(id.0) else {
+    fn modify_polygon(&mut self, id: PrimitiveId, paint: PolygonPaint) {
+        let Some(PrimitiveInfo::MapRef { vertex_ranges }) = self.primitives.get(id.0) else {
             return;
         };
 
@@ -687,43 +688,12 @@ impl UnpackedBundle for WgpuUnpackedBundle {
         self.to_write.push(id);
     }
 
-    fn modify_point(&mut self, id: PrimitiveId, paint: PointPaint) {
-        let Some(PrimitiveInfo::Point { point_index }) = self.primitives.get(id.0) else {
-            return;
-        };
-        let Some(point_buffers) = &mut self.point_buffers else {
-            return;
-        };
-
-        let point = &mut point_buffers.vertices[*point_index];
-        point.color = paint.color.to_f32_array();
-        point.size = paint.size as f32;
-
-        self.to_write.push(id);
+    fn modify_point(&mut self, _id: PrimitiveId, _paint: PointPaint) {
+        todo!()
     }
 
     fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct PointVertex {
-    norm: [f32; 2],
-}
-
-impl PointVertex {
-    fn wgpu_desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: size_of::<PointVertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[wgpu::VertexAttribute {
-                offset: 0,
-                shader_location: 0,
-                format: wgpu::VertexFormat::Float32x2,
-            }],
-        }
     }
 }
 
@@ -745,18 +715,13 @@ impl PointInstance {
             attributes: &[
                 wgpu::VertexAttribute {
                     offset: 0,
-                    shader_location: 2,
+                    shader_location: 0,
                     format: wgpu::VertexFormat::Float32x3,
                 },
                 wgpu::VertexAttribute {
-                    offset: size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 3,
-                    format: wgpu::VertexFormat::Float32,
-                },
-                wgpu::VertexAttribute {
-                    offset: (size_of::<[f32; 3]>() + size_of::<f32>()) as wgpu::BufferAddress,
-                    shader_location: 4,
-                    format: wgpu::VertexFormat::Float32x4,
+                    offset: (size_of::<[f32; 3]>()) as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Uint8x4,
                 },
             ],
         }

@@ -1,7 +1,7 @@
 use crate::layer::feature_layer::symbol::Symbol;
-use crate::primitives::Color;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{LineCap, LinePaint, PrimitiveId};
+use crate::Color;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geometry::Geom;
 use galileo_types::multi_contour::MultiContour;

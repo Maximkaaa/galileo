@@ -1,8 +1,8 @@
 use galileo::galileo_map::MapBuilder;
 use galileo::layer::feature_layer::symbol::point::CirclePointSymbol;
 use galileo::layer::feature_layer::FeatureLayer;
-use galileo::primitives::Color;
 use galileo::tile_scheme::TileScheme;
+use galileo::Color;
 use galileo_types::disambig::{Disambig, Disambiguate};
 use galileo_types::geo::crs::Crs;
 use galileo_types::geometry_type::GeoSpace2d;

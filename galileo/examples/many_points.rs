@@ -2,10 +2,11 @@ use galileo::galileo_map::MapBuilder;
 use galileo::layer::feature_layer::feature::Feature;
 use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::FeatureLayer;
-use galileo::primitives::Color;
+use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderBundle;
-use galileo::render::{PointPaint, PrimitiveId};
+use galileo::render::PrimitiveId;
 use galileo::tile_scheme::TileScheme;
+use galileo::Color;
 use galileo_types::cartesian::impls::point::Point3d;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geo::crs::Crs;
@@ -41,13 +42,7 @@ impl Symbol<ColoredPoint> for ColoredPointSymbol {
         bundle: &mut RenderBundle,
     ) -> Vec<PrimitiveId> {
         if let Geom::Point(point) = geometry {
-            vec![bundle.add_point(
-                point,
-                PointPaint {
-                    color: feature.color,
-                    size: 3.0,
-                },
-            )]
+            vec![bundle.add_point(point, PointPaint::dot(feature.color))]
         } else {
             vec![]
         }
@@ -64,7 +59,7 @@ fn generate_points() -> Vec<ColoredPoint> {
         let radius = 50_000.0 * level as f64;
 
         let color = ((level - 1) as f32 / (LEVELS - 1) as f32 * 150.0) as u8;
-        let color = Color::rgba(255, color, 0, 20);
+        let color = Color::rgba(255, color, 0, 150);
 
         for i in 0..points_count {
             let z = 1.0 - (i as f64 / (points_count - 1) as f64);

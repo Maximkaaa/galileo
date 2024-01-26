@@ -1,8 +1,10 @@
 use crate::render::wgpu::pipelines::clip::ClipPipeline;
+use crate::render::wgpu::pipelines::dot::DotPipeline;
 use crate::render::wgpu::pipelines::image::ImagePipeline;
 use crate::render::wgpu::pipelines::map_ref::MapRefPipeline;
 use crate::render::wgpu::pipelines::screen_ref::ScreenRefPipeline;
-use crate::render::wgpu::{ViewUniform, WgpuPackedBundle};
+use crate::render::wgpu::{ViewUniform, WgpuPackedBundle, DEPTH_FORMAT};
+use crate::render::RenderOptions;
 use std::mem::size_of;
 use wgpu::{
     BindGroup, Buffer, CompareFunction, DepthStencilState, Device, PipelineLayout, RenderPass,
@@ -11,6 +13,7 @@ use wgpu::{
 };
 
 mod clip;
+mod dot;
 pub mod image;
 mod map_ref;
 mod screen_ref;
@@ -23,6 +26,7 @@ pub struct Pipelines {
     screen_ref: ScreenRefPipeline,
     map_ref: MapRefPipeline,
     clip: ClipPipeline,
+    dot: DotPipeline,
 }
 
 impl Pipelines {
@@ -65,6 +69,7 @@ impl Pipelines {
             map_ref: MapRefPipeline::create(device, format, &map_view_bind_group_layout),
             screen_ref: ScreenRefPipeline::create(device, format, &map_view_bind_group_layout),
             clip: ClipPipeline::create(device, format, &map_view_bind_group_layout),
+            dot: DotPipeline::create(device, format, &map_view_bind_group_layout),
         }
     }
 
@@ -73,28 +78,34 @@ impl Pipelines {
         render_pass: &mut RenderPass<'a>,
         bundle: &'a WgpuPackedBundle,
         resolution: f32,
+        render_options: RenderOptions,
     ) {
         self.set_bindings(render_pass);
 
         if let Some(clip) = &bundle.clip_area_buffers {
-            self.clip.clip(clip, render_pass);
+            self.clip.clip(clip, render_pass, render_options);
         }
 
         for image in &bundle.image_buffers {
-            self.image.render(image, render_pass);
+            self.image.render(image, render_pass, render_options);
         }
 
         let selected = bundle.select_poly_buffers(resolution);
         if selected.index_count > 0 {
-            self.map_ref.render(selected, render_pass);
+            self.map_ref.render(selected, render_pass, render_options);
         }
 
-        if let Some(point_buffers) = &bundle.point_buffers {
-            self.screen_ref.render(point_buffers, render_pass);
+        if let Some(screen_ref_buffers) = &bundle.screen_ref_buffers {
+            self.screen_ref
+                .render(screen_ref_buffers, render_pass, render_options);
+        }
+
+        if let Some(dot_buffers) = &bundle.dot_buffers {
+            self.dot.render(dot_buffers, render_pass, render_options);
         }
 
         if let Some(clip) = &bundle.clip_area_buffers {
-            self.clip.unclip(clip, render_pass);
+            self.clip.unclip(clip, render_pass, render_options);
         }
     }
 
@@ -124,6 +135,7 @@ fn default_pipeline_descriptor<'a>(
     shader: &'a ShaderModule,
     targets: &'a [Option<wgpu::ColorTargetState>],
     buffers: &'a [VertexBufferLayout<'a>],
+    antialias: bool,
 ) -> RenderPipelineDescriptor<'a> {
     let stencil_state = StencilFaceState {
         compare: CompareFunction::Equal,
@@ -155,7 +167,7 @@ fn default_pipeline_descriptor<'a>(
             conservative: false,
         },
         depth_stencil: Some(DepthStencilState {
-            format: TextureFormat::Depth24PlusStencil8,
+            format: DEPTH_FORMAT,
             depth_write_enabled: false,
             depth_compare: CompareFunction::Always,
             stencil: StencilState {
@@ -167,7 +179,7 @@ fn default_pipeline_descriptor<'a>(
             bias: Default::default(),
         }),
         multisample: wgpu::MultisampleState {
-            count: 4,
+            count: if antialias { 4 } else { 1 },
             mask: !0,
             alpha_to_coverage_enabled: false,
         },

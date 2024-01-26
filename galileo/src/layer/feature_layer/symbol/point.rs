@@ -1,7 +1,8 @@
 use crate::layer::feature_layer::symbol::Symbol;
-use crate::primitives::Color;
+use crate::render::point_paint::PointPaint;
 use crate::render::render_bundle::RenderBundle;
-use crate::render::{PointPaint, PrimitiveId};
+use crate::render::PrimitiveId;
+use crate::Color;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geometry::Geom;
 use galileo_types::multi_point::MultiPoint;
@@ -25,16 +26,13 @@ impl<F> Symbol<F> for CirclePointSymbol {
         geometry: &Geom<P>,
         bundle: &mut RenderBundle,
     ) -> Vec<PrimitiveId> {
-        let paint = PointPaint {
-            color: self.color,
-            size: self.size,
-        };
+        let paint = PointPaint::circle(self.color, self.size as f32);
 
         match geometry {
             Geom::Point(point) => vec![bundle.add_point(point, paint)],
             Geom::MultiPoint(points) => points
                 .iter_points()
-                .map(|point| bundle.add_point(point, paint))
+                .map(|point| bundle.add_point(point, paint.clone()))
                 .collect(),
             _ => vec![],
         }

@@ -1,6 +1,6 @@
 use crate::layer::Layer;
 use crate::messenger::Messenger;
-use crate::render::{Canvas, PackedBundle, Renderer};
+use crate::render::{Canvas, PackedBundle, RenderOptions, Renderer};
 use crate::tile_scheme::TileScheme;
 use crate::view::MapView;
 use nalgebra::Point2;
@@ -30,7 +30,11 @@ impl<Provider: VectorTileProvider + 'static> Layer for VectorTileLayer<Provider>
         let tiles = self.get_tiles_to_draw(view, &tiles_store);
         let to_render: Vec<&dyn PackedBundle> = tiles.iter().map(|v| &*v.bundle).collect();
 
-        canvas.draw_bundles(&to_render, view.resolution() as f32);
+        canvas.draw_bundles(
+            &to_render,
+            view.resolution() as f32,
+            RenderOptions::default(),
+        );
     }
 
     fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>) {
