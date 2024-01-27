@@ -49,18 +49,28 @@ impl RenderBundle {
         }
     }
 
-    pub fn add_line<N, P, C>(&mut self, line: &C, paint: LinePaint) -> PrimitiveId
+    pub fn add_line<N, P, C>(
+        &mut self,
+        line: &C,
+        paint: LinePaint,
+        min_resolution: f64,
+    ) -> PrimitiveId
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
         C: Contour<Point = P>,
     {
         match self {
-            RenderBundle::Tessellating(inner) => inner.add_line(line, paint),
+            RenderBundle::Tessellating(inner) => inner.add_line(line, paint, min_resolution),
         }
     }
 
-    pub fn add_polygon<N, P, Poly>(&mut self, polygon: &Poly, paint: PolygonPaint) -> PrimitiveId
+    pub fn add_polygon<N, P, Poly>(
+        &mut self,
+        polygon: &Poly,
+        paint: PolygonPaint,
+        min_resolution: f64,
+    ) -> PrimitiveId
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
@@ -68,7 +78,7 @@ impl RenderBundle {
         Poly::Contour: Contour<Point = P>,
     {
         match self {
-            RenderBundle::Tessellating(inner) => inner.add_polygon(polygon, paint),
+            RenderBundle::Tessellating(inner) => inner.add_polygon(polygon, paint, min_resolution),
         }
     }
 

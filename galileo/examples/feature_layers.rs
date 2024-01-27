@@ -55,7 +55,7 @@ pub async fn run(builder: MapBuilder) {
         countries,
         CountrySymbol {},
         Crs::EPSG3857,
-        vec![8000.0, 1000.0, 1.0],
+        &vec![8000.0, 1000.0, 1.0],
     );
     let feature_layer = Arc::new(RwLock::new(feature_layer));
 
@@ -149,9 +149,10 @@ impl Symbol<Country> for CountrySymbol {
         feature: &Country,
         geometry: &Geom<P>,
         bundle: &mut RenderBundle,
+        min_resolution: f64,
     ) -> Vec<PrimitiveId> {
         self.get_polygon_symbol(feature)
-            .render(&(), geometry, bundle)
+            .render(&(), geometry, bundle, min_resolution)
     }
 
     fn update(
@@ -184,6 +185,7 @@ impl Symbol<City> for CitySymbol {
         feature: &City,
         geometry: &Geom<P>,
         bundle: &mut RenderBundle,
+        _min_resolution: f64,
     ) -> Vec<PrimitiveId> {
         let size = (feature.population / 1000.0).log2() as f32;
         let ids = vec![];

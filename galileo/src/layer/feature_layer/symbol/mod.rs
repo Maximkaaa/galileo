@@ -18,6 +18,7 @@ pub trait Symbol<F> {
         feature: &F,
         geometry: &Geom<P>,
         bundle: &mut RenderBundle,
+        min_resolution: f64,
     ) -> Vec<PrimitiveId>;
 
     fn update(

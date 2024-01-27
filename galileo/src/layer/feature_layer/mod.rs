@@ -32,13 +32,17 @@ where
 {
     features: Vec<F>,
     symbol: S,
-    render_bundle: RwLock<Option<Box<dyn PackedBundle>>>,
-    feature_render_map: RwLock<Vec<Vec<PrimitiveId>>>,
     crs: Crs,
-    lods: Option<Vec<f32>>,
+    lods: Vec<Lod>,
     messenger: RwLock<Option<Box<dyn Messenger>>>,
 
     space: PhantomData<Space>,
+}
+
+struct Lod {
+    min_resolution: f64,
+    render_bundle: RwLock<Option<Box<dyn PackedBundle>>>,
+    feature_render_map: RwLock<Vec<Vec<PrimitiveId>>>,
 }
 
 impl<P, F, S, Space> FeatureLayer<P, F, S, Space>
@@ -50,24 +54,34 @@ where
         Self {
             features,
             symbol: style,
-            render_bundle: RwLock::new(None),
-            feature_render_map: RwLock::new(Vec::new()),
             crs,
             messenger: RwLock::new(None),
-            lods: None,
+            lods: vec![Lod {
+                min_resolution: 1.0,
+                render_bundle: RwLock::new(None),
+                feature_render_map: RwLock::new(Vec::new()),
+            }],
             space: Default::default(),
         }
     }
 
-    pub fn with_lods(features: Vec<F>, style: S, crs: Crs, lods: Vec<f32>) -> Self {
+    pub fn with_lods(features: Vec<F>, style: S, crs: Crs, lods: &[f64]) -> Self {
+        let mut lods: Vec<_> = lods
+            .iter()
+            .map(|&min_resolution| Lod {
+                min_resolution,
+                render_bundle: RwLock::new(None),
+                feature_render_map: RwLock::new(Vec::new()),
+            })
+            .collect();
+        lods.sort_by(|a, b| b.min_resolution.total_cmp(&a.min_resolution));
+
         Self {
             features,
             symbol: style,
-            render_bundle: RwLock::new(None),
-            feature_render_map: RwLock::new(Vec::new()),
             crs,
             messenger: RwLock::new(None),
-            lods: Some(lods),
+            lods,
             space: Default::default(),
         }
     }
@@ -129,26 +143,40 @@ where
     S: Symbol<F>,
 {
     pub fn update_features(&mut self, indices: &[usize], renderer: &dyn Renderer) {
-        let mut bundle_lock = self.render_bundle.write().unwrap();
-        let Some(bundle) = bundle_lock.take() else {
-            return;
-        };
+        for lod in &self.lods {
+            let mut bundle_lock = lod.render_bundle.write().unwrap();
+            let Some(bundle) = bundle_lock.take() else {
+                return;
+            };
 
-        let feature_render_map = self.feature_render_map.read().unwrap();
-        let mut unpacked = bundle.unpack();
-        for index in indices {
-            let feature = self.features.get(*index).unwrap();
-            let render_ids = feature_render_map.get(*index).unwrap();
-            self.symbol.update(feature, render_ids, &mut unpacked);
+            let feature_render_map = lod.feature_render_map.read().unwrap();
+            let mut unpacked = bundle.unpack();
+            for index in indices {
+                let feature = self.features.get(*index).unwrap();
+                let render_ids = feature_render_map.get(*index).unwrap();
+                self.symbol.update(feature, render_ids, &mut unpacked);
+            }
+
+            // todo: remove deps on wgpu
+            let wgpu: &WgpuRenderer = renderer.as_any().downcast_ref().unwrap();
+            *bundle_lock = Some(wgpu.pack_bundle(unpacked));
+
+            if let Some(messenger) = &(*self.messenger.read().unwrap()) {
+                messenger.request_redraw();
+            }
+        }
+    }
+
+    fn select_lod(&self, resolution: f64) -> &Lod {
+        debug_assert!(!self.lods.is_empty());
+
+        for lod in &self.lods {
+            if lod.min_resolution < resolution {
+                return lod;
+            }
         }
 
-        // todo: remove deps on wgpu
-        let wgpu: &WgpuRenderer = renderer.as_any().downcast_ref().unwrap();
-        *bundle_lock = Some(wgpu.pack_bundle(unpacked));
-
-        if let Some(messenger) = &(*self.messenger.read().unwrap()) {
-            messenger.request_redraw();
-        }
+        &self.lods[self.lods.len() - 1]
     }
 }
 
@@ -160,9 +188,10 @@ where
     S: Symbol<F> + MaybeSend + MaybeSync,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
-        if self.render_bundle.read().unwrap().is_none() {
-            let mut bundle = canvas.create_bundle(&self.lods);
-            let mut render_map = self.feature_render_map.write().unwrap();
+        let lod = self.select_lod(view.resolution());
+        if lod.render_bundle.read().unwrap().is_none() {
+            let mut bundle = canvas.create_bundle();
+            let mut render_map = lod.feature_render_map.write().unwrap();
             let projection = ChainProjection::new(
                 view.crs().get_projection::<P, Point2d>().unwrap(),
                 Box::new(AddDimensionProjection::new(0.0)),
@@ -174,17 +203,18 @@ where
                 else {
                     continue;
                 };
-                let ids = self.symbol.render(feature, &projected, &mut bundle);
+                let ids = self
+                    .symbol
+                    .render(feature, &projected, &mut bundle, lod.min_resolution);
                 render_map.push(ids)
             }
 
             let packed = canvas.pack_bundle(bundle);
-            *self.render_bundle.write().unwrap() = Some(packed);
+            *lod.render_bundle.write().unwrap() = Some(packed);
         }
 
         canvas.draw_bundles(
-            &[&**self.render_bundle.read().unwrap().as_ref().unwrap()],
-            view.resolution() as f32,
+            &[&**lod.render_bundle.read().unwrap().as_ref().unwrap()],
             RenderOptions::default(),
         );
     }
@@ -206,9 +236,11 @@ where
     S: Symbol<F> + MaybeSend + MaybeSync,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
-        if self.render_bundle.read().unwrap().is_none() {
-            let mut bundle = canvas.create_bundle(&self.lods);
-            let mut render_map = self.feature_render_map.write().unwrap();
+        let lod = self.select_lod(view.resolution());
+
+        if lod.render_bundle.read().unwrap().is_none() {
+            let mut bundle = canvas.create_bundle();
+            let mut render_map = lod.feature_render_map.write().unwrap();
 
             let projection: Box<dyn Projection<InPoint = _, OutPoint = Point3d>> =
                 if view.crs() == &self.crs {
@@ -230,17 +262,18 @@ where
                 let Some(geom) = feature.geometry().project(&*projection) else {
                     continue;
                 };
-                let ids = self.symbol.render(feature, &geom, &mut bundle);
+                let ids = self
+                    .symbol
+                    .render(feature, &geom, &mut bundle, lod.min_resolution);
                 render_map.push(ids)
             }
 
             let packed = canvas.pack_bundle(bundle);
-            *self.render_bundle.write().unwrap() = Some(packed);
+            *lod.render_bundle.write().unwrap() = Some(packed);
         }
 
         canvas.draw_bundles(
-            &[&**self.render_bundle.read().unwrap().as_ref().unwrap()],
-            view.resolution() as f32,
+            &[&**lod.render_bundle.read().unwrap().as_ref().unwrap()],
             RenderOptions::default(),
         );
     }
@@ -268,14 +301,18 @@ where
             return;
         }
 
-        if self.render_bundle.read().unwrap().is_none() {
-            let mut bundle = canvas.create_bundle(&self.lods);
-            let mut render_map = self.feature_render_map.write().unwrap();
+        let lod = self.select_lod(view.resolution());
+
+        if lod.render_bundle.read().unwrap().is_none() {
+            let mut bundle = canvas.create_bundle();
+            let mut render_map = lod.feature_render_map.write().unwrap();
 
             for feature in &self.features {
                 let projection = IdentityProjection::<_, Point3d, _>::new();
                 if let Some(geometry) = feature.geometry().project(&projection) {
-                    let ids = self.symbol.render(feature, &geometry, &mut bundle);
+                    let ids =
+                        self.symbol
+                            .render(feature, &geometry, &mut bundle, lod.min_resolution);
                     render_map.push(ids)
                 } else {
                     render_map.push(vec![])
@@ -283,7 +320,7 @@ where
             }
 
             let packed = canvas.pack_bundle(bundle);
-            *self.render_bundle.write().unwrap() = Some(packed);
+            *lod.render_bundle.write().unwrap() = Some(packed);
         }
 
         let options = RenderOptions {
@@ -291,8 +328,7 @@ where
         };
 
         canvas.draw_bundles(
-            &[&**self.render_bundle.read().unwrap().as_ref().unwrap()],
-            view.resolution() as f32,
+            &[&**lod.render_bundle.read().unwrap().as_ref().unwrap()],
             options,
         );
     }

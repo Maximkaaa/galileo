@@ -25,6 +25,7 @@ impl<F> Symbol<F> for CirclePointSymbol {
         _feature: &F,
         geometry: &Geom<P>,
         bundle: &mut RenderBundle,
+        _min_resolution: f64,
     ) -> Vec<PrimitiveId> {
         let paint = PointPaint::circle(self.color, self.size as f32);
 

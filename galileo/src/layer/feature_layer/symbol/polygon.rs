@@ -51,6 +51,7 @@ impl SimplePolygonSymbol {
         &self,
         polygon: &Polygon<P>,
         bundle: &mut RenderBundle,
+        min_resolution: f64,
     ) -> Vec<PrimitiveId> {
         let mut ids = vec![];
         let id = bundle.add_polygon(
@@ -58,6 +59,7 @@ impl SimplePolygonSymbol {
             PolygonPaint {
                 color: self.fill_color,
             },
+            min_resolution,
         );
 
         ids.push(id);
@@ -70,7 +72,7 @@ impl SimplePolygonSymbol {
         };
 
         for contour in polygon.iter_contours() {
-            ids.push(bundle.add_line(contour, line_paint));
+            ids.push(bundle.add_line(contour, line_paint, min_resolution));
         }
 
         ids
@@ -101,12 +103,13 @@ impl<F> Symbol<F> for SimplePolygonSymbol {
         _feature: &F,
         geometry: &Geom<P>,
         bundle: &mut RenderBundle,
+        min_resolution: f64,
     ) -> Vec<PrimitiveId> {
         match geometry {
-            Geom::Polygon(poly) => self.render_poly(poly, bundle),
+            Geom::Polygon(poly) => self.render_poly(poly, bundle, min_resolution),
             Geom::MultiPolygon(polygons) => polygons
                 .polygons()
-                .flat_map(|polygon| self.render_poly(polygon, bundle))
+                .flat_map(|polygon| self.render_poly(polygon, bundle, min_resolution))
                 .collect(),
             _ => vec![],
         }

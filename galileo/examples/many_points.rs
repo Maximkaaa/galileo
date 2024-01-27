@@ -40,6 +40,7 @@ impl Symbol<ColoredPoint> for ColoredPointSymbol {
         feature: &ColoredPoint,
         geometry: &Geom<P>,
         bundle: &mut RenderBundle,
+        _min_resolution: f64,
     ) -> Vec<PrimitiveId> {
         if let Geom::Point(point) = geometry {
             vec![bundle.add_point(point, PointPaint::dot(feature.color))]

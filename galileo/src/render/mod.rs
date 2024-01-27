@@ -15,7 +15,7 @@ pub mod render_bundle;
 pub struct PrimitiveId(usize);
 
 pub trait Renderer: MaybeSend + MaybeSync {
-    fn create_bundle(&self, lods: &Option<Vec<f32>>) -> RenderBundle;
+    fn create_bundle(&self) -> RenderBundle;
     fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle>;
 
     fn as_any(&self) -> &dyn Any;
@@ -23,15 +23,10 @@ pub trait Renderer: MaybeSend + MaybeSync {
 
 pub trait Canvas {
     fn size(&self) -> Size;
-    fn create_bundle(&self, lods: &Option<Vec<f32>>) -> RenderBundle;
+    fn create_bundle(&self) -> RenderBundle;
     fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle>;
     fn pack_unpacked(&self, bundle: Box<dyn UnpackedBundle>) -> Box<dyn PackedBundle>;
-    fn draw_bundles(
-        &mut self,
-        bundles: &[&dyn PackedBundle],
-        resolution: f32,
-        options: RenderOptions,
-    );
+    fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle], options: RenderOptions);
 }
 
 pub trait PackedBundle: MaybeSend + MaybeSync {

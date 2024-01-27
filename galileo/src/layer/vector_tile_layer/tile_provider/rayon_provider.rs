@@ -211,7 +211,7 @@ where
 
         let renderer = renderer.read().expect("renderer lock is poisoned");
 
-        let bundle = renderer.create_bundle(&None);
+        let bundle = renderer.create_bundle();
         let context = VectorTileDecodeContext {
             index,
             style: style.clone(),

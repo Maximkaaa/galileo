@@ -15,8 +15,7 @@ use crate::layer::Layer;
 use crate::map::Map;
 use crate::render::point_paint::PointPaint;
 use crate::render::render_bundle::tessellating::{
-    LodTessellation, PointInstance, PolyVertex, PrimitiveInfo, ScreenRefVertex,
-    TessellatingRenderBundle,
+    PointInstance, PolyVertex, PrimitiveInfo, ScreenRefVertex, TessellatingRenderBundle,
 };
 use crate::render::render_bundle::RenderBundle;
 use crate::render::wgpu::pipelines::image::WgpuImage;
@@ -47,11 +46,8 @@ pub struct WgpuRenderer {
 }
 
 impl Renderer for WgpuRenderer {
-    fn create_bundle(&self, lods: &Option<Vec<f32>>) -> RenderBundle {
-        match lods {
-            Some(v) => RenderBundle::Tessellating(TessellatingRenderBundle::with_lods(v)),
-            None => RenderBundle::Tessellating(TessellatingRenderBundle::new()),
-        }
+    fn create_bundle(&self) -> RenderBundle {
+        RenderBundle::Tessellating(TessellatingRenderBundle::new())
     }
 
     fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle> {
@@ -313,8 +309,8 @@ impl<'a> Canvas for WgpuCanvas<'a> {
         self.renderer.size()
     }
 
-    fn create_bundle(&self, lods: &Option<Vec<f32>>) -> RenderBundle {
-        self.renderer.create_bundle(lods)
+    fn create_bundle(&self) -> RenderBundle {
+        self.renderer.create_bundle()
     }
 
     fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle> {
@@ -329,12 +325,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
         self.renderer.pack_bundle(bundle)
     }
 
-    fn draw_bundles(
-        &mut self,
-        bundles: &[&dyn PackedBundle],
-        resolution: f32,
-        options: RenderOptions,
-    ) {
+    fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle], options: RenderOptions) {
         let mut encoder =
             self.renderer
                 .device
@@ -382,7 +373,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
                 if let Some(cast) = bundle.as_any().downcast_ref() {
                     self.renderer
                         .pipelines
-                        .render(&mut render_pass, cast, resolution, options);
+                        .render(&mut render_pass, cast, options);
                 }
             }
         }
@@ -395,11 +386,11 @@ impl<'a> Canvas for WgpuCanvas<'a> {
 
 pub struct WgpuPackedBundle {
     clip_area_buffers: Option<WgpuPolygonBuffers>,
-    map_ref_buffers: Vec<WgpuPolygonBuffers>,
+    map_ref_buffers: WgpuPolygonBuffers,
     screen_ref_buffers: Option<ScreenRefBuffers>,
     dot_buffers: Option<WgpuDotBuffers>,
     image_buffers: Vec<WgpuImage>,
-    poly_tessellation: Vec<LodTessellation>,
+    poly_tessellation: VertexBuffers<PolyVertex, u32>,
     primitives: Vec<PrimitiveInfo>,
 }
 
@@ -435,10 +426,7 @@ impl WgpuPackedBundle {
 
         let clip_area_buffers = clip_area.map(|v| Self::write_poly_buffers(&v, renderer));
 
-        let mut poly_buffers = vec![];
-        for lod in &poly_tessellation {
-            poly_buffers.push(Self::write_poly_buffers(&lod.tessellation, renderer));
-        }
+        let poly_buffers = Self::write_poly_buffers(&poly_tessellation, renderer);
 
         let screen_ref_buffers = if !screen_ref.vertices.is_empty() {
             let index = renderer
@@ -508,16 +496,6 @@ impl WgpuPackedBundle {
         }
     }
 
-    fn select_poly_buffers(&self, resolution: f32) -> &WgpuPolygonBuffers {
-        for i in 0..self.map_ref_buffers.len() {
-            if self.poly_tessellation[i].min_resolution <= resolution {
-                return &self.map_ref_buffers[i];
-            }
-        }
-
-        &self.map_ref_buffers[self.map_ref_buffers.len() - 1]
-    }
-
     fn write_poly_buffers(
         tessellation: &VertexBuffers<PolyVertex, u32>,
         renderer: &WgpuRenderer,
@@ -567,8 +545,8 @@ impl PackedBundle for WgpuPackedBundle {
 
 struct WgpuUnpackedBundle {
     clip_area_buffers: Option<WgpuPolygonBuffers>,
-    poly_tessellation: Vec<LodTessellation>,
-    poly_buffers: Vec<WgpuPolygonBuffers>,
+    poly_tessellation: VertexBuffers<PolyVertex, u32>,
+    poly_buffers: WgpuPolygonBuffers,
     point_buffers: Option<ScreenRefBuffers>,
     images: Vec<WgpuImage>,
     dot_buffers: Option<WgpuDotBuffers>,
@@ -595,35 +573,32 @@ impl WgpuUnpackedBundle {
     }
 
     fn write_poly_buffers(&mut self, queue: &Queue) {
-        for (index, _) in self.poly_tessellation.iter().enumerate() {
-            let mut prev: Option<Range<usize>> = None;
-            for id in &self.to_write {
-                if let PrimitiveInfo::MapRef { vertex_ranges } = &self.primitives[id.0] {
-                    let vertex_range = &vertex_ranges[index];
-                    if let Some(prev_range) = prev {
-                        if vertex_range.start == prev_range.end {
-                            prev = Some(prev_range.start..vertex_range.end);
-                        } else {
-                            self.write_buffer_range(index, prev_range, queue);
-                            prev = Some(vertex_range.clone());
-                        }
+        let mut prev: Option<Range<usize>> = None;
+        for id in &self.to_write {
+            if let PrimitiveInfo::MapRef { vertex_range } = &self.primitives[id.0] {
+                if let Some(prev_range) = prev {
+                    if vertex_range.start == prev_range.end {
+                        prev = Some(prev_range.start..vertex_range.end);
                     } else {
+                        self.write_buffer_range(prev_range, queue);
                         prev = Some(vertex_range.clone());
                     }
+                } else {
+                    prev = Some(vertex_range.clone());
                 }
             }
+        }
 
-            if let Some(prev_range) = prev {
-                self.write_buffer_range(index, prev_range, queue);
-            }
+        if let Some(prev_range) = prev {
+            self.write_buffer_range(prev_range, queue);
         }
     }
 
-    fn write_buffer_range(&self, index: usize, range: Range<usize>, queue: &Queue) {
+    fn write_buffer_range(&self, range: Range<usize>, queue: &Queue) {
         queue.write_buffer(
-            &self.poly_buffers[index].vertex,
+            &self.poly_buffers.vertex,
             (range.start * size_of::<PolyVertex>()) as u64,
-            bytemuck::cast_slice(&self.poly_tessellation[index].tessellation.vertices[range]),
+            bytemuck::cast_slice(&self.poly_tessellation.vertices[range]),
         );
     }
 
@@ -651,28 +626,24 @@ impl WgpuUnpackedBundle {
 
 impl UnpackedBundle for WgpuUnpackedBundle {
     fn modify_line(&mut self, id: PrimitiveId, paint: LinePaint) {
-        let Some(PrimitiveInfo::MapRef { vertex_ranges }) = self.primitives.get(id.0) else {
+        let Some(PrimitiveInfo::MapRef { vertex_range }) = self.primitives.get(id.0) else {
             return;
         };
 
-        for (index, range) in vertex_ranges.iter().enumerate() {
-            for vertex in &mut self.poly_tessellation[index].tessellation.vertices[range.clone()] {
-                vertex.color = paint.color.to_f32_array();
-            }
+        for vertex in &mut self.poly_tessellation.vertices[vertex_range.clone()] {
+            vertex.color = paint.color.to_f32_array();
         }
 
         self.to_write.push(id);
     }
 
     fn modify_polygon(&mut self, id: PrimitiveId, paint: PolygonPaint) {
-        let Some(PrimitiveInfo::MapRef { vertex_ranges }) = self.primitives.get(id.0) else {
+        let Some(PrimitiveInfo::MapRef { vertex_range }) = self.primitives.get(id.0) else {
             return;
         };
 
-        for (index, range) in vertex_ranges.iter().enumerate() {
-            for vertex in &mut self.poly_tessellation[index].tessellation.vertices[range.clone()] {
-                vertex.color = paint.color.to_f32_array();
-            }
+        for vertex in &mut self.poly_tessellation.vertices[vertex_range.clone()] {
+            vertex.color = paint.color.to_f32_array();
         }
 
         self.to_write.push(id);

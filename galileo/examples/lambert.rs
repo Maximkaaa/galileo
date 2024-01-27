@@ -127,9 +127,10 @@ impl Symbol<Country> for CountrySymbol {
         feature: &Country,
         geometry: &Geom<P>,
         bundle: &mut RenderBundle,
+        min_resolution: f64,
     ) -> Vec<PrimitiveId> {
         self.get_polygon_symbol(feature)
-            .render(&(), geometry, bundle)
+            .render(&(), geometry, bundle, min_resolution)
     }
 
     fn update(

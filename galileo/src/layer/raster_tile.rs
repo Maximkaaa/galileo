@@ -210,7 +210,7 @@ where
                     }
                 }
                 TileState::Loaded(decoded_image) => {
-                    let mut bundle = canvas.create_bundle(&None);
+                    let mut bundle = canvas.create_bundle();
                     let mut decoded_image = decoded_image.lock();
 
                     let owned = std::mem::replace(
@@ -308,7 +308,6 @@ where
                 .iter()
                 .map(|guard| &*guard.bundle)
                 .collect::<Vec<_>>(),
-            view.resolution() as f32,
             RenderOptions::default(),
         );
         *self.prev_drawn_tiles.lock() = tiles.iter().map(|(index, _)| *index).collect();
