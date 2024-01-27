@@ -14,7 +14,6 @@ const INDICES: &[u16] = &[1, 0, 2, 1, 2, 3];
 pub struct WgpuImage {
     pub texture_bind_group: wgpu::BindGroup,
     pub vertex_buffer: wgpu::Buffer,
-    pub vertices: [ImageVertex; 4],
 }
 
 pub struct ImagePipeline {
@@ -90,7 +89,7 @@ impl ImagePipeline {
         device: &Device,
         queue: &Queue,
         image: &DecodedImage,
-        vertices: [ImageVertex; 4],
+        vertices: &[ImageVertex; 4],
     ) -> WgpuImage {
         let texture_size = wgpu::Extent3d {
             width: image.dimensions.0,
@@ -143,13 +142,12 @@ impl ImagePipeline {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Image vertex buffer"),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            contents: bytemuck::cast_slice(&vertices),
+            contents: bytemuck::cast_slice(vertices),
         });
 
         WgpuImage {
             texture_bind_group,
             vertex_buffer,
-            vertices,
         }
     }
 

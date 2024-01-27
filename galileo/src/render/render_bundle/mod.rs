@@ -1,3 +1,4 @@
+use crate::error::GalileoError;
 use crate::primitives::DecodedImage;
 use crate::render::point_paint::PointPaint;
 use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
@@ -16,6 +17,12 @@ pub enum RenderBundle {
 }
 
 impl RenderBundle {
+    pub fn approx_buffer_size(&self) -> usize {
+        match self {
+            RenderBundle::Tessellating(inner) => inner.approx_buffer_size(),
+        }
+    }
+
     pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly)
     where
         N: AsPrimitive<f32>,
@@ -49,18 +56,28 @@ impl RenderBundle {
         }
     }
 
-    pub fn add_line<N, P, C>(&mut self, line: &C, paint: LinePaint) -> PrimitiveId
+    pub fn add_line<N, P, C>(
+        &mut self,
+        line: &C,
+        paint: LinePaint,
+        min_resolution: f64,
+    ) -> PrimitiveId
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
         C: Contour<Point = P>,
     {
         match self {
-            RenderBundle::Tessellating(inner) => inner.add_line(line, paint),
+            RenderBundle::Tessellating(inner) => inner.add_line(line, paint, min_resolution),
         }
     }
 
-    pub fn add_polygon<N, P, Poly>(&mut self, polygon: &Poly, paint: PolygonPaint) -> PrimitiveId
+    pub fn add_polygon<N, P, Poly>(
+        &mut self,
+        polygon: &Poly,
+        paint: PolygonPaint,
+        min_resolution: f64,
+    ) -> PrimitiveId
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
@@ -68,13 +85,35 @@ impl RenderBundle {
         Poly::Contour: Contour<Point = P>,
     {
         match self {
-            RenderBundle::Tessellating(inner) => inner.add_polygon(polygon, paint),
+            RenderBundle::Tessellating(inner) => inner.add_polygon(polygon, paint, min_resolution),
         }
     }
 
     pub fn is_empty(&self) -> bool {
         match self {
             RenderBundle::Tessellating(inner) => inner.is_empty(),
+        }
+    }
+
+    pub fn modify_line(&mut self, id: PrimitiveId, paint: LinePaint) -> Result<(), GalileoError> {
+        match self {
+            RenderBundle::Tessellating(inner) => inner.modify_line(id, paint),
+        }
+    }
+
+    pub fn modify_polygon(
+        &mut self,
+        id: PrimitiveId,
+        paint: PolygonPaint,
+    ) -> Result<(), GalileoError> {
+        match self {
+            RenderBundle::Tessellating(inner) => inner.modify_polygon(id, paint),
+        }
+    }
+
+    pub fn modify_image(&mut self, id: PrimitiveId, paint: ImagePaint) -> Result<(), GalileoError> {
+        match self {
+            RenderBundle::Tessellating(inner) => inner.modify_image(id, paint),
         }
     }
 }

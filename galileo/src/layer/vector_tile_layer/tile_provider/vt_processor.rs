@@ -74,6 +74,7 @@ impl VtProcessor {
             PolygonPaint {
                 color: style.background,
             },
+            lod_resolution,
         );
 
         for layer in &mvt_tile.layers {
@@ -98,6 +99,7 @@ impl VtProcessor {
                                             .collect(),
                                     },
                                     paint,
+                                    lod_resolution,
                                 );
                             }
                         }
@@ -110,6 +112,7 @@ impl VtProcessor {
                                         Self::transform_point(p, bbox, tile_resolution)
                                     }),
                                     paint,
+                                    lod_resolution,
                                 );
                             }
                         }

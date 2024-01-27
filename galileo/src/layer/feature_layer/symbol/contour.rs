@@ -24,6 +24,7 @@ impl<F> Symbol<F> for SimpleContourSymbol {
         _feature: &F,
         geometry: &Geom<P>,
         bundle: &mut RenderBundle,
+        min_resolution: f64,
     ) -> Vec<PrimitiveId> {
         let paint = LinePaint {
             color: self.color,
@@ -33,10 +34,10 @@ impl<F> Symbol<F> for SimpleContourSymbol {
         };
 
         match geometry {
-            Geom::Contour(contour) => vec![bundle.add_line(contour, paint)],
+            Geom::Contour(contour) => vec![bundle.add_line(contour, paint, min_resolution)],
             Geom::MultiContour(contours) => contours
                 .contours()
-                .map(|contour| bundle.add_line(contour, paint))
+                .map(|contour| bundle.add_line(contour, paint, min_resolution))
                 .collect(),
             _ => vec![],
         }

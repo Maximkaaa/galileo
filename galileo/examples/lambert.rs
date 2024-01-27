@@ -5,7 +5,7 @@ use galileo::layer::feature_layer::symbol::polygon::SimplePolygonSymbol;
 use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::FeatureLayer;
 use galileo::render::render_bundle::RenderBundle;
-use galileo::render::{PrimitiveId, UnpackedBundle};
+use galileo::render::PrimitiveId;
 use galileo::view::MapView;
 use galileo::Color;
 use galileo_types::cartesian::impls::point::Point2d;
@@ -50,7 +50,7 @@ pub async fn run(builder: MapBuilder) {
             ),
         ))
         .with_layer(feature_layer.clone())
-        .with_event_handler(move |ev, map, backend| {
+        .with_event_handler(move |ev, map, _backend| {
             if let UserEvent::PointerMoved(event) = ev {
                 let mut layer = feature_layer.write().unwrap();
 
@@ -92,7 +92,7 @@ pub async fn run(builder: MapBuilder) {
                 }
 
                 if !to_update.is_empty() {
-                    layer.update_features(&to_update, backend);
+                    layer.update_features(&to_update);
                 }
 
                 return EventPropagation::Stop;
@@ -127,17 +127,13 @@ impl Symbol<Country> for CountrySymbol {
         feature: &Country,
         geometry: &Geom<P>,
         bundle: &mut RenderBundle,
+        min_resolution: f64,
     ) -> Vec<PrimitiveId> {
         self.get_polygon_symbol(feature)
-            .render(&(), geometry, bundle)
+            .render(&(), geometry, bundle, min_resolution)
     }
 
-    fn update(
-        &self,
-        feature: &Country,
-        render_ids: &[PrimitiveId],
-        bundle: &mut Box<dyn UnpackedBundle>,
-    ) {
+    fn update(&self, feature: &Country, render_ids: &[PrimitiveId], bundle: &mut RenderBundle) {
         let renders_by_feature = render_ids.len() / feature.geometry.parts().len();
         let mut next_index = 0;
         for _ in feature.geometry.parts() {

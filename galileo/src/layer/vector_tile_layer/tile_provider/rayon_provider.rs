@@ -211,7 +211,7 @@ where
 
         let renderer = renderer.read().expect("renderer lock is poisoned");
 
-        let bundle = renderer.create_bundle(&None);
+        let bundle = renderer.create_bundle();
         let context = VectorTileDecodeContext {
             index,
             style: style.clone(),
@@ -219,7 +219,7 @@ where
             bundle,
         };
         let (bundle, mvt_tile) = self.data_provider.decode(bytes, context)?;
-        let packed_bundle = renderer.pack_bundle(bundle);
+        let packed_bundle = renderer.pack_bundle(&bundle);
 
         Ok(VectorTile {
             bundle: packed_bundle,

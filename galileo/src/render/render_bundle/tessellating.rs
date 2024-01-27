@@ -1,3 +1,4 @@
+use crate::error::GalileoError;
 use crate::primitives::DecodedImage;
 use crate::render::point_paint::{CircleFill, PointPaint, PointShape, SectorParameters};
 use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
@@ -23,12 +24,13 @@ use std::ops::Range;
 
 #[derive(Debug)]
 pub struct TessellatingRenderBundle {
-    pub poly_tessellation: Vec<LodTessellation>,
+    pub poly_tessellation: VertexBuffers<PolyVertex, u32>,
     pub points: Vec<PointInstance>,
     pub screen_ref: ScreenRefTessellation,
     pub images: Vec<(DecodedImage, [ImageVertex; 4])>,
-    pub primitives: Vec<PrimitiveInfo>,
     pub clip_area: Option<VertexBuffers<PolyVertex, u32>>,
+    pub primitives: Vec<PrimitiveInfo>,
+    buffer_size: usize,
 }
 
 pub(crate) type ScreenRefTessellation = VertexBuffers<ScreenRefVertex, u32>;
@@ -41,16 +43,9 @@ pub struct ScreenRefVertex {
     color: [u8; 4],
 }
 
-#[derive(Debug)]
-pub struct LodTessellation {
-    pub min_resolution: f32,
-    pub tessellation: VertexBuffers<PolyVertex, u32>,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub enum PrimitiveInfo {
-    Invalid,
-    MapRef { vertex_ranges: Vec<Range<usize>> },
+    MapRef { vertex_range: Range<usize> },
     ScreenRef { vertex_range: Range<usize> },
     Dot { point_index: usize },
     Image { image_index: usize },
@@ -65,37 +60,20 @@ impl Default for TessellatingRenderBundle {
 impl TessellatingRenderBundle {
     pub fn new() -> Self {
         Self {
-            poly_tessellation: vec![LodTessellation {
-                min_resolution: 1.0,
-                tessellation: VertexBuffers::new(),
-            }],
+            poly_tessellation: VertexBuffers::new(),
             points: Vec::new(),
             screen_ref: VertexBuffers::new(),
             images: Vec::new(),
             primitives: Vec::new(),
             clip_area: None,
+            buffer_size: 0,
         }
     }
 
-    pub fn with_lods(lods: &[f32]) -> Self {
-        Self {
-            poly_tessellation: lods
-                .iter()
-                .map(|&min_resolution| LodTessellation {
-                    min_resolution,
-                    tessellation: VertexBuffers::new(),
-                })
-                .collect(),
-            points: Vec::new(),
-            screen_ref: VertexBuffers::new(),
-            images: Vec::new(),
-            primitives: Vec::new(),
-            clip_area: None,
-        }
+    pub fn approx_buffer_size(&self) -> usize {
+        self.buffer_size
     }
-}
 
-impl TessellatingRenderBundle {
     pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly)
     where
         N: AsPrimitive<f32>,
@@ -111,6 +89,10 @@ impl TessellatingRenderBundle {
             },
             &mut tessellation,
         );
+
+        self.buffer_size += tessellation.vertices.len() * std::mem::size_of::<PolyVertex>()
+            + tessellation.indices.len() * std::mem::size_of::<u32>();
+
         self.clip_area = Some(tessellation);
     }
 
@@ -122,6 +104,9 @@ impl TessellatingRenderBundle {
     ) -> PrimitiveId {
         let opacity = paint.opacity as f32 / 255.0;
         let image_index = self.images.len();
+
+        self.buffer_size += image.bytes.len() + std::mem::size_of::<ImageVertex>() * 4;
+
         self.images.push((
             image,
             [
@@ -149,8 +134,8 @@ impl TessellatingRenderBundle {
         ));
 
         let id = self.primitives.len();
-        self.primitives.push(PrimitiveInfo::Image { image_index });
 
+        self.primitives.push(PrimitiveInfo::Image { image_index });
         PrimitiveId(id)
     }
 
@@ -211,37 +196,39 @@ impl TessellatingRenderBundle {
         id
     }
 
-    pub fn add_line<N, P, C>(&mut self, line: &C, paint: LinePaint) -> PrimitiveId
+    pub fn add_line<N, P, C>(
+        &mut self,
+        line: &C,
+        paint: LinePaint,
+        min_resolution: f64,
+    ) -> PrimitiveId
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
         C: Contour<Point = P>,
     {
-        let mut ranges = vec![];
-        for index in 0..self.poly_tessellation.len() {
-            ranges.push(self.add_line_lod(line, paint, index));
-        }
+        let range = self.add_line_lod(line, paint, min_resolution);
 
         let id = self.primitives.len();
         self.primitives.push(PrimitiveInfo::MapRef {
-            vertex_ranges: ranges,
+            vertex_range: range,
         });
 
         PrimitiveId(id)
     }
 
-    pub fn add_line_lod<N, P, C>(
+    fn add_line_lod<N, P, C>(
         &mut self,
         line: &C,
         paint: LinePaint,
-        lod_index: usize,
+        min_resolution: f64,
     ) -> Range<usize>
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
         C: Contour<Point = P>,
     {
-        let lod = &mut self.poly_tessellation[lod_index];
+        let tessellation = &mut self.poly_tessellation;
         let mut path_builder = BuilderWithAttributes::new(1);
         let mut iterator = line.iter_points();
 
@@ -251,8 +238,8 @@ impl TessellatingRenderBundle {
 
         let _ = path_builder.begin(
             point(
-                first_point.x().as_() / lod.min_resolution,
-                first_point.y().as_() / lod.min_resolution,
+                first_point.x().as_() / min_resolution as f32,
+                first_point.y().as_() / min_resolution as f32,
             ),
             &[first_point.z().as_()],
         );
@@ -260,8 +247,8 @@ impl TessellatingRenderBundle {
         for p in iterator {
             let _ = path_builder.line_to(
                 point(
-                    p.x().as_() / lod.min_resolution,
-                    p.y().as_() / lod.min_resolution,
+                    p.x().as_() / min_resolution as f32,
+                    p.y().as_() / min_resolution as f32,
                 ),
                 &[p.z().as_()],
             );
@@ -274,12 +261,13 @@ impl TessellatingRenderBundle {
             width: paint.width as f32,
             offset: paint.offset as f32,
             color: paint.color.to_f32_array(),
-            resolution: lod.min_resolution,
+            resolution: min_resolution as f32,
             path: &path,
         };
 
         let mut tesselator = StrokeTessellator::new();
-        let start_index = lod.tessellation.vertices.len();
+        let start_index = tessellation.vertices.len();
+        let start_index_count = tessellation.indices.len();
 
         tesselator
             .tessellate_path(
@@ -290,39 +278,104 @@ impl TessellatingRenderBundle {
                     .with_miter_limit(1.0)
                     .with_tolerance(0.1)
                     .with_line_join(LineJoin::Round),
-                &mut BuffersBuilder::new(&mut lod.tessellation, vertex_constructor),
+                &mut BuffersBuilder::new(tessellation, vertex_constructor),
             )
             .unwrap();
 
-        let end_index = lod.tessellation.vertices.len();
+        let end_index = tessellation.vertices.len();
+
+        self.buffer_size += (end_index - start_index) * std::mem::size_of::<PolyVertex>();
+        self.buffer_size +=
+            (tessellation.indices.len() - start_index_count) * std::mem::size_of::<u32>();
+
         start_index..end_index
     }
 
-    pub fn add_polygon<N, P, Poly>(&mut self, polygon: &Poly, paint: PolygonPaint) -> PrimitiveId
+    pub fn add_polygon<N, P, Poly>(
+        &mut self,
+        polygon: &Poly,
+        paint: PolygonPaint,
+        min_resolution: f64,
+    ) -> PrimitiveId
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
         Poly: Polygon,
         Poly::Contour: Contour<Point = P>,
     {
-        let mut ranges = vec![];
-        for lod_index in 0..self.poly_tessellation.len() {
-            ranges.push(self.add_polygon_lod(polygon, paint, lod_index));
-        }
-
+        let vertex_range = self.add_polygon_lod(polygon, paint, min_resolution as f32);
         let id = self.primitives.len();
-        self.primitives.push(PrimitiveInfo::MapRef {
-            vertex_ranges: ranges,
-        });
+        self.primitives.push(PrimitiveInfo::MapRef { vertex_range });
 
         PrimitiveId(id)
+    }
+
+    pub fn modify_line(&mut self, id: PrimitiveId, paint: LinePaint) -> Result<(), GalileoError> {
+        let info = self
+            .primitives
+            .get(id.0)
+            .ok_or(GalileoError::Generic("primitive does not exist".into()))?;
+        match info {
+            PrimitiveInfo::MapRef { vertex_range } => {
+                self.update_map_ref(vertex_range.clone(), paint.color)
+            }
+            _ => return Err(GalileoError::Generic("invalid primitive type".into())),
+        }
+
+        Ok(())
+    }
+
+    pub fn modify_polygon(
+        &mut self,
+        id: PrimitiveId,
+        paint: PolygonPaint,
+    ) -> Result<(), GalileoError> {
+        let info = self
+            .primitives
+            .get(id.0)
+            .ok_or(GalileoError::Generic("primitive does not exist".into()))?;
+        match info {
+            PrimitiveInfo::MapRef { vertex_range } => {
+                self.update_map_ref(vertex_range.clone(), paint.color)
+            }
+            _ => return Err(GalileoError::Generic("invalid primitive type".into())),
+        }
+
+        Ok(())
+    }
+
+    pub fn modify_image(&mut self, id: PrimitiveId, paint: ImagePaint) -> Result<(), GalileoError> {
+        let info = self
+            .primitives
+            .get(id.0)
+            .ok_or(GalileoError::Generic("primitive does not exist".into()))?;
+        match info {
+            PrimitiveInfo::Image { image_index } => {
+                let (_, vertices) = self
+                    .images
+                    .get_mut(*image_index)
+                    .ok_or(GalileoError::Generic("invalid image id".into()))?;
+                for vertex in vertices {
+                    vertex.opacity = paint.opacity as f32 / 255.0;
+                }
+            }
+            _ => return Err(GalileoError::Generic("invalid primitive type".into())),
+        }
+
+        Ok(())
+    }
+
+    fn update_map_ref(&mut self, range: Range<usize>, color: Color) {
+        for vertex in &mut self.poly_tessellation.vertices[range] {
+            vertex.color = color.to_f32_array();
+        }
     }
 
     fn add_polygon_lod<N, P, Poly>(
         &mut self,
         polygon: &Poly,
         paint: PolygonPaint,
-        lod_index: usize,
+        _min_resolution: f32,
     ) -> Range<usize>
     where
         N: AsPrimitive<f32>,
@@ -330,12 +383,17 @@ impl TessellatingRenderBundle {
         Poly: Polygon,
         Poly::Contour: Contour<Point = P>,
     {
-        let lod = &mut self.poly_tessellation[lod_index];
-        let start_index = lod.tessellation.vertices.len();
+        let lod = &mut self.poly_tessellation;
+        let start_index = lod.vertices.len();
+        let start_index_count = lod.indices.len();
 
-        Self::tessellate_polygon(polygon, paint, &mut lod.tessellation);
+        Self::tessellate_polygon(polygon, paint, lod);
 
-        let end_index = lod.tessellation.vertices.len();
+        let end_index = lod.vertices.len();
+
+        self.buffer_size += (end_index - start_index) * std::mem::size_of::<PolyVertex>();
+        self.buffer_size += (lod.indices.len() - start_index_count) * std::mem::size_of::<u32>();
+
         start_index..end_index
     }
 
@@ -405,6 +463,9 @@ impl TessellatingRenderBundle {
         build_contour_path(&mut path_builder, shape, scale);
         let path = path_builder.build();
 
+        let start_vertex_count = self.screen_ref.vertices.len();
+        let start_index_count = self.screen_ref.indices.len();
+
         if let Some(outline) = outline {
             let vertex_constructor = ScreenRefVertexConstructor {
                 color: outline.color.to_u8_array(),
@@ -437,6 +498,11 @@ impl TessellatingRenderBundle {
                 log::warn!("Shape tessellation failed: {err:?}");
             }
         }
+
+        self.buffer_size += (self.screen_ref.vertices.len() - start_vertex_count)
+            * std::mem::size_of::<ScreenRefVertex>();
+        self.buffer_size +=
+            (self.screen_ref.indices.len() - start_index_count) * std::mem::size_of::<u32>();
     }
 
     fn add_circle<N, P>(
@@ -495,6 +561,9 @@ impl TessellatingRenderBundle {
         let mut contour = get_circle_sector(radius, start_angle, end_angle);
         let first_index = self.screen_ref.vertices.len() as u32;
 
+        let start_vertex_count = self.screen_ref.vertices.len();
+        let start_index_count = self.screen_ref.indices.len();
+
         let mut vertices = vec![center];
         let mut indices = vec![];
         for point in &contour {
@@ -533,6 +602,11 @@ impl TessellatingRenderBundle {
                 offset,
             );
         }
+
+        self.buffer_size += (self.screen_ref.vertices.len() - start_vertex_count)
+            * std::mem::size_of::<ScreenRefVertex>();
+        self.buffer_size +=
+            (self.screen_ref.indices.len() - start_index_count) * std::mem::size_of::<u32>();
     }
 
     fn add_dot<P, N>(&mut self, point: &P, color: Color, offset: Vector2<f32>)

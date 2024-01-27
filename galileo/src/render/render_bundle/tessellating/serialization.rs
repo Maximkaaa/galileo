@@ -1,6 +1,6 @@
 use crate::primitives::DecodedImage;
 use crate::render::render_bundle::tessellating::{
-    LodTessellation, PolyVertex, PrimitiveInfo, ScreenRefVertex, TessellatingRenderBundle,
+    PolyVertex, PrimitiveInfo, ScreenRefVertex, TessellatingRenderBundle,
 };
 use lyon::lyon_tessellation::VertexBuffers;
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,7 @@ use std::mem::size_of;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct TessellatingRenderBundleBytes {
-    pub poly_tessellation: Vec<LodTessellationBytes>,
+    pub poly_tessellation: PolyVertexBuffersBytes,
     pub points: Vec<u32>,
     pub screen_ref: ScreenRefVertexBuffersBytes,
     pub images: Vec<ImageBytes>,
@@ -78,38 +78,10 @@ impl ScreenRefVertexBuffersBytes {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct LodTessellationBytes {
-    pub min_resolution: f32,
-    pub tessellation: PolyVertexBuffersBytes,
-}
-
-impl From<LodTessellation> for LodTessellationBytes {
-    fn from(value: LodTessellation) -> Self {
-        Self {
-            min_resolution: value.min_resolution,
-            tessellation: value.tessellation.into(),
-        }
-    }
-}
-
-impl LodTessellation {
-    fn from_bytes_unchecked(lod: LodTessellationBytes) -> Self {
-        Self {
-            min_resolution: lod.min_resolution,
-            tessellation: lod.tessellation.into_typed_unchecked(),
-        }
-    }
-}
-
 impl TessellatingRenderBundle {
     pub(crate) fn into_bytes(self) -> TessellatingRenderBundleBytes {
         let converted = TessellatingRenderBundleBytes {
-            poly_tessellation: self
-                .poly_tessellation
-                .into_iter()
-                .map(|v| v.into())
-                .collect(),
+            poly_tessellation: self.poly_tessellation.into(),
             points: bytemuck::cast_vec(self.points),
             screen_ref: self.screen_ref.into(),
             images: self
@@ -130,11 +102,7 @@ impl TessellatingRenderBundle {
 
     pub(crate) fn from_bytes_unchecked(bundle: TessellatingRenderBundleBytes) -> Self {
         Self {
-            poly_tessellation: bundle
-                .poly_tessellation
-                .into_iter()
-                .map(|v| LodTessellation::from_bytes_unchecked(v))
-                .collect(),
+            poly_tessellation: bundle.poly_tessellation.into_typed_unchecked(),
             points: bytemuck::cast_vec(bundle.points),
             screen_ref: bundle.screen_ref.into_typed_unchecked(),
             images: bundle

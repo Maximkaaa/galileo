@@ -77,7 +77,6 @@ impl Pipelines {
         &'a self,
         render_pass: &mut RenderPass<'a>,
         bundle: &'a WgpuPackedBundle,
-        resolution: f32,
         render_options: RenderOptions,
     ) {
         self.set_bindings(render_pass);
@@ -90,9 +89,9 @@ impl Pipelines {
             self.image.render(image, render_pass, render_options);
         }
 
-        let selected = bundle.select_poly_buffers(resolution);
-        if selected.index_count > 0 {
-            self.map_ref.render(selected, render_pass, render_options);
+        if bundle.map_ref_buffers.index_count > 0 {
+            self.map_ref
+                .render(&bundle.map_ref_buffers, render_pass, render_options);
         }
 
         if let Some(screen_ref_buffers) = &bundle.screen_ref_buffers {

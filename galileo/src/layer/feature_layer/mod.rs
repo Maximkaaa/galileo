@@ -2,7 +2,7 @@ use crate::layer::feature_layer::feature::Feature;
 use crate::layer::feature_layer::symbol::Symbol;
 use crate::layer::Layer;
 use crate::messenger::Messenger;
-use crate::render::wgpu::WgpuRenderer;
+use crate::render::render_bundle::RenderBundle;
 use crate::render::{Canvas, PackedBundle, PrimitiveId, RenderOptions, Renderer};
 use crate::view::MapView;
 use galileo_types::cartesian::impls::point::{Point2d, Point3d};
@@ -21,9 +21,12 @@ use maybe_sync::{MaybeSend, MaybeSync};
 use num_traits::AsPrimitive;
 use std::marker::PhantomData;
 use std::sync::{Arc, RwLock};
+use web_time::SystemTime;
 
 pub mod feature;
 pub mod symbol;
+
+const BUFFER_SIZE_LIMIT: usize = 10_000_000;
 
 pub struct FeatureLayer<P, F, S, Space>
 where
@@ -32,44 +35,95 @@ where
 {
     features: Vec<F>,
     symbol: S,
-    render_bundle: RwLock<Option<Box<dyn PackedBundle>>>,
-    feature_render_map: RwLock<Vec<Vec<PrimitiveId>>>,
     crs: Crs,
-    lods: Option<Vec<f32>>,
+    lods: Vec<Lod>,
     messenger: RwLock<Option<Box<dyn Messenger>>>,
 
     space: PhantomData<Space>,
+}
+
+struct Lod {
+    min_resolution: f64,
+    render_bundles: RwLock<Vec<RenderBundle>>,
+    packed_bundles: RwLock<Vec<Option<Box<dyn PackedBundle>>>>,
+    feature_render_map: RwLock<Vec<RenderMapEntry>>,
+}
+
+struct RenderMapEntry {
+    bundle_index: usize,
+    primitive_ids: Vec<PrimitiveId>,
 }
 
 impl<P, F, S, Space> FeatureLayer<P, F, S, Space>
 where
     F: Feature,
     F::Geom: Geometry<Point = P>,
+    S: Symbol<F>,
 {
     pub fn new(features: Vec<F>, style: S, crs: Crs) -> Self {
         Self {
             features,
             symbol: style,
-            render_bundle: RwLock::new(None),
-            feature_render_map: RwLock::new(Vec::new()),
             crs,
             messenger: RwLock::new(None),
-            lods: None,
+            lods: vec![Lod {
+                min_resolution: 1.0,
+                render_bundles: RwLock::new(vec![]),
+                packed_bundles: RwLock::new(vec![]),
+                feature_render_map: RwLock::new(Vec::new()),
+            }],
             space: Default::default(),
         }
     }
 
-    pub fn with_lods(features: Vec<F>, style: S, crs: Crs, lods: Vec<f32>) -> Self {
+    pub fn with_lods(features: Vec<F>, style: S, crs: Crs, lods: &[f64]) -> Self {
+        let mut lods: Vec<_> = lods
+            .iter()
+            .map(|&min_resolution| Lod {
+                min_resolution,
+                render_bundles: RwLock::new(vec![]),
+                packed_bundles: RwLock::new(vec![]),
+                feature_render_map: RwLock::new(Vec::new()),
+            })
+            .collect();
+        lods.sort_by(|a, b| b.min_resolution.total_cmp(&a.min_resolution));
+
         Self {
             features,
             symbol: style,
-            render_bundle: RwLock::new(None),
-            feature_render_map: RwLock::new(Vec::new()),
             crs,
             messenger: RwLock::new(None),
-            lods: Some(lods),
+            lods,
             space: Default::default(),
         }
+    }
+
+    fn render_internal(&self, lod: &Lod, canvas: &mut dyn Canvas) {
+        let mut packed_bundles = lod.packed_bundles.write().unwrap();
+        let bundles = lod.render_bundles.read().unwrap();
+        for (index, bundle) in bundles.iter().enumerate() {
+            if packed_bundles.len() == index {
+                packed_bundles.push(None);
+            }
+            if packed_bundles[index].is_none() {
+                packed_bundles[index] = Some(canvas.pack_bundle(bundle))
+            }
+        }
+
+        let start = SystemTime::now();
+        canvas.draw_bundles(
+            &packed_bundles
+                .iter()
+                .filter_map(|v| v.as_ref().map(|v| &**v))
+                .collect::<Vec<_>>(),
+            RenderOptions {
+                antialias: self.symbol.use_antialiasing(),
+            },
+        );
+        log::info!(
+            "Packed everything in {} ms",
+            start.elapsed().unwrap().as_millis()
+        );
     }
 }
 
@@ -128,27 +182,49 @@ where
     F::Geom: Geometry<Point = P>,
     S: Symbol<F>,
 {
-    pub fn update_features(&mut self, indices: &[usize], renderer: &dyn Renderer) {
-        let mut bundle_lock = self.render_bundle.write().unwrap();
-        let Some(bundle) = bundle_lock.take() else {
+    pub fn update_features(&mut self, indices: &[usize]) {
+        if indices.is_empty() {
             return;
-        };
-
-        let feature_render_map = self.feature_render_map.read().unwrap();
-        let mut unpacked = bundle.unpack();
-        for index in indices {
-            let feature = self.features.get(*index).unwrap();
-            let render_ids = feature_render_map.get(*index).unwrap();
-            self.symbol.update(feature, render_ids, &mut unpacked);
         }
 
-        // todo: remove deps on wgpu
-        let wgpu: &WgpuRenderer = renderer.as_any().downcast_ref().unwrap();
-        *bundle_lock = Some(wgpu.pack_bundle(unpacked));
+        for lod in &self.lods {
+            let mut bundles = lod.render_bundles.write().unwrap();
+            let mut packed_bundles = lod.packed_bundles.write().unwrap();
 
-        if let Some(messenger) = &(*self.messenger.read().unwrap()) {
-            messenger.request_redraw();
+            let feature_render_map = lod.feature_render_map.read().unwrap();
+            if feature_render_map.is_empty() {
+                return;
+            }
+
+            for index in indices {
+                let entry = &feature_render_map[*index];
+                let Some(bundle) = bundles.get_mut(entry.bundle_index) else {
+                    return;
+                };
+                let feature = self.features.get(*index).unwrap();
+                self.symbol.update(feature, &entry.primitive_ids, bundle);
+
+                if let Some(bundle) = packed_bundles.get_mut(entry.bundle_index) {
+                    bundle.take();
+                }
+            }
+
+            if let Some(messenger) = &(*self.messenger.read().unwrap()) {
+                messenger.request_redraw();
+            }
         }
+    }
+
+    fn select_lod(&self, resolution: f64) -> &Lod {
+        debug_assert!(!self.lods.is_empty());
+
+        for lod in &self.lods {
+            if lod.min_resolution < resolution {
+                return lod;
+            }
+        }
+
+        &self.lods[self.lods.len() - 1]
     }
 }
 
@@ -160,9 +236,16 @@ where
     S: Symbol<F> + MaybeSend + MaybeSync,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
-        if self.render_bundle.read().unwrap().is_none() {
-            let mut bundle = canvas.create_bundle(&self.lods);
-            let mut render_map = self.feature_render_map.write().unwrap();
+        if self.features.is_empty() {
+            return;
+        }
+
+        let lod = self.select_lod(view.resolution());
+        if lod.render_bundles.read().unwrap().is_empty() {
+            let mut render_bundles = lod.render_bundles.write().unwrap();
+
+            let mut bundle = canvas.create_bundle();
+            let mut render_map = lod.feature_render_map.write().unwrap();
             let projection = ChainProjection::new(
                 view.crs().get_projection::<P, Point2d>().unwrap(),
                 Box::new(AddDimensionProjection::new(0.0)),
@@ -174,19 +257,24 @@ where
                 else {
                     continue;
                 };
-                let ids = self.symbol.render(feature, &projected, &mut bundle);
-                render_map.push(ids)
+                let ids = self
+                    .symbol
+                    .render(feature, &projected, &mut bundle, lod.min_resolution);
+                render_map.push(RenderMapEntry {
+                    bundle_index: render_bundles.len(),
+                    primitive_ids: ids,
+                });
+
+                if bundle.approx_buffer_size() > BUFFER_SIZE_LIMIT {
+                    let full_bundle = std::mem::replace(&mut bundle, canvas.create_bundle());
+                    render_bundles.push(full_bundle);
+                }
             }
 
-            let packed = canvas.pack_bundle(bundle);
-            *self.render_bundle.write().unwrap() = Some(packed);
+            render_bundles.push(bundle);
         }
 
-        canvas.draw_bundles(
-            &[&**self.render_bundle.read().unwrap().as_ref().unwrap()],
-            view.resolution() as f32,
-            RenderOptions::default(),
-        );
+        self.render_internal(lod, canvas);
     }
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
@@ -206,9 +294,13 @@ where
     S: Symbol<F> + MaybeSend + MaybeSync,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
-        if self.render_bundle.read().unwrap().is_none() {
-            let mut bundle = canvas.create_bundle(&self.lods);
-            let mut render_map = self.feature_render_map.write().unwrap();
+        let lod = self.select_lod(view.resolution());
+
+        if lod.render_bundles.read().unwrap().is_empty() {
+            let mut render_bundles = lod.render_bundles.write().unwrap();
+
+            let mut bundle = canvas.create_bundle();
+            let mut render_map = lod.feature_render_map.write().unwrap();
 
             let projection: Box<dyn Projection<InPoint = _, OutPoint = Point3d>> =
                 if view.crs() == &self.crs {
@@ -230,19 +322,24 @@ where
                 let Some(geom) = feature.geometry().project(&*projection) else {
                     continue;
                 };
-                let ids = self.symbol.render(feature, &geom, &mut bundle);
-                render_map.push(ids)
+                let ids = self
+                    .symbol
+                    .render(feature, &geom, &mut bundle, lod.min_resolution);
+                render_map.push(RenderMapEntry {
+                    bundle_index: render_bundles.len(),
+                    primitive_ids: ids,
+                });
+
+                if bundle.approx_buffer_size() > BUFFER_SIZE_LIMIT {
+                    let full_bundle = std::mem::replace(&mut bundle, canvas.create_bundle());
+                    render_bundles.push(full_bundle);
+                }
             }
 
-            let packed = canvas.pack_bundle(bundle);
-            *self.render_bundle.write().unwrap() = Some(packed);
+            render_bundles.push(bundle);
         }
 
-        canvas.draw_bundles(
-            &[&**self.render_bundle.read().unwrap().as_ref().unwrap()],
-            view.resolution() as f32,
-            RenderOptions::default(),
-        );
+        self.render_internal(lod, canvas);
     }
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
@@ -268,33 +365,41 @@ where
             return;
         }
 
-        if self.render_bundle.read().unwrap().is_none() {
-            let mut bundle = canvas.create_bundle(&self.lods);
-            let mut render_map = self.feature_render_map.write().unwrap();
+        let lod = self.select_lod(view.resolution());
+
+        if lod.render_bundles.read().unwrap().is_empty() {
+            let mut render_bundles = lod.render_bundles.write().unwrap();
+
+            let mut bundle = canvas.create_bundle();
+            let mut render_map = lod.feature_render_map.write().unwrap();
 
             for feature in &self.features {
                 let projection = IdentityProjection::<_, Point3d, _>::new();
                 if let Some(geometry) = feature.geometry().project(&projection) {
-                    let ids = self.symbol.render(feature, &geometry, &mut bundle);
-                    render_map.push(ids)
+                    let ids =
+                        self.symbol
+                            .render(feature, &geometry, &mut bundle, lod.min_resolution);
+                    render_map.push(RenderMapEntry {
+                        bundle_index: render_bundles.len(),
+                        primitive_ids: ids,
+                    });
                 } else {
-                    render_map.push(vec![])
+                    render_map.push(RenderMapEntry {
+                        bundle_index: render_bundles.len(),
+                        primitive_ids: vec![],
+                    });
                 };
             }
 
-            let packed = canvas.pack_bundle(bundle);
-            *self.render_bundle.write().unwrap() = Some(packed);
+            if bundle.approx_buffer_size() > BUFFER_SIZE_LIMIT {
+                let full_bundle = std::mem::replace(&mut bundle, canvas.create_bundle());
+                render_bundles.push(full_bundle);
+            }
+
+            render_bundles.push(bundle);
         }
 
-        let options = RenderOptions {
-            antialias: self.symbol.use_antialiasing(),
-        };
-
-        canvas.draw_bundles(
-            &[&**self.render_bundle.read().unwrap().as_ref().unwrap()],
-            view.resolution() as f32,
-            options,
-        );
+        self.render_internal(lod, canvas);
     }
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {

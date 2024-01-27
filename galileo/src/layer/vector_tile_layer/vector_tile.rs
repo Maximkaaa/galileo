@@ -44,6 +44,7 @@ impl VectorTile {
             PolygonPaint {
                 color: style.background,
             },
+            tile_resolution,
         );
 
         for layer in &mvt_tile.layers {
@@ -68,6 +69,7 @@ impl VectorTile {
                                             .collect(),
                                     },
                                     paint,
+                                    tile_resolution,
                                 );
                             }
                         }
@@ -80,6 +82,7 @@ impl VectorTile {
                                         Self::transform_point(p, bbox, tile_resolution)
                                     }),
                                     paint,
+                                    tile_resolution,
                                 );
                             }
                         }
