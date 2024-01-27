@@ -1,7 +1,6 @@
 use crate::Color;
 use galileo_types::cartesian::size::Size;
 use maybe_sync::{MaybeSend, MaybeSync};
-use point_paint::PointPaint;
 use render_bundle::RenderBundle;
 use std::any::Any;
 
@@ -16,7 +15,7 @@ pub struct PrimitiveId(usize);
 
 pub trait Renderer: MaybeSend + MaybeSync {
     fn create_bundle(&self) -> RenderBundle;
-    fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle>;
+    fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle>;
 
     fn as_any(&self) -> &dyn Any;
 }
@@ -24,41 +23,17 @@ pub trait Renderer: MaybeSend + MaybeSync {
 pub trait Canvas {
     fn size(&self) -> Size;
     fn create_bundle(&self) -> RenderBundle;
-    fn pack_bundle(&self, bundle: RenderBundle) -> Box<dyn PackedBundle>;
-    fn pack_unpacked(&self, bundle: Box<dyn UnpackedBundle>) -> Box<dyn PackedBundle>;
+    fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle>;
     fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle], options: RenderOptions);
 }
 
 pub trait PackedBundle: MaybeSend + MaybeSync {
     fn as_any(&self) -> &dyn Any;
-    fn unpack(self: Box<Self>) -> Box<dyn UnpackedBundle>;
-}
-
-pub trait UnpackedBundle {
-    fn modify_line(&mut self, id: PrimitiveId, paint: LinePaint);
-    fn modify_polygon(&mut self, id: PrimitiveId, paint: PolygonPaint);
-    fn modify_image(&mut self, id: PrimitiveId, paint: ImagePaint);
-    fn modify_point(&mut self, id: PrimitiveId, paint: PointPaint);
-    fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
 
 pub struct EmptyBundle {}
 impl PackedBundle for EmptyBundle {
     fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn unpack(self: Box<Self>) -> Box<dyn UnpackedBundle> {
-        self
-    }
-}
-
-impl UnpackedBundle for EmptyBundle {
-    fn modify_line(&mut self, _id: PrimitiveId, _paint: LinePaint) {}
-    fn modify_polygon(&mut self, _id: PrimitiveId, _paint: PolygonPaint) {}
-    fn modify_image(&mut self, _id: PrimitiveId, _paint: ImagePaint) {}
-    fn modify_point(&mut self, _id: PrimitiveId, _paint: PointPaint) {}
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self
     }
 }

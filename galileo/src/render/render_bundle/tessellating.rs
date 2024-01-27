@@ -1,3 +1,4 @@
+use crate::error::GalileoError;
 use crate::primitives::DecodedImage;
 use crate::render::point_paint::{CircleFill, PointPaint, PointShape, SectorParameters};
 use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
@@ -29,6 +30,7 @@ pub struct TessellatingRenderBundle {
     pub images: Vec<(DecodedImage, [ImageVertex; 4])>,
     pub clip_area: Option<VertexBuffers<PolyVertex, u32>>,
     pub primitives: Vec<PrimitiveInfo>,
+    buffer_size: usize,
 }
 
 pub(crate) type ScreenRefTessellation = VertexBuffers<ScreenRefVertex, u32>;
@@ -64,11 +66,14 @@ impl TessellatingRenderBundle {
             images: Vec::new(),
             primitives: Vec::new(),
             clip_area: None,
+            buffer_size: 0,
         }
     }
-}
 
-impl TessellatingRenderBundle {
+    pub fn approx_buffer_size(&self) -> usize {
+        self.buffer_size
+    }
+
     pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly)
     where
         N: AsPrimitive<f32>,
@@ -84,6 +89,10 @@ impl TessellatingRenderBundle {
             },
             &mut tessellation,
         );
+
+        self.buffer_size += tessellation.vertices.len() * std::mem::size_of::<PolyVertex>()
+            + tessellation.indices.len() * std::mem::size_of::<u32>();
+
         self.clip_area = Some(tessellation);
     }
 
@@ -95,6 +104,9 @@ impl TessellatingRenderBundle {
     ) -> PrimitiveId {
         let opacity = paint.opacity as f32 / 255.0;
         let image_index = self.images.len();
+
+        self.buffer_size += image.bytes.len() + std::mem::size_of::<ImageVertex>() * 4;
+
         self.images.push((
             image,
             [
@@ -122,8 +134,8 @@ impl TessellatingRenderBundle {
         ));
 
         let id = self.primitives.len();
-        self.primitives.push(PrimitiveInfo::Image { image_index });
 
+        self.primitives.push(PrimitiveInfo::Image { image_index });
         PrimitiveId(id)
     }
 
@@ -255,6 +267,7 @@ impl TessellatingRenderBundle {
 
         let mut tesselator = StrokeTessellator::new();
         let start_index = tessellation.vertices.len();
+        let start_index_count = tessellation.indices.len();
 
         tesselator
             .tessellate_path(
@@ -270,6 +283,11 @@ impl TessellatingRenderBundle {
             .unwrap();
 
         let end_index = tessellation.vertices.len();
+
+        self.buffer_size += (end_index - start_index) * std::mem::size_of::<PolyVertex>();
+        self.buffer_size +=
+            (tessellation.indices.len() - start_index_count) * std::mem::size_of::<u32>();
+
         start_index..end_index
     }
 
@@ -292,6 +310,67 @@ impl TessellatingRenderBundle {
         PrimitiveId(id)
     }
 
+    pub fn modify_line(&mut self, id: PrimitiveId, paint: LinePaint) -> Result<(), GalileoError> {
+        let info = self
+            .primitives
+            .get(id.0)
+            .ok_or(GalileoError::Generic("primitive does not exist".into()))?;
+        match info {
+            PrimitiveInfo::MapRef { vertex_range } => {
+                self.update_map_ref(vertex_range.clone(), paint.color)
+            }
+            _ => return Err(GalileoError::Generic("invalid primitive type".into())),
+        }
+
+        Ok(())
+    }
+
+    pub fn modify_polygon(
+        &mut self,
+        id: PrimitiveId,
+        paint: PolygonPaint,
+    ) -> Result<(), GalileoError> {
+        let info = self
+            .primitives
+            .get(id.0)
+            .ok_or(GalileoError::Generic("primitive does not exist".into()))?;
+        match info {
+            PrimitiveInfo::MapRef { vertex_range } => {
+                self.update_map_ref(vertex_range.clone(), paint.color)
+            }
+            _ => return Err(GalileoError::Generic("invalid primitive type".into())),
+        }
+
+        Ok(())
+    }
+
+    pub fn modify_image(&mut self, id: PrimitiveId, paint: ImagePaint) -> Result<(), GalileoError> {
+        let info = self
+            .primitives
+            .get(id.0)
+            .ok_or(GalileoError::Generic("primitive does not exist".into()))?;
+        match info {
+            PrimitiveInfo::Image { image_index } => {
+                let (_, vertices) = self
+                    .images
+                    .get_mut(*image_index)
+                    .ok_or(GalileoError::Generic("invalid image id".into()))?;
+                for vertex in vertices {
+                    vertex.opacity = paint.opacity as f32 / 255.0;
+                }
+            }
+            _ => return Err(GalileoError::Generic("invalid primitive type".into())),
+        }
+
+        Ok(())
+    }
+
+    fn update_map_ref(&mut self, range: Range<usize>, color: Color) {
+        for vertex in &mut self.poly_tessellation.vertices[range] {
+            vertex.color = color.to_f32_array();
+        }
+    }
+
     fn add_polygon_lod<N, P, Poly>(
         &mut self,
         polygon: &Poly,
@@ -306,10 +385,15 @@ impl TessellatingRenderBundle {
     {
         let lod = &mut self.poly_tessellation;
         let start_index = lod.vertices.len();
+        let start_index_count = lod.indices.len();
 
         Self::tessellate_polygon(polygon, paint, lod);
 
         let end_index = lod.vertices.len();
+
+        self.buffer_size += (end_index - start_index) * std::mem::size_of::<PolyVertex>();
+        self.buffer_size += (lod.indices.len() - start_index_count) * std::mem::size_of::<u32>();
+
         start_index..end_index
     }
 
@@ -379,6 +463,9 @@ impl TessellatingRenderBundle {
         build_contour_path(&mut path_builder, shape, scale);
         let path = path_builder.build();
 
+        let start_vertex_count = self.screen_ref.vertices.len();
+        let start_index_count = self.screen_ref.indices.len();
+
         if let Some(outline) = outline {
             let vertex_constructor = ScreenRefVertexConstructor {
                 color: outline.color.to_u8_array(),
@@ -411,6 +498,11 @@ impl TessellatingRenderBundle {
                 log::warn!("Shape tessellation failed: {err:?}");
             }
         }
+
+        self.buffer_size += (self.screen_ref.vertices.len() - start_vertex_count)
+            * std::mem::size_of::<ScreenRefVertex>();
+        self.buffer_size +=
+            (self.screen_ref.indices.len() - start_index_count) * std::mem::size_of::<u32>();
     }
 
     fn add_circle<N, P>(
@@ -469,6 +561,9 @@ impl TessellatingRenderBundle {
         let mut contour = get_circle_sector(radius, start_angle, end_angle);
         let first_index = self.screen_ref.vertices.len() as u32;
 
+        let start_vertex_count = self.screen_ref.vertices.len();
+        let start_index_count = self.screen_ref.indices.len();
+
         let mut vertices = vec![center];
         let mut indices = vec![];
         for point in &contour {
@@ -507,6 +602,11 @@ impl TessellatingRenderBundle {
                 offset,
             );
         }
+
+        self.buffer_size += (self.screen_ref.vertices.len() - start_vertex_count)
+            * std::mem::size_of::<ScreenRefVertex>();
+        self.buffer_size +=
+            (self.screen_ref.indices.len() - start_index_count) * std::mem::size_of::<u32>();
     }
 
     fn add_dot<P, N>(&mut self, point: &P, color: Color, offset: Vector2<f32>)

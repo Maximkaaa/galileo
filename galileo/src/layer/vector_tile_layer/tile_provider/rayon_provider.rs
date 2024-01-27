@@ -219,7 +219,7 @@ where
             bundle,
         };
         let (bundle, mvt_tile) = self.data_provider.decode(bytes, context)?;
-        let packed_bundle = renderer.pack_bundle(bundle);
+        let packed_bundle = renderer.pack_bundle(&bundle);
 
         Ok(VectorTile {
             bundle: packed_bundle,

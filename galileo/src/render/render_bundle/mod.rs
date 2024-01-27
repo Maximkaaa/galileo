@@ -1,3 +1,4 @@
+use crate::error::GalileoError;
 use crate::primitives::DecodedImage;
 use crate::render::point_paint::PointPaint;
 use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
@@ -16,6 +17,12 @@ pub enum RenderBundle {
 }
 
 impl RenderBundle {
+    pub fn approx_buffer_size(&self) -> usize {
+        match self {
+            RenderBundle::Tessellating(inner) => inner.approx_buffer_size(),
+        }
+    }
+
     pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly)
     where
         N: AsPrimitive<f32>,
@@ -85,6 +92,28 @@ impl RenderBundle {
     pub fn is_empty(&self) -> bool {
         match self {
             RenderBundle::Tessellating(inner) => inner.is_empty(),
+        }
+    }
+
+    pub fn modify_line(&mut self, id: PrimitiveId, paint: LinePaint) -> Result<(), GalileoError> {
+        match self {
+            RenderBundle::Tessellating(inner) => inner.modify_line(id, paint),
+        }
+    }
+
+    pub fn modify_polygon(
+        &mut self,
+        id: PrimitiveId,
+        paint: PolygonPaint,
+    ) -> Result<(), GalileoError> {
+        match self {
+            RenderBundle::Tessellating(inner) => inner.modify_polygon(id, paint),
+        }
+    }
+
+    pub fn modify_image(&mut self, id: PrimitiveId, paint: ImagePaint) -> Result<(), GalileoError> {
+        match self {
+            RenderBundle::Tessellating(inner) => inner.modify_image(id, paint),
         }
     }
 }

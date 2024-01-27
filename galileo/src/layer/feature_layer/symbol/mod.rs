@@ -1,4 +1,4 @@
-use crate::render::{PrimitiveId, UnpackedBundle};
+use crate::render::PrimitiveId;
 use num_traits::AsPrimitive;
 
 pub mod contour;
@@ -21,12 +21,7 @@ pub trait Symbol<F> {
         min_resolution: f64,
     ) -> Vec<PrimitiveId>;
 
-    fn update(
-        &self,
-        _feature: &F,
-        _renders_ids: &[PrimitiveId],
-        _bundle: &mut Box<dyn UnpackedBundle>,
-    ) {
+    fn update(&self, _feature: &F, _renders_ids: &[PrimitiveId], _bundle: &mut RenderBundle) {
         // provide implementation to make features editable
     }
 

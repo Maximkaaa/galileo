@@ -1,9 +1,8 @@
 use crate::layer::data_provider::DataProvider;
 use crate::messenger::Messenger;
 use crate::primitives::DecodedImage;
-use crate::render::{
-    Canvas, EmptyBundle, ImagePaint, PackedBundle, PrimitiveId, RenderOptions, Renderer,
-};
+use crate::render::render_bundle::RenderBundle;
+use crate::render::{Canvas, ImagePaint, PackedBundle, PrimitiveId, RenderOptions, Renderer};
 use crate::tile_scheme::{TileIndex, TileScheme};
 use crate::view::MapView;
 use async_trait::async_trait;
@@ -30,12 +29,13 @@ where
 enum TileState {
     Loading,
     Loaded(Mutex<DecodedImage>),
-    Rendered(Mutex<RenderedTile>),
+    Rendered(Box<Mutex<RenderedTile>>),
     Error,
 }
 
 struct RenderedTile {
-    bundle: Box<dyn PackedBundle>,
+    render_bundle: RenderBundle,
+    packed_bundle: Box<dyn PackedBundle>,
     first_drawn: SystemTime,
     is_opaque: bool,
     primitive_id: PrimitiveId,
@@ -183,31 +183,12 @@ where
                         requires_redraw = true;
                     }
 
-                    let RenderedTile {
-                        bundle,
-                        is_opaque,
-                        first_drawn,
-                        primitive_id,
-                    } = std::mem::replace(
-                        &mut *rendered,
-                        RenderedTile {
-                            bundle: Box::new(EmptyBundle {}),
-                            is_opaque: false,
-                            first_drawn,
-                            primitive_id,
-                        },
-                    );
-
-                    let mut unpacked = bundle.unpack();
-                    unpacked.modify_image(primitive_id, ImagePaint { opacity });
-                    let packed = canvas.pack_unpacked(unpacked);
-
-                    *rendered = RenderedTile {
-                        bundle: packed,
-                        is_opaque,
-                        first_drawn,
-                        primitive_id,
-                    }
+                    rendered
+                        .render_bundle
+                        .modify_image(primitive_id, ImagePaint { opacity })
+                        .unwrap();
+                    let packed = canvas.pack_bundle(&rendered.render_bundle);
+                    rendered.packed_bundle = packed;
                 }
                 TileState::Loaded(decoded_image) => {
                     let mut bundle = canvas.create_bundle();
@@ -229,15 +210,16 @@ where
                             .into_quadrangle(),
                         ImagePaint { opacity: 0 },
                     );
-                    let packed = canvas.pack_bundle(bundle);
+                    let packed = canvas.pack_bundle(&bundle);
                     self.tiles.insert(
                         *index,
-                        Arc::new(TileState::Rendered(Mutex::new(RenderedTile {
-                            bundle: packed,
+                        Arc::new(TileState::Rendered(Box::new(Mutex::new(RenderedTile {
+                            render_bundle: bundle,
+                            packed_bundle: packed,
                             first_drawn: now,
                             is_opaque: false,
                             primitive_id: id,
-                        }))),
+                        })))),
                     );
 
                     requires_redraw = true;
@@ -306,7 +288,7 @@ where
         canvas.draw_bundles(
             &to_draw
                 .iter()
-                .map(|guard| &*guard.bundle)
+                .map(|guard| &*guard.packed_bundle)
                 .collect::<Vec<_>>(),
             RenderOptions::default(),
         );
