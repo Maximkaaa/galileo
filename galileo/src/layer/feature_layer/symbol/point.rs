@@ -53,7 +53,7 @@ pub struct ImagePointSymbol {
 }
 
 impl ImagePointSymbol {
-    pub fn from_file(path: &str, offset: Vector2<f32>, scale: f32) -> Result<Self, GalileoError> {
+    pub fn from_path(path: &str, offset: Vector2<f32>, scale: f32) -> Result<Self, GalileoError> {
         let image = image::io::Reader::open(path)?.decode()?;
         let dimensions = image.dimensions();
 
@@ -95,7 +95,7 @@ mod tests {
 
     #[test]
     fn image_symbol_from_file() {
-        let symbol = ImagePointSymbol::from_file(
+        let symbol = ImagePointSymbol::from_path(
             "examples/data/pin-yellow.png",
             Vector2::new(0.5, 1.0),
             1.0,

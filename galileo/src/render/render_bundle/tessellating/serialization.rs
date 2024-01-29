@@ -5,6 +5,7 @@ use crate::render::render_bundle::tessellating::{
 use lyon::lyon_tessellation::VertexBuffers;
 use serde::{Deserialize, Serialize};
 use std::mem::size_of;
+use std::sync::Arc;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct TessellatingRenderBundleBytes {
@@ -13,13 +14,14 @@ pub(crate) struct TessellatingRenderBundleBytes {
     pub screen_ref: ScreenRefVertexBuffersBytes,
     pub images: Vec<ImageBytes>,
     pub primitives: Vec<PrimitiveInfo>,
+    pub image_store: Vec<(u32, u32, Vec<u8>)>,
     pub clip_area: Option<PolyVertexBuffersBytes>,
+    pub bundle_size: usize,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct ImageBytes {
-    image_bytes: Vec<u8>,
-    dimensions: (u32, u32),
+    image_index: usize,
     vertices: Vec<u32>,
 }
 
@@ -87,14 +89,19 @@ impl TessellatingRenderBundle {
             images: self
                 .images
                 .into_iter()
-                .map(|(image, vertices)| ImageBytes {
-                    image_bytes: bytemuck::cast_vec(image.bytes),
-                    dimensions: image.dimensions,
+                .map(|(image_index, vertices)| ImageBytes {
+                    image_index,
                     vertices: bytemuck::cast_vec(vertices.to_vec()),
                 })
                 .collect(),
             primitives: self.primitives,
+            image_store: self
+                .image_store
+                .into_iter()
+                .map(|image| (image.dimensions.0, image.dimensions.1, image.bytes.clone()))
+                .collect(),
             clip_area: self.clip_area.map(|v| v.into()),
+            bundle_size: self.buffer_size,
         };
 
         converted
@@ -108,20 +115,32 @@ impl TessellatingRenderBundle {
             images: bundle
                 .images
                 .into_iter()
-                .map(|v| {
-                    let decoded_image = DecodedImage {
-                        bytes: v.image_bytes,
-                        dimensions: v.dimensions,
-                    };
-                    let vertices = bytemuck::cast_vec(v.vertices)
-                        .try_into()
-                        .expect("invalid vector length");
+                .map(
+                    |ImageBytes {
+                         image_index,
+                         vertices,
+                     }| {
+                        let vertices = bytemuck::cast_vec(vertices)
+                            .try_into()
+                            .expect("invalid vector length");
 
-                    (decoded_image, vertices)
-                })
+                        (image_index, vertices)
+                    },
+                )
                 .collect(),
             primitives: bundle.primitives,
+            image_store: bundle
+                .image_store
+                .into_iter()
+                .map(|(width, height, bytes)| {
+                    Arc::new(DecodedImage {
+                        bytes,
+                        dimensions: (width, height),
+                    })
+                })
+                .collect(),
             clip_area: bundle.clip_area.map(|v| v.into_typed_unchecked()),
+            buffer_size: bundle.bundle_size,
         }
     }
 }

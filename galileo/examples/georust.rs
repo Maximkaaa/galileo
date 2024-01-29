@@ -35,7 +35,7 @@ fn load_points() -> Vec<Disambig<geo_types::Point, GeoSpace2d>> {
 pub async fn run(builder: MapBuilder) {
     let point_layer = FeatureLayer::new(
         load_points(),
-        ImagePointSymbol::from_file(
+        ImagePointSymbol::from_path(
             "galileo/examples/data/pin-yellow.png",
             Vector2::new(0.5, 1.0),
             0.5,

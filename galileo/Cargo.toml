@@ -13,6 +13,9 @@ exclude = [
     "examples",
 ]
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [features]
 default = ["wgpu", "tokio", "image", "serde"]
 web = ["wasm-bindgen-futures", "serde", "byte-conversion", "js-sys"]

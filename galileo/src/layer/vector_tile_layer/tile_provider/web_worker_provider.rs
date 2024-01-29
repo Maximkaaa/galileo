@@ -257,7 +257,7 @@ fn store_vector_tile(
             let packed = renderer
                 .read()
                 .unwrap()
-                .pack_bundle(RenderBundle::Tessellating(bundle));
+                .pack_bundle(&RenderBundle::Tessellating(bundle));
             store.insert(
                 index,
                 TileState::Loaded(VectorTile {
