@@ -1,13 +1,7 @@
 use image::GenericImageView;
-use maybe_sync::{MaybeSend, MaybeSync};
-use std::any::Any;
 use std::ops::Deref;
 
 use crate::error::GalileoError;
-
-pub trait Image: MaybeSend + MaybeSync {
-    fn as_any(&self) -> &dyn Any;
-}
 
 #[derive(Debug, Clone)]
 pub struct DecodedImage {

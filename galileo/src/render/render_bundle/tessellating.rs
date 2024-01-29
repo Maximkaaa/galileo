@@ -2,9 +2,10 @@ use crate::error::GalileoError;
 use crate::primitives::DecodedImage;
 use crate::render::point_paint::{CircleFill, PointPaint, PointShape, SectorParameters};
 use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
+use crate::view::MapView;
 use crate::Color;
 use galileo_types::cartesian::impls::contour::ClosedContour;
-use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::cartesian::traits::cartesian_point::{CartesianPoint2d, CartesianPoint3d};
 use galileo_types::contour::Contour;
 use galileo_types::polygon::Polygon;
@@ -21,15 +22,17 @@ use nalgebra::{Point2, Vector2};
 use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
 use std::ops::Range;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct TessellatingRenderBundle {
     pub poly_tessellation: VertexBuffers<PolyVertex, u32>,
     pub points: Vec<PointInstance>,
     pub screen_ref: ScreenRefTessellation,
-    pub images: Vec<(DecodedImage, [ImageVertex; 4])>,
+    pub images: Vec<(usize, [ImageVertex; 4])>,
     pub clip_area: Option<VertexBuffers<PolyVertex, u32>>,
     pub primitives: Vec<PrimitiveInfo>,
+    pub image_store: Vec<Arc<DecodedImage>>,
     buffer_size: usize,
 }
 
@@ -66,6 +69,7 @@ impl TessellatingRenderBundle {
             images: Vec::new(),
             primitives: Vec::new(),
             clip_area: None,
+            image_store: Vec::new(),
             buffer_size: 0,
         }
     }
@@ -107,28 +111,33 @@ impl TessellatingRenderBundle {
 
         self.buffer_size += image.bytes.len() + std::mem::size_of::<ImageVertex>() * 4;
 
+        let index = self.add_image_to_store(Arc::new(image));
         self.images.push((
-            image,
+            index,
             [
                 ImageVertex {
                     position: [vertices[0].x() as f32, vertices[0].y() as f32],
                     opacity,
                     tex_coords: [0.0, 1.0],
+                    offset: [0.0, 0.0],
                 },
                 ImageVertex {
                     position: [vertices[1].x() as f32, vertices[1].y() as f32],
                     opacity,
                     tex_coords: [0.0, 0.0],
+                    offset: [0.0, 0.0],
                 },
                 ImageVertex {
                     position: [vertices[3].x() as f32, vertices[3].y() as f32],
                     opacity,
                     tex_coords: [1.0, 1.0],
+                    offset: [0.0, 0.0],
                 },
                 ImageVertex {
                     position: [vertices[2].x() as f32, vertices[2].y() as f32],
                     opacity,
                     tex_coords: [1.0, 0.0],
+                    offset: [0.0, 0.0],
                 },
             ],
         ));
@@ -137,6 +146,77 @@ impl TessellatingRenderBundle {
 
         self.primitives.push(PrimitiveInfo::Image { image_index });
         PrimitiveId(id)
+    }
+
+    fn add_image_point<N, P>(
+        &mut self,
+        position: &P,
+        image: Arc<DecodedImage>,
+        opacity: u8,
+        width: f32,
+        height: f32,
+        offset: Vector2<f32>,
+    ) -> PrimitiveId
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+    {
+        let opacity = opacity as f32 / 255.0;
+        let image_index = self.images.len();
+
+        self.buffer_size += image.bytes.len() + std::mem::size_of::<ImageVertex>() * 4;
+
+        let position = [position.x().as_(), position.y().as_()];
+        let offset_x = -offset[0] * width;
+        let offset_y = offset[1] * height;
+
+        let index = self.add_image_to_store(image);
+        self.images.push((
+            index,
+            [
+                ImageVertex {
+                    position,
+                    opacity,
+                    tex_coords: [0.0, 1.0],
+                    offset: [offset_x, offset_y - height],
+                },
+                ImageVertex {
+                    position,
+                    opacity,
+                    tex_coords: [0.0, 0.0],
+                    offset: [offset_x, offset_y],
+                },
+                ImageVertex {
+                    position,
+                    opacity,
+                    tex_coords: [1.0, 1.0],
+                    offset: [offset_x + width, offset_y - height],
+                },
+                ImageVertex {
+                    position,
+                    opacity,
+                    tex_coords: [1.0, 0.0],
+                    offset: [offset_x + width, offset_y],
+                },
+            ],
+        ));
+
+        let id = self.primitives.len();
+
+        self.primitives.push(PrimitiveInfo::Image { image_index });
+        PrimitiveId(id)
+    }
+
+    fn add_image_to_store(&mut self, image: Arc<DecodedImage>) -> usize {
+        for (i, stored) in self.image_store.iter().enumerate() {
+            if Arc::ptr_eq(stored, &image) {
+                return i;
+            }
+        }
+
+        let index = self.image_store.len();
+        self.image_store.push(image);
+        index
     }
 
     pub fn add_point<N, P>(&mut self, point: &P, paint: PointPaint) -> PrimitiveId
@@ -153,7 +233,21 @@ impl TessellatingRenderBundle {
                     point_index: self.points.len() - 1,
                 });
             }
-            PointShape::_Image { .. } => todo!(),
+            PointShape::Image {
+                image,
+                opacity,
+                width,
+                height,
+            } => {
+                return self.add_image_point(
+                    point,
+                    image.clone(),
+                    *opacity,
+                    *width,
+                    *height,
+                    paint.offset,
+                );
+            }
             PointShape::Circle {
                 fill,
                 radius,
@@ -624,6 +718,34 @@ impl TessellatingRenderBundle {
             color: color.to_u8_array(),
         })
     }
+
+    pub fn sort_by_depth(&mut self, view: &MapView) {
+        self.sort_images_by_depth(view);
+    }
+
+    pub fn sort_images_by_depth(&mut self, view: &MapView) {
+        let Some(transform) = view.map_to_scene_transform() else {
+            return;
+        };
+        self.images.sort_by(|(_, vertex_set_a), (_, vertex_set_b)| {
+            let point_a = Point3d::new(
+                vertex_set_a[0].position[0] as f64,
+                vertex_set_a[0].position[1] as f64,
+                0.0,
+            )
+            .to_homogeneous();
+            let point_b = Point3d::new(
+                vertex_set_b[0].position[0] as f64,
+                vertex_set_b[0].position[1] as f64,
+                0.0,
+            )
+            .to_homogeneous();
+            let projected_a = transform * point_a;
+            let projected_b = transform * point_b;
+
+            projected_b.z.total_cmp(&projected_a.z)
+        });
+    }
 }
 
 fn get_circle_sector(radius: f32, start_angle: f32, end_angle: f32) -> Vec<Point2<f32>> {
@@ -808,6 +930,7 @@ pub struct ImageVertex {
     pub position: [f32; 2],
     pub opacity: f32,
     pub tex_coords: [f32; 2],
+    pub offset: [f32; 2],
 }
 
 #[cfg(feature = "byte-conversion")]

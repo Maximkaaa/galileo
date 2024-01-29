@@ -2,6 +2,7 @@ use crate::error::GalileoError;
 use crate::primitives::DecodedImage;
 use crate::render::point_paint::PointPaint;
 use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
+use crate::view::MapView;
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::contour::Contour;
@@ -114,6 +115,12 @@ impl RenderBundle {
     pub fn modify_image(&mut self, id: PrimitiveId, paint: ImagePaint) -> Result<(), GalileoError> {
         match self {
             RenderBundle::Tessellating(inner) => inner.modify_image(id, paint),
+        }
+    }
+
+    pub fn sort_by_depth(&mut self, view: &MapView) {
+        match self {
+            RenderBundle::Tessellating(inner) => inner.sort_by_depth(view),
         }
     }
 }

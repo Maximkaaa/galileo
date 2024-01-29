@@ -21,12 +21,9 @@ use maybe_sync::{MaybeSend, MaybeSync};
 use num_traits::AsPrimitive;
 use std::marker::PhantomData;
 use std::sync::{Arc, RwLock};
-use web_time::SystemTime;
 
 pub mod feature;
 pub mod symbol;
-
-const BUFFER_SIZE_LIMIT: usize = 10_000_000;
 
 pub struct FeatureLayer<P, F, S, Space>
 where
@@ -38,8 +35,39 @@ where
     crs: Crs,
     lods: Vec<Lod>,
     messenger: RwLock<Option<Box<dyn Messenger>>>,
+    options: FeatureLayerOptions,
 
     space: PhantomData<Space>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct FeatureLayerOptions {
+    /// If set to true, images drawn by the layer will be sorted by the depth value (relative to viewer) before being
+    /// rendered.
+    ///
+    /// This option is useful for layers that render points as images, and when the map is rendered in 3D you want the
+    /// images that are positioned behind other pins to be drawn behind. Without this option, the images are drawn in
+    /// the order they are added to the feature list.
+    ///
+    /// Use this with caution though, as turning on this option affects performance drastically. You probably don't want
+    /// it if the layer will have more then a 1000 images drawn. If you decide to use this option for larger layers
+    /// anyway, don't forget to also increase [`buffer_size_limit`](FeatureLayerOptions::buffer_size_limit) as only
+    /// features from the same buffer will be sorted.
+    pub sort_by_depth: bool,
+
+    /// Sets up a soft limit on the internal GPU buffers' size (in bytes) used to render this layer. Larger values
+    /// slightly improve performance when rendering, bun drastically improve performance when updating just a
+    /// few features from the set.
+    pub buffer_size_limit: usize,
+}
+
+impl Default for FeatureLayerOptions {
+    fn default() -> Self {
+        Self {
+            sort_by_depth: false,
+            buffer_size_limit: 10_000_000,
+        }
+    }
 }
 
 struct Lod {
@@ -72,6 +100,7 @@ where
                 packed_bundles: RwLock::new(vec![]),
                 feature_render_map: RwLock::new(Vec::new()),
             }],
+            options: Default::default(),
             space: Default::default(),
         }
     }
@@ -94,23 +123,33 @@ where
             crs,
             messenger: RwLock::new(None),
             lods,
+            options: Default::default(),
             space: Default::default(),
         }
     }
 
-    fn render_internal(&self, lod: &Lod, canvas: &mut dyn Canvas) {
+    pub fn with_options(mut self, options: FeatureLayerOptions) -> Self {
+        self.options = options;
+        self
+    }
+
+    fn render_internal(&self, lod: &Lod, canvas: &mut dyn Canvas, view: &MapView) {
         let mut packed_bundles = lod.packed_bundles.write().unwrap();
-        let bundles = lod.render_bundles.read().unwrap();
-        for (index, bundle) in bundles.iter().enumerate() {
+        let mut bundles = lod.render_bundles.write().unwrap();
+        for (index, bundle) in bundles.iter_mut().enumerate() {
             if packed_bundles.len() == index {
                 packed_bundles.push(None);
             }
-            if packed_bundles[index].is_none() {
+
+            if self.options.sort_by_depth {
+                bundle.sort_by_depth(view);
+            }
+
+            if packed_bundles[index].is_none() || self.options.sort_by_depth {
                 packed_bundles[index] = Some(canvas.pack_bundle(bundle))
             }
         }
 
-        let start = SystemTime::now();
         canvas.draw_bundles(
             &packed_bundles
                 .iter()
@@ -119,10 +158,6 @@ where
             RenderOptions {
                 antialias: self.symbol.use_antialiasing(),
             },
-        );
-        log::info!(
-            "Packed everything in {} ms",
-            start.elapsed().unwrap().as_millis()
         );
     }
 }
@@ -265,7 +300,7 @@ where
                     primitive_ids: ids,
                 });
 
-                if bundle.approx_buffer_size() > BUFFER_SIZE_LIMIT {
+                if bundle.approx_buffer_size() > self.options.buffer_size_limit {
                     let full_bundle = std::mem::replace(&mut bundle, canvas.create_bundle());
                     render_bundles.push(full_bundle);
                 }
@@ -274,7 +309,7 @@ where
             render_bundles.push(bundle);
         }
 
-        self.render_internal(lod, canvas);
+        self.render_internal(lod, canvas, view);
     }
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
@@ -330,7 +365,7 @@ where
                     primitive_ids: ids,
                 });
 
-                if bundle.approx_buffer_size() > BUFFER_SIZE_LIMIT {
+                if bundle.approx_buffer_size() > self.options.buffer_size_limit {
                     let full_bundle = std::mem::replace(&mut bundle, canvas.create_bundle());
                     render_bundles.push(full_bundle);
                 }
@@ -339,7 +374,7 @@ where
             render_bundles.push(bundle);
         }
 
-        self.render_internal(lod, canvas);
+        self.render_internal(lod, canvas, view);
     }
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
@@ -391,7 +426,7 @@ where
                 };
             }
 
-            if bundle.approx_buffer_size() > BUFFER_SIZE_LIMIT {
+            if bundle.approx_buffer_size() > self.options.buffer_size_limit {
                 let full_bundle = std::mem::replace(&mut bundle, canvas.create_bundle());
                 render_bundles.push(full_bundle);
             }
@@ -399,7 +434,7 @@ where
             render_bundles.push(bundle);
         }
 
-        self.render_internal(lod, canvas);
+        self.render_internal(lod, canvas, view);
     }
 
     fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
