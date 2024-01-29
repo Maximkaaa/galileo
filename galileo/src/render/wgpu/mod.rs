@@ -403,6 +403,7 @@ impl WgpuPackedBundle {
             screen_ref,
             images,
             clip_area,
+            image_store,
             ..
         } = bundle;
 
@@ -456,12 +457,24 @@ impl WgpuPackedBundle {
             })
         };
 
+        let textures: Vec<_> = image_store
+            .iter()
+            .map(|decoded_image| {
+                renderer.pipelines.image_pipeline().create_image_texture(
+                    &renderer.device,
+                    &renderer.queue,
+                    decoded_image,
+                )
+            })
+            .collect();
+
+        debug_assert!(textures.len() == 1);
+
         let mut image_buffers = vec![];
-        for (image, vertices) in images {
+        for (image_index, vertices) in images {
             let image = renderer.pipelines.image_pipeline().create_image(
                 &renderer.device,
-                &renderer.queue,
-                image,
+                textures[*image_index].clone(),
                 vertices,
             );
             image_buffers.push(image);
@@ -482,7 +495,6 @@ impl WgpuPackedBundle {
     ) -> WgpuPolygonBuffers {
         let index_bytes = bytemuck::cast_slice(&tessellation.indices);
         let bytes = bytemuck::cast_slice(&tessellation.vertices);
-        log::info!("Copying {} + {} bytes", index_bytes.len(), bytes.len());
 
         let index = renderer
             .device

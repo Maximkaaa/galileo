@@ -1,14 +1,14 @@
 use galileo::galileo_map::MapBuilder;
-use galileo::layer::feature_layer::symbol::point::CirclePointSymbol;
-use galileo::layer::feature_layer::FeatureLayer;
+use galileo::layer::feature_layer::{FeatureLayer, FeatureLayerOptions};
+use galileo::symbol::point::ImagePointSymbol;
 use galileo::tile_scheme::TileScheme;
-use galileo::Color;
 use galileo_types::disambig::{Disambig, Disambiguate};
 use galileo_types::geo::crs::Crs;
 use galileo_types::geometry_type::GeoSpace2d;
 use galileo_types::latlon;
 use geozero::geojson::GeoJson;
 use geozero::ToGeo;
+use nalgebra::Vector2;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
@@ -35,9 +35,18 @@ fn load_points() -> Vec<Disambig<geo_types::Point, GeoSpace2d>> {
 pub async fn run(builder: MapBuilder) {
     let point_layer = FeatureLayer::new(
         load_points(),
-        CirclePointSymbol::new(Color::RED, 10.0),
+        ImagePointSymbol::from_file(
+            "galileo/examples/data/pin-yellow.png",
+            Vector2::new(0.5, 1.0),
+            0.5,
+        )
+        .unwrap(),
         Crs::WGS84,
-    );
+    )
+    .with_options(FeatureLayerOptions {
+        sort_by_depth: true,
+        ..Default::default()
+    });
 
     builder
         .center(latlon!(53.732562, -1.863383))

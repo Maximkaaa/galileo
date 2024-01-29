@@ -189,6 +189,7 @@ where
                         .unwrap();
                     let packed = canvas.pack_bundle(&rendered.render_bundle);
                     rendered.packed_bundle = packed;
+                    rendered.is_opaque = is_opaque;
                 }
                 TileState::Loaded(decoded_image) => {
                     let mut bundle = canvas.create_bundle();

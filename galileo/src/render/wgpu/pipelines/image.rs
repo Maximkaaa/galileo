@@ -3,16 +3,17 @@ use crate::render::render_bundle::tessellating::ImageVertex;
 use crate::render::wgpu::pipelines;
 use crate::render::wgpu::pipelines::default_targets;
 use crate::render::RenderOptions;
+use std::sync::Arc;
 use wgpu::util::DeviceExt;
 use wgpu::{
-    BindGroupLayout, Device, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
-    TextureFormat,
+    BindGroup, BindGroupLayout, Device, Queue, RenderPass, RenderPipeline,
+    RenderPipelineDescriptor, TextureFormat,
 };
 
 const INDICES: &[u16] = &[1, 0, 2, 1, 2, 3];
 
 pub struct WgpuImage {
-    pub texture_bind_group: wgpu::BindGroup,
+    pub texture_bind_group: Arc<BindGroup>,
     pub vertex_buffer: wgpu::Buffer,
 }
 
@@ -62,6 +63,7 @@ impl ImagePipeline {
         });
 
         let targets = default_targets(format);
+
         let mut desc = RenderPipelineDescriptor {
             ..pipelines::default_pipeline_descriptor(&layout, &shader, &targets, &buffers, false)
         };
@@ -84,13 +86,12 @@ impl ImagePipeline {
         }
     }
 
-    pub fn create_image(
+    pub fn create_image_texture(
         &self,
         device: &Device,
         queue: &Queue,
         image: &DecodedImage,
-        vertices: &[ImageVertex; 4],
-    ) -> WgpuImage {
+    ) -> Arc<BindGroup> {
         let texture_size = wgpu::Extent3d {
             width: image.dimensions.0,
             height: image.dimensions.1,
@@ -104,7 +105,7 @@ impl ImagePipeline {
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                format: TextureFormat::Rgba8UnormSrgb,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                 label: None,
                 view_formats: &[],
@@ -139,6 +140,15 @@ impl ImagePipeline {
             label: Some("diffuse_bind_group"),
         });
 
+        Arc::new(texture_bind_group)
+    }
+
+    pub fn create_image(
+        &self,
+        device: &Device,
+        texture: Arc<BindGroup>,
+        vertices: &[ImageVertex; 4],
+    ) -> WgpuImage {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Image vertex buffer"),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
@@ -146,7 +156,7 @@ impl ImagePipeline {
         });
 
         WgpuImage {
-            texture_bind_group,
+            texture_bind_group: texture,
             vertex_buffer,
         }
     }
@@ -190,6 +200,14 @@ impl ImageVertex {
                     offset: (std::mem::size_of::<[f32; 2]>() + std::mem::size_of::<f32>())
                         as wgpu::BufferAddress,
                     shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: (std::mem::size_of::<[f32; 2]>()
+                        + std::mem::size_of::<f32>()
+                        + std::mem::size_of::<[f32; 2]>())
+                        as wgpu::BufferAddress,
+                    shader_location: 3,
                     format: wgpu::VertexFormat::Float32x2,
                 },
             ],

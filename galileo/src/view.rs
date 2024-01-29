@@ -148,7 +148,7 @@ impl MapView {
         .to_homogeneous()
     }
 
-    fn map_to_scene_transform(&self) -> Option<OMatrix<f64, U4, U4>> {
+    pub fn map_to_scene_transform(&self) -> Option<OMatrix<f64, U4, U4>> {
         let scale = Scale3::new(1.0, 1.0, 0.5).to_homogeneous();
         Some(scale * self.map_to_screen_center_transform()?)
     }

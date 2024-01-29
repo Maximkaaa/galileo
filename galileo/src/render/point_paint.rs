@@ -1,7 +1,9 @@
-use crate::render::{LineCap, LinePaint, PreparedImage};
+use crate::primitives::DecodedImage;
+use crate::render::{LineCap, LinePaint};
 use crate::Color;
 use galileo_types::cartesian::impls::contour::ClosedContour;
 use nalgebra::{Point2, Vector2};
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct PointPaint<'a> {
@@ -64,6 +66,20 @@ impl<'a> PointPaint<'a> {
         }
     }
 
+    pub fn image(image: Arc<DecodedImage>, offset: Vector2<f32>, scale: f32) -> Self {
+        let width = image.dimensions.0 as f32 * scale;
+        let height = image.dimensions.1 as f32 * scale;
+        Self {
+            offset,
+            shape: PointShape::Image {
+                image,
+                opacity: 255,
+                width,
+                height,
+            },
+        }
+    }
+
     pub fn with_outline(mut self, color: Color, width: f32) -> Self {
         match &mut self.shape {
             PointShape::Circle { outline, .. }
@@ -105,10 +121,11 @@ pub(crate) enum PointShape<'a> {
         outline: Option<LinePaint>,
         shape: &'a ClosedContour<Point2<f32>>,
     },
-    _Image {
-        source: PreparedImage,
-        width: Option<f32>,
-        height: Option<f32>,
+    Image {
+        image: Arc<DecodedImage>,
+        opacity: u8,
+        width: f32,
+        height: f32,
     },
 }
 
