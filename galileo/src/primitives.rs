@@ -1,4 +1,3 @@
-use image::GenericImageView;
 use std::ops::Deref;
 
 use crate::error::GalileoError;
@@ -10,7 +9,9 @@ pub struct DecodedImage {
 }
 
 impl DecodedImage {
+    #[cfg(feature = "image")]
     pub fn new(bytes: &[u8]) -> Result<Self, GalileoError> {
+        use image::GenericImageView;
         let decoded = image::load_from_memory(bytes)?;
         let bytes = decoded.to_rgba8();
         let dimensions = decoded.dimensions();

@@ -1,6 +1,7 @@
 use crate::render::PrimitiveId;
 use num_traits::AsPrimitive;
 
+pub mod arbitrary;
 pub mod contour;
 pub mod point;
 pub mod polygon;

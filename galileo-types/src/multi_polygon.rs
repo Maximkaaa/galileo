@@ -1,10 +1,15 @@
 use crate::cartesian::impls::polygon::Polygon;
+use crate::cartesian::rect::Rect;
+use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
+use crate::contour::Contour;
 use crate::geo::traits::projection::Projection;
-use crate::geometry::{Geom, Geometry, GeometrySpecialization};
-use crate::geometry_type::{GeometryType, MultiPolygonGeometryType};
+use crate::geometry::{
+    CartesianGeometry2d, CartesianGeometry2dSpecialization, Geom, Geometry, GeometrySpecialization,
+};
+use crate::geometry_type::{CartesianSpace2d, GeometryType, MultiPolygonGeometryType};
 
 pub trait MultiPolygon {
-    type Polygon;
+    type Polygon: crate::polygon::Polygon;
 
     fn polygons(&self) -> impl Iterator<Item = &Self::Polygon>;
 }
@@ -16,7 +21,7 @@ where
 {
     type Point = <Poly::Polygon as Geometry>::Point;
 
-    fn project<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
+    fn project_spec<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
     where
         Proj: Projection<InPoint = Self::Point> + ?Sized,
     {
@@ -30,5 +35,29 @@ where
             })
             .collect::<Option<Vec<Polygon<Proj::OutPoint>>>>()?;
         Some(Geom::MultiPolygon(polygons.into()))
+    }
+}
+
+impl<P, Poly> CartesianGeometry2dSpecialization<P, MultiPolygonGeometryType> for Poly
+where
+    P: CartesianPoint2d,
+    Poly: MultiPolygon
+        + GeometryType<Type = MultiPolygonGeometryType, Space = CartesianSpace2d>
+        + Geometry<Point = P>,
+    Poly::Polygon: CartesianGeometry2d<P>,
+    <Poly::Polygon as crate::polygon::Polygon>::Contour: Contour<Point = P>,
+{
+    fn is_point_inside_spec<Other: CartesianPoint2d<Num = P::Num>>(
+        &self,
+        point: &Other,
+        tolerance: P::Num,
+    ) -> bool {
+        self.polygons().any(|p| p.is_point_inside(point, tolerance))
+    }
+
+    fn bounding_rectangle_spec(&self) -> Option<Rect<P::Num>> {
+        self.polygons()
+            .filter_map(|p| p.bounding_rectangle())
+            .collect()
     }
 }

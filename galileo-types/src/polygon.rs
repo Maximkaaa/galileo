@@ -1,7 +1,12 @@
+use crate::cartesian::rect::Rect;
+use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
+use crate::cartesian::traits::polygon::CartesianPolygon;
 use crate::contour::Contour;
 use crate::geo::traits::projection::Projection;
-use crate::geometry::{Geom, Geometry, GeometrySpecialization};
-use crate::geometry_type::{GeometryType, PolygonGeometryType};
+use crate::geometry::{
+    CartesianGeometry2d, CartesianGeometry2dSpecialization, Geom, Geometry, GeometrySpecialization,
+};
+use crate::geometry_type::{CartesianSpace2d, GeometryType, PolygonGeometryType};
 use crate::segment::Segment;
 
 pub trait Polygon {
@@ -28,7 +33,7 @@ where
 {
     type Point = <Poly::Contour as Geometry>::Point;
 
-    fn project<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
+    fn project_spec<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
     where
         Proj: Projection<InPoint = Self::Point> + ?Sized,
     {
@@ -48,5 +53,29 @@ where
             outer_contour: outer_contour.into_closed()?,
             inner_contours,
         }))
+    }
+}
+
+impl<P, Poly> CartesianGeometry2dSpecialization<P, PolygonGeometryType> for Poly
+where
+    P: CartesianPoint2d,
+    Poly: Polygon
+        + CartesianPolygon<Point = P>
+        + GeometryType<Type = PolygonGeometryType, Space = CartesianSpace2d>
+        + Geometry<Point = P>,
+    Poly::Contour: Contour<Point = P> + CartesianGeometry2d<P>,
+{
+    fn is_point_inside_spec<Other: CartesianPoint2d<Num = P::Num>>(
+        &self,
+        point: &Other,
+        _tolerance: P::Num,
+    ) -> bool {
+        self.contains_point(point)
+    }
+
+    fn bounding_rectangle_spec(&self) -> Option<Rect<P::Num>> {
+        self.iter_contours()
+            .filter_map(|c| c.bounding_rectangle())
+            .collect()
     }
 }

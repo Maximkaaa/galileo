@@ -208,3 +208,17 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> FromIterator<Rect<N>> 
         curr
     }
 }
+
+impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> FromIterator<Rect<N>>
+    for Option<Rect<N>>
+{
+    fn from_iter<T: IntoIterator<Item = Rect<N>>>(iter: T) -> Self {
+        let mut iter = iter.into_iter();
+        let mut prev = iter.next()?;
+        for next in iter {
+            prev = prev.merge(next);
+        }
+
+        Some(prev)
+    }
+}

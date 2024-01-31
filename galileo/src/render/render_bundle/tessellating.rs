@@ -21,6 +21,7 @@ use lyon::tessellation::VertexSource;
 use nalgebra::{Point2, Vector2};
 use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
+use std::mem::size_of;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -716,7 +717,8 @@ impl TessellatingRenderBundle {
         self.points.push(PointInstance {
             position,
             color: color.to_u8_array(),
-        })
+        });
+        self.buffer_size += size_of::<PointInstance>();
     }
 
     pub fn sort_by_depth(&mut self, view: &MapView) {

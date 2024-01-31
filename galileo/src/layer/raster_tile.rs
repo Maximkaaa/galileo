@@ -5,7 +5,6 @@ use crate::render::render_bundle::RenderBundle;
 use crate::render::{Canvas, ImagePaint, PackedBundle, PrimitiveId, RenderOptions, Renderer};
 use crate::tile_scheme::{TileIndex, TileScheme};
 use crate::view::MapView;
-use async_trait::async_trait;
 use maybe_sync::{MaybeSend, MaybeSync, Mutex};
 use quick_cache::sync::Cache;
 use std::collections::HashSet;
@@ -58,6 +57,10 @@ where
             tiles: Arc::new(Cache::new(1000)),
             messenger,
         }
+    }
+
+    pub fn set_fade_in_duration(&mut self, duration: Duration) {
+        self.fade_in_duration = duration;
     }
 
     fn get_tiles_to_draw(&self, view: &MapView) -> Vec<(TileIndex, Arc<TileState>)> {
@@ -175,9 +178,13 @@ where
                     let since_drawn = now
                         .duration_since(first_drawn)
                         .unwrap_or(Duration::from_millis(0));
-                    let opacity =
+                    let opacity = if self.fade_in_duration.is_zero() {
+                        255
+                    } else {
                         ((since_drawn.as_secs_f64() / self.fade_in_duration.as_secs_f64()).min(1.0)
-                            * 255.0) as u8;
+                            * 255.0) as u8
+                    };
+
                     let is_opaque = opacity == 255;
                     if !is_opaque {
                         requires_redraw = true;
@@ -203,13 +210,19 @@ where
                         },
                     );
 
+                    let opacity = if self.fade_in_duration.is_zero() {
+                        255
+                    } else {
+                        0
+                    };
+
                     let id = bundle.add_image(
                         owned,
                         self.tile_scheme
                             .tile_bbox(*index)
                             .unwrap()
                             .into_quadrangle(),
-                        ImagePaint { opacity: 0 },
+                        ImagePaint { opacity },
                     );
                     let packed = canvas.pack_bundle(&bundle);
                     self.tiles.insert(
@@ -264,9 +277,19 @@ where
             }
         }
     }
+
+    pub async fn load_tiles(&self, view: &MapView) {
+        if let Some(iter) = self.tile_scheme.iter_tiles(view) {
+            for index in iter {
+                let tile_provider = self.tile_provider.clone();
+                let tiles = self.tiles.clone();
+                let messenger = self.messenger.clone();
+                Self::load_tile(index, tile_provider, &tiles, messenger).await;
+            }
+        }
+    }
 }
 
-#[async_trait]
 impl<Provider> Layer for RasterTileLayer<Provider>
 where
     Provider: DataProvider<TileIndex, DecodedImage, ()> + MaybeSync + MaybeSend + 'static,

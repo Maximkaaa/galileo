@@ -7,6 +7,7 @@ use galileo_types::geometry::Geom;
 use galileo_types::multi_contour::MultiContour;
 use num_traits::AsPrimitive;
 
+#[derive(Debug, Copy, Clone)]
 pub struct SimpleContourSymbol {
     pub color: Color,
     pub width: f64,

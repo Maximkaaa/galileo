@@ -43,7 +43,7 @@ where
 {
     type Point = P;
 
-    fn project<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
+    fn project_spec<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
     where
         Proj: Projection<InPoint = Self::Point> + ?Sized,
     {

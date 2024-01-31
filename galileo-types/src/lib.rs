@@ -1,6 +1,7 @@
 pub mod cartesian;
 pub mod contour;
 pub mod disambig;
+pub mod error;
 pub mod geo;
 pub mod geometry;
 pub mod geometry_type;
@@ -14,3 +15,6 @@ pub mod segment;
 
 #[cfg(feature = "geo-types")]
 pub mod geo_types;
+
+#[cfg(feature = "geojson")]
+mod geojson;

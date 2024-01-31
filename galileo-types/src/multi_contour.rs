@@ -1,7 +1,11 @@
+use crate::cartesian::rect::Rect;
+use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
 use crate::contour::Contour;
 use crate::geo::traits::projection::Projection;
-use crate::geometry::{Geom, Geometry, GeometrySpecialization};
-use crate::geometry_type::{GeometryType, MultiContourGeometryType};
+use crate::geometry::{
+    CartesianGeometry2d, CartesianGeometry2dSpecialization, Geom, Geometry, GeometrySpecialization,
+};
+use crate::geometry_type::{CartesianSpace2d, GeometryType, MultiContourGeometryType};
 
 pub trait MultiContour {
     type Contour: Contour;
@@ -16,7 +20,7 @@ where
 {
     type Point = <C::Contour as Geometry>::Point;
 
-    fn project<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
+    fn project_spec<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
     where
         Proj: Projection<InPoint = Self::Point> + ?Sized,
     {
@@ -30,5 +34,28 @@ where
             })
             .collect::<Option<Vec<crate::cartesian::impls::contour::Contour<Proj::OutPoint>>>>()?;
         Some(Geom::MultiContour(contours.into()))
+    }
+}
+
+impl<P, C> CartesianGeometry2dSpecialization<P, MultiContourGeometryType> for C
+where
+    P: CartesianPoint2d,
+    C: MultiContour
+        + GeometryType<Type = MultiContourGeometryType, Space = CartesianSpace2d>
+        + Geometry<Point = P>,
+    C::Contour: Contour<Point = P> + CartesianGeometry2d<P>,
+{
+    fn is_point_inside_spec<Other: CartesianPoint2d<Num = P::Num>>(
+        &self,
+        _point: &Other,
+        _tolerance: P::Num,
+    ) -> bool {
+        todo!()
+    }
+
+    fn bounding_rectangle_spec(&self) -> Option<Rect<P::Num>> {
+        self.contours()
+            .filter_map(|c| c.bounding_rectangle())
+            .collect()
     }
 }

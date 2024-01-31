@@ -6,6 +6,7 @@ use crate::render::render_bundle::RenderBundle;
 use crate::render::{Canvas, PackedBundle, PrimitiveId, RenderOptions, Renderer};
 use crate::view::MapView;
 use galileo_types::cartesian::impls::point::{Point2d, Point3d};
+use galileo_types::cartesian::rect::Rect;
 use galileo_types::cartesian::traits::cartesian_point::{
     CartesianPoint2d, NewCartesianPoint2d, NewCartesianPoint3d,
 };
@@ -162,7 +163,23 @@ where
     }
 }
 
-impl<P, F, S, Space> FeatureLayer<P, F, S, Space>
+impl<P, F, S> FeatureLayer<P, F, S, GeoSpace2d>
+where
+    P: NewGeoPoint + 'static,
+    F: Feature,
+    F::Geom: Geometry<Point = P>,
+{
+    pub fn extent_projected(&self, crs: &Crs) -> Option<Rect> {
+        let projection = crs.get_projection::<P, Point2d>()?;
+        self.features
+            .iter()
+            .filter_map(|f| f.geometry().project(&*projection))
+            .map(|g| g.bounding_rectangle())
+            .collect()
+    }
+}
+
+impl<P, F, S> FeatureLayer<P, F, S, CartesianSpace2d>
 where
     P: CartesianPoint2d,
     F: Feature,
@@ -424,11 +441,11 @@ where
                         primitive_ids: vec![],
                     });
                 };
-            }
 
-            if bundle.approx_buffer_size() > self.options.buffer_size_limit {
-                let full_bundle = std::mem::replace(&mut bundle, canvas.create_bundle());
-                render_bundles.push(full_bundle);
+                if bundle.approx_buffer_size() > self.options.buffer_size_limit {
+                    let full_bundle = std::mem::replace(&mut bundle, canvas.create_bundle());
+                    render_bundles.push(full_bundle);
+                }
             }
 
             render_bundles.push(bundle);

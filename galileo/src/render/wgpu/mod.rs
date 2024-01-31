@@ -5,10 +5,12 @@ use std::any::Any;
 use std::mem::size_of;
 use wgpu::util::DeviceExt;
 use wgpu::{
-    Buffer, Device, Extent3d, Queue, RenderPassDepthStencilAttachment, StoreOp, TextureDescriptor,
-    TextureDimension, TextureFormat, TextureUsages, TextureView, TextureViewDescriptor,
+    Adapter, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Extent3d,
+    ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, Origin3d, Queue,
+    RenderPassDepthStencilAttachment, StoreOp, Surface, SurfaceConfiguration, SurfaceError,
+    SurfaceTexture, Texture, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat,
+    TextureUsages, TextureView, TextureViewDescriptor,
 };
-use winit::dpi::PhysicalSize;
 
 use crate::layer::Layer;
 use crate::map::Map;
@@ -26,18 +28,58 @@ use super::{Canvas, PackedBundle, RenderOptions, Renderer};
 mod pipelines;
 
 const DEPTH_FORMAT: TextureFormat = TextureFormat::Depth24PlusStencil8;
+const TARGET_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
 
 pub struct WgpuRenderer {
-    surface: wgpu::Surface,
+    render_target: RenderTarget,
     device: Device,
     queue: Queue,
-    config: wgpu::SurfaceConfiguration,
-    size: PhysicalSize<u32>,
+    size: Size<u32>,
     pipelines: Pipelines,
     multisampling_view: TextureView,
     background: Color,
     stencil_view_multisample: TextureView,
     stencil_view: TextureView,
+}
+
+enum RenderTarget {
+    Surface {
+        config: SurfaceConfiguration,
+        surface: Surface,
+    },
+    Texture(Texture),
+}
+
+enum RenderTargetTexture<'a> {
+    Surface(SurfaceTexture),
+    Texture(&'a Texture),
+}
+
+impl<'a> RenderTargetTexture<'a> {
+    fn view(&self) -> TextureView {
+        match self {
+            RenderTargetTexture::Surface(t) => t.texture.create_view(&Default::default()),
+            RenderTargetTexture::Texture(t) => t.create_view(&Default::default()),
+        }
+    }
+
+    fn present(self) {
+        match self {
+            RenderTargetTexture::Surface(t) => t.present(),
+            RenderTargetTexture::Texture(_) => {}
+        }
+    }
+}
+
+impl RenderTarget {
+    fn texture(&self) -> Result<RenderTargetTexture, SurfaceError> {
+        match &self {
+            RenderTarget::Surface { surface, .. } => {
+                Ok(RenderTargetTexture::Surface(surface.get_current_texture()?))
+            }
+            RenderTarget::Texture(texture) => Ok(RenderTargetTexture::Texture(texture)),
+        }
+    }
 }
 
 impl Renderer for WgpuRenderer {
@@ -57,14 +99,59 @@ impl Renderer for WgpuRenderer {
 }
 
 impl WgpuRenderer {
-    pub async fn create(window: &winit::window::Window) -> Self {
-        let size = window.inner_size();
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
-            flags: Default::default(),
-            dx12_shader_compiler: Default::default(),
-            gles_minor_version: Default::default(),
+    pub async fn create(size: Size<u32>) -> Self {
+        let instance = Self::create_instance();
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::default(),
+                compatible_surface: None,
+                force_fallback_adapter: false,
+            })
+            .await
+            .unwrap();
+
+        let (device, queue) = Self::create_device(&adapter).await;
+
+        let target_texture = device.create_texture(&TextureDescriptor {
+            label: Some("Multisampling texture"),
+            size: Extent3d {
+                width: size.width(),
+                height: size.height(),
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TARGET_TEXTURE_FORMAT,
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::COPY_SRC,
+            view_formats: &[],
         });
+
+        let multisampling_view =
+            Self::create_multisample_texture(&device, size, TARGET_TEXTURE_FORMAT);
+        let stencil_view_multisample = Self::create_stencil_texture(&device, size, 4);
+        let stencil_view = Self::create_stencil_texture(&device, size, 1);
+
+        let pipelines = Pipelines::create(&device, TARGET_TEXTURE_FORMAT);
+
+        Self {
+            render_target: RenderTarget::Texture(target_texture),
+            device,
+            queue,
+            size,
+            pipelines,
+            multisampling_view,
+            stencil_view_multisample,
+            stencil_view,
+            background: Color::rgba(255, 255, 255, 255),
+        }
+    }
+
+    pub async fn create_with_window<W>(window: &W, size: Size<u32>) -> Self
+    where
+        W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+    {
+        let instance = Self::create_instance();
 
         let surface = unsafe { instance.create_surface(window) }.unwrap();
         let adapter = instance
@@ -76,27 +163,7 @@ impl WgpuRenderer {
             .await
             .unwrap();
 
-        let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    features: wgpu::Features::empty(),
-                    limits: if cfg!(target_arch = "wasm32") {
-                        wgpu::Limits {
-                            max_texture_dimension_2d: 4096,
-                            ..wgpu::Limits::downlevel_webgl2_defaults()
-                        }
-                    } else {
-                        wgpu::Limits {
-                            max_buffer_size: 256 << 22,
-                            ..wgpu::Limits::default()
-                        }
-                    },
-                    label: None,
-                },
-                None,
-            )
-            .await
-            .unwrap();
+        let (device, queue) = Self::create_device(&adapter).await;
 
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps
@@ -109,8 +176,8 @@ impl WgpuRenderer {
         let config = wgpu::SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
-            width: size.width,
-            height: size.height,
+            width: size.width(),
+            height: size.height(),
             present_mode: surface_caps.present_modes[0],
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
@@ -124,10 +191,9 @@ impl WgpuRenderer {
         let pipelines = Pipelines::create(&device, surface_format);
 
         Self {
-            surface,
+            render_target: RenderTarget::Surface { surface, config },
             device,
             queue,
-            config,
             size,
             pipelines,
             multisampling_view,
@@ -141,16 +207,46 @@ impl WgpuRenderer {
         self.background = color;
     }
 
+    fn create_instance() -> wgpu::Instance {
+        wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            flags: Default::default(),
+            dx12_shader_compiler: Default::default(),
+            gles_minor_version: Default::default(),
+        })
+    }
+
+    async fn create_device(adapter: &Adapter) -> (Device, Queue) {
+        adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    features: wgpu::Features::empty(),
+                    limits: if cfg!(target_arch = "wasm32") {
+                        wgpu::Limits {
+                            max_texture_dimension_2d: 4096,
+                            ..wgpu::Limits::downlevel_webgl2_defaults()
+                        }
+                    } else {
+                        wgpu::Limits::default()
+                    },
+                    label: None,
+                },
+                None,
+            )
+            .await
+            .unwrap()
+    }
+
     fn create_multisample_texture(
         device: &Device,
-        size: PhysicalSize<u32>,
+        size: Size<u32>,
         format: TextureFormat,
     ) -> TextureView {
         let multisampling_texture = device.create_texture(&TextureDescriptor {
             label: Some("Multisampling texture"),
             size: Extent3d {
-                width: size.width,
-                height: size.height,
+                width: size.width(),
+                height: size.height(),
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -164,16 +260,12 @@ impl WgpuRenderer {
         multisampling_texture.create_view(&TextureViewDescriptor::default())
     }
 
-    fn create_stencil_texture(
-        device: &Device,
-        size: PhysicalSize<u32>,
-        sample_count: u32,
-    ) -> TextureView {
+    fn create_stencil_texture(device: &Device, size: Size<u32>, sample_count: u32) -> TextureView {
         let texture = device.create_texture(&TextureDescriptor {
             label: Some("Stencil/depth texture"),
             size: Extent3d {
-                width: size.width,
-                height: size.height,
+                width: size.width(),
+                height: size.height(),
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -187,25 +279,92 @@ impl WgpuRenderer {
         texture.create_view(&TextureViewDescriptor::default())
     }
 
-    pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
-        if new_size.width > 0 && new_size.height > 0 {
+    pub fn resize(&mut self, new_size: Size<u32>) {
+        if new_size.width() > 0 && new_size.height() > 0 {
             self.size = new_size;
-            self.config.width = new_size.width;
-            self.config.height = new_size.height;
-            self.surface.configure(&self.device, &self.config);
+            self.resize_render_target(new_size);
 
             self.multisampling_view =
-                Self::create_multisample_texture(&self.device, new_size, self.config.format);
+                Self::create_multisample_texture(&self.device, new_size, self.target_format());
             self.stencil_view_multisample = Self::create_stencil_texture(&self.device, new_size, 4);
             self.stencil_view = Self::create_stencil_texture(&self.device, new_size, 1);
         }
     }
 
-    pub fn render(&self, map: &Map) -> Result<(), wgpu::SurfaceError> {
-        let output = self.surface.get_current_texture()?;
-        let view = output.texture.create_view(&TextureViewDescriptor {
-            ..Default::default()
+    fn resize_render_target(&mut self, new_size: Size<u32>) {
+        match &mut self.render_target {
+            RenderTarget::Surface { config, surface } => {
+                config.width = new_size.width();
+                config.height = new_size.height();
+                surface.configure(&self.device, config);
+            }
+            RenderTarget::Texture(_) => {}
+        }
+    }
+
+    fn target_format(&self) -> TextureFormat {
+        match &self.render_target {
+            RenderTarget::Surface { config, .. } => config.format,
+            RenderTarget::Texture(_) => TARGET_TEXTURE_FORMAT,
+        }
+    }
+
+    pub async fn get_image(&self) -> Result<Vec<u8>, SurfaceError> {
+        let buffer_size =
+            (self.size.width() * self.size.height() * size_of::<u32>() as u32) as BufferAddress;
+        let buffer_desc = BufferDescriptor {
+            size: buffer_size,
+            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+            label: None,
+            mapped_at_creation: false,
+        };
+        let buffer = self.device.create_buffer(&buffer_desc);
+
+        let RenderTarget::Texture(texture) = &self.render_target else {
+            todo!()
+        };
+
+        let mut encoder = self.device.create_command_encoder(&Default::default());
+        encoder.copy_texture_to_buffer(
+            ImageCopyTexture {
+                aspect: TextureAspect::All,
+                texture,
+                mip_level: 0,
+                origin: Origin3d::ZERO,
+            },
+            ImageCopyBuffer {
+                buffer: &buffer,
+                layout: ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(size_of::<u32>() as u32 * self.size.width()),
+                    rows_per_image: Some(self.size.height()),
+                },
+            },
+            Extent3d {
+                width: self.size.width(),
+                height: self.size.height(),
+                depth_or_array_layers: 1,
+            },
+        );
+
+        self.queue.submit(Some(encoder.finish()));
+
+        let buffer_slice = buffer.slice(..);
+        let (tx, rx) = futures_intrusive::channel::shared::oneshot_channel();
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            tx.send(result).unwrap();
         });
+        self.device.poll(wgpu::Maintain::Wait);
+        rx.receive().await.unwrap().unwrap();
+
+        let data = buffer_slice.get_mapped_range();
+        Ok(data.to_vec())
+    }
+
+    pub fn render(&self, map: &Map) -> Result<(), SurfaceError> {
+        let texture = self.render_target.texture()?;
+        let view = texture.view();
+
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -238,8 +397,7 @@ impl WgpuRenderer {
         self.queue.submit(std::iter::once(encoder.finish()));
 
         self.render_map(map, &view);
-
-        output.present();
+        texture.present();
 
         Ok(())
     }
@@ -257,7 +415,7 @@ impl WgpuRenderer {
     }
 
     pub fn size(&self) -> Size {
-        Size::new(self.size.width as f64, self.size.height as f64)
+        Size::new(self.size.width() as f64, self.size.height() as f64)
     }
 }
 
@@ -282,8 +440,8 @@ impl<'a> WgpuCanvas<'a> {
                 view_proj: map_view.map_to_scene_mtx().unwrap(),
                 view_rotation: rotation_mtx.cast::<f32>().data.0,
                 inv_screen_size: [
-                    1.0 / renderer.size.width as f32,
-                    1.0 / renderer.size.height as f32,
+                    1.0 / renderer.size.width() as f32,
+                    1.0 / renderer.size.height() as f32,
                 ],
                 resolution: map_view.resolution() as f32,
                 _padding: [0.0; 1],
@@ -467,8 +625,6 @@ impl WgpuPackedBundle {
                 )
             })
             .collect();
-
-        debug_assert!(textures.len() == 1);
 
         let mut image_buffers = vec![];
         for (image_index, vertices) in images {

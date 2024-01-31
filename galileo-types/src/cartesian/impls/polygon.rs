@@ -1,8 +1,4 @@
 use crate::cartesian::impls::contour::ClosedContour;
-use crate::cartesian::rect::Rect;
-use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
-use crate::cartesian::traits::polygon::CartesianPolygon;
-use crate::geometry::CartesianGeometry2d;
 use crate::geometry_type::{GeometryType, PolygonGeometryType};
 use serde::{Deserialize, Serialize};
 
@@ -62,21 +58,4 @@ impl<P> From<ClosedContour<P>> for Polygon<P> {
 impl<P: GeometryType> GeometryType for Polygon<P> {
     type Type = PolygonGeometryType;
     type Space = P::Space;
-}
-
-impl<P: GeometryType> CartesianGeometry2d<P> for Polygon<P>
-where
-    P: CartesianPoint2d,
-{
-    fn is_point_inside<Other: CartesianPoint2d<Num = P::Num>>(
-        &self,
-        point: &Other,
-        _tolerance: P::Num,
-    ) -> bool {
-        self.contains_point(point)
-    }
-
-    fn bounding_rectangle(&self) -> Rect<P::Num> {
-        todo!()
-    }
 }
