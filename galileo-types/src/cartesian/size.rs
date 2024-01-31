@@ -1,5 +1,4 @@
-use num_traits::real::Real;
-use num_traits::FromPrimitive;
+use num_traits::{FromPrimitive, NumCast};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Size<Num: num_traits::Num + PartialOrd + Copy = f64> {
@@ -7,12 +6,9 @@ pub struct Size<Num: num_traits::Num + PartialOrd + Copy = f64> {
     height: Num,
 }
 
-impl<Num: Real + FromPrimitive> Size<Num> {
+impl<Num: num_traits::Num + FromPrimitive + PartialOrd + Copy + NumCast> Size<Num> {
     pub fn new(width: Num, height: Num) -> Self {
-        Self {
-            width: width.max(Num::zero()),
-            height: height.max(Num::zero()),
-        }
+        Self { width, height }
     }
 
     pub fn width(&self) -> Num {
@@ -33,5 +29,14 @@ impl<Num: Real + FromPrimitive> Size<Num> {
 
     pub fn is_zero(&self) -> bool {
         self.width.is_zero() || self.height.is_zero()
+    }
+
+    pub fn cast<T: num_traits::Num + FromPrimitive + PartialOrd + Copy + NumCast>(
+        &self,
+    ) -> Size<T> {
+        Size {
+            width: NumCast::from(self.width).unwrap(),
+            height: NumCast::from(self.height).unwrap(),
+        }
     }
 }

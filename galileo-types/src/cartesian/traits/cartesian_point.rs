@@ -1,5 +1,6 @@
+use crate::cartesian::rect::Rect;
 use crate::geo::traits::projection::Projection;
-use crate::geometry::{Geom, GeometrySpecialization};
+use crate::geometry::{CartesianGeometry2dSpecialization, Geom, GeometrySpecialization};
 use crate::geometry_type::{CartesianSpace2d, GeometryType, PointGeometryType};
 use crate::point::{CartesianPointType, Point, PointHelper};
 use nalgebra::{Point2, Scalar, Vector2};
@@ -85,10 +86,27 @@ where
 {
     type Point = P;
 
-    fn project<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
+    fn project_spec<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
     where
         Proj: Projection<InPoint = Self::Point> + ?Sized,
     {
         Some(Geom::Point(projection.project(self)?))
+    }
+}
+
+impl<P> CartesianGeometry2dSpecialization<P, PointGeometryType> for P
+where
+    P: CartesianPoint2d + GeometryType<Type = PointGeometryType, Space = CartesianSpace2d>,
+{
+    fn is_point_inside_spec<Other: CartesianPoint2d<Num = P::Num>>(
+        &self,
+        point: &Other,
+        tolerance: P::Num,
+    ) -> bool {
+        self.distance_sq(point) < tolerance * tolerance
+    }
+
+    fn bounding_rectangle_spec(&self) -> Option<Rect<P::Num>> {
+        Some(Rect::from_point(self))
     }
 }

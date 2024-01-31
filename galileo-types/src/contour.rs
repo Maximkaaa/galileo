@@ -1,6 +1,8 @@
+use crate::cartesian::rect::Rect;
+use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
 use crate::geo::traits::projection::Projection;
-use crate::geometry::{Geom, GeometrySpecialization};
-use crate::geometry_type::{ContourGeometryType, GeometryType};
+use crate::geometry::{CartesianGeometry2dSpecialization, Geom, Geometry, GeometrySpecialization};
+use crate::geometry_type::{CartesianSpace2d, ContourGeometryType, GeometryType};
 use crate::segment::Segment;
 
 pub trait Contour {
@@ -142,7 +144,7 @@ where
 {
     type Point = C::Point;
 
-    fn project<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
+    fn project_spec<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
     where
         Proj: Projection<InPoint = Self::Point> + ?Sized,
     {
@@ -154,5 +156,25 @@ where
             points,
             is_closed: true,
         }))
+    }
+}
+
+impl<P, C> CartesianGeometry2dSpecialization<P, ContourGeometryType> for C
+where
+    P: CartesianPoint2d,
+    C: Contour<Point = P>
+        + GeometryType<Type = ContourGeometryType, Space = CartesianSpace2d>
+        + Geometry<Point = P>,
+{
+    fn is_point_inside_spec<Other: CartesianPoint2d<Num = P::Num>>(
+        &self,
+        _point: &Other,
+        _tolerance: P::Num,
+    ) -> bool {
+        todo!()
+    }
+
+    fn bounding_rectangle_spec(&self) -> Option<Rect<P::Num>> {
+        Rect::from_points(self.iter_points())
     }
 }

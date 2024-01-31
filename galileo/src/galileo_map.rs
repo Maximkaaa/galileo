@@ -65,7 +65,10 @@ impl GalileoMap {
                             }
                             WindowEvent::Resized(size) => {
                                 log::info!("Window resized to: {size:?}");
-                                backend.write().unwrap().resize(size);
+                                backend
+                                    .write()
+                                    .unwrap()
+                                    .resize(Size::new(size.width, size.height));
                                 let mut map = map.write().unwrap();
                                 map.set_size(Size::new(size.width as f64, size.height as f64));
                             }
@@ -156,7 +159,11 @@ impl MapBuilder {
         let window = Arc::new(window);
         let messenger = WinitMessenger::new(window.clone());
 
-        let backend = WgpuRenderer::create(&window).await;
+        let backend = WgpuRenderer::create_with_window(
+            &window,
+            Size::new(window.inner_size().width, window.inner_size().height),
+        )
+        .await;
         let backend = Arc::new(RwLock::new(backend));
 
         let input_handler = WinitInputHandler::default();
@@ -277,7 +284,7 @@ impl MapBuilder {
             .view
             .unwrap_or_else(|| MapView::new(&self.position, self.resolution));
 
-        let map = Map::new(view, self.layers, messenger);
+        let map = Map::new(view, self.layers, Some(messenger));
 
         Arc::new(RwLock::new(map))
     }

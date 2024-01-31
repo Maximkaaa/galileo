@@ -1,3 +1,4 @@
+use galileo::layer::feature_layer::feature::Feature;
 use galileo::Color;
 use galileo_types::cartesian::impls::multipolygon::MultiPolygon;
 use galileo_types::cartesian::impls::point::Point2d;
@@ -30,6 +31,14 @@ impl Country {
     }
 }
 
+impl Feature for Country {
+    type Geom = Self;
+
+    fn geometry(&self) -> &Self::Geom {
+        self
+    }
+}
+
 impl Geometry for Country {
     type Point = Point2d;
 
@@ -54,8 +63,8 @@ impl CartesianGeometry2d<Point2d> for Country {
         self.geometry.is_point_inside(point, tolerance)
     }
 
-    fn bounding_rectangle(&self) -> Rect {
-        self.bbox
+    fn bounding_rectangle(&self) -> Option<Rect> {
+        Some(self.bbox)
     }
 }
 
@@ -65,6 +74,14 @@ pub struct City {
     lng: f64,
     pub capital: String,
     pub population: f64,
+}
+
+impl Feature for City {
+    type Geom = Self;
+
+    fn geometry(&self) -> &Self::Geom {
+        self
+    }
 }
 
 impl GeoPoint for City {

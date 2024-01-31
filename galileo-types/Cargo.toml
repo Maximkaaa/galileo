@@ -18,3 +18,5 @@ nalgebra = "0.32"
 serde = { version = "1.0", features = ["derive"] }
 geodesy = "0.11.1"
 geo-types = { version = "0.7", optional = true }
+geojson = { version = "0.24", optional = true }
+thiserror = "1.0"

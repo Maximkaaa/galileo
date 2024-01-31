@@ -1,10 +1,5 @@
-use crate::cartesian::rect::Rect;
-use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
-use crate::cartesian::traits::contour::CartesianContour;
 use crate::geo::traits::projection::Projection;
-use crate::geometry::CartesianGeometry2d;
 use crate::geometry_type::{ContourGeometryType, GeometryType};
-use num_traits::Float;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,25 +124,4 @@ impl<P: GeometryType> GeometryType for Contour<P> {
 impl<P: GeometryType> GeometryType for ClosedContour<P> {
     type Type = ContourGeometryType;
     type Space = P::Space;
-}
-
-impl<N, P: GeometryType> CartesianGeometry2d<P> for Contour<P>
-where
-    N: Float,
-    P: CartesianPoint2d<Num = N>,
-{
-    fn is_point_inside<Other: CartesianPoint2d<Num = P::Num>>(
-        &self,
-        point: &Other,
-        tolerance: P::Num,
-    ) -> bool {
-        let Some(distance) = self.distance_to_point_sq(point) else {
-            return false;
-        };
-        distance <= tolerance * tolerance
-    }
-
-    fn bounding_rectangle(&self) -> Rect<P::Num> {
-        todo!()
-    }
 }

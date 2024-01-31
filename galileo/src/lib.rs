@@ -67,15 +67,12 @@
 //! * [`EventProcessor`](control::event_processor::EventProcessor) to convert raw system event into
 //!   some intermediate representation, more convenient to deal with, and some
 //! * [`controls`](control) that actually change state of the map or layers based on the user input.
-//!
-//!
 
 pub mod async_runtime;
 pub mod bounding_box;
 pub mod color;
 pub mod control;
 pub mod error;
-pub mod galileo_map;
 pub mod layer;
 pub mod lod;
 pub mod map;
@@ -85,10 +82,17 @@ pub mod primitives;
 pub mod render;
 pub mod tile_scheme;
 pub mod view;
+
+#[cfg(feature = "winit")]
 pub mod winit;
 
-pub use color::Color;
+#[cfg(all(feature = "winit", feature = "wgpu"))]
+pub mod galileo_map;
+#[cfg(all(feature = "winit", feature = "wgpu"))]
 pub use galileo_map::MapBuilder;
+
+pub use color::Color;
+
 pub use layer::feature_layer::symbol;
 pub use tile_scheme::TileScheme;
 

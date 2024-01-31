@@ -12,7 +12,7 @@ const FRAME_DURATION: Duration = Duration::from_millis(16);
 pub struct Map {
     view: MapView,
     layers: Vec<Box<dyn Layer>>,
-    messenger: Box<dyn Messenger>,
+    messenger: Option<Box<dyn Messenger>>,
     animation: Option<AnimationParameters>,
 }
 
@@ -27,12 +27,17 @@ impl Map {
     pub fn new(
         view: MapView,
         layers: Vec<Box<dyn Layer>>,
-        messenger: impl Messenger + 'static,
+        messenger: Option<impl Messenger + 'static>,
     ) -> Self {
+        let messenger: Option<Box<dyn Messenger>> = if let Some(m) = messenger {
+            Some(Box::new(m))
+        } else {
+            None
+        };
         Self {
             view,
             layers,
-            messenger: Box::new(messenger),
+            messenger,
             animation: None,
         }
     }
@@ -51,7 +56,9 @@ impl Map {
 
     pub(crate) fn set_view(&mut self, view: MapView) {
         self.view = view;
-        self.messenger.request_redraw();
+        if let Some(messenger) = &self.messenger {
+            messenger.request_redraw();
+        }
     }
 
     pub fn load_layers(&self, renderer: &Arc<RwLock<dyn Renderer>>) {
@@ -61,7 +68,9 @@ impl Map {
     }
 
     pub fn redraw(&self) {
-        self.messenger.request_redraw()
+        if let Some(messenger) = &self.messenger {
+            messenger.request_redraw()
+        }
     }
 
     pub fn animate(&mut self) {

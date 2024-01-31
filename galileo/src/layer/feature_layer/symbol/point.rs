@@ -8,12 +8,12 @@ use crate::Color;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geometry::Geom;
 use galileo_types::multi_point::MultiPoint;
-use image::GenericImageView;
 use nalgebra::Vector2;
 use num_traits::AsPrimitive;
 use std::ops::Deref;
 use std::sync::Arc;
 
+#[derive(Debug, Copy, Clone)]
 pub struct CirclePointSymbol {
     pub color: Color,
     pub size: f64,
@@ -53,7 +53,9 @@ pub struct ImagePointSymbol {
 }
 
 impl ImagePointSymbol {
+    #[cfg(feature = "image")]
     pub fn from_path(path: &str, offset: Vector2<f32>, scale: f32) -> Result<Self, GalileoError> {
+        use image::GenericImageView;
         let image = image::io::Reader::open(path)?.decode()?;
         let dimensions = image.dimensions();
 

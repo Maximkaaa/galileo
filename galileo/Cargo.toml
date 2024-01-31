@@ -17,9 +17,11 @@ exclude = [
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["wgpu", "tokio", "image", "serde"]
+default = ["wgpu", "tokio", "image", "serde", "winit"]
+wgpu = ["dep:wgpu", "raw-window-handle"]
 web = ["wasm-bindgen-futures", "serde", "byte-conversion", "js-sys"]
 byte-conversion = ["serde_bytes", "js-sys"]
+geojson = ["dep:geojson", "galileo-types/geojson"]
 
 [dependencies]
 cfg-if = "1"
@@ -28,7 +30,7 @@ bytemuck = { version = "1.13.1", features = ["derive"] }
 bytes = "1.4.0"
 futures = "0.3.28"
 wgpu = { version = "0.18", optional = true }
-winit = { version ="0.29", features = ["rwh_05"] }
+winit = { version ="0.29", features = ["rwh_05"], optional = true }
 log = "0.4"
 image = { version = "0.24", default-features = false, features = ["png", "jpeg"], optional = true }
 lyon = { version = "1" }
@@ -42,6 +44,9 @@ nalgebra = "0.32"
 quick_cache = "0.4"
 serde_bytes = { version = "0.11", optional = true }
 js-sys = { version = "0.3", optional = true }
+futures-intrusive = "0.5"
+geojson = { version = "0.24", optional = true }
+raw-window-handle = { version = "0.5", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.28.2", features = ["macros", "rt", "rt-multi-thread" ], optional = true }
@@ -90,3 +95,9 @@ csv = "1.3"
 geo-types = "0.7"
 geozero = "0.11"
 las = { version = "0.8", features = ["laz"] }
+anyhow = "1.0"
+geojson = "0.24"
+
+[[example]]
+name = "render_to_file"
+required-features = ["geojson"]
