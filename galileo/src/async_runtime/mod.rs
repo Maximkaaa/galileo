@@ -1,8 +1,8 @@
-#[cfg(feature = "tokio")]
+#[cfg(not(target_arch = "wasm32"))]
 use maybe_sync::MaybeSend;
 use std::future::Future;
 
-#[cfg(feature = "tokio")]
+#[cfg(not(target_arch = "wasm32"))]
 pub fn spawn<T>(future: T)
 where
     T: Future + MaybeSend + 'static,
@@ -11,7 +11,7 @@ where
     tokio::spawn(future);
 }
 
-#[cfg(feature = "web")]
+#[cfg(target_arch = "wasm32")]
 pub fn spawn<T>(future: T)
 where
     T: Future + 'static,

@@ -36,3 +36,11 @@ jobs:
       - run: rustup component add clippy
       - name: Clippy check
         run: cargo clippy --all -- -D warnings
+
+  build-wasm:
+      name: Build wasm32 target
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v3
+        - run: rustup target add wasm32-unknown-unknown
+        - run: cargo build -p galileo --target wasm32-unknown-unknown

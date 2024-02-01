@@ -935,5 +935,5 @@ pub struct ImageVertex {
     pub offset: [f32; 2],
 }
 
-#[cfg(feature = "byte-conversion")]
+#[cfg(target_arch = "wasm32")]
 pub(crate) mod serialization;
