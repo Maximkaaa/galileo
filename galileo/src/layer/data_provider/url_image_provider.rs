@@ -7,6 +7,9 @@ use bytes::Bytes;
 use maybe_sync::{MaybeSend, MaybeSync};
 use std::marker::PhantomData;
 
+#[cfg(target_arch = "wasm32")]
+use std::future::Future;
+
 pub trait UrlSource<Key>: (Fn(&Key) -> String) + MaybeSend + MaybeSync {}
 impl<Key, T: Fn(&Key) -> String> UrlSource<Key> for T where T: MaybeSend + MaybeSync {}
 
@@ -38,6 +41,7 @@ impl<Key, Cache> UrlImageProvider<Key, Cache> {
         self.offline_mode = enabled;
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn check_offline_mode(&self) -> Result<(), GalileoError> {
         if self.offline_mode {
             Err(GalileoError::NotFound)
@@ -47,6 +51,7 @@ impl<Key, Cache> UrlImageProvider<Key, Cache> {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl<Key, Cache> DataProvider<Key, DecodedImage, ()> for UrlImageProvider<Key, Cache>
 where
     Key: MaybeSend + MaybeSync,
@@ -77,6 +82,29 @@ where
 
     fn decode(&self, bytes: Bytes, _context: ()) -> Result<DecodedImage, GalileoError> {
         DecodedImage::new(&bytes)
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl<Key, Cache> DataProvider<Key, DecodedImage, ()> for UrlImageProvider<Key, Cache>
+where
+    Key: MaybeSend + MaybeSync,
+    Cache: PersistentCacheController<str, Bytes> + MaybeSend + MaybeSync,
+{
+    fn load_raw(
+        &self,
+        _key: &Key,
+    ) -> impl Future<Output = Result<Bytes, GalileoError>> + MaybeSend {
+        std::future::ready(Err(GalileoError::Generic("not supported".into())))
+    }
+
+    fn decode(&self, _bytes: Bytes, _context: ()) -> Result<DecodedImage, GalileoError> {
+        Err(GalileoError::Generic("not supported".into()))
+    }
+
+    async fn load(&self, key: &Key, _context: ()) -> Result<DecodedImage, GalileoError> {
+        let url = (self.url_source)(key);
+        self.platform_service.load_image_url(&url).await
     }
 }
 

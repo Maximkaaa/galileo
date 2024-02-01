@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 winit = { version ="0.29", features = ["rwh_05"] }
-galileo = { path = "../../galileo", default-features = false, features = ["wgpu", "image", "web", "serde"] }
+galileo = { path = "../../galileo" }
 galileo-types = { path = "../../galileo-types" }
 console_error_panic_hook = "0.1"
 console_log = "1.0"

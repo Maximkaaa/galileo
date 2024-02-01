@@ -1,4 +1,3 @@
-use crate::error::GalileoError;
 use crate::layer::feature_layer::symbol::Symbol;
 use crate::primitives::DecodedImage;
 use crate::render::point_paint::PointPaint;
@@ -10,8 +9,12 @@ use galileo_types::geometry::Geom;
 use galileo_types::multi_point::MultiPoint;
 use nalgebra::Vector2;
 use num_traits::AsPrimitive;
-use std::ops::Deref;
 use std::sync::Arc;
+
+#[cfg(not(target_arch = "wasm32"))]
+use crate::error::GalileoError;
+#[cfg(not(target_arch = "wasm32"))]
+use std::ops::Deref;
 
 #[derive(Debug, Copy, Clone)]
 pub struct CirclePointSymbol {
@@ -53,7 +56,7 @@ pub struct ImagePointSymbol {
 }
 
 impl ImagePointSymbol {
-    #[cfg(feature = "image")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn from_path(path: &str, offset: Vector2<f32>, scale: f32) -> Result<Self, GalileoError> {
         use image::GenericImageView;
         let image = image::io::Reader::open(path)?.decode()?;

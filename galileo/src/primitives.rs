@@ -1,6 +1,7 @@
-use std::ops::Deref;
-
+#[cfg(not(target_arch = "wasm32"))]
 use crate::error::GalileoError;
+#[cfg(not(target_arch = "wasm32"))]
+use std::ops::Deref;
 
 #[derive(Debug, Clone)]
 pub struct DecodedImage {
@@ -9,7 +10,7 @@ pub struct DecodedImage {
 }
 
 impl DecodedImage {
-    #[cfg(feature = "image")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(bytes: &[u8]) -> Result<Self, GalileoError> {
         use image::GenericImageView;
         let decoded = image::load_from_memory(bytes)?;

@@ -1,7 +1,7 @@
 use galileo_mvt::error::GalileoMvtError;
 use thiserror::Error;
 
-#[cfg(feature = "image")]
+#[cfg(not(target_arch = "wasm32"))]
 use image::ImageError;
 
 #[derive(Debug, Error)]
@@ -14,7 +14,7 @@ pub enum GalileoError {
     Wasm(Option<String>),
     #[error("item not found")]
     NotFound,
-    #[cfg(feature = "image")]
+    #[cfg(not(target_arch = "wasm32"))]
     #[error("image decode error: {0:?}")]
     ImageDecode(#[from] ImageError),
     #[error("{0}")]

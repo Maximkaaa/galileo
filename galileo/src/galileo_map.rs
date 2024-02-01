@@ -2,11 +2,9 @@ use crate::control::custom::{CustomEventHandler, EventHandler};
 use crate::control::event_processor::EventProcessor;
 use crate::control::map::MapController;
 use crate::layer::data_provider::file_cache::FileCacheController;
-use crate::layer::data_provider::url_data_provider::UrlDataProvider;
 use crate::layer::data_provider::url_image_provider::{UrlImageProvider, UrlSource};
 use crate::layer::raster_tile::RasterTileLayer;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::layer::vector_tile_layer::tile_provider::vt_processor::VtProcessor;
 use crate::layer::vector_tile_layer::VectorTileLayer;
 use crate::layer::Layer;
 use crate::map::Map;
@@ -24,9 +22,16 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 
 #[cfg(not(target_arch = "wasm32"))]
+use crate::layer::data_provider::url_data_provider::UrlDataProvider;
+
+#[cfg(not(target_arch = "wasm32"))]
 pub type VectorTileProvider =
     crate::layer::vector_tile_layer::tile_provider::rayon_provider::RayonProvider<
-        UrlDataProvider<TileIndex, VtProcessor, FileCacheController>,
+        UrlDataProvider<
+            TileIndex,
+            crate::layer::vector_tile_layer::tile_provider::vt_processor::VtProcessor,
+            FileCacheController,
+        >,
     >;
 
 #[cfg(target_arch = "wasm32")]
@@ -239,7 +244,7 @@ impl MapBuilder {
             tile_scheme.clone(),
             UrlDataProvider::new(
                 tile_source,
-                VtProcessor {},
+                crate::layer::vector_tile_layer::tile_provider::vt_processor::VtProcessor {},
                 FileCacheController::new(".tile_cache"),
             ),
         );
