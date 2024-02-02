@@ -1,3 +1,4 @@
+use js_sys::wasm_bindgen::prelude::wasm_bindgen;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -7,7 +8,7 @@ pub struct Lod {
 }
 
 impl Lod {
-    pub fn new(resolution: f64, z_index: u32) -> Option<Self> {
+    pub fn new(resolution: f64, z_index: u32) -> Option<Lod> {
         if resolution.is_finite() && resolution != 0.0 {
             Some(Self {
                 resolution,

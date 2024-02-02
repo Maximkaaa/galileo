@@ -1,7 +1,7 @@
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, PackedBundle, RenderOptions, Renderer};
-use crate::tile_scheme::TileScheme;
+use crate::tile_scheme::TileSchema;
 use crate::view::MapView;
 use nalgebra::Point2;
 use std::collections::HashSet;
@@ -20,7 +20,7 @@ pub mod vector_tile;
 
 pub struct VectorTileLayer<Provider: VectorTileProvider> {
     tile_provider: Provider,
-    tile_scheme: TileScheme,
+    tile_scheme: TileSchema,
     style: VectorTileStyle,
 }
 
@@ -56,7 +56,7 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
     pub fn from_url(
         tile_provider: Provider,
         style: VectorTileStyle,
-        tile_scheme: TileScheme,
+        tile_scheme: TileSchema,
     ) -> Self {
         Self {
             tile_provider,

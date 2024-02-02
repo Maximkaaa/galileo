@@ -25,6 +25,10 @@ impl MapView {
         Self::new_with_crs(position, resolution, Crs::EPSG3857)
     }
 
+    pub fn new_typed(position: GeoPoint2d, resolution: f64) -> MapView {
+        Self::new(&position, resolution)
+    }
+
     pub fn new_with_crs(position: &impl GeoPoint<Num = f64>, resolution: f64, crs: Crs) -> Self {
         let projected = crs
             .get_projection()

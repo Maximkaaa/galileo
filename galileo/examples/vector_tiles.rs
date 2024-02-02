@@ -4,7 +4,7 @@ use galileo::galileo_map::{MapBuilder, VectorTileProvider};
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
 use galileo::layer::vector_tile_layer::VectorTileLayer;
 use galileo::lod::Lod;
-use galileo::tile_scheme::{TileIndex, TileScheme, VerticalDirection};
+use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::geo::crs::Crs;
 use std::sync::{Arc, RwLock};
@@ -64,7 +64,7 @@ pub async fn run(builder: MapBuilder, style: VectorTileStyle) {
         .run();
 }
 
-pub fn tile_scheme() -> TileScheme {
+pub fn tile_scheme() -> TileSchema {
     const ORIGIN: Point2d = Point2d::new(-20037508.342787, 20037508.342787);
     const TOP_RESOLUTION: f64 = 156543.03392800014 / 4.0;
 
@@ -73,7 +73,7 @@ pub fn tile_scheme() -> TileScheme {
         lods.push(Lod::new(lods[(i - 1) as usize].resolution() / 2.0, i).unwrap());
     }
 
-    TileScheme {
+    TileSchema {
         origin: ORIGIN,
         bounds: BoundingBox::new(
             -20037508.342787,

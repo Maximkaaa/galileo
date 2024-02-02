@@ -17,7 +17,7 @@ use galileo::render::wgpu::WgpuRenderer;
 use galileo::symbol::arbitrary::ArbitraryGeometrySymbol;
 use galileo::tile_scheme::TileIndex;
 use galileo::view::MapView;
-use galileo::TileScheme;
+use galileo::TileSchema;
 use galileo_types::cartesian::size::Size;
 use galileo_types::geo::crs::Crs;
 use geojson::{FeatureCollection, GeoJson};
@@ -62,7 +62,7 @@ async fn main() -> Result<()> {
     let width_resolution = extent.width() / image_size.width() as f64;
     let height_resolution = extent.height() / image_size.height() as f64;
     let resolution = (width_resolution.max(height_resolution) * 1.1)
-        .max(TileScheme::web(18).lod_resolution(17).unwrap());
+        .max(TileSchema::web(18).lod_resolution(17).unwrap());
 
     // Create OSM layer for background
     let cache_controller = Some(FileCacheController::new(".tile_cache"));
@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
         cache_controller,
     );
     let mut osm = RasterTileLayer::new(
-        TileScheme::web(18),
+        TileSchema::web(18),
         tile_provider,
         None::<Arc<dyn Messenger>>,
     );

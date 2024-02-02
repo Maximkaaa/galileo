@@ -3,7 +3,7 @@ use crate::messenger::Messenger;
 use crate::primitives::DecodedImage;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{Canvas, ImagePaint, PackedBundle, PrimitiveId, RenderOptions, Renderer};
-use crate::tile_scheme::{TileIndex, TileScheme};
+use crate::tile_scheme::{TileIndex, TileSchema};
 use crate::view::MapView;
 use maybe_sync::{MaybeSend, MaybeSync, Mutex};
 use quick_cache::sync::Cache;
@@ -18,7 +18,7 @@ where
     Provider: DataProvider<TileIndex, DecodedImage, ()> + MaybeSync + MaybeSend,
 {
     tile_provider: Arc<Provider>,
-    tile_scheme: TileScheme,
+    tile_scheme: TileSchema,
     fade_in_duration: Duration,
     tiles: Arc<Cache<TileIndex, Arc<TileState>>>,
     prev_drawn_tiles: Mutex<Vec<TileIndex>>,
@@ -45,7 +45,7 @@ where
     Provider: DataProvider<TileIndex, DecodedImage, ()> + MaybeSync + MaybeSend,
 {
     pub fn new(
-        tile_scheme: TileScheme,
+        tile_scheme: TileSchema,
         tile_provider: Provider,
         messenger: Option<Arc<dyn Messenger>>,
     ) -> Self {

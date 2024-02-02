@@ -13,7 +13,7 @@ use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderBundle;
 use galileo::render::PrimitiveId;
 use galileo::symbol::Symbol;
-use galileo::tile_scheme::TileScheme;
+use galileo::tile_scheme::TileSchema;
 use galileo::Color;
 use galileo_types::cartesian::impls::point::Point3d;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
@@ -110,7 +110,7 @@ pub async fn run(builder: MapBuilder) {
     let points = load_points();
     builder
         .center(latlon!(51.4549, -2.6279))
-        .resolution(TileScheme::web(18).lod_resolution(14).unwrap())
+        .resolution(TileSchema::web(18).lod_resolution(14).unwrap())
         .with_raster_tiles(
             |index| {
                 format!(
@@ -118,7 +118,7 @@ pub async fn run(builder: MapBuilder) {
                     index.z, index.x, index.y
                 )
             },
-            TileScheme::web(18),
+            TileSchema::web(18),
         )
         .with_layer(FeatureLayer::new(
             points,

@@ -3,6 +3,7 @@ use crate::control::event_processor::EventProcessor;
 use crate::control::map::MapController;
 use crate::layer::data_provider::file_cache::FileCacheController;
 use crate::layer::data_provider::url_image_provider::{UrlImageProvider, UrlSource};
+use crate::layer::data_provider::EmptyCache;
 use crate::layer::raster_tile::RasterTileLayer;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::VectorTileLayer;
@@ -10,11 +11,12 @@ use crate::layer::Layer;
 use crate::map::Map;
 use crate::render::wgpu::WgpuRenderer;
 use crate::render::Renderer;
-use crate::tile_scheme::{TileIndex, TileScheme};
+use crate::tile_scheme::{TileIndex, TileSchema};
 use crate::view::MapView;
 use crate::winit::{WinitInputHandler, WinitMessenger};
 use galileo_types::cartesian::size::Size;
 use galileo_types::geo::impls::point::GeoPoint2d;
+use js_sys::wasm_bindgen::prelude::wasm_bindgen;
 use std::sync::{Arc, RwLock};
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, WindowEvent};
@@ -38,6 +40,7 @@ pub type VectorTileProvider =
 pub type VectorTileProvider =
     crate::layer::vector_tile_layer::tile_provider::web_worker_provider::WebWorkerVectorTileProvider;
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct GalileoMap {
     window: Arc<Window>,
     map: Arc<RwLock<Map>>,
@@ -47,6 +50,7 @@ pub struct GalileoMap {
     event_loop: EventLoop<()>,
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl GalileoMap {
     pub fn run(self) {
         let Self {
@@ -117,6 +121,7 @@ impl GalileoMap {
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct MapBuilder {
     position: GeoPoint2d,
     resolution: f64,
@@ -133,8 +138,15 @@ impl Default for MapBuilder {
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl MapBuilder {
     pub fn new() -> Self {
+        #[cfg(target_arch = "wasm32")]
+        {
+            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+            console_log::init_with_level(log::Level::Info).expect("Couldn't init logger");
+        }
+
         Self {
             position: GeoPoint2d::default(),
             resolution: 156543.03392800014 / 16.0,
@@ -146,6 +158,65 @@ impl MapBuilder {
         }
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn with_raster_tiles(mut self, tile_source: js_sys::Function) -> Self {
+        let tile_source_int = move |index: &TileIndex| {
+            log::info!("{index:?}");
+            let this = wasm_bindgen::JsValue::null();
+            tile_source
+                .call1(&this, &(*index).into())
+                .unwrap()
+                .as_string()
+                .unwrap()
+        };
+
+        let tile_provider = UrlImageProvider::new(tile_source_int, None::<EmptyCache>);
+        self.layers.push(Box::new(RasterTileLayer::new(
+            TileSchema::web(18),
+            tile_provider,
+            None,
+        )));
+
+        self
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub async fn build_into(mut self, container: web_sys::Element) -> GalileoMap {
+        use winit::platform::web::WindowExtWebSys;
+
+        let event_loop = self
+            .event_loop
+            .take()
+            .unwrap_or_else(|| EventLoop::new().unwrap());
+        let window = self.window.take().unwrap_or_else(|| {
+            WindowBuilder::new()
+                .with_inner_size(PhysicalSize {
+                    width: 1024,
+                    height: 1024,
+                })
+                .build(&event_loop)
+                .unwrap()
+        });
+
+        let canvas = web_sys::Element::from(window.canvas().unwrap());
+        container.append_child(&canvas).unwrap();
+
+        let width = container.client_width() as u32;
+        let height = container.client_height() as u32;
+        log::info!("Requesting canvas size: {width} - {height}");
+
+        let _ = window.request_inner_size(PhysicalSize { width, height });
+
+        sleep(1).await;
+
+        self.window = Some(window);
+        self.event_loop = Some(event_loop);
+
+        self.build().await
+    }
+}
+
+impl MapBuilder {
     pub async fn build(mut self) -> GalileoMap {
         let event_loop = self
             .event_loop
@@ -164,6 +235,7 @@ impl MapBuilder {
         let window = Arc::new(window);
         let messenger = WinitMessenger::new(window.clone());
 
+        log::info!("Window size: {:?}", window.inner_size());
         let backend = WgpuRenderer::create_with_window(
             &window,
             Size::new(window.inner_size().width, window.inner_size().height),
@@ -214,15 +286,13 @@ impl MapBuilder {
         self
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn with_raster_tiles(
         mut self,
         tile_source: impl UrlSource<TileIndex> + 'static,
-        tile_scheme: TileScheme,
+        tile_scheme: TileSchema,
     ) -> Self {
-        #[cfg(not(target = "wasm32-unknown-unknown"))]
         let cache_controller = Some(FileCacheController::new(".tile_cache"));
-        #[cfg(target = "wasm32-unknown-unknown")]
-        let cache_controller = None;
 
         let tile_provider = UrlImageProvider::new(tile_source, cache_controller);
         self.layers.push(Box::new(RasterTileLayer::new(
@@ -235,7 +305,7 @@ impl MapBuilder {
 
     pub fn create_vector_tile_layer(
         tile_source: impl UrlSource<TileIndex> + 'static,
-        tile_scheme: TileScheme,
+        tile_scheme: TileSchema,
         style: VectorTileStyle,
     ) -> VectorTileLayer<VectorTileProvider> {
         #[cfg(not(target_arch = "wasm32"))]
@@ -257,7 +327,7 @@ impl MapBuilder {
     pub fn with_vector_tiles(
         mut self,
         tile_source: impl UrlSource<TileIndex> + 'static,
-        tile_scheme: TileScheme,
+        tile_scheme: TileSchema,
         style: VectorTileStyle,
     ) -> Self {
         self.layers.push(Box::new(Self::create_vector_tile_layer(
@@ -293,4 +363,18 @@ impl MapBuilder {
 
         Arc::new(RwLock::new(map))
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn sleep(duration: i32) {
+    let mut cb = |resolve: js_sys::Function, _reject: js_sys::Function| {
+        web_sys::window()
+            .unwrap()
+            .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, duration)
+            .unwrap();
+    };
+
+    let p = js_sys::Promise::new(&mut cb);
+
+    wasm_bindgen_futures::JsFuture::from(p).await.unwrap();
 }

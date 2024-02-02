@@ -6,3 +6,7 @@ Cargo.lock
 
 # Ignore large sample files
 **/*.laz
+
+#Npm
+**/package-lock.json
+**/node_modules

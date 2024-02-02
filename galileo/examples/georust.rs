@@ -1,7 +1,7 @@
 use galileo::galileo_map::MapBuilder;
 use galileo::layer::feature_layer::{FeatureLayer, FeatureLayerOptions};
 use galileo::symbol::point::ImagePointSymbol;
-use galileo::tile_scheme::TileScheme;
+use galileo::tile_scheme::TileSchema;
 use galileo_types::disambig::{Disambig, Disambiguate};
 use galileo_types::geo::crs::Crs;
 use galileo_types::geometry_type::GeoSpace2d;
@@ -58,7 +58,7 @@ pub async fn run(builder: MapBuilder) {
                     index.z, index.x, index.y
                 )
             },
-            TileScheme::web(18),
+            TileSchema::web(18),
         )
         .with_layer(point_layer)
         .build()

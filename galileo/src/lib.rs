@@ -9,7 +9,7 @@
 //! You can create a simple interactive map with two layers by this code:
 //!
 //! ```no_run
-//! use galileo::{MapBuilder, TileScheme };
+//! use galileo::{MapBuilder, TileSchema };
 //! use galileo::layer::FeatureLayer;
 //! use galileo::symbol::CirclePointSymbol;
 //! use galileo::galileo_types::latlon;
@@ -19,13 +19,13 @@
 //! # tokio_test::block_on(async {
 //! MapBuilder::new()
 //!     .center(latlon!(37.566, 126.9784))
-//!     .resolution(TileScheme::web(18).lod_resolution(8).unwrap())
+//!     .resolution(TileSchema::web(18).lod_resolution(8).unwrap())
 //!     .with_raster_tiles(|index| {
 //!         format!(
 //!             "https://tile.openstreetmap.org/{}/{}/{}.png",
 //!             index.z, index.x, index.y
 //!         )},
-//!         TileScheme::web(18))
+//!         TileSchema::web(18))
 //!     .with_layer(FeatureLayer::new(
 //!         vec![latlon!(37.566, 126.9784)],
 //!         CirclePointSymbol::new(Color::BLUE, 5.0),
@@ -94,7 +94,7 @@ pub use galileo_map::MapBuilder;
 pub use color::Color;
 
 pub use layer::feature_layer::symbol;
-pub use tile_scheme::TileScheme;
+pub use tile_scheme::TileSchema;
 
 // Reexport galileo_types
 pub use galileo_types;

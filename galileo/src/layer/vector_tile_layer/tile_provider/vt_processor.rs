@@ -4,7 +4,7 @@ use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{LineCap, LinePaint, PolygonPaint};
 use crate::tile_scheme::TileIndex;
-use crate::TileScheme;
+use crate::TileSchema;
 use bytes::Bytes;
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
 use galileo_types::cartesian::impls::contour::{ClosedContour, Contour};
@@ -19,7 +19,7 @@ pub struct VtProcessor {}
 pub struct VectorTileDecodeContext {
     pub index: TileIndex,
     pub style: VectorTileStyle,
-    pub tile_scheme: TileScheme,
+    pub tile_scheme: TileSchema,
     pub bundle: RenderBundle,
 }
 
@@ -52,7 +52,7 @@ impl VtProcessor {
         bundle: &mut RenderBundle,
         index: TileIndex,
         style: &VectorTileStyle,
-        tile_scheme: &TileScheme,
+        tile_scheme: &TileSchema,
     ) -> Result<(), GalileoError> {
         let bbox = tile_scheme.tile_bbox(index).unwrap();
         let lod_resolution = tile_scheme.lod_resolution(index.z).unwrap();

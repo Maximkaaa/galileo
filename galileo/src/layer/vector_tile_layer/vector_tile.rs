@@ -2,7 +2,7 @@ use crate::error::GalileoError;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{LineCap, LinePaint, PackedBundle, PolygonPaint};
-use crate::tile_scheme::{TileIndex, TileScheme};
+use crate::tile_scheme::{TileIndex, TileSchema};
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
 use galileo_types::cartesian::impls::contour::{ClosedContour, Contour};
 use galileo_types::cartesian::impls::point::Point3d;
@@ -22,7 +22,7 @@ impl VectorTile {
         bundle: &mut RenderBundle,
         index: TileIndex,
         style: &VectorTileStyle,
-        tile_scheme: &TileScheme,
+        tile_scheme: &TileSchema,
     ) -> Result<(), GalileoError> {
         let bbox = tile_scheme.tile_bbox(index).unwrap();
         let lod_resolution = tile_scheme.lod_resolution(index.z).unwrap();
