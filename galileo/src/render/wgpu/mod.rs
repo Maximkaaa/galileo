@@ -3,6 +3,7 @@ use lyon::tessellation::VertexBuffers;
 use nalgebra::{Rotation3, Vector3};
 use std::any::Any;
 use std::mem::size_of;
+use std::sync::Arc;
 use wgpu::util::DeviceExt;
 use wgpu::{
     Adapter, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Extent3d,
@@ -32,8 +33,8 @@ const TARGET_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
 
 pub struct WgpuRenderer {
     render_target: RenderTarget,
-    device: Device,
-    queue: Queue,
+    device: Arc<Device>,
+    queue: Arc<Queue>,
     size: Size<u32>,
     pipelines: Pipelines,
     multisampling_view: TextureView,
@@ -45,7 +46,7 @@ pub struct WgpuRenderer {
 enum RenderTarget {
     Surface {
         config: SurfaceConfiguration,
-        surface: Surface,
+        surface: Arc<Surface>,
     },
     Texture(Texture),
 }
@@ -136,8 +137,8 @@ impl WgpuRenderer {
 
         Self {
             render_target: RenderTarget::Texture(target_texture),
-            device,
-            queue,
+            device: Arc::new(device),
+            queue: Arc::new(queue),
             size,
             pipelines,
             multisampling_view,
@@ -189,6 +190,35 @@ impl WgpuRenderer {
         let stencil_view = Self::create_stencil_texture(&device, size, 1);
 
         let pipelines = Pipelines::create(&device, surface_format);
+
+        Self {
+            render_target: RenderTarget::Surface {
+                surface: Arc::new(surface),
+                config,
+            },
+            device: Arc::new(device),
+            queue: Arc::new(queue),
+            size,
+            pipelines,
+            multisampling_view,
+            stencil_view_multisample,
+            stencil_view,
+            background: Color::rgba(255, 255, 255, 255),
+        }
+    }
+
+    pub fn create_with_surface(
+        device: Arc<Device>,
+        surface: Arc<Surface>,
+        queue: Arc<Queue>,
+        config: SurfaceConfiguration,
+        size: Size<u32>,
+    ) -> Self {
+        let multisampling_view = Self::create_multisample_texture(&device, size, config.format);
+        let stencil_view_multisample = Self::create_stencil_texture(&device, size, 4);
+        let stencil_view = Self::create_stencil_texture(&device, size, 1);
+
+        let pipelines = Pipelines::create(&device, config.format);
 
         Self {
             render_target: RenderTarget::Surface { surface, config },
@@ -361,10 +391,7 @@ impl WgpuRenderer {
         Ok(data.to_vec())
     }
 
-    pub fn render(&self, map: &Map) -> Result<(), SurfaceError> {
-        let texture = self.render_target.texture()?;
-        let view = texture.view();
-
+    pub fn render_to_texture_view(&self, map: &Map, view: &TextureView) {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -377,7 +404,7 @@ impl WgpuRenderer {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &self.multisampling_view,
-                    resolve_target: Some(&view),
+                    resolve_target: Some(view),
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: background[0] as f64,
@@ -396,7 +423,15 @@ impl WgpuRenderer {
 
         self.queue.submit(std::iter::once(encoder.finish()));
 
-        self.render_map(map, &view);
+        self.render_map(map, view);
+    }
+
+    pub fn render(&self, map: &Map) -> Result<(), SurfaceError> {
+        let texture = self.render_target.texture()?;
+        let view = texture.view();
+
+        self.render_to_texture_view(map, &view);
+
         texture.present();
 
         Ok(())

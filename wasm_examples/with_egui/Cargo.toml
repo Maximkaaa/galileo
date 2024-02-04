@@ -1,0 +1,23 @@
+[package]
+edition = "2021"
+name = "with_egui_wasm"
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib"]
+name = "with_egui"
+
+[dependencies]
+console_error_panic_hook = { version = "0.1", default-features = false }
+console_log = { version = "1.0", default-features = false }
+js-sys = { version = "0.3", default-features = false }
+log = { version = "0.4", default-features = false }
+wasm-bindgen = { version = "0.2", default-features = false }
+wasm-bindgen-futures = { version = "0.4", default-features = false }
+web-sys = { version = "0.3", default-features = false, features = [
+    "Document",
+    "Window",
+    "Element",
+] }
+winit = { version = "0.29", default-features = false }
+with_egui = { path = "../../galileo/examples/with_egui" }

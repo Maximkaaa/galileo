@@ -20,9 +20,9 @@
 </td>
 <td>
 
-* Create a map with one raster tile layer (OSM)
-* Set initial map position and zoom
- 
+- Create a map with one raster tile layer (OSM)
+- Set initial map position and zoom
+
 </td>
 </tr>
 <tr>
@@ -38,9 +38,9 @@
 </td>
 <td>
 
-* Create a map with one vector tile layer (MapLibre)
-* Configure layer styling with the style file
-* Get information about objects in the tiles by click
+- Create a map with one vector tile layer (MapLibre)
+- Configure layer styling with the style file
+- Get information about objects in the tiles by click
 
 </td>
 </tr>
@@ -57,11 +57,11 @@
 </td>
 <td>
 
-* Create a map with feature layers without a tile base map
-* Use symbols to set advanced styles for features based on their properties
-* Change properties of the features when hovering mouse over them
-* Modify how the features are displayed based on changed properties
-* Get information about features by click
+- Create a map with feature layers without a tile base map
+- Use symbols to set advanced styles for features based on their properties
+- Change properties of the features when hovering mouse over them
+- Modify how the features are displayed based on changed properties
+- Get information about features by click
 
 </td>
 </tr>
@@ -78,8 +78,8 @@
 </td>
 <td>
 
-* Render feature layer in Lambert Equal Area projection
-* Get and update features on cursor hover
+- Render feature layer in Lambert Equal Area projection
+- Get and update features on cursor hover
 
 </td>
 </tr>
@@ -96,7 +96,7 @@
 </td>
 <td>
 
-* Render ~3_000_000 3D points over a map
+- Render ~3_000_000 3D points over a map
 
 </td>
 </tr>
@@ -113,10 +113,10 @@
 </td>
 <td>
 
-* Read ~19_000_000 points from a LAS data set (lidar laser scanning result)
-* Render all the points without pre-grouping (to demonstrate renderer performance limits)
-* NOTE: before running the example, load the dataset. Read module-level docs in the example file.
-* NOTE 2: You probably want to run this example in `--release` mode
+- Read ~19_000_000 points from a LAS data set (lidar laser scanning result)
+- Render all the points without pre-grouping (to demonstrate renderer performance limits)
+- NOTE: before running the example, load the dataset. Read module-level docs in the example file.
+- NOTE 2: You probably want to run this example in `--release` mode
 
 </td>
 </tr>
@@ -133,9 +133,9 @@ You can generate an image yourself running this example
 </td>
 <td>
 
-* Run a map without a window
-* Load GEOJSON file to a feature layer
-* Render the map to a `.png` file
+- Run a map without a window
+- Load GEOJSON file to a feature layer
+- Render the map to a `.png` file
 
 </td>
 </tr>
@@ -152,8 +152,25 @@ You can generate an image yourself running this example
 </td>
 <td>
 
-* Load features as `geo-types` geometries using `geo-zero` crate
-* Display the features with pin images
+- Load features as `geo-types` geometries using `geo-zero` crate
+- Display the features with pin images
+
+</td>
+</tr>
+<tr>
+<td>
+
+[with_egui](./with_egui)
+
+</td>
+<td>
+
+![i](https://maximkaaa.github.io/galileo/with_egui.png)
+
+</td>
+<td>
+
+- Same as the raster tiles example, but with support for [egui](https://www.egui.rs/).
 
 </td>
 </tr>
