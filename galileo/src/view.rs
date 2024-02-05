@@ -63,6 +63,14 @@ impl MapView {
         &self.crs
     }
 
+    pub fn position(&self) -> Option<GeoPoint2d> {
+        self.projected_position.and_then(|p| {
+            self.crs
+                .get_projection()
+                .and_then(|proj| proj.unproject(&Point2d::new(p.x, p.y)))
+        })
+    }
+
     pub fn resolution(&self) -> f64 {
         self.resolution
     }
@@ -220,6 +228,14 @@ impl MapView {
         let transformed = translation * rotation_z * p;
 
         Some(Point2::new(transformed.x, transformed.y))
+    }
+
+    pub fn screen_to_map_geo(&self, px_position: Point2d) -> Option<GeoPoint2d> {
+        self.screen_to_map(px_position).and_then(|p| {
+            self.crs
+                .get_projection()
+                .and_then(|proj| proj.unproject(&Point2d::new(p.x, p.y)))
+        })
     }
 
     pub fn translate_by_pixels(&self, from: Point2d, to: Point2d) -> Self {
