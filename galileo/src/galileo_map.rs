@@ -3,7 +3,6 @@ use crate::control::event_processor::EventProcessor;
 use crate::control::map::MapController;
 use crate::layer::data_provider::file_cache::FileCacheController;
 use crate::layer::data_provider::url_image_provider::{UrlImageProvider, UrlSource};
-use crate::layer::data_provider::EmptyCache;
 use crate::layer::raster_tile::RasterTileLayer;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::VectorTileLayer;
@@ -16,7 +15,6 @@ use crate::view::MapView;
 use crate::winit::{WinitInputHandler, WinitMessenger};
 use galileo_types::cartesian::size::Size;
 use galileo_types::geo::impls::point::GeoPoint2d;
-use js_sys::wasm_bindgen::prelude::wasm_bindgen;
 use std::sync::{Arc, RwLock};
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, WindowEvent};
@@ -25,6 +23,11 @@ use winit::window::{Window, WindowBuilder};
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::layer::data_provider::url_data_provider::UrlDataProvider;
+
+#[cfg(target_arch = "wasm32")]
+use crate::layer::data_provider::EmptyCache;
+#[cfg(target_arch = "wasm32")]
+use js_sys::wasm_bindgen::prelude::wasm_bindgen;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub type VectorTileProvider =

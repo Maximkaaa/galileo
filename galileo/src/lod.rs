@@ -1,4 +1,3 @@
-use js_sys::wasm_bindgen::prelude::wasm_bindgen;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

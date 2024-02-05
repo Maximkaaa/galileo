@@ -10,7 +10,7 @@ use galileo::{
     tile_scheme::TileIndex,
     view::MapView,
     winit::WinitInputHandler,
-    TileScheme,
+    TileSchema,
 };
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::{cartesian::size::Size, latlon};
@@ -70,7 +70,7 @@ impl GalileoState {
 
         let view = MapView::new(
             &latlon!(37.566, 126.9784),
-            TileScheme::web(18).lod_resolution(8).unwrap(),
+            TileSchema::web(18).lod_resolution(8).unwrap(),
         );
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -92,7 +92,7 @@ impl GalileoState {
             );
 
         let layer = Box::new(galileo::layer::RasterTileLayer::new(
-            galileo::TileScheme::web(18),
+            galileo::TileSchema::web(18),
             tile_provider,
             None,
         ));
