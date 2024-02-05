@@ -1,22 +1,42 @@
 use egui::Context;
+use galileo_types::geo::impls::point::GeoPoint2d;
+use galileo_types::geo::traits::point::GeoPoint;
 
 #[derive(Clone, Default, Debug)]
 pub struct UiState {
-    pub name: String,
-    pub age: u32,
+    pub positions: Positions,
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct Positions {
+    pub pointer_position: Option<GeoPoint2d>,
+    pub map_center_position: Option<GeoPoint2d>,
 }
 
 pub fn run_ui(state: &mut UiState, ui: &Context) {
-    egui::Window::new("My egui Application").show(ui, |ui| {
-        ui.horizontal(|ui| {
-            let name_label = ui.label("Your name: ");
-            ui.text_edit_singleline(&mut state.name)
-                .labelled_by(name_label.id);
-        });
-        ui.add(egui::Slider::new(&mut state.age, 0..=120).text("age"));
-        if ui.button("Increment").clicked() {
-            state.age += 1;
+    egui::Window::new("Galileo map").show(ui, |ui| {
+        ui.label("Pointer position:");
+        if let Some(pointer_position) = state.positions.pointer_position {
+            ui.label(format!(
+                "Lat: {:.4} Lon: {:.4}",
+                pointer_position.lat(),
+                pointer_position.lon()
+            ));
+        } else {
+            ui.label("<unavaliable>");
         }
-        ui.label(format!("Hello '{}', age {}", state.name, state.age));
+
+        ui.separator();
+
+        ui.label("Map center position:");
+        if let Some(map_center_position) = state.positions.map_center_position {
+            ui.label(format!(
+                "Lat: {:.4} Lon: {:.4}",
+                map_center_position.lat(),
+                map_center_position.lon()
+            ));
+        } else {
+            ui.label("<unavaliable>");
+        }
     });
 }

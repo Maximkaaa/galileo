@@ -1,5 +1,8 @@
 use std::sync::{Arc, RwLock};
 
+use crate::run_ui::Positions;
+use galileo::control::custom::CustomEventHandler;
+use galileo::control::{EventPropagation, MouseEvent, UserEvent};
 use galileo::{
     control::{event_processor::EventProcessor, map::MapController},
     layer::data_provider::file_cache::FileCacheController,
@@ -9,6 +12,7 @@ use galileo::{
     winit::WinitInputHandler,
     TileScheme,
 };
+use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::{cartesian::size::Size, latlon};
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
 use winit::{dpi::PhysicalSize, window::Window};
@@ -20,6 +24,7 @@ pub struct GalileoState {
     event_processor: EventProcessor,
     renderer: Arc<RwLock<WgpuRenderer>>,
     map: Arc<RwLock<galileo::map::Map>>,
+    pointer_position: Arc<RwLock<Point2d>>,
 }
 
 impl GalileoState {
@@ -44,7 +49,23 @@ impl GalileoState {
 
         let input_handler = WinitInputHandler::default();
 
+        let pointer_position = Arc::new(RwLock::new(Point2d::default()));
+        let pointer_position_clone = pointer_position.clone();
+        let mut pointer_tracker = CustomEventHandler::default();
+        pointer_tracker.set_input_handler(move |ev, _, _| {
+            if let UserEvent::PointerMoved(MouseEvent {
+                screen_pointer_position,
+                ..
+            }) = ev
+            {
+                *pointer_position_clone.write().expect("poisoned lock") = *screen_pointer_position;
+            }
+
+            EventPropagation::Propagate
+        });
+
         let mut event_processor = EventProcessor::default();
+        event_processor.add_handler(pointer_tracker);
         event_processor.add_handler(MapController::default());
 
         let view = MapView::new(
@@ -87,6 +108,7 @@ impl GalileoState {
             event_processor,
             renderer,
             map,
+            pointer_position,
         }
     }
 
@@ -135,6 +157,15 @@ impl GalileoState {
                 &mut map,
                 &(*self.renderer.read().expect("poisoned lock")),
             );
+        }
+    }
+
+    pub fn positions(&self) -> Positions {
+        let pointer_position = *self.pointer_position.read().expect("poisoned lock");
+        let view = self.map.read().expect("poisoned lock").view().clone();
+        Positions {
+            pointer_position: view.screen_to_map_geo(pointer_position),
+            map_center_position: view.position(),
         }
     }
 }

@@ -147,6 +147,8 @@ impl State {
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        self.ui_state.positions = self.galileo_state.positions();
+
         let texture = self.surface.get_current_texture()?;
 
         let texture_view = texture.texture.create_view(&wgpu::TextureViewDescriptor {
