@@ -47,7 +47,12 @@ impl EguiState {
     }
 
     pub fn handle_event(&mut self, window: &Window, event: &WindowEvent) -> EventResponse {
-        self.state.on_window_event(window, event)
+        let mut response = self.state.on_window_event(window, event);
+        if self.context.wants_pointer_input() {
+            response.consumed = true;
+        }
+
+        response
     }
 
     pub fn render(&mut self, wgpu_frame: &mut WgpuFrame<'_>, run_ui: impl FnOnce(&Context)) {

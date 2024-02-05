@@ -1,5 +1,5 @@
 use galileo::galileo_map::MapBuilder;
-use galileo::tile_scheme::TileScheme;
+use galileo::tile_scheme::TileSchema;
 use galileo_types::latlon;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -12,7 +12,7 @@ async fn main() {
 pub async fn run(builder: MapBuilder) {
     builder
         .center(latlon!(37.566, 126.9784))
-        .resolution(TileScheme::web(18).lod_resolution(8).unwrap())
+        .resolution(TileSchema::web(18).lod_resolution(8).unwrap())
         .with_raster_tiles(
             |index| {
                 format!(
@@ -20,7 +20,7 @@ pub async fn run(builder: MapBuilder) {
                     index.z, index.x, index.y
                 )
             },
-            TileScheme::web(18),
+            TileSchema::web(18),
         )
         .build()
         .await

@@ -91,8 +91,10 @@ them all done at the same time. So here's our current plan and priorities:
 
 # Running examples
 
-There are examples in `galileo` crate that can be run with `cargo run --example <name>`
-command. Web examples are separate creates in `wasm_examples` directory. These are
+Rust examples of using Galileo are located at [`galileo/examples`]. Refer to the [readme](galileo/examples/README.md)
+for the list, description and run instructions.
+
+There are also examples of running Galileo in a web-browser located at [`web_examples`] folder. These are
 excluded from the workspace (because Cargo does not like cross-platform workspaces).
 To run those you will need to [install wasm-pack](https://rustwasm.github.io/wasm-pack/installer/):
 

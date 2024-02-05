@@ -1,3 +1,14 @@
+Run all simple examples with:
+```shell
+cargo run --example <example_name>
+```
+
+Some more complex examples are structured as separate crates. Use `cargo run` to run those. For example.
+```
+cd galileo/examples/with_egui
+cargo run
+```
+
 <table>
 <thead>
 <tr>

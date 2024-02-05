@@ -5,6 +5,9 @@ use galileo_types::geo::crs::Crs;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+#[cfg(target_arch = "wasm32")]
+use js_sys::wasm_bindgen::prelude::wasm_bindgen;
+
 use crate::bounding_box::BoundingBox;
 use crate::lod::Lod;
 use crate::view::MapView;
@@ -18,15 +21,16 @@ pub enum VerticalDirection {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, Serialize, Deserialize)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct TileIndex {
     pub z: u32,
-    pub x: i64,
-    pub y: i64,
-    pub display_x: i64,
+    pub x: i32,
+    pub y: i32,
+    pub display_x: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TileScheme {
+pub struct TileSchema {
     pub origin: Point2d,
     pub bounds: BoundingBox,
     pub lods: BTreeSet<Lod>,
@@ -38,7 +42,7 @@ pub struct TileScheme {
     pub crs: Crs,
 }
 
-impl TileScheme {
+impl TileSchema {
     pub fn lod_resolution(&self, z: u32) -> Option<f64> {
         for lod in &self.lods {
             if lod.z_index() == z {
@@ -101,13 +105,13 @@ impl TileScheme {
         let tile_w = lod.resolution() * self.tile_width as f64;
         let tile_h = lod.resolution() * self.tile_height as f64;
 
-        let x_min = (self.x_adj(bounding_box.x_min()) / tile_w) as i64;
+        let x_min = (self.x_adj(bounding_box.x_min()) / tile_w) as i32;
         let x_min = x_min.max(self.min_x_index(lod.resolution()));
 
         let x_max_adj = self.x_adj(bounding_box.x_max());
         let x_add_one = if (x_max_adj % tile_w) < 0.001 { -1 } else { 0 };
 
-        let x_max = (x_max_adj / tile_w) as i64 + x_add_one;
+        let x_max = (x_max_adj / tile_w) as i32 + x_add_one;
         let x_max = x_max.min(self.max_x_index(lod.resolution()));
 
         let (top, bottom) = if self.y_direction == VerticalDirection::TopToBottom {
@@ -116,13 +120,13 @@ impl TileScheme {
             (bounding_box.y_max(), bounding_box.y_min())
         };
 
-        let y_min = (self.y_adj(bottom) / tile_h) as i64;
+        let y_min = (self.y_adj(bottom) / tile_h) as i32;
         let y_min = y_min.max(self.min_y_index(lod.resolution()));
 
         let y_max_adj = self.y_adj(top);
         let y_add_one = if (y_max_adj % tile_h) < 0.001 { -1 } else { 0 };
 
-        let y_max = (y_max_adj / tile_h) as i64 + y_add_one;
+        let y_max = (y_max_adj / tile_h) as i32 + y_add_one;
         let y_max = y_max.min(self.max_y_index(lod.resolution()));
 
         Some((x_min..=x_max).flat_map(move |x| {
@@ -177,7 +181,7 @@ impl TileScheme {
             lods.push(Lod::new(lods[(i - 1) as usize].resolution() / 2.0, i).unwrap());
         }
 
-        TileScheme {
+        TileSchema {
             origin: ORIGIN,
             bounds: BoundingBox::new(
                 -20037508.342787,
@@ -219,44 +223,44 @@ impl TileScheme {
         ))
     }
 
-    fn min_x_index(&self, resolution: f64) -> i64 {
+    fn min_x_index(&self, resolution: f64) -> i32 {
         ((self.bounds.x_min() - self.origin.x()) / resolution / self.tile_width as f64).floor()
-            as i64
+            as i32
     }
 
-    fn max_x_index(&self, resolution: f64) -> i64 {
+    fn max_x_index(&self, resolution: f64) -> i32 {
         let pix_bound = (self.bounds.x_max() - self.origin.x()) / resolution;
         let floored = pix_bound.floor();
         if (pix_bound - floored).abs() < 0.1 {
-            (floored / self.tile_width as f64) as i64 - 1
+            (floored / self.tile_width as f64) as i32 - 1
         } else {
-            (floored / self.tile_width as f64) as i64
+            (floored / self.tile_width as f64) as i32
         }
     }
 
-    fn min_y_index(&self, resolution: f64) -> i64 {
+    fn min_y_index(&self, resolution: f64) -> i32 {
         match self.y_direction {
             VerticalDirection::TopToBottom => {
                 ((self.bounds.y_min() + self.origin.y()) / resolution / self.tile_height as f64)
-                    .floor() as i64
+                    .floor() as i32
             }
             VerticalDirection::BottomToTop => {
                 ((self.bounds.y_min() - self.origin.y()) / resolution / self.tile_height as f64)
-                    .floor() as i64
+                    .floor() as i32
             }
         }
     }
 
-    fn max_y_index(&self, resolution: f64) -> i64 {
+    fn max_y_index(&self, resolution: f64) -> i32 {
         let pix_bound = match self.y_direction {
             VerticalDirection::TopToBottom => (self.bounds.y_max() + self.origin.y()) / resolution,
             VerticalDirection::BottomToTop => (self.bounds.y_max() - self.origin.y()) / resolution,
         };
         let floored = pix_bound.floor();
         if (pix_bound - floored).abs() < 0.1 {
-            (floored / self.tile_height as f64) as i64 - 1
+            (floored / self.tile_height as f64) as i32 - 1
         } else {
-            (floored / self.tile_height as f64) as i64
+            (floored / self.tile_height as f64) as i32
         }
     }
 }
@@ -266,8 +270,8 @@ mod tests {
     use super::*;
     use galileo_types::cartesian::size::Size;
 
-    fn simple_schema() -> TileScheme {
-        TileScheme {
+    fn simple_schema() -> TileSchema {
+        TileSchema {
             origin: Point2d::default(),
             bounds: BoundingBox::new(0.0, 0.0, 2048.0, 2048.0),
             lods: [

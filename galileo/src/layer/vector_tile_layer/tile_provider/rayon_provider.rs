@@ -9,7 +9,7 @@ use crate::layer::vector_tile_layer::vector_tile::VectorTile;
 use crate::messenger::Messenger;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::Renderer;
-use crate::tile_scheme::{TileIndex, TileScheme};
+use crate::tile_scheme::{TileIndex, TileSchema};
 use bytes::Bytes;
 use galileo_mvt::MvtTile;
 use maybe_sync::{MaybeSend, MaybeSync};
@@ -24,7 +24,7 @@ where
         + 'static,
 {
     messenger: Arc<RwLock<Option<Box<dyn Messenger>>>>,
-    tile_schema: TileScheme,
+    tile_schema: TileSchema,
     data_provider: Arc<Provider>,
     tiles: Arc<Mutex<Cache<TileIndex, TileState>>>,
 }
@@ -113,7 +113,7 @@ where
 {
     pub fn new(
         messenger: Option<Box<dyn Messenger>>,
-        tile_scheme: TileScheme,
+        tile_scheme: TileSchema,
         data_provider: Provider,
     ) -> Self {
         Self {

@@ -13,7 +13,7 @@ use crate::render::render_bundle::tessellating::serialization::TessellatingRende
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::Renderer;
-use crate::tile_scheme::{TileIndex, TileScheme};
+use crate::tile_scheme::{TileIndex, TileSchema};
 use galileo_mvt::MvtTile;
 use quick_cache::unsync::Cache;
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ pub struct WebWorkerVectorTileProvider {
     tiles: Arc<Mutex<Cache<TileIndex, TileState>>>,
     messenger: Arc<RwLock<Option<Box<dyn Messenger>>>>,
     tile_source: Box<dyn UrlSource<TileIndex>>,
-    tile_scheme: TileScheme,
+    tile_scheme: TileSchema,
 }
 
 struct WorkerState {
@@ -95,7 +95,7 @@ impl WebWorkerVectorTileProvider {
         pool_size: usize,
         messenger: Option<Box<dyn Messenger>>,
         source: impl UrlSource<TileIndex> + 'static,
-        tile_scheme: TileScheme,
+        tile_scheme: TileSchema,
     ) -> Self {
         let mut provider = Self {
             worker_pool: Vec::with_capacity(pool_size),
@@ -293,7 +293,7 @@ pub struct LoadTilePayload {
     index: TileIndex,
     url: String,
     style: VectorTileStyle,
-    tile_scheme: TileScheme,
+    tile_scheme: TileSchema,
 }
 
 #[wasm_bindgen]

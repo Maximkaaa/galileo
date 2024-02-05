@@ -5,7 +5,7 @@ use galileo::layer::feature_layer::FeatureLayer;
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderBundle;
 use galileo::render::PrimitiveId;
-use galileo::tile_scheme::TileScheme;
+use galileo::tile_scheme::TileSchema;
 use galileo::Color;
 use galileo_types::cartesian::impls::point::Point3d;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
@@ -88,7 +88,7 @@ pub async fn run(builder: MapBuilder) {
                     index.z, index.x, index.y
                 )
             },
-            TileScheme::web(18),
+            TileSchema::web(18),
         )
         .with_layer(FeatureLayer::new(
             generate_points(),
