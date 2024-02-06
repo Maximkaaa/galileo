@@ -289,19 +289,25 @@ impl MapBuilder {
         self
     }
 
+    pub fn create_raster_tile_layer(
+        tile_source: impl UrlSource<TileIndex> + 'static,
+        tile_scheme: TileSchema,
+    ) -> RasterTileLayer<UrlImageProvider<TileIndex, FileCacheController>> {
+        let cache_controller = Some(FileCacheController::new(".tile_cache"));
+
+        let tile_provider = UrlImageProvider::new(tile_source, cache_controller);
+        RasterTileLayer::new(tile_scheme, tile_provider, None)
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     pub fn with_raster_tiles(
         mut self,
         tile_source: impl UrlSource<TileIndex> + 'static,
         tile_scheme: TileSchema,
     ) -> Self {
-        let cache_controller = Some(FileCacheController::new(".tile_cache"));
-
-        let tile_provider = UrlImageProvider::new(tile_source, cache_controller);
-        self.layers.push(Box::new(RasterTileLayer::new(
+        self.layers.push(Box::new(Self::create_raster_tile_layer(
+            tile_source,
             tile_scheme,
-            tile_provider,
-            None,
         )));
         self
     }

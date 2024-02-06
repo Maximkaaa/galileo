@@ -439,8 +439,8 @@ impl WgpuRenderer {
 
     fn render_map(&self, map: &Map, texture_view: &TextureView) {
         let view = map.view();
-        for layer in map.layers() {
-            self.render_layer(&(**layer), view, texture_view);
+        for layer in map.layers().iter_visible() {
+            self.render_layer(layer, view, texture_view);
         }
     }
 

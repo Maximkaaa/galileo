@@ -7,6 +7,7 @@ use crate::tile_scheme::{TileIndex, TileSchema};
 use crate::view::MapView;
 use maybe_sync::{MaybeSend, MaybeSync, Mutex};
 use quick_cache::sync::Cache;
+use std::any::Any;
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 use web_time::{Duration, SystemTime};
@@ -334,5 +335,13 @@ where
 
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
         self.messenger = Some(Arc::from(messenger));
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
