@@ -20,6 +20,7 @@ use galileo_types::geometry::{CartesianGeometry2d, Geom, Geometry};
 use galileo_types::geometry_type::{CartesianSpace2d, CartesianSpace3d, GeoSpace2d};
 use maybe_sync::{MaybeSend, MaybeSync};
 use num_traits::AsPrimitive;
+use std::any::Any;
 use std::marker::PhantomData;
 use std::sync::{Arc, RwLock};
 
@@ -283,9 +284,9 @@ where
 impl<P, F, S> Layer for FeatureLayer<P, F, S, GeoSpace2d>
 where
     P: NewGeoPoint + 'static,
-    F: Feature + MaybeSend + MaybeSync,
+    F: Feature + MaybeSend + MaybeSync + 'static,
     F::Geom: Geometry<Point = P>,
-    S: Symbol<F> + MaybeSend + MaybeSync,
+    S: Symbol<F> + MaybeSend + MaybeSync + 'static,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         if self.features.is_empty() {
@@ -336,14 +337,22 @@ where
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
         *self.messenger.write().unwrap() = Some(messenger);
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
 }
 
 impl<P, F, S> Layer for FeatureLayer<P, F, S, CartesianSpace2d>
 where
     P: NewCartesianPoint2d + Clone + 'static,
-    F: Feature + MaybeSend + MaybeSync,
+    F: Feature + MaybeSend + MaybeSync + 'static,
     F::Geom: Geometry<Point = P>,
-    S: Symbol<F> + MaybeSend + MaybeSync,
+    S: Symbol<F> + MaybeSend + MaybeSync + 'static,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         let lod = self.select_lod(view.resolution());
@@ -401,15 +410,23 @@ where
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
         *self.messenger.write().unwrap() = Some(messenger);
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
 }
 
 impl<P, F, S> Layer for FeatureLayer<P, F, S, CartesianSpace3d>
 where
-    P: NewCartesianPoint3d,
+    P: NewCartesianPoint3d + 'static,
     P::Num: AsPrimitive<f32>,
-    F: Feature + MaybeSend + MaybeSync,
+    F: Feature + MaybeSend + MaybeSync + 'static,
     F::Geom: Geometry<Point = P>,
-    S: Symbol<F> + MaybeSend + MaybeSync,
+    S: Symbol<F> + MaybeSend + MaybeSync + 'static,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         if view.crs() != &self.crs {
@@ -460,5 +477,13 @@ where
 
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
         *self.messenger.write().unwrap() = Some(messenger);
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }

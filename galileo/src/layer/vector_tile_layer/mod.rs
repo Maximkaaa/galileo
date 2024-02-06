@@ -4,6 +4,7 @@ use crate::render::{Canvas, PackedBundle, RenderOptions, Renderer};
 use crate::tile_scheme::TileSchema;
 use crate::view::MapView;
 use nalgebra::Point2;
+use std::any::Any;
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 
@@ -45,6 +46,14 @@ impl<Provider: VectorTileProvider + 'static> Layer for VectorTileLayer<Provider>
 
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
         self.tile_provider.set_messenger(messenger);
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 

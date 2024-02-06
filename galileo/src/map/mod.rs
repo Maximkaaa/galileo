@@ -1,4 +1,5 @@
 use crate::layer::Layer;
+use crate::map::layer_collection::LayerCollection;
 use crate::messenger::Messenger;
 use crate::render::Renderer;
 use crate::view::MapView;
@@ -7,11 +8,13 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use web_time::SystemTime;
 
+pub mod layer_collection;
+
 const FRAME_DURATION: Duration = Duration::from_millis(16);
 
 pub struct Map {
     view: MapView,
-    layers: Vec<Box<dyn Layer>>,
+    layers: LayerCollection,
     messenger: Option<Box<dyn Messenger>>,
     animation: Option<AnimationParameters>,
 }
@@ -36,7 +39,7 @@ impl Map {
         };
         Self {
             view,
-            layers,
+            layers: layers.into(),
             messenger,
             animation: None,
         }
@@ -46,12 +49,14 @@ impl Map {
         &self.view
     }
 
-    pub fn layers(&self) -> &[Box<dyn Layer>] {
+    /// Returns the list of map's layers.
+    pub fn layers(&self) -> &LayerCollection {
         &self.layers
     }
 
-    pub fn layer_mut(&mut self, index: usize) -> Option<&mut Box<dyn Layer>> {
-        self.layers.get_mut(index)
+    /// Returns a mutable reference to the list of map's layers.
+    pub fn layers_mut(&mut self) -> &mut LayerCollection {
+        &mut self.layers
     }
 
     pub(crate) fn set_view(&mut self, view: MapView) {
@@ -62,7 +67,7 @@ impl Map {
     }
 
     pub fn load_layers(&self, renderer: &Arc<RwLock<dyn Renderer>>) {
-        for layer in &self.layers {
+        for layer in self.layers.iter_visible() {
             layer.prepare(&self.view, renderer);
         }
     }

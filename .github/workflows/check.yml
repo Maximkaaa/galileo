@@ -18,7 +18,7 @@ jobs:
       - name: Build
         run: cargo build --verbose --all
       - name: Tests
-        run: cargo test --verbose
+        run: cargo test --features _tests --verbose
 
   fmt:
     name: Rustfmt
