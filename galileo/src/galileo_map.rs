@@ -9,7 +9,6 @@ use crate::layer::vector_tile_layer::VectorTileLayer;
 use crate::layer::Layer;
 use crate::map::Map;
 use crate::render::wgpu::WgpuRenderer;
-use crate::render::Renderer;
 use crate::tile_scheme::{TileIndex, TileSchema};
 use crate::view::MapView;
 use crate::winit::{WinitInputHandler, WinitMessenger};
@@ -23,6 +22,10 @@ use winit::window::{Window, WindowBuilder};
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::layer::data_provider::url_data_provider::UrlDataProvider;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::render::render_bundle::RenderBundle;
 
 #[cfg(target_arch = "wasm32")]
 use crate::layer::data_provider::EmptyCache;
@@ -47,7 +50,7 @@ pub type VectorTileProvider =
 pub struct GalileoMap {
     window: Arc<Window>,
     map: Arc<RwLock<Map>>,
-    backend: Arc<RwLock<WgpuRenderer>>,
+    backend: Arc<RwLock<Option<WgpuRenderer>>>,
     event_processor: EventProcessor,
     input_handler: WinitInputHandler,
     event_loop: EventLoop<()>,
@@ -72,57 +75,56 @@ impl GalileoMap {
                 match event {
                     Event::Resumed => {
                         log::info!("Resume called");
-                        let size = window.inner_size();
-                        if size.width > 0 && size.height > 0 {
-                            let backend = backend.clone();
-                            let window = window.clone();
-                            let map = map.clone();
-                            crate::async_runtime::spawn(async move {
-                                let renderer = WgpuRenderer::new_with_window(
-                                    &window,
-                                    Size::new(size.width, size.height),
-                                )
-                                .await
-                                .expect("failed to init renderer");
+                        let backend = backend.clone();
+                        let window = window.clone();
+                        let map = map.clone();
+                        crate::async_runtime::spawn(async move {
+                            let size = window.inner_size();
 
-                                *backend.write().expect("poisoned lock") = renderer;
-                                map.write()
-                                    .expect("poisoned lock")
-                                    .set_size(Size::new(size.width as f64, size.height as f64));
-                                window.request_redraw();
-                            });
-                        }
+                            let mut renderer = WgpuRenderer::new_with_window(
+                                &window,
+                                Size::new(size.width, size.height),
+                            )
+                            .await
+                            .expect("failed to init renderer");
+
+                            let new_size = window.inner_size();
+                            if new_size != size {
+                                renderer.resize(Size::new(new_size.width, new_size.height));
+                            }
+
+                            *backend.write().expect("poisoned lock") = Some(renderer);
+                            map.write()
+                                .expect("poisoned lock")
+                                .set_size(Size::new(size.width as f64, size.height as f64));
+                            window.request_redraw();
+                        });
                     }
                     Event::Suspended => {
-                        backend
-                            .write()
-                            .expect("poisoned lock")
-                            .clear_render_target();
+                        *backend.write().expect("poisoned lock") = None;
                     }
                     Event::WindowEvent { event, window_id } if window_id == window.id() => {
-                        if !backend.read().expect("poisoned lock").initialized() {
-                            return;
-                        }
-
                         match event {
                             WindowEvent::CloseRequested => {
                                 target.exit();
                             }
                             WindowEvent::Resized(size) => {
                                 log::info!("Window resized to: {size:?}");
-                                backend
-                                    .write()
-                                    .unwrap()
-                                    .resize(Size::new(size.width, size.height));
+                                if let Some(backend) = backend.write().unwrap().as_mut() {
+                                    backend.resize(Size::new(size.width, size.height));
 
-                                let mut map = map.write().unwrap();
-                                map.set_size(Size::new(size.width as f64, size.height as f64));
+                                    let mut map = map.write().unwrap();
+                                    map.set_size(Size::new(size.width as f64, size.height as f64));
+                                }
                             }
                             WindowEvent::RedrawRequested => {
-                                let cast: Arc<RwLock<dyn Renderer>> = backend.clone();
-                                let map = map.read().unwrap();
-                                map.load_layers(&cast);
-                                backend.read().unwrap().render(&map).unwrap();
+                                if let Some(backend) = backend.read().unwrap().as_ref() {
+                                    let map = map.read().unwrap();
+                                    map.load_layers();
+                                    if let Err(err) = backend.render(&map) {
+                                        log::error!("Render error: {err:?}");
+                                    }
+                                }
                             }
                             other => {
                                 // Phone emulator in browsers works funny with scaling, using this code fixes it.
@@ -138,12 +140,10 @@ impl GalileoMap {
                                 if let Some(raw_event) =
                                     input_handler.process_user_input(&other, scale)
                                 {
-                                    let mut map = map.write().unwrap();
-                                    event_processor.handle(
-                                        raw_event,
-                                        &mut map,
-                                        &(*backend.read().unwrap()),
-                                    );
+                                    if let Some(backend) = backend.read().unwrap().as_ref() {
+                                        let mut map = map.write().unwrap();
+                                        event_processor.handle(raw_event, &mut map, backend);
+                                    }
                                 }
                             }
                         }
@@ -274,13 +274,7 @@ impl MapBuilder {
 
         let window = Arc::new(window);
         let messenger = WinitMessenger::new(window.clone());
-
-        log::info!("Window size: {:?}", window.inner_size());
-        let backend = WgpuRenderer::new()
-            .await
-            .expect("failed to create renderer");
-
-        let backend = Arc::new(RwLock::new(backend));
+        let backend = Arc::new(RwLock::new(None));
 
         let input_handler = WinitInputHandler::default();
 
@@ -368,6 +362,7 @@ impl MapBuilder {
                 crate::layer::vector_tile_layer::tile_provider::vt_processor::VtProcessor {},
                 FileCacheController::new(".tile_cache"),
             ),
+            RenderBundle::Tessellating(TessellatingRenderBundle::new()),
         );
 
         #[cfg(target_arch = "wasm32")]

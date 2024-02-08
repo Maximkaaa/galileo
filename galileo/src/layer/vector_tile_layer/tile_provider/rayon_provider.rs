@@ -3,12 +3,10 @@ use crate::layer::data_provider::DataProvider;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::vt_processor::VectorTileDecodeContext;
 use crate::layer::vector_tile_layer::tile_provider::{
-    LockedTileStore, TileState, VectorTileProvider,
+    LockedTileStore, TileState, UnpackedVectorTile, VectorTileProvider,
 };
-use crate::layer::vector_tile_layer::vector_tile::VectorTile;
 use crate::messenger::Messenger;
 use crate::render::render_bundle::RenderBundle;
-use crate::render::Renderer;
 use crate::tile_scheme::{TileIndex, TileSchema};
 use bytes::Bytes;
 use galileo_mvt::MvtTile;
@@ -27,6 +25,7 @@ where
     tile_schema: TileSchema,
     data_provider: Arc<Provider>,
     tiles: Arc<Mutex<Cache<TileIndex, TileState>>>,
+    empty_bundle: RenderBundle,
 }
 
 impl<Provider> Clone for RayonProvider<Provider>
@@ -42,6 +41,7 @@ where
             tile_schema: self.tile_schema.clone(),
             data_provider: self.data_provider.clone(),
             tiles: self.tiles.clone(),
+            empty_bundle: self.empty_bundle.clone(),
         }
     }
 }
@@ -53,17 +53,8 @@ where
         + MaybeSync
         + 'static,
 {
-    fn supports(&self, _renderer: &RwLock<dyn Renderer>) -> bool {
-        true
-    }
-
-    fn load_tile(
-        &self,
-        index: TileIndex,
-        style: &VectorTileStyle,
-        renderer: &Arc<RwLock<dyn Renderer>>,
-    ) {
-        if self.set_loading_state(index, renderer) {
+    fn load_tile(&self, index: TileIndex, style: &VectorTileStyle) {
+        if self.set_loading_state(index) {
             self.load_tile_internal(index, style);
         }
     }
@@ -78,7 +69,7 @@ where
             };
             let tile_state = &mut *entry;
             if matches!(*tile_state, TileState::Loaded(_)) {
-                let TileState::Loaded(tile) = std::mem::replace(tile_state, TileState::Error)
+                let TileState::Packed(tile) = std::mem::replace(tile_state, TileState::Error)
                 else {
                     log::error!("Type of value changed unexpectedly during updating style.");
                     continue;
@@ -115,16 +106,18 @@ where
         messenger: Option<Box<dyn Messenger>>,
         tile_scheme: TileSchema,
         data_provider: Provider,
+        empty_bundle: RenderBundle,
     ) -> Self {
         Self {
             messenger: Arc::new(RwLock::new(messenger)),
             tile_schema: tile_scheme,
             data_provider: Arc::new(data_provider),
             tiles: Arc::new(Mutex::new(Cache::new(1000))),
+            empty_bundle,
         }
     }
 
-    fn set_loading_state(&self, index: TileIndex, renderer: &Arc<RwLock<dyn Renderer>>) -> bool {
+    fn set_loading_state(&self, index: TileIndex) -> bool {
         let mut tiles = self.tiles.lock().expect("tile store mutex is poisoned");
         let has_entry = tiles.peek(&index).is_some();
         if has_entry {
@@ -139,10 +132,10 @@ where
                     return false;
                 };
 
-                *value = TileState::Updating(tile, renderer.clone());
+                *value = TileState::Updating(tile);
             }
         } else {
-            tiles.insert(index, TileState::Loading(renderer.clone()));
+            tiles.insert(index, TileState::Loading);
         }
 
         true
@@ -155,7 +148,7 @@ where
             match provider.clone().load_tile_async(index, style).await {
                 Ok(tile) => {
                     let mut tiles = provider.tiles.lock().expect("tile store mutex is poisoned");
-                    tiles.insert(index, TileState::Loaded(tile));
+                    tiles.insert(index, TileState::Loaded(Box::new(tile)));
                     if let Some(messenger) = &*provider
                         .messenger
                         .read()
@@ -177,7 +170,7 @@ where
         self,
         index: TileIndex,
         style: VectorTileStyle,
-    ) -> Result<VectorTile, GalileoError> {
+    ) -> Result<UnpackedVectorTile, GalileoError> {
         let bytes = self.download_tile(index).await?;
         tokio::task::spawn_blocking(move || self.try_prepare_tile(bytes, index, &style))
             .await
@@ -193,25 +186,8 @@ where
         bytes: Bytes,
         index: TileIndex,
         style: &VectorTileStyle,
-    ) -> Result<VectorTile, GalileoError> {
-        let renderer = {
-            let mut tiles = self.tiles.lock().expect("tile store mutex is poisoned");
-            match tiles.get(&index) {
-                Some(TileState::Loading(renderer)) | Some(TileState::Updating(_, renderer)) => {
-                    renderer.clone()
-                }
-                _ => {
-                    tiles.remove(&index);
-                    return Err(GalileoError::Generic("tile was in invalid state".into()));
-                }
-            }
-
-            // drop mutex before doing expensive computations
-        };
-
-        let renderer = renderer.read().expect("renderer lock is poisoned");
-
-        let bundle = renderer.create_bundle();
+    ) -> Result<UnpackedVectorTile, GalileoError> {
+        let bundle = self.empty_bundle.clone();
         let context = VectorTileDecodeContext {
             index,
             style: style.clone(),
@@ -219,12 +195,8 @@ where
             bundle,
         };
         let (bundle, mvt_tile) = self.data_provider.decode(bytes, context)?;
-        let packed_bundle = renderer.pack_bundle(&bundle);
 
-        Ok(VectorTile {
-            bundle: packed_bundle,
-            mvt_tile,
-        })
+        Ok(UnpackedVectorTile { bundle, mvt_tile })
     }
 
     async fn download_tile(&self, index: TileIndex) -> Result<Bytes, GalileoError> {

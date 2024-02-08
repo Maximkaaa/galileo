@@ -25,7 +25,7 @@ use std::mem::size_of;
 use std::ops::Range;
 use std::sync::Arc;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TessellatingRenderBundle {
     pub poly_tessellation: VertexBuffers<PolyVertex, u32>,
     pub points: Vec<PointInstance>,
@@ -47,7 +47,7 @@ pub struct ScreenRefVertex {
     color: [u8; 4],
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum PrimitiveInfo {
     MapRef { vertex_range: Range<usize> },
     ScreenRef { vertex_range: Range<usize> },

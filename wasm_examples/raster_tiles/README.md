@@ -4,7 +4,7 @@ Galileo.
 
 To run this example, first build Galileo as wasm package:
 ```
-wasm-pack build --target no-modules --release galileo
+wasm-pack build --release galileo
 ```
 
 After the package is created, use `npm` and `webpack` to build and run the example:

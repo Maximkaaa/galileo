@@ -12,6 +12,7 @@ use tessellating::TessellatingRenderBundle;
 
 pub mod tessellating;
 
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum RenderBundle {
     Tessellating(TessellatingRenderBundle),

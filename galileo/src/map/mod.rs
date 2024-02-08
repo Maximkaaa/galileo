@@ -1,10 +1,8 @@
 use crate::layer::Layer;
 use crate::map::layer_collection::LayerCollection;
 use crate::messenger::Messenger;
-use crate::render::Renderer;
 use crate::view::MapView;
 use galileo_types::cartesian::size::Size;
-use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use web_time::SystemTime;
 
@@ -66,9 +64,9 @@ impl Map {
         }
     }
 
-    pub fn load_layers(&self, renderer: &Arc<RwLock<dyn Renderer>>) {
+    pub fn load_layers(&self) {
         for layer in self.layers.iter_visible() {
-            layer.prepare(&self.view, renderer);
+            layer.prepare(&self.view);
         }
     }
 

@@ -2,14 +2,14 @@ use crate::layer::data_provider::DataProvider;
 use crate::messenger::Messenger;
 use crate::primitives::DecodedImage;
 use crate::render::render_bundle::RenderBundle;
-use crate::render::{Canvas, ImagePaint, PackedBundle, PrimitiveId, RenderOptions, Renderer};
+use crate::render::{Canvas, ImagePaint, PackedBundle, PrimitiveId, RenderOptions};
 use crate::tile_scheme::{TileIndex, TileSchema};
 use crate::view::MapView;
 use maybe_sync::{MaybeSend, MaybeSync, Mutex};
 use quick_cache::sync::Cache;
 use std::any::Any;
 use std::collections::HashSet;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use web_time::{Duration, SystemTime};
 
 use super::Layer;
@@ -320,7 +320,7 @@ where
         *self.prev_drawn_tiles.lock() = tiles.iter().map(|(index, _)| *index).collect();
     }
 
-    fn prepare(&self, view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
+    fn prepare(&self, view: &MapView) {
         if let Some(iter) = self.tile_scheme.iter_tiles(view) {
             for index in iter {
                 let tile_provider = self.tile_provider.clone();

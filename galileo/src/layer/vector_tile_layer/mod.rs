@@ -1,12 +1,11 @@
 use crate::layer::Layer;
 use crate::messenger::Messenger;
-use crate::render::{Canvas, PackedBundle, RenderOptions, Renderer};
+use crate::render::{Canvas, PackedBundle, RenderOptions};
 use crate::tile_scheme::TileSchema;
 use crate::view::MapView;
 use nalgebra::Point2;
 use std::any::Any;
 use std::collections::HashSet;
-use std::sync::{Arc, RwLock};
 
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::{LockedTileStore, VectorTileProvider};
@@ -27,19 +26,17 @@ pub struct VectorTileLayer<Provider: VectorTileProvider> {
 
 impl<Provider: VectorTileProvider + 'static> Layer for VectorTileLayer<Provider> {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
-        let tiles_store = self.tile_provider.read();
-        let tiles = self.get_tiles_to_draw(view, &tiles_store);
+        let mut tiles_store = self.tile_provider.read();
+        let tiles = self.get_tiles_to_draw(view, &mut tiles_store, canvas);
         let to_render: Vec<&dyn PackedBundle> = tiles.iter().map(|v| &*v.bundle).collect();
 
         canvas.draw_bundles(&to_render, RenderOptions::default());
     }
 
-    fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>) {
+    fn prepare(&self, view: &MapView) {
         if let Some(iter) = self.tile_scheme.iter_tiles(view) {
             for index in iter {
-                if self.tile_provider.supports(&**renderer) {
-                    self.tile_provider.load_tile(index, &self.style, renderer);
-                }
+                self.tile_provider.load_tile(index, &self.style);
             }
         }
     }
@@ -77,18 +74,25 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
     fn get_tiles_to_draw<'a>(
         &self,
         view: &MapView,
-        tiles_store: &'a LockedTileStore,
+        tiles_store: &'a mut LockedTileStore,
+        canvas: &dyn Canvas,
     ) -> Vec<&'a VectorTile> {
         let mut tiles = vec![];
         let Some(tile_iter) = self.tile_scheme.iter_tiles(view) else {
             return vec![];
         };
 
+        let indices: Vec<_> = tile_iter.collect();
+
+        for index in &indices {
+            tiles_store.pack(*index, canvas);
+        }
+
         let mut to_substitute = vec![];
-        for index in tile_iter {
-            match tiles_store.get_tile(index) {
-                None => to_substitute.push(index),
-                Some(v) => tiles.push((index, v)),
+        for index in &indices {
+            match tiles_store.get_tile(*index) {
+                None => to_substitute.push(*index),
+                Some(v) => tiles.push((*index, v)),
             }
         }
 
@@ -141,8 +145,8 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
 
                 let tolerance = (view.resolution() / tile_resolution) as f32 * 2.0;
 
-                if let Some(tile) = tile_store.get_tile(index) {
-                    for layer in &tile.mvt_tile.layers {
+                if let Some(mvt_tile) = tile_store.get_mvt_tile(index) {
+                    for layer in &mvt_tile.layers {
                         for feature in &layer.features {
                             match &feature.geometry {
                                 MvtGeometry::Point(_) => {}
