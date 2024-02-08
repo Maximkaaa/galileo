@@ -14,6 +14,7 @@ exclude = [
     "wasm_examples/many_points",
     "wasm_examples/lambert",
     "wasm_examples/with_egui",
+    "android_examples/raster_tiles/rust",
 ]
 
 [workspace.package]

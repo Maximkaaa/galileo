@@ -70,7 +70,40 @@ impl GalileoMap {
                 target.set_control_flow(ControlFlow::Wait);
 
                 match event {
+                    Event::Resumed => {
+                        log::info!("Resume called");
+                        let size = window.inner_size();
+                        if size.width > 0 && size.height > 0 {
+                            let backend = backend.clone();
+                            let window = window.clone();
+                            let map = map.clone();
+                            crate::async_runtime::spawn(async move {
+                                let renderer = WgpuRenderer::new_with_window(
+                                    &window,
+                                    Size::new(size.width, size.height),
+                                )
+                                .await
+                                .expect("failed to init renderer");
+
+                                *backend.write().expect("poisoned lock") = renderer;
+                                map.write()
+                                    .expect("poisoned lock")
+                                    .set_size(Size::new(size.width as f64, size.height as f64));
+                                window.request_redraw();
+                            });
+                        }
+                    }
+                    Event::Suspended => {
+                        backend
+                            .write()
+                            .expect("poisoned lock")
+                            .clear_render_target();
+                    }
                     Event::WindowEvent { event, window_id } if window_id == window.id() => {
+                        if !backend.read().expect("poisoned lock").initialized() {
+                            return;
+                        }
+
                         match event {
                             WindowEvent::CloseRequested => {
                                 target.exit();
@@ -81,6 +114,7 @@ impl GalileoMap {
                                     .write()
                                     .unwrap()
                                     .resize(Size::new(size.width, size.height));
+
                                 let mut map = map.write().unwrap();
                                 map.set_size(Size::new(size.width as f64, size.height as f64));
                             }
@@ -225,6 +259,9 @@ impl MapBuilder {
             .event_loop
             .take()
             .unwrap_or_else(|| EventLoop::new().unwrap());
+
+        log::info!("Trying to get window");
+
         let window = self.window.take().unwrap_or_else(|| {
             WindowBuilder::new()
                 .with_inner_size(PhysicalSize {
@@ -239,11 +276,10 @@ impl MapBuilder {
         let messenger = WinitMessenger::new(window.clone());
 
         log::info!("Window size: {:?}", window.inner_size());
-        let backend = WgpuRenderer::create_with_window(
-            &window,
-            Size::new(window.inner_size().width, window.inner_size().height),
-        )
-        .await;
+        let backend = WgpuRenderer::new()
+            .await
+            .expect("failed to create renderer");
+
         let backend = Arc::new(RwLock::new(backend));
 
         let input_handler = WinitInputHandler::default();
@@ -293,7 +329,13 @@ impl MapBuilder {
         tile_source: impl UrlSource<TileIndex> + 'static,
         tile_scheme: TileSchema,
     ) -> RasterTileLayer<UrlImageProvider<TileIndex, FileCacheController>> {
+        #[cfg(not(target_os = "android"))]
         let cache_controller = Some(FileCacheController::new(".tile_cache"));
+
+        #[cfg(target_os = "android")]
+        let cache_controller = Some(FileCacheController::new(
+            "/data/data/com.example.rastertilesandroid/.tile_cache",
+        ));
 
         let tile_provider = UrlImageProvider::new(tile_source, cache_controller);
         RasterTileLayer::new(tile_scheme, tile_provider, None)
