@@ -1,7 +1,7 @@
 target
 .idea
 .tile_cache
-**/pkg
+galileo/pkg
 Cargo.lock
 
 # Ignore large sample files

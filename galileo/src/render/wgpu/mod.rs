@@ -229,6 +229,7 @@ impl WgpuRenderer {
         let (device, queue) = Self::create_device(&adapter).await;
 
         let config = Self::get_surface_configuration(&surface, &adapter, size);
+        log::info!("Configuring surface with size {size:?}");
         surface.configure(&device, &config);
 
         Some(Self::new_with_device_and_surface(
@@ -245,6 +246,7 @@ impl WgpuRenderer {
     {
         let instance = Self::create_instance();
 
+        log::info!("Creating new surface");
         let surface = match unsafe { instance.create_surface(window) } {
             Ok(s) => s,
             Err(err) => {
@@ -438,6 +440,7 @@ impl WgpuRenderer {
                 RenderTarget::Surface { config, surface } => {
                     config.width = new_size.width();
                     config.height = new_size.height();
+                    log::info!("Configuring surface with size {new_size:?}");
                     surface.configure(&self.device, config);
                 }
                 RenderTarget::Texture(texture, size) => {

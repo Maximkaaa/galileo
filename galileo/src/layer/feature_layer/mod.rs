@@ -3,7 +3,7 @@ use crate::layer::feature_layer::symbol::Symbol;
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::render_bundle::RenderBundle;
-use crate::render::{Canvas, PackedBundle, PrimitiveId, RenderOptions, Renderer};
+use crate::render::{Canvas, PackedBundle, PrimitiveId, RenderOptions};
 use crate::view::MapView;
 use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::cartesian::rect::Rect;
@@ -22,7 +22,7 @@ use maybe_sync::{MaybeSend, MaybeSync};
 use num_traits::AsPrimitive;
 use std::any::Any;
 use std::marker::PhantomData;
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 
 pub mod feature;
 pub mod symbol;
@@ -330,7 +330,7 @@ where
         self.render_internal(lod, canvas, view);
     }
 
-    fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
+    fn prepare(&self, _view: &MapView) {
         // do nothing
     }
 
@@ -403,7 +403,7 @@ where
         self.render_internal(lod, canvas, view);
     }
 
-    fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
+    fn prepare(&self, _view: &MapView) {
         // do nothing
     }
 
@@ -471,7 +471,7 @@ where
         self.render_internal(lod, canvas, view);
     }
 
-    fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
+    fn prepare(&self, _view: &MapView) {
         // do nothing
     }
 

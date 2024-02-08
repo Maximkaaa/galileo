@@ -1,5 +1,5 @@
 use crate::messenger::Messenger;
-use crate::render::{Canvas, Renderer};
+use crate::render::Canvas;
 use crate::view::MapView;
 use maybe_sync::{MaybeSend, MaybeSync};
 use std::any::Any;
@@ -17,7 +17,7 @@ pub use vector_tile_layer::VectorTileLayer;
 
 pub trait Layer: MaybeSend + MaybeSync {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas);
-    fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>);
+    fn prepare(&self, view: &MapView);
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>);
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
@@ -28,8 +28,8 @@ impl<T: Layer + 'static> Layer for Arc<RwLock<T>> {
         self.read().unwrap().render(position, canvas)
     }
 
-    fn prepare(&self, view: &MapView, renderer: &Arc<RwLock<dyn Renderer>>) {
-        self.read().unwrap().prepare(view, renderer)
+    fn prepare(&self, view: &MapView) {
+        self.read().unwrap().prepare(view)
     }
 
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
@@ -55,7 +55,7 @@ impl Layer for TestLayer {
         unimplemented!()
     }
 
-    fn prepare(&self, _view: &MapView, _renderer: &Arc<RwLock<dyn Renderer>>) {
+    fn prepare(&self, _view: &MapView) {
         unimplemented!()
     }
 

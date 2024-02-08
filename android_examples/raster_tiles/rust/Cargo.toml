@@ -5,17 +5,14 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib"]
 
-[[bin]]
-name = "uniffi-bindgen"
-path = "src/uniffi-bindgen.rs"
-
 [dependencies]
 galileo = { path = "../../../galileo" }
 galileo-types = { path = "../../../galileo-types" }
 log = "0.4"
 tokio = {version = "1", features = ["rt-multi-thread"]}
+
+# Use this version until https://github.com/sfackler/rust-openssl/issues/2163 is fixed
 openssl-sys = "=0.9.92"
-uniffi = { version = "0.26", features = ["cli"] }
 lazy_static = "1.4"
 
 [target.'cfg(target_os = "android")'.dependencies]

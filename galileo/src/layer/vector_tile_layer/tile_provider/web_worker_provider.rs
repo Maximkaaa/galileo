@@ -6,13 +6,12 @@ use crate::layer::vector_tile_layer::tile_provider::vt_processor::{
     VectorTileDecodeContext, VtProcessor,
 };
 use crate::layer::vector_tile_layer::tile_provider::{
-    LockedTileStore, TileState, VectorTile, VectorTileProvider,
+    LockedTileStore, TileState, UnpackedVectorTile, VectorTileProvider,
 };
 use crate::messenger::Messenger;
 use crate::render::render_bundle::tessellating::serialization::TessellatingRenderBundleBytes;
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
 use crate::render::render_bundle::RenderBundle;
-use crate::render::Renderer;
 use crate::tile_scheme::{TileIndex, TileSchema};
 use galileo_mvt::MvtTile;
 use quick_cache::unsync::Cache;
@@ -41,18 +40,8 @@ struct WorkerState {
 }
 
 impl VectorTileProvider for WebWorkerVectorTileProvider {
-    fn supports(&self, _renderer: &RwLock<dyn Renderer>) -> bool {
-        // todo
-        true
-    }
-
-    fn load_tile(
-        &self,
-        index: TileIndex,
-        style: &VectorTileStyle,
-        renderer: &Arc<RwLock<dyn Renderer>>,
-    ) {
-        self.load(index, style.clone(), renderer)
+    fn load_tile(&self, index: TileIndex, style: &VectorTileStyle) {
+        self.load(index, style.clone())
     }
 
     fn update_style(&self) {
@@ -65,7 +54,7 @@ impl VectorTileProvider for WebWorkerVectorTileProvider {
             };
             let tile_state = &mut *entry;
             if matches!(*tile_state, TileState::Loaded(_)) {
-                let TileState::Loaded(tile) = std::mem::replace(tile_state, TileState::Error)
+                let TileState::Packed(tile) = std::mem::replace(tile_state, TileState::Error)
                 else {
                     log::error!("Type of value changed unexpectedly during updating style.");
                     continue;
@@ -113,7 +102,7 @@ impl WebWorkerVectorTileProvider {
         provider
     }
 
-    fn load(&self, index: TileIndex, style: VectorTileStyle, renderer: &Arc<RwLock<dyn Renderer>>) {
+    fn load(&self, index: TileIndex, style: VectorTileStyle) {
         if self
             .worker_pool
             .iter()
@@ -125,7 +114,7 @@ impl WebWorkerVectorTileProvider {
             return;
         }
 
-        if !self.set_loading_state(index, renderer) {
+        if !self.set_loading_state(index) {
             return;
         }
 
@@ -153,7 +142,7 @@ impl WebWorkerVectorTileProvider {
         }
     }
 
-    fn set_loading_state(&self, index: TileIndex, renderer: &Arc<RwLock<dyn Renderer>>) -> bool {
+    fn set_loading_state(&self, index: TileIndex) -> bool {
         let mut tiles = self.tiles.lock().expect("tile store mutex is poisoned");
         let has_entry = tiles.peek(&index).is_some();
         if has_entry {
@@ -168,10 +157,10 @@ impl WebWorkerVectorTileProvider {
                     return false;
                 };
 
-                *value = TileState::Updating(tile, renderer.clone());
+                *value = TileState::Updating(tile);
             }
         } else {
-            tiles.insert(index, TileState::Loading(renderer.clone()));
+            tiles.insert(index, TileState::Loading);
         }
 
         true
@@ -248,22 +237,16 @@ fn store_vector_tile(
         bundle_bytes,
     } = decoded_vector_tile;
     match store.get(&index) {
-        Some(TileState::Loading(renderer) | TileState::Updating(_, renderer)) => {
+        Some(TileState::Loading | TileState::Updating(_)) => {
             let converted: TessellatingRenderBundleBytes =
                 bincode::deserialize(&bundle_bytes).unwrap();
-            let bundle = TessellatingRenderBundle::from_bytes_unchecked(converted);
+            let bundle = RenderBundle::Tessellating(
+                TessellatingRenderBundle::from_bytes_unchecked(converted),
+            );
             let mvt_tile = MvtTile::decode(bytes::Bytes::from(mvt_tile), true).unwrap();
-
-            let packed = renderer
-                .read()
-                .unwrap()
-                .pack_bundle(&RenderBundle::Tessellating(bundle));
             store.insert(
                 index,
-                TileState::Loaded(VectorTile {
-                    bundle: packed,
-                    mvt_tile,
-                }),
+                TileState::Loaded(Box::new(UnpackedVectorTile { bundle, mvt_tile })),
             );
 
             if let Some(messenger) = &(*messenger.read().unwrap()) {
