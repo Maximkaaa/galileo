@@ -52,6 +52,17 @@ it can be used on any platform that `wgpu` supports:
 Still, the backend is not integral part of the Galileo design, so we will probably
 try other promising backends (like [vello](https://github.com/linebender/vello)).
 
+![Android](https://maximkaaa.github.io/galileo/android.png)
+
+## FFI
+
+At this point, you can develop an application using Galileo only in Rust. But there is
+a POC example of how we envision future development on other platforms: [wasm_examples/raster_tiles].
+When all main features of Galileo are more or less stable (or when a need arises) we
+will add FFI bindings to other languages using `wasm-bindgen` and `uniffi`. This will
+allow you to create your applications in `JS`, `Kotlin`, `Swift` or `Python` using
+common API.
+
 ## Features
 
 Galileo is an active WIP, here is the list of the features that are already present:
@@ -91,10 +102,12 @@ them all done at the same time. So here's our current plan and priorities:
 
 # Running examples
 
-Rust examples of using Galileo are located at [`galileo/examples`]. Refer to the [readme](galileo/examples/README.md)
+Rust examples of using Galileo are located at [`galileo/examples`](galileo/examples). Refer to the [readme](galileo/examples/README.md)
 for the list, description and run instructions.
 
-There are also examples of running Galileo in a web-browser located at [`web_examples`] folder. These are
+## Web
+
+There are also examples of running Galileo in a web-browser located at [`wasm_examples`](wasm_examples) folder. These are
 excluded from the workspace (because Cargo does not like cross-platform workspaces).
 To run those you will need to [install wasm-pack](https://rustwasm.github.io/wasm-pack/installer/):
 
@@ -104,6 +117,10 @@ wasm-pack build wasm_examples/countries --target no-modules --release
 
 After that open `index.html` in your browser (must be served from `localhost`, use your
 favourite developer server).
+
+## Android
+
+Check out [this example](android_examples/raster_tiles/README.md) to run Galileo on Android.
 
 ## Cross-compile from Linux to Windows
 
@@ -127,13 +144,17 @@ cargo build --target x86_64-px-windows-gnu
 
 # Sponsoring
 
+There is still a lot of work to be done to make Galileo feature-full, production ready and useful for many. And we
+would love to work on this full-time to bring this to you as soon as possible. So we are looking for sponsors
+to make it possible.
+
+Sponsor funds will help support maintainer's dedicated work and eventually fund freelance contributors.
+
 If you think this library can be useful to you or someone you love, consider supporting its development. Sponsoring
 comes with additional advantages:
-* Increase development speed. All funds will be spent on development.
+* Increase development speed.
 * Make your needs our priority.
 * See your logo on the project's page.
-
-Please, contact the maintainer of the project with any questions related to sponsoring.
 
 # License
 

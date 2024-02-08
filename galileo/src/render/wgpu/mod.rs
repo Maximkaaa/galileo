@@ -1,3 +1,4 @@
+use cfg_if::cfg_if;
 use galileo_types::cartesian::size::Size;
 use lyon::tessellation::VertexBuffers;
 use nalgebra::{Rotation3, Vector3};
@@ -13,6 +14,7 @@ use wgpu::{
     TextureUsages, TextureView, TextureViewDescriptor,
 };
 
+use crate::error::GalileoError;
 use crate::layer::Layer;
 use crate::map::Map;
 use crate::render::render_bundle::tessellating::{
@@ -28,17 +30,21 @@ use super::{Canvas, PackedBundle, RenderOptions, Renderer};
 
 mod pipelines;
 
+const DEFAULT_BACKGROUND: Color = Color::WHITE;
 const DEPTH_FORMAT: TextureFormat = TextureFormat::Depth24PlusStencil8;
 const TARGET_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
 
 pub struct WgpuRenderer {
-    render_target: RenderTarget,
     device: Arc<Device>,
     queue: Arc<Queue>,
-    size: Size<u32>,
+    render_set: Option<RenderSet>,
+    background: Color,
+}
+
+struct RenderSet {
+    render_target: RenderTarget,
     pipelines: Pipelines,
     multisampling_view: TextureView,
-    background: Color,
     stencil_view_multisample: TextureView,
     stencil_view: TextureView,
 }
@@ -48,7 +54,7 @@ enum RenderTarget {
         config: SurfaceConfiguration,
         surface: Arc<Surface>,
     },
-    Texture(Texture),
+    Texture(Texture, Size<u32>),
 }
 
 enum RenderTargetTexture<'a> {
@@ -78,7 +84,21 @@ impl RenderTarget {
             RenderTarget::Surface { surface, .. } => {
                 Ok(RenderTargetTexture::Surface(surface.get_current_texture()?))
             }
-            RenderTarget::Texture(texture) => Ok(RenderTargetTexture::Texture(texture)),
+            RenderTarget::Texture(texture, _) => Ok(RenderTargetTexture::Texture(texture)),
+        }
+    }
+
+    fn size(&self) -> Size<u32> {
+        match &self {
+            RenderTarget::Surface { config, .. } => Size::new(config.width, config.height),
+            RenderTarget::Texture(_, size) => *size,
+        }
+    }
+
+    fn format(&self) -> TextureFormat {
+        match &self {
+            RenderTarget::Surface { config, .. } => config.format,
+            RenderTarget::Texture(_, _) => TARGET_TEXTURE_FORMAT,
         }
     }
 }
@@ -90,7 +110,11 @@ impl Renderer for WgpuRenderer {
 
     fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle> {
         match bundle {
-            RenderBundle::Tessellating(inner) => Box::new(WgpuPackedBundle::new(inner, self)),
+            RenderBundle::Tessellating(inner) => Box::new(WgpuPackedBundle::new(
+                inner,
+                self,
+                self.render_set.as_ref().unwrap(),
+            )),
         }
     }
 
@@ -100,7 +124,7 @@ impl Renderer for WgpuRenderer {
 }
 
 impl WgpuRenderer {
-    pub async fn create(size: Size<u32>) -> Self {
+    pub async fn new() -> Option<Self> {
         let instance = Self::create_instance();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -108,13 +132,34 @@ impl WgpuRenderer {
                 compatible_surface: None,
                 force_fallback_adapter: false,
             })
-            .await
-            .unwrap();
+            .await?;
 
         let (device, queue) = Self::create_device(&adapter).await;
 
-        let target_texture = device.create_texture(&TextureDescriptor {
-            label: Some("Multisampling texture"),
+        Some(Self {
+            device: Arc::new(device),
+            queue: Arc::new(queue),
+            render_set: None,
+            background: DEFAULT_BACKGROUND,
+        })
+    }
+
+    pub async fn new_with_texture_rt(size: Size<u32>) -> Option<Self> {
+        let mut renderer = Self::new().await?;
+        renderer.init_target_texture(size);
+
+        Some(renderer)
+    }
+
+    fn init_target_texture(&mut self, size: Size<u32>) {
+        let target_texture = Self::create_target_texture(&self.device, size);
+        let render_target = RenderTarget::Texture(target_texture, size);
+        self.init_render_set(render_target);
+    }
+
+    fn create_target_texture(device: &Device, size: Size<u32>) -> Texture {
+        device.create_texture(&TextureDescriptor {
+            label: Some("Render target texture"),
             size: Extent3d {
                 width: size.width(),
                 height: size.height(),
@@ -126,47 +171,104 @@ impl WgpuRenderer {
             format: TARGET_TEXTURE_FORMAT,
             usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::COPY_SRC,
             view_formats: &[],
-        });
+        })
+    }
 
-        let multisampling_view =
-            Self::create_multisample_texture(&device, size, TARGET_TEXTURE_FORMAT);
-        let stencil_view_multisample = Self::create_stencil_texture(&device, size, 4);
-        let stencil_view = Self::create_stencil_texture(&device, size, 1);
+    fn init_render_set(&mut self, new_target: RenderTarget) {
+        let current_set = self.render_set.take();
+        match current_set {
+            Some(RenderSet {
+                render_target,
+                pipelines,
+                multisampling_view,
+                stencil_view_multisample,
+                stencil_view,
+            }) if new_target.size() == render_target.size() => {
+                let pipelines = if new_target.format() == render_target.format() {
+                    pipelines
+                } else {
+                    Pipelines::create(&self.device, new_target.format())
+                };
 
-        let pipelines = Pipelines::create(&device, TARGET_TEXTURE_FORMAT);
+                self.render_set = Some(RenderSet {
+                    render_target: new_target,
+                    pipelines,
+                    multisampling_view,
+                    stencil_view_multisample,
+                    stencil_view,
+                })
+            }
+            _ => self.render_set = Some(self.create_render_set(new_target)),
+        }
+    }
 
-        Self {
-            render_target: RenderTarget::Texture(target_texture),
-            device: Arc::new(device),
-            queue: Arc::new(queue),
-            size,
+    fn create_render_set(&self, render_target: RenderTarget) -> RenderSet {
+        let size = render_target.size();
+        let format = render_target.format();
+
+        let multisampling_view = Self::create_multisample_texture(&self.device, size, format);
+        let stencil_view_multisample = Self::create_stencil_texture(&self.device, size, 4);
+        let stencil_view = Self::create_stencil_texture(&self.device, size, 1);
+
+        let pipelines = Pipelines::create(&self.device, format);
+
+        RenderSet {
+            render_target,
             pipelines,
             multisampling_view,
             stencil_view_multisample,
             stencil_view,
-            background: Color::rgba(255, 255, 255, 255),
         }
     }
 
-    pub async fn create_with_window<W>(window: &W, size: Size<u32>) -> Self
+    pub async fn new_with_window<W>(window: &W, size: Size<u32>) -> Option<Self>
+    where
+        W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+    {
+        let (surface, adapter) = Self::get_window_surface(window).await.unwrap();
+        let (device, queue) = Self::create_device(&adapter).await;
+
+        let config = Self::get_surface_configuration(&surface, &adapter, size);
+        surface.configure(&device, &config);
+
+        Some(Self::new_with_device_and_surface(
+            Arc::new(device),
+            Arc::new(surface),
+            Arc::new(queue),
+            config,
+        ))
+    }
+
+    pub async fn get_window_surface<W>(window: &W) -> Option<(Surface, Adapter)>
     where
         W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
     {
         let instance = Self::create_instance();
 
-        let surface = unsafe { instance.create_surface(window) }.unwrap();
+        let surface = match unsafe { instance.create_surface(window) } {
+            Ok(s) => s,
+            Err(err) => {
+                log::warn!("Failed to create a surface from window: {err:?}");
+                return None;
+            }
+        };
+
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })
-            .await
-            .unwrap();
+            .await?;
+        Some((surface, adapter))
+    }
 
-        let (device, queue) = Self::create_device(&adapter).await;
-
-        let surface_caps = surface.get_capabilities(&adapter);
+    fn get_surface_configuration(
+        surface: &Surface,
+        adapter: &Adapter,
+        size: Size<u32>,
+    ) -> SurfaceConfiguration {
+        let surface_caps = surface.get_capabilities(adapter);
         let surface_format = surface_caps
             .formats
             .iter()
@@ -174,7 +276,7 @@ impl WgpuRenderer {
             .find(|f| f.is_srgb())
             .unwrap_or(surface_caps.formats[0]);
 
-        let config = wgpu::SurfaceConfiguration {
+        SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
             width: size.width(),
@@ -182,64 +284,46 @@ impl WgpuRenderer {
             present_mode: surface_caps.present_modes[0],
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
-        };
-
-        surface.configure(&device, &config);
-        let multisampling_view = Self::create_multisample_texture(&device, size, config.format);
-        let stencil_view_multisample = Self::create_stencil_texture(&device, size, 4);
-        let stencil_view = Self::create_stencil_texture(&device, size, 1);
-
-        let pipelines = Pipelines::create(&device, surface_format);
-
-        Self {
-            render_target: RenderTarget::Surface {
-                surface: Arc::new(surface),
-                config,
-            },
-            device: Arc::new(device),
-            queue: Arc::new(queue),
-            size,
-            pipelines,
-            multisampling_view,
-            stencil_view_multisample,
-            stencil_view,
-            background: Color::rgba(255, 255, 255, 255),
         }
     }
 
-    pub fn create_with_surface(
+    pub fn new_with_device_and_surface(
         device: Arc<Device>,
         surface: Arc<Surface>,
         queue: Arc<Queue>,
         config: SurfaceConfiguration,
-        size: Size<u32>,
     ) -> Self {
-        let multisampling_view = Self::create_multisample_texture(&device, size, config.format);
-        let stencil_view_multisample = Self::create_stencil_texture(&device, size, 4);
-        let stencil_view = Self::create_stencil_texture(&device, size, 1);
-
-        let pipelines = Pipelines::create(&device, config.format);
-
-        Self {
-            render_target: RenderTarget::Surface { surface, config },
+        let render_target = RenderTarget::Surface { surface, config };
+        let mut renderer = Self {
             device,
             queue,
-            size,
-            pipelines,
-            multisampling_view,
-            stencil_view_multisample,
-            stencil_view,
-            background: Color::rgba(255, 255, 255, 255),
-        }
+            render_set: None,
+            background: DEFAULT_BACKGROUND,
+        };
+        renderer.init_render_set(render_target);
+
+        renderer
     }
 
     pub fn set_background(&mut self, color: Color) {
         self.background = color;
     }
 
+    pub fn initialized(&self) -> bool {
+        self.render_set.is_some()
+    }
+
     fn create_instance() -> wgpu::Instance {
+        cfg_if! {
+            if #[cfg(target_os = "android")] {
+                let backends = wgpu::Backends::GL;
+            } else {
+                let backends = wgpu::Backends::all();
+            }
+        };
+
         wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
+            backends,
             flags: Default::default(),
             dx12_shader_compiler: Default::default(),
             gles_minor_version: Default::default(),
@@ -251,7 +335,7 @@ impl WgpuRenderer {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     features: wgpu::Features::empty(),
-                    limits: if cfg!(target_arch = "wasm32") {
+                    limits: if cfg!(any(target_arch = "wasm32", target_os = "android")) {
                         wgpu::Limits {
                             max_texture_dimension_2d: 4096,
                             ..wgpu::Limits::downlevel_webgl2_defaults()
@@ -309,39 +393,84 @@ impl WgpuRenderer {
         texture.create_view(&TextureViewDescriptor::default())
     }
 
-    pub fn resize(&mut self, new_size: Size<u32>) {
-        if new_size.width() > 0 && new_size.height() > 0 {
-            self.size = new_size;
-            self.resize_render_target(new_size);
-
-            self.multisampling_view =
-                Self::create_multisample_texture(&self.device, new_size, self.target_format());
-            self.stencil_view_multisample = Self::create_stencil_texture(&self.device, new_size, 4);
-            self.stencil_view = Self::create_stencil_texture(&self.device, new_size, 1);
-        }
+    pub fn clear_render_target(&mut self) {
+        self.render_set = None;
     }
 
-    fn resize_render_target(&mut self, new_size: Size<u32>) {
-        match &mut self.render_target {
-            RenderTarget::Surface { config, surface } => {
-                config.width = new_size.width();
-                config.height = new_size.height();
-                surface.configure(&self.device, config);
+    pub async fn init_with_window<W>(
+        &mut self,
+        window: &W,
+        size: Size<u32>,
+    ) -> Result<(), GalileoError>
+    where
+        W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+    {
+        let Some((surface, adapter)) = Self::get_window_surface(window).await else {
+            return Err(GalileoError::Generic("Failed to create surface".into()));
+        };
+        self.init_with_surface(surface, adapter, size);
+
+        Ok(())
+    }
+
+    pub fn init_with_surface(&mut self, surface: Surface, adapter: Adapter, size: Size<u32>) {
+        let config = Self::get_surface_configuration(&surface, &adapter, size);
+        surface.configure(&self.device, &config);
+
+        let render_target = RenderTarget::Surface {
+            surface: Arc::new(surface),
+            config,
+        };
+        self.init_render_set(render_target);
+    }
+
+    pub fn resize(&mut self, new_size: Size<u32>) {
+        let format = self.target_format();
+        let Some(render_set) = &mut self.render_set else {
+            return;
+        };
+
+        if render_set.render_target.size() != new_size
+            && new_size.width() > 0
+            && new_size.height() > 0
+        {
+            match &mut render_set.render_target {
+                RenderTarget::Surface { config, surface } => {
+                    config.width = new_size.width();
+                    config.height = new_size.height();
+                    surface.configure(&self.device, config);
+                }
+                RenderTarget::Texture(texture, size) => {
+                    *texture = Self::create_target_texture(&self.device, *size);
+                    *size = new_size
+                }
             }
-            RenderTarget::Texture(_) => {}
+
+            render_set.multisampling_view =
+                Self::create_multisample_texture(&self.device, new_size, format);
+            render_set.stencil_view_multisample =
+                Self::create_stencil_texture(&self.device, new_size, 4);
+            render_set.stencil_view = Self::create_stencil_texture(&self.device, new_size, 1);
         }
     }
 
     fn target_format(&self) -> TextureFormat {
-        match &self.render_target {
-            RenderTarget::Surface { config, .. } => config.format,
-            RenderTarget::Texture(_) => TARGET_TEXTURE_FORMAT,
+        match &self.render_set {
+            Some(RenderSet {
+                render_target: RenderTarget::Surface { config, .. },
+                ..
+            }) => config.format,
+            _ => TARGET_TEXTURE_FORMAT,
         }
     }
 
     pub async fn get_image(&self) -> Result<Vec<u8>, SurfaceError> {
-        let buffer_size =
-            (self.size.width() * self.size.height() * size_of::<u32>() as u32) as BufferAddress;
+        let Some(render_set) = &self.render_set else {
+            return Err(SurfaceError::Lost);
+        };
+
+        let size = render_set.render_target.size();
+        let buffer_size = (size.width() * size.height() * size_of::<u32>() as u32) as BufferAddress;
         let buffer_desc = BufferDescriptor {
             size: buffer_size,
             usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
@@ -350,7 +479,7 @@ impl WgpuRenderer {
         };
         let buffer = self.device.create_buffer(&buffer_desc);
 
-        let RenderTarget::Texture(texture) = &self.render_target else {
+        let RenderTarget::Texture(texture, _) = &render_set.render_target else {
             todo!()
         };
 
@@ -366,13 +495,13 @@ impl WgpuRenderer {
                 buffer: &buffer,
                 layout: ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some(size_of::<u32>() as u32 * self.size.width()),
-                    rows_per_image: Some(self.size.height()),
+                    bytes_per_row: Some(size_of::<u32>() as u32 * size.width()),
+                    rows_per_image: Some(size.height()),
                 },
             },
             Extent3d {
-                width: self.size.width(),
-                height: self.size.height(),
+                width: size.width(),
+                height: size.height(),
                 depth_or_array_layers: 1,
             },
         );
@@ -392,42 +521,50 @@ impl WgpuRenderer {
     }
 
     pub fn render_to_texture_view(&self, map: &Map, view: &TextureView) {
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
+        if let Some(render_set) = &self.render_set {
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
 
-        {
-            let background = self.background.to_f32_array();
-            let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.multisampling_view,
-                    resolve_target: Some(view),
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: background[0] as f64,
-                            g: background[1] as f64,
-                            b: background[2] as f64,
-                            a: background[3] as f64,
-                        }),
-                        store: StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
+            {
+                let background = self.background.to_f32_array();
+                let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Render Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &render_set.multisampling_view,
+                        resolve_target: Some(view),
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color {
+                                r: background[0] as f64,
+                                g: background[1] as f64,
+                                b: background[2] as f64,
+                                a: background[3] as f64,
+                            }),
+                            store: StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
+            }
+
+            self.queue.submit(std::iter::once(encoder.finish()));
+        } else {
+            return;
         }
-
-        self.queue.submit(std::iter::once(encoder.finish()));
 
         self.render_map(map, view);
     }
 
     pub fn render(&self, map: &Map) -> Result<(), SurfaceError> {
-        let texture = self.render_target.texture()?;
+        let Some(render_set) = &self.render_set else {
+            return Ok(());
+        };
+
+        let texture = render_set.render_target.texture()?;
         let view = texture.view();
 
         self.render_to_texture_view(map, &view);
@@ -445,23 +582,37 @@ impl WgpuRenderer {
     }
 
     fn render_layer(&self, layer: &dyn Layer, view: &MapView, texture_view: &TextureView) {
-        let mut canvas = WgpuCanvas::new(self, texture_view, view.clone());
+        let Some(render_set) = &self.render_set else {
+            return;
+        };
+        let mut canvas = WgpuCanvas::new(self, render_set, texture_view, view.clone());
         layer.render(view, &mut canvas);
     }
 
     pub fn size(&self) -> Size {
-        Size::new(self.size.width() as f64, self.size.height() as f64)
+        let size = match &self.render_set {
+            Some(set) => set.render_target.size(),
+            None => Size::default(),
+        };
+
+        Size::new(size.width() as f64, size.height() as f64)
     }
 }
 
 #[allow(dead_code)]
 struct WgpuCanvas<'a> {
     renderer: &'a WgpuRenderer,
+    render_set: &'a RenderSet,
     view: &'a TextureView,
 }
 
 impl<'a> WgpuCanvas<'a> {
-    fn new(renderer: &'a WgpuRenderer, view: &'a TextureView, map_view: MapView) -> Self {
+    fn new(
+        renderer: &'a WgpuRenderer,
+        render_set: &'a RenderSet,
+        view: &'a TextureView,
+        map_view: MapView,
+    ) -> Self {
         let rotation_mtx = Rotation3::new(Vector3::new(
             map_view.rotation_x(),
             0.0,
@@ -469,21 +620,25 @@ impl<'a> WgpuCanvas<'a> {
         ))
         .to_homogeneous();
         renderer.queue.write_buffer(
-            renderer.pipelines.map_view_buffer(),
+            render_set.pipelines.map_view_buffer(),
             0,
             bytemuck::cast_slice(&[ViewUniform {
                 view_proj: map_view.map_to_scene_mtx().unwrap(),
                 view_rotation: rotation_mtx.cast::<f32>().data.0,
                 inv_screen_size: [
-                    1.0 / renderer.size.width() as f32,
-                    1.0 / renderer.size.height() as f32,
+                    1.0 / renderer.size().width() as f32,
+                    1.0 / renderer.size().height() as f32,
                 ],
                 resolution: map_view.resolution() as f32,
                 _padding: [0.0; 1],
             }]),
         );
 
-        Self { renderer, view }
+        Self {
+            renderer,
+            render_set,
+            view,
+        }
     }
 }
 
@@ -499,7 +654,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
     fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle> {
         match bundle {
             RenderBundle::Tessellating(inner) => {
-                Box::new(WgpuPackedBundle::new(inner, self.renderer))
+                Box::new(WgpuPackedBundle::new(inner, self.renderer, self.render_set))
             }
         }
     }
@@ -515,12 +670,12 @@ impl<'a> Canvas for WgpuCanvas<'a> {
         {
             let (view, resolve_target, depth_view) = if options.antialias {
                 (
-                    &self.renderer.multisampling_view,
+                    &self.render_set.multisampling_view,
                     Some(self.view),
-                    &self.renderer.stencil_view_multisample,
+                    &self.render_set.stencil_view_multisample,
                 )
             } else {
-                (self.view, None, &self.renderer.stencil_view)
+                (self.view, None, &self.render_set.stencil_view)
             };
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -549,8 +704,8 @@ impl<'a> Canvas for WgpuCanvas<'a> {
             });
 
             for bundle in bundles {
-                if let Some(cast) = bundle.as_any().downcast_ref() {
-                    self.renderer
+                if let Some(cast) = bundle.as_any().downcast_ref::<WgpuPackedBundle>() {
+                    self.render_set
                         .pipelines
                         .render(&mut render_pass, cast, options);
                 }
@@ -589,7 +744,11 @@ struct WgpuDotBuffers {
 }
 
 impl WgpuPackedBundle {
-    fn new(bundle: &TessellatingRenderBundle, renderer: &WgpuRenderer) -> Self {
+    fn new(
+        bundle: &TessellatingRenderBundle,
+        renderer: &WgpuRenderer,
+        render_set: &RenderSet,
+    ) -> Self {
         let TessellatingRenderBundle {
             poly_tessellation,
             points,
@@ -653,7 +812,7 @@ impl WgpuPackedBundle {
         let textures: Vec<_> = image_store
             .iter()
             .map(|decoded_image| {
-                renderer.pipelines.image_pipeline().create_image_texture(
+                render_set.pipelines.image_pipeline().create_image_texture(
                     &renderer.device,
                     &renderer.queue,
                     decoded_image,
@@ -663,7 +822,7 @@ impl WgpuPackedBundle {
 
         let mut image_buffers = vec![];
         for (image_index, vertices) in images {
-            let image = renderer.pipelines.image_pipeline().create_image(
+            let image = render_set.pipelines.image_pipeline().create_image(
                 &renderer.device,
                 textures[*image_index].clone(),
                 vertices,

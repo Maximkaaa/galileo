@@ -15,7 +15,7 @@ use galileo::{
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::{cartesian::size::Size, latlon};
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
-use winit::{dpi::PhysicalSize, window::Window};
+use winit::window::Window;
 
 use super::WgpuFrame;
 
@@ -38,13 +38,7 @@ impl GalileoState {
     ) -> Self {
         let messenger = galileo::winit::WinitMessenger::new(window);
 
-        let renderer = WgpuRenderer::create_with_surface(
-            device,
-            surface,
-            queue,
-            config,
-            Size::new(size.width, size.height),
-        );
+        let renderer = WgpuRenderer::new_with_device_and_surface(device, surface, queue, config);
         let renderer = Arc::new(RwLock::new(renderer));
 
         let input_handler = WinitInputHandler::default();

@@ -1,0 +1,24 @@
+[package]
+name = "raster_tiles_android"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/uniffi-bindgen.rs"
+
+[dependencies]
+galileo = { path = "../../../galileo" }
+galileo-types = { path = "../../../galileo-types" }
+log = "0.4"
+tokio = {version = "1", features = ["rt-multi-thread"]}
+openssl-sys = "=0.9.92"
+uniffi = { version = "0.26", features = ["cli"] }
+lazy_static = "1.4"
+
+[target.'cfg(target_os = "android")'.dependencies]
+android-activity = { version = "0.5", features = ["native-activity"] }
+android_logger = "0.13"
+winit = { version = "0.29", features = ["android-native-activity"] }

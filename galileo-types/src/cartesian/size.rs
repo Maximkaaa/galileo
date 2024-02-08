@@ -1,7 +1,7 @@
 use num_traits::{FromPrimitive, NumCast};
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Size<Num: num_traits::Num + PartialOrd + Copy = f64> {
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Size<Num: num_traits::Num + PartialOrd + Copy + PartialEq = f64> {
     width: Num,
     height: Num,
 }
