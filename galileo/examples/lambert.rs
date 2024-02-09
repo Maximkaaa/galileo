@@ -4,11 +4,12 @@ use galileo::galileo_map::MapBuilder;
 use galileo::layer::feature_layer::symbol::polygon::SimplePolygonSymbol;
 use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::FeatureLayer;
-use galileo::render::render_bundle::RenderBundle;
-use galileo::render::PrimitiveId;
+use galileo::render::render_bundle::RenderPrimitive;
 use galileo::view::MapView;
 use galileo::Color;
+use galileo_types::cartesian::impls::contour::Contour;
 use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::impls::polygon::Polygon;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geo::crs::{Crs, ProjectionType};
 use galileo_types::geo::datum::Datum;
@@ -92,7 +93,7 @@ pub async fn run(builder: MapBuilder) {
                 }
 
                 if !to_update.is_empty() {
-                    layer.update_features(&to_update);
+                    layer.update_features(&to_update, map.view(), true);
                 }
 
                 return EventPropagation::Stop;
@@ -122,30 +123,17 @@ impl CountrySymbol {
 }
 
 impl Symbol<Country> for CountrySymbol {
-    fn render<N: AsPrimitive<f32>, P: CartesianPoint3d<Num = N>>(
+    fn render<'a, N, P>(
         &self,
         feature: &Country,
-        geometry: &Geom<P>,
-        bundle: &mut RenderBundle,
+        geometry: &'a Geom<P>,
         min_resolution: f64,
-    ) -> Vec<PrimitiveId> {
+    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N> + Clone,
+    {
         self.get_polygon_symbol(feature)
-            .render(&(), geometry, bundle, min_resolution)
-    }
-
-    fn update(&self, feature: &Country, render_ids: &[PrimitiveId], bundle: &mut RenderBundle) {
-        let renders_by_feature = render_ids.len() / feature.geometry.parts().len();
-        let mut next_index = 0;
-        for _ in feature.geometry.parts() {
-            let polygon_symbol = self.get_polygon_symbol(feature);
-            <SimplePolygonSymbol as Symbol<()>>::update(
-                &polygon_symbol,
-                &(),
-                &render_ids[next_index..next_index + renders_by_feature],
-                bundle,
-            );
-
-            next_index += renders_by_feature;
-        }
+            .render(&(), geometry, min_resolution)
     }
 }

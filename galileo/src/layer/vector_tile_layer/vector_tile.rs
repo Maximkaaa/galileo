@@ -1,6 +1,6 @@
 use crate::error::GalileoError;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::render::render_bundle::RenderBundle;
+use crate::render::render_bundle::{RenderBundle, RenderPrimitive};
 use crate::render::{LineCap, LinePaint, PackedBundle, PolygonPaint};
 use crate::tile_scheme::{TileIndex, TileSchema};
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
@@ -39,11 +39,13 @@ impl VectorTile {
         );
         bundle.clip_area(&bounds);
 
-        bundle.add_polygon(
-            &bounds,
-            PolygonPaint {
-                color: style.background,
-            },
+        bundle.add(
+            RenderPrimitive::<_, _, Contour<_>, _>::new_polygon(
+                bounds,
+                PolygonPaint {
+                    color: style.background,
+                },
+            ),
             tile_resolution,
         );
 
@@ -57,18 +59,20 @@ impl VectorTile {
                     MvtGeometry::LineString(contours) => {
                         if let Some(paint) = Self::get_line_symbol(style, &layer.name, feature) {
                             for contour in contours {
-                                bundle.add_line(
-                                    &Contour {
-                                        is_closed: false,
-                                        points: contour
-                                            .points
-                                            .iter()
-                                            .map(|p| {
-                                                Self::transform_point(p, bbox, tile_resolution)
-                                            })
-                                            .collect(),
-                                    },
-                                    paint,
+                                bundle.add(
+                                    RenderPrimitive::<_, _, _, Polygon<_>>::new_contour(
+                                        Contour {
+                                            is_closed: false,
+                                            points: contour
+                                                .points
+                                                .iter()
+                                                .map(|p| {
+                                                    Self::transform_point(p, bbox, tile_resolution)
+                                                })
+                                                .collect(),
+                                        },
+                                        paint,
+                                    ),
                                     tile_resolution,
                                 );
                             }
@@ -77,11 +81,13 @@ impl VectorTile {
                     MvtGeometry::Polygon(polygons) => {
                         if let Some(paint) = Self::get_polygon_symbol(style, &layer.name, feature) {
                             for polygon in polygons {
-                                bundle.add_polygon(
-                                    &polygon.cast_points(|p| {
-                                        Self::transform_point(p, bbox, tile_resolution)
-                                    }),
-                                    paint,
+                                bundle.add(
+                                    RenderPrimitive::<_, _, Contour<_>, _>::new_polygon(
+                                        polygon.cast_points(|p| {
+                                            Self::transform_point(p, bbox, tile_resolution)
+                                        }),
+                                        paint,
+                                    ),
                                     tile_resolution,
                                 );
                             }

@@ -1,7 +1,8 @@
 use crate::layer::feature_layer::symbol::Symbol;
-use crate::render::render_bundle::RenderBundle;
-use crate::render::{LineCap, LinePaint, PolygonPaint, PrimitiveId};
+use crate::render::render_bundle::RenderPrimitive;
+use crate::render::{LineCap, LinePaint, PolygonPaint};
 use crate::Color;
+use galileo_types::cartesian::impls::contour::Contour;
 use galileo_types::cartesian::impls::polygon::Polygon;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geometry::Geom;
@@ -47,22 +48,21 @@ impl SimplePolygonSymbol {
         }
     }
 
-    fn render_poly<N: AsPrimitive<f32>, P: CartesianPoint3d<Num = N>>(
+    fn render_poly<'a, N, P>(
         &self,
-        polygon: &Polygon<P>,
-        bundle: &mut RenderBundle,
-        min_resolution: f64,
-    ) -> Vec<PrimitiveId> {
-        let mut ids = vec![];
-        let id = bundle.add_polygon(
+        polygon: &'a Polygon<P>,
+    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N> + Clone,
+    {
+        let mut primitives = vec![];
+        primitives.push(RenderPrimitive::new_polygon_ref(
             polygon,
             PolygonPaint {
                 color: self.fill_color,
             },
-            min_resolution,
-        );
-
-        ids.push(id);
+        ));
 
         let line_paint = LinePaint {
             color: self.stroke_color,
@@ -72,50 +72,34 @@ impl SimplePolygonSymbol {
         };
 
         for contour in polygon.iter_contours() {
-            ids.push(bundle.add_line(contour, line_paint, min_resolution));
+            primitives.push(RenderPrimitive::new_contour(
+                contour.clone().into(),
+                line_paint,
+            ));
         }
 
-        ids
-    }
-
-    fn update_internal(&self, renders_ids: &[PrimitiveId], bundle: &mut RenderBundle) {
-        let poly_paint = PolygonPaint {
-            color: self.fill_color,
-        };
-
-        bundle.modify_polygon(renders_ids[0], poly_paint).unwrap();
-
-        let line_paint = LinePaint {
-            color: self.stroke_color,
-            width: self.stroke_width,
-            offset: 0.0,
-            line_cap: LineCap::Butt,
-        };
-        for line_id in &renders_ids[1..] {
-            bundle.modify_line(*line_id, line_paint).unwrap();
-        }
+        primitives
     }
 }
 
 impl<F> Symbol<F> for SimplePolygonSymbol {
-    fn render<N: AsPrimitive<f32>, P: CartesianPoint3d<Num = N>>(
+    fn render<'a, N, P>(
         &self,
         _feature: &F,
-        geometry: &Geom<P>,
-        bundle: &mut RenderBundle,
-        min_resolution: f64,
-    ) -> Vec<PrimitiveId> {
+        geometry: &'a Geom<P>,
+        _min_resolution: f64,
+    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N> + Clone,
+    {
         match geometry {
-            Geom::Polygon(poly) => self.render_poly(poly, bundle, min_resolution),
+            Geom::Polygon(poly) => self.render_poly(poly),
             Geom::MultiPolygon(polygons) => polygons
                 .polygons()
-                .flat_map(|polygon| self.render_poly(polygon, bundle, min_resolution))
+                .flat_map(|polygon| self.render_poly(polygon))
                 .collect(),
             _ => vec![],
         }
-    }
-
-    fn update(&self, _feature: &F, renders_ids: &[PrimitiveId], bundle: &mut RenderBundle) {
-        self.update_internal(renders_ids, bundle)
     }
 }
