@@ -104,20 +104,6 @@ impl RenderTarget {
 }
 
 impl Renderer for WgpuRenderer {
-    fn create_bundle(&self) -> RenderBundle {
-        RenderBundle::Tessellating(TessellatingRenderBundle::new())
-    }
-
-    fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle> {
-        match bundle {
-            RenderBundle::Tessellating(inner) => Box::new(WgpuPackedBundle::new(
-                inner,
-                self,
-                self.render_set.as_ref().unwrap(),
-            )),
-        }
-    }
-
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -599,6 +585,10 @@ impl WgpuRenderer {
         };
 
         Size::new(size.width() as f64, size.height() as f64)
+    }
+
+    fn create_bundle(&self) -> RenderBundle {
+        RenderBundle::Tessellating(TessellatingRenderBundle::new())
     }
 }
 

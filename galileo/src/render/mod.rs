@@ -14,9 +14,6 @@ pub mod render_bundle;
 pub struct PrimitiveId(usize);
 
 pub trait Renderer: MaybeSend + MaybeSync {
-    fn create_bundle(&self) -> RenderBundle;
-    fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle>;
-
     fn as_any(&self) -> &dyn Any;
 }
 

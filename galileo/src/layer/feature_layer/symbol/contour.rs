@@ -1,7 +1,9 @@
 use crate::layer::feature_layer::symbol::Symbol;
-use crate::render::render_bundle::RenderBundle;
-use crate::render::{LineCap, LinePaint, PrimitiveId};
+use crate::render::render_bundle::RenderPrimitive;
+use crate::render::{LineCap, LinePaint};
 use crate::Color;
+use galileo_types::cartesian::impls::contour::Contour;
+use galileo_types::cartesian::impls::polygon::Polygon;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geometry::Geom;
 use galileo_types::multi_contour::MultiContour;
@@ -20,13 +22,16 @@ impl SimpleContourSymbol {
 }
 
 impl<F> Symbol<F> for SimpleContourSymbol {
-    fn render<N: AsPrimitive<f32>, P: CartesianPoint3d<Num = N>>(
+    fn render<'a, N, P>(
         &self,
         _feature: &F,
-        geometry: &Geom<P>,
-        bundle: &mut RenderBundle,
-        min_resolution: f64,
-    ) -> Vec<PrimitiveId> {
+        geometry: &'a Geom<P>,
+        _min_resolution: f64,
+    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N> + Clone,
+    {
         let paint = LinePaint {
             color: self.color,
             width: self.width,
@@ -35,10 +40,10 @@ impl<F> Symbol<F> for SimpleContourSymbol {
         };
 
         match geometry {
-            Geom::Contour(contour) => vec![bundle.add_line(contour, paint, min_resolution)],
+            Geom::Contour(contour) => vec![RenderPrimitive::new_contour_ref(contour, paint)],
             Geom::MultiContour(contours) => contours
                 .contours()
-                .map(|contour| bundle.add_line(contour, paint, min_resolution))
+                .map(|contour| RenderPrimitive::new_contour_ref(contour, paint))
                 .collect(),
             _ => vec![],
         }

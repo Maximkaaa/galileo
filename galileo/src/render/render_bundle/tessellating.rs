@@ -1,6 +1,7 @@
 use crate::error::GalileoError;
 use crate::primitives::DecodedImage;
 use crate::render::point_paint::{CircleFill, PointPaint, PointShape, SectorParameters};
+use crate::render::render_bundle::RenderPrimitive;
 use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
 use crate::view::MapView;
 use crate::Color;
@@ -21,6 +22,7 @@ use lyon::tessellation::VertexSource;
 use nalgebra::{Point2, Vector2};
 use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
+use std::borrow::Borrow;
 use std::mem::size_of;
 use std::ops::Range;
 use std::sync::Arc;
@@ -32,8 +34,9 @@ pub struct TessellatingRenderBundle {
     pub screen_ref: ScreenRefTessellation,
     pub images: Vec<(usize, [ImageVertex; 4])>,
     pub clip_area: Option<VertexBuffers<PolyVertex, u32>>,
-    pub primitives: Vec<PrimitiveInfo>,
     pub image_store: Vec<Arc<DecodedImage>>,
+    pub primitives: Vec<PrimitiveInfo>,
+    vacant_ids: Vec<usize>,
     buffer_size: usize,
 }
 
@@ -49,6 +52,7 @@ pub struct ScreenRefVertex {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum PrimitiveInfo {
+    Vacant,
     MapRef { vertex_range: Range<usize> },
     ScreenRef { vertex_range: Range<usize> },
     Dot { point_index: usize },
@@ -71,6 +75,7 @@ impl TessellatingRenderBundle {
             primitives: Vec::new(),
             clip_area: None,
             image_store: Vec::new(),
+            vacant_ids: vec![],
             buffer_size: 0,
         }
     }
@@ -157,7 +162,7 @@ impl TessellatingRenderBundle {
         width: f32,
         height: f32,
         offset: Vector2<f32>,
-    ) -> PrimitiveId
+    ) -> PrimitiveInfo
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
@@ -165,7 +170,7 @@ impl TessellatingRenderBundle {
         let opacity = opacity as f32 / 255.0;
         let image_index = self.images.len();
 
-        self.buffer_size += image.bytes.len() + std::mem::size_of::<ImageVertex>() * 4;
+        self.buffer_size += image.bytes.len() + size_of::<ImageVertex>() * 4;
 
         let position = [position.x().as_(), position.y().as_()];
         let offset_x = -offset[0] * width;
@@ -202,10 +207,18 @@ impl TessellatingRenderBundle {
             ],
         ));
 
-        let id = self.primitives.len();
+        PrimitiveInfo::Image { image_index }
+    }
 
-        self.primitives.push(PrimitiveInfo::Image { image_index });
-        PrimitiveId(id)
+    fn add_primitive_info(&mut self, info: PrimitiveInfo) -> PrimitiveId {
+        if let Some(id) = self.vacant_ids.pop() {
+            self.primitives[id] = info;
+            PrimitiveId(id)
+        } else {
+            let id = self.primitives.len();
+            self.primitives.push(info);
+            PrimitiveId(id)
+        }
     }
 
     fn add_image_to_store(&mut self, image: Arc<DecodedImage>) -> usize {
@@ -220,50 +233,238 @@ impl TessellatingRenderBundle {
         index
     }
 
+    pub fn add<N, P, C, Poly>(
+        &mut self,
+        primitive: RenderPrimitive<N, P, C, Poly>,
+        min_resolution: f64,
+    ) -> PrimitiveId
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N> + Clone,
+        C: Contour<Point = P> + Clone,
+        Poly: Polygon + Clone,
+        Poly::Contour: Contour<Point = P>,
+    {
+        match primitive {
+            RenderPrimitive::Point(point, paint) => self.add_point::<N, P>(point.borrow(), paint),
+            RenderPrimitive::Contour(contour, paint) => {
+                self.add_line::<N, P, C>(contour.borrow(), paint, min_resolution)
+            }
+            RenderPrimitive::Polygon(polygon, paint) => {
+                self.add_polygon::<N, P, Poly>(polygon.borrow(), paint, min_resolution)
+            }
+        }
+    }
+
+    pub fn update<N, P, C, Poly>(
+        &mut self,
+        primitive_id: PrimitiveId,
+        primitive: RenderPrimitive<N, P, C, Poly>,
+    ) -> Result<(), GalileoError>
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N> + Clone,
+        C: Contour<Point = P> + Clone,
+        Poly: Polygon + Clone,
+        Poly::Contour: Contour<Point = P>,
+    {
+        if primitive_id.0 >= self.primitives.len() {
+            return Err(GalileoError::Generic(
+                "no primitive with the given id".into(),
+            ));
+        }
+
+        let info = &self.primitives[primitive_id.0];
+
+        match info {
+            PrimitiveInfo::MapRef { vertex_range } => {
+                self.update_map_ref(vertex_range.clone(), primitive)
+            }
+            PrimitiveInfo::Vacant => Ok(()),
+            _ => todo!(),
+        }
+    }
+
+    pub fn remove(&mut self, primitive_id: PrimitiveId) -> Result<(), GalileoError> {
+        if primitive_id.0 >= self.primitives.len() {
+            return Err(GalileoError::Generic(
+                "no primitive with the given id".into(),
+            ));
+        }
+
+        let info = std::mem::replace(&mut self.primitives[primitive_id.0], PrimitiveInfo::Vacant);
+
+        match info {
+            PrimitiveInfo::MapRef { vertex_range } => self.remove_map_ref(vertex_range),
+            PrimitiveInfo::ScreenRef { vertex_range } => self.remove_screen_ref(vertex_range),
+            PrimitiveInfo::Dot { point_index } => self.remove_dot(point_index),
+            PrimitiveInfo::Image { image_index } => self.remove_image(image_index),
+            PrimitiveInfo::Vacant => Ok(()),
+        }
+    }
+
+    fn remove_image(&mut self, index: usize) -> Result<(), GalileoError> {
+        if index >= self.images.len() {
+            Err(GalileoError::Generic("index out of bounds".into()))
+        } else {
+            let (image_id, _) = self.images.remove(index);
+            let image = self.image_store.remove(image_id);
+
+            self.buffer_size -= image.bytes.len() + size_of::<ImageVertex>() * 4;
+
+            for info in &mut self.primitives {
+                match info {
+                    PrimitiveInfo::Dot {
+                        point_index: ref mut image_index,
+                    } if *image_index > index => {
+                        *image_index -= 1;
+                    }
+                    _ => {}
+                }
+            }
+
+            Ok(())
+        }
+    }
+
+    fn remove_dot(&mut self, index: usize) -> Result<(), GalileoError> {
+        if index >= self.points.len() {
+            Err(GalileoError::Generic("index out of bounds".into()))
+        } else {
+            self.points.remove(index);
+
+            self.buffer_size -= size_of::<PointInstance>();
+
+            for info in &mut self.primitives {
+                match info {
+                    PrimitiveInfo::Dot {
+                        ref mut point_index,
+                    } if *point_index > index => {
+                        *point_index -= 1;
+                    }
+                    _ => {}
+                }
+            }
+
+            Ok(())
+        }
+    }
+
+    fn remove_screen_ref(&mut self, range: Range<usize>) -> Result<(), GalileoError> {
+        let removed_index_count =
+            Self::remove_from_tessellation(&mut self.screen_ref, range.clone())?;
+        let len = range.len();
+        self.buffer_size -= size_of::<PolyVertex>() * len + size_of::<u32>() * removed_index_count;
+
+        for info in &mut self.primitives {
+            match info {
+                PrimitiveInfo::ScreenRef {
+                    ref mut vertex_range,
+                } if vertex_range.start >= range.end => {
+                    vertex_range.start -= len;
+                    vertex_range.end -= len;
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
+
+    fn remove_map_ref(&mut self, range: Range<usize>) -> Result<(), GalileoError> {
+        let removed_index_count =
+            Self::remove_from_tessellation(&mut self.poly_tessellation, range.clone())?;
+        let len = range.len();
+        self.buffer_size -= size_of::<PolyVertex>() * len + size_of::<u32>() * removed_index_count;
+
+        for info in &mut self.primitives {
+            match info {
+                PrimitiveInfo::MapRef {
+                    ref mut vertex_range,
+                } if vertex_range.start >= range.end => {
+                    vertex_range.start -= len;
+                    vertex_range.end -= len;
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
+
+    fn remove_from_tessellation<T>(
+        tessellation: &mut VertexBuffers<T, u32>,
+        range: Range<usize>,
+    ) -> Result<usize, GalileoError> {
+        if range.is_empty() {
+            return Ok(0);
+        }
+
+        let len = range.len() as u32;
+        let start = range.start as u32;
+        let end = range.end as u32;
+
+        if range.end > tessellation.vertices.len() {
+            return Err(GalileoError::Generic("range out of bounds".into()));
+        }
+
+        tessellation.vertices.drain(range);
+        let length_before = tessellation.indices.len();
+        tessellation.indices = tessellation
+            .indices
+            .iter()
+            .filter_map(|index| match *index {
+                i if i < start => Some(i),
+                i if i >= end => Some(i - len),
+                _ => None,
+            })
+            .collect();
+        let length_after = tessellation.indices.len();
+
+        Ok(length_before - length_after)
+    }
+
     pub fn add_point<N, P>(&mut self, point: &P, paint: PointPaint) -> PrimitiveId
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
         let start_index = self.screen_ref.vertices.len();
-        let id = PrimitiveId(self.primitives.len());
-        match &paint.shape {
+        let info = match &paint.shape {
             PointShape::Dot { color } => {
                 self.add_dot(point, *color, paint.offset);
-                self.primitives.push(PrimitiveInfo::Dot {
+                PrimitiveInfo::Dot {
                     point_index: self.points.len() - 1,
-                });
+                }
             }
             PointShape::Image {
                 image,
                 opacity,
                 width,
                 height,
-            } => {
-                return self.add_image_point(
-                    point,
-                    image.clone(),
-                    *opacity,
-                    *width,
-                    *height,
-                    paint.offset,
-                );
-            }
+            } => self.add_image_point(
+                point,
+                image.clone(),
+                *opacity,
+                *width,
+                *height,
+                paint.offset,
+            ),
             PointShape::Circle {
                 fill,
                 radius,
                 outline,
             } => {
                 self.add_circle(point, *fill, *radius, *outline, paint.offset);
-                self.primitives.push(PrimitiveInfo::ScreenRef {
+                PrimitiveInfo::ScreenRef {
                     vertex_range: start_index..self.screen_ref.vertices.len(),
-                });
+                }
             }
             PointShape::Sector(parameters) => {
                 self.add_circle_sector(point, *parameters, paint.offset);
-                self.primitives.push(PrimitiveInfo::ScreenRef {
+                PrimitiveInfo::ScreenRef {
                     vertex_range: start_index..self.screen_ref.vertices.len(),
-                });
+                }
             }
             PointShape::Square {
                 fill,
@@ -271,9 +472,9 @@ impl TessellatingRenderBundle {
                 outline,
             } => {
                 self.add_shape(point, *fill, *size, *outline, &square_shape(), paint.offset);
-                self.primitives.push(PrimitiveInfo::ScreenRef {
+                PrimitiveInfo::ScreenRef {
                     vertex_range: start_index..self.screen_ref.vertices.len(),
-                });
+                }
             }
             PointShape::FreeShape {
                 fill,
@@ -282,13 +483,13 @@ impl TessellatingRenderBundle {
                 shape,
             } => {
                 self.add_shape(point, *fill, *scale, *outline, shape, paint.offset);
-                self.primitives.push(PrimitiveInfo::ScreenRef {
+                PrimitiveInfo::ScreenRef {
                     vertex_range: start_index..self.screen_ref.vertices.len(),
-                });
+                }
             }
-        }
+        };
 
-        id
+        self.add_primitive_info(info)
     }
 
     pub fn add_line<N, P, C>(
@@ -304,12 +505,9 @@ impl TessellatingRenderBundle {
     {
         let range = self.add_line_lod(line, paint, min_resolution);
 
-        let id = self.primitives.len();
-        self.primitives.push(PrimitiveInfo::MapRef {
+        self.add_primitive_info(PrimitiveInfo::MapRef {
             vertex_range: range,
-        });
-
-        PrimitiveId(id)
+        })
     }
 
     fn add_line_lod<N, P, C>(
@@ -399,44 +597,7 @@ impl TessellatingRenderBundle {
         Poly::Contour: Contour<Point = P>,
     {
         let vertex_range = self.add_polygon_lod(polygon, paint, min_resolution as f32);
-        let id = self.primitives.len();
-        self.primitives.push(PrimitiveInfo::MapRef { vertex_range });
-
-        PrimitiveId(id)
-    }
-
-    pub fn modify_line(&mut self, id: PrimitiveId, paint: LinePaint) -> Result<(), GalileoError> {
-        let info = self
-            .primitives
-            .get(id.0)
-            .ok_or(GalileoError::Generic("primitive does not exist".into()))?;
-        match info {
-            PrimitiveInfo::MapRef { vertex_range } => {
-                self.update_map_ref(vertex_range.clone(), paint.color)
-            }
-            _ => return Err(GalileoError::Generic("invalid primitive type".into())),
-        }
-
-        Ok(())
-    }
-
-    pub fn modify_polygon(
-        &mut self,
-        id: PrimitiveId,
-        paint: PolygonPaint,
-    ) -> Result<(), GalileoError> {
-        let info = self
-            .primitives
-            .get(id.0)
-            .ok_or(GalileoError::Generic("primitive does not exist".into()))?;
-        match info {
-            PrimitiveInfo::MapRef { vertex_range } => {
-                self.update_map_ref(vertex_range.clone(), paint.color)
-            }
-            _ => return Err(GalileoError::Generic("invalid primitive type".into())),
-        }
-
-        Ok(())
+        self.add_primitive_info(PrimitiveInfo::MapRef { vertex_range })
     }
 
     pub fn modify_image(&mut self, id: PrimitiveId, paint: ImagePaint) -> Result<(), GalileoError> {
@@ -460,10 +621,33 @@ impl TessellatingRenderBundle {
         Ok(())
     }
 
-    fn update_map_ref(&mut self, range: Range<usize>, color: Color) {
+    fn update_map_ref<N, P, C, Poly>(
+        &mut self,
+        range: Range<usize>,
+        primitive: RenderPrimitive<N, P, C, Poly>,
+    ) -> Result<(), GalileoError>
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N> + Clone,
+        C: Contour<Point = P> + Clone,
+        Poly: Polygon + Clone,
+        Poly::Contour: Contour<Point = P>,
+    {
+        let color = match primitive {
+            RenderPrimitive::Contour(_, LinePaint { color, .. })
+            | RenderPrimitive::Polygon(_, PolygonPaint { color }) => color,
+            _ => {
+                return Err(GalileoError::Generic(
+                    "expected line or polygon primitive, but got a point".into(),
+                ));
+            }
+        };
+
         for vertex in &mut self.poly_tessellation.vertices[range] {
             vertex.color = color.to_f32_array();
         }
+
+        Ok(())
     }
 
     fn add_polygon_lod<N, P, Poly>(
@@ -823,16 +1007,15 @@ struct LineVertexConstructor<'a> {
 impl<'a> StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'a> {
     fn new_vertex(&mut self, mut vertex: StrokeVertex) -> PolyVertex {
         let position = vertex.position_on_path();
-        let normal = match vertex.side() {
-            Side::Negative => [
-                vertex.normal().x * (vertex.line_width() / 2.0 - self.offset),
-                vertex.normal().y * (vertex.line_width() / 2.0 - self.offset),
-            ],
-            Side::Positive => [
-                vertex.normal().x * (vertex.line_width() / 2.0 + self.offset),
-                vertex.normal().y * (vertex.line_width() / 2.0 + self.offset),
-            ],
+        let offset = match vertex.side() {
+            Side::Negative => -self.offset,
+            Side::Positive => self.offset,
         };
+
+        let normal = [
+            vertex.normal().x * (vertex.line_width() / 2.0 + offset),
+            vertex.normal().y * (vertex.line_width() / 2.0 + offset),
+        ];
 
         let norm_limit = if let VertexSource::Endpoint { id } = vertex.source() {
             let mut prev_id = id.0.saturating_sub(1);
@@ -937,3 +1120,60 @@ pub struct ImageVertex {
 
 #[cfg(target_arch = "wasm32")]
 pub(crate) mod serialization;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    type C = galileo_types::cartesian::impls::contour::Contour<Point3d>;
+
+    #[test]
+    fn remove_map_ref() {
+        let mut bundle = TessellatingRenderBundle::new();
+        let polygon = galileo_types::cartesian::impls::polygon::Polygon::from(vec![
+            Point3d::new(0.0, 0.0, 0.0),
+            Point3d::new(1.0, 0.0, 0.0),
+            Point3d::new(1.0, 1.0, 0.0),
+            Point3d::new(0.0, 1.0, 0.0),
+        ]);
+        let paint1 = PolygonPaint {
+            color: Color::BLACK,
+        };
+        let paint2 = PolygonPaint { color: Color::RED };
+
+        let _id0 = bundle.add(
+            RenderPrimitive::<_, _, C, _>::new_polygon_ref(&polygon, paint1),
+            1.0,
+        );
+        let id1 = bundle.add(
+            RenderPrimitive::<_, _, C, _>::new_polygon_ref(&polygon, paint2),
+            1.0,
+        );
+        let id2 = bundle.add(
+            RenderPrimitive::<_, _, C, _>::new_polygon_ref(&polygon, paint1),
+            1.0,
+        );
+
+        let vertex_range = 0..bundle.poly_tessellation.vertices.len();
+
+        bundle.remove(id1).unwrap();
+
+        assert!(bundle
+            .poly_tessellation
+            .vertices
+            .iter()
+            .all(|v| v.color == Color::BLACK.to_f32_array()));
+        assert!(bundle
+            .poly_tessellation
+            .indices
+            .iter()
+            .all(|v| vertex_range.contains(&(*v as usize))));
+
+        let vertex_count = bundle.poly_tessellation.vertices.len();
+        let PrimitiveInfo::MapRef { vertex_range } = bundle.primitives[id2.0].clone() else {
+            panic!("invalid primitive type");
+        };
+
+        assert_eq!(vertex_range.end, vertex_count);
+    }
+}

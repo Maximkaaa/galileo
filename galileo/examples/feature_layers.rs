@@ -5,9 +5,10 @@ use galileo::layer::feature_layer::symbol::polygon::SimplePolygonSymbol;
 use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::FeatureLayer;
 use galileo::render::point_paint::PointPaint;
-use galileo::render::render_bundle::RenderBundle;
-use galileo::render::PrimitiveId;
+use galileo::render::render_bundle::RenderPrimitive;
 use galileo::Color;
+use galileo_types::cartesian::impls::contour::Contour;
+use galileo_types::cartesian::impls::polygon::Polygon;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geo::crs::Crs;
 use galileo_types::geometry::Geom;
@@ -114,7 +115,7 @@ pub async fn run(builder: MapBuilder) {
                 }
 
                 if !to_update.is_empty() {
-                    layer.update_features(&to_update);
+                    layer.update_features(&to_update, map.view(), true);
                 }
 
                 return EventPropagation::Stop;
@@ -144,54 +145,47 @@ impl CountrySymbol {
 }
 
 impl Symbol<Country> for CountrySymbol {
-    fn render<N: AsPrimitive<f32>, P: CartesianPoint3d<Num = N>>(
+    fn render<'a, N, P>(
         &self,
         feature: &Country,
-        geometry: &Geom<P>,
-        bundle: &mut RenderBundle,
+        geometry: &'a Geom<P>,
         min_resolution: f64,
-    ) -> Vec<PrimitiveId> {
+    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N> + Clone,
+    {
         self.get_polygon_symbol(feature)
-            .render(&(), geometry, bundle, min_resolution)
-    }
-
-    fn update(&self, feature: &Country, render_ids: &[PrimitiveId], bundle: &mut RenderBundle) {
-        let renders_by_feature = render_ids.len() / feature.geometry.parts().len();
-        let mut next_index = 0;
-        for _ in feature.geometry.parts() {
-            let polygon_symbol = self.get_polygon_symbol(feature);
-            <SimplePolygonSymbol as Symbol<()>>::update(
-                &polygon_symbol,
-                &(),
-                &render_ids[next_index..next_index + renders_by_feature],
-                bundle,
-            );
-
-            next_index += renders_by_feature;
-        }
+            .render(&(), geometry, min_resolution)
     }
 }
 
 struct CitySymbol {}
 
 impl Symbol<City> for CitySymbol {
-    fn render<N: AsPrimitive<f32>, P: CartesianPoint3d<Num = N>>(
+    fn render<'a, N, P>(
         &self,
         feature: &City,
-        geometry: &Geom<P>,
-        bundle: &mut RenderBundle,
+        geometry: &'a Geom<P>,
         _min_resolution: f64,
-    ) -> Vec<PrimitiveId> {
+    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N> + Clone,
+    {
         let size = (feature.population / 1000.0).log2() as f32;
-        let ids = vec![];
+        let mut primitives = vec![];
         let Geom::Point(point) = geometry else {
-            return ids;
+            return primitives;
         };
 
         let _ = match &feature.capital[..] {
             "primary" => {
-                bundle.add_point(point, PointPaint::circle(Color::BLACK, size * 2.0 + 4.0));
-                bundle.add_point(
+                primitives.push(RenderPrimitive::new_point_ref(
+                    point,
+                    PointPaint::circle(Color::BLACK, size * 2.0 + 4.0),
+                ));
+                primitives.push(RenderPrimitive::new_point_ref(
                     point,
                     PointPaint::sector(
                         Color::from_hex("#ff8000"),
@@ -199,8 +193,8 @@ impl Symbol<City> for CitySymbol {
                         -5f32.to_radians(),
                         135f32.to_radians(),
                     ),
-                );
-                bundle.add_point(
+                ));
+                primitives.push(RenderPrimitive::new_point_ref(
                     point,
                     PointPaint::sector(
                         Color::from_hex("#ffff00"),
@@ -208,8 +202,8 @@ impl Symbol<City> for CitySymbol {
                         130f32.to_radians(),
                         270f32.to_radians(),
                     ),
-                );
-                bundle.add_point(
+                ));
+                primitives.push(RenderPrimitive::new_point_ref(
                     point,
                     PointPaint::sector(
                         Color::from_hex("#00ffff"),
@@ -217,19 +211,23 @@ impl Symbol<City> for CitySymbol {
                         265f32.to_radians(),
                         360f32.to_radians(),
                     ),
-                )
+                ))
             }
-            "admin" => {
-                bundle.add_point(point, PointPaint::circle(Color::from_hex("#f5009b"), size))
-            }
-            "minor" => bundle.add_point(
+            "admin" => primitives.push(RenderPrimitive::new_point_ref(
+                point,
+                PointPaint::circle(Color::from_hex("#f5009b"), size),
+            )),
+            "minor" => primitives.push(RenderPrimitive::new_point_ref(
                 point,
                 PointPaint::square(Color::from_hex("#0a85ed"), size)
                     .with_outline(Color::from_hex("#0d4101"), 2.0),
-            ),
-            _ => bundle.add_point(point, PointPaint::circle(Color::from_hex("#4e00de"), size)),
+            )),
+            _ => primitives.push(RenderPrimitive::new_point_ref(
+                point,
+                PointPaint::circle(Color::from_hex("#4e00de"), size),
+            )),
         };
 
-        ids
+        primitives
     }
 }

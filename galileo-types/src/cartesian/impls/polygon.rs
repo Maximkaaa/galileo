@@ -59,3 +59,12 @@ impl<P: GeometryType> GeometryType for Polygon<P> {
     type Type = PolygonGeometryType;
     type Space = P::Space;
 }
+
+impl<P> From<Vec<P>> for Polygon<P> {
+    fn from(value: Vec<P>) -> Self {
+        Self {
+            outer_contour: ClosedContour::new(value),
+            inner_contours: vec![],
+        }
+    }
+}

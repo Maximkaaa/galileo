@@ -22,6 +22,7 @@ use maybe_sync::{MaybeSend, MaybeSync};
 use num_traits::AsPrimitive;
 use std::any::Any;
 use std::marker::PhantomData;
+use std::ops::Deref;
 use std::sync::RwLock;
 
 pub mod feature;
@@ -235,7 +236,12 @@ where
     F::Geom: Geometry<Point = P>,
     S: Symbol<F>,
 {
-    pub fn update_features(&mut self, indices: &[usize]) {
+    fn update_features_internal<Proj: Projection<InPoint = P, OutPoint = Point3d> + ?Sized>(
+        &mut self,
+        indices: &[usize],
+        projection: impl Deref<Target = Proj>,
+        in_place: bool,
+    ) {
         if indices.is_empty() {
             return;
         }
@@ -244,18 +250,46 @@ where
             let mut bundles = lod.render_bundles.write().unwrap();
             let mut packed_bundles = lod.packed_bundles.write().unwrap();
 
-            let feature_render_map = lod.feature_render_map.read().unwrap();
+            let mut feature_render_map = lod.feature_render_map.write().unwrap();
             if feature_render_map.is_empty() {
                 return;
             }
 
             for index in indices {
-                let entry = &feature_render_map[*index];
+                let entry = &mut feature_render_map[*index];
                 let Some(bundle) = bundles.get_mut(entry.bundle_index) else {
                     return;
                 };
+
+                if !in_place {
+                    for id in &entry.primitive_ids {
+                        if let Err(err) = bundle.remove(*id) {
+                            log::error!("Failed to remove primitive from the bundle: {err:?}");
+                        }
+                    }
+                }
+
                 let feature = self.features.get(*index).unwrap();
-                self.symbol.update(feature, &entry.primitive_ids, bundle);
+                if let Some(geometry) = feature.geometry().project(&*projection) {
+                    let primitives = self.symbol.render(feature, &geometry, lod.min_resolution);
+
+                    if primitives.len() == entry.primitive_ids.len() && in_place {
+                        for (primitive, id) in
+                            primitives.into_iter().zip(entry.primitive_ids.iter())
+                        {
+                            if let Err(err) = bundle.update(*id, primitive) {
+                                log::error!("failed to update a primitive: {err:?}");
+                            }
+                        }
+                    } else {
+                        let mut ids = vec![];
+                        for primitive in primitives {
+                            ids.push(bundle.add(primitive, lod.min_resolution));
+                        }
+
+                        entry.primitive_ids = ids;
+                    }
+                }
 
                 if let Some(bundle) = packed_bundles.get_mut(entry.bundle_index) {
                     bundle.take();
@@ -279,16 +313,13 @@ where
 
         &self.lods[self.lods.len() - 1]
     }
-}
 
-impl<P, F, S> Layer for FeatureLayer<P, F, S, GeoSpace2d>
-where
-    P: NewGeoPoint + 'static,
-    F: Feature + MaybeSend + MaybeSync + 'static,
-    F::Geom: Geometry<Point = P>,
-    S: Symbol<F> + MaybeSend + MaybeSync + 'static,
-{
-    fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
+    fn render_with_projection<Proj: Projection<InPoint = P, OutPoint = Point3d> + ?Sized>(
+        &self,
+        view: &MapView,
+        canvas: &mut dyn Canvas,
+        projection: impl Deref<Target = Proj>,
+    ) {
         if self.features.is_empty() {
             return;
         }
@@ -299,20 +330,20 @@ where
 
             let mut bundle = canvas.create_bundle();
             let mut render_map = lod.feature_render_map.write().unwrap();
-            let projection = ChainProjection::new(
-                view.crs().get_projection::<P, Point2d>().unwrap(),
-                Box::new(AddDimensionProjection::new(0.0)),
-            );
 
             for feature in &self.features {
                 let Some(projected): Option<Geom<Point3d>> =
-                    feature.geometry().project(&projection)
+                    feature.geometry().project(&*projection)
                 else {
                     continue;
                 };
-                let ids = self
-                    .symbol
-                    .render(feature, &projected, &mut bundle, lod.min_resolution);
+
+                let primitives = self.symbol.render(feature, &projected, lod.min_resolution);
+                let ids = primitives
+                    .into_iter()
+                    .map(|primitive| bundle.add(primitive, lod.min_resolution))
+                    .collect();
+
                 render_map.push(RenderMapEntry {
                     bundle_index: render_bundles.len(),
                     primitive_ids: ids,
@@ -329,6 +360,38 @@ where
 
         self.render_internal(lod, canvas, view);
     }
+}
+
+impl<P, F, S> FeatureLayer<P, F, S, GeoSpace2d>
+where
+    P: NewGeoPoint + 'static,
+    F: Feature + MaybeSend + MaybeSync + 'static,
+    F::Geom: Geometry<Point = P>,
+    S: Symbol<F> + MaybeSend + MaybeSync + 'static,
+{
+    fn get_projection(&self, crs: &Crs) -> impl Projection<InPoint = P, OutPoint = Point3d> {
+        ChainProjection::new(
+            crs.get_projection::<P, Point2d>().unwrap(),
+            Box::new(AddDimensionProjection::new(0.0)),
+        )
+    }
+
+    pub fn update_features(&mut self, indices: &[usize], view: &MapView, in_place: bool) {
+        self.update_features_internal(indices, &self.get_projection(view.crs()), in_place)
+    }
+}
+
+impl<P, F, S> Layer for FeatureLayer<P, F, S, GeoSpace2d>
+where
+    P: NewGeoPoint + 'static,
+    F: Feature + MaybeSend + MaybeSync + 'static,
+    F::Geom: Geometry<Point = P>,
+    S: Symbol<F> + MaybeSend + MaybeSync + 'static,
+{
+    fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
+        let projection = self.get_projection(view.crs());
+        self.render_with_projection(view, canvas, &projection);
+    }
 
     fn prepare(&self, _view: &MapView) {
         // do nothing
@@ -344,6 +407,35 @@ where
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+impl<P, F, S> FeatureLayer<P, F, S, CartesianSpace2d>
+where
+    P: NewCartesianPoint2d + Clone + 'static,
+    F: Feature + MaybeSend + MaybeSync + 'static,
+    F::Geom: Geometry<Point = P>,
+    S: Symbol<F> + MaybeSend + MaybeSync + 'static,
+{
+    fn get_projection(&self, crs: &Crs) -> Box<dyn Projection<InPoint = P, OutPoint = Point3d>> {
+        if crs == &self.crs {
+            Box::new(AddDimensionProjection::new(0.0))
+        } else {
+            let self_proj = self.crs.get_projection::<GeoPoint2d, P>().unwrap();
+            let view_proj: Box<dyn Projection<InPoint = _, OutPoint = Point2d>> =
+                crs.get_projection().unwrap();
+            Box::new(ChainProjection::new(
+                Box::new(ChainProjection::new(
+                    Box::new(InvertedProjection::new(self_proj)),
+                    view_proj,
+                )),
+                Box::new(AddDimensionProjection::new(0.0)),
+            ))
+        }
+    }
+
+    pub fn update_features(&mut self, indices: &[usize], view: &MapView, in_place: bool) {
+        self.update_features_internal(indices, self.get_projection(view.crs()), in_place)
     }
 }
 
@@ -355,52 +447,8 @@ where
     S: Symbol<F> + MaybeSend + MaybeSync + 'static,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
-        let lod = self.select_lod(view.resolution());
-
-        if lod.render_bundles.read().unwrap().is_empty() {
-            let mut render_bundles = lod.render_bundles.write().unwrap();
-
-            let mut bundle = canvas.create_bundle();
-            let mut render_map = lod.feature_render_map.write().unwrap();
-
-            let projection: Box<dyn Projection<InPoint = _, OutPoint = Point3d>> =
-                if view.crs() == &self.crs {
-                    Box::new(AddDimensionProjection::new(0.0))
-                } else {
-                    let self_proj = self.crs.get_projection::<GeoPoint2d, P>().unwrap();
-                    let view_proj: Box<dyn Projection<InPoint = _, OutPoint = Point2d>> =
-                        view.crs().get_projection().unwrap();
-                    Box::new(ChainProjection::new(
-                        Box::new(ChainProjection::new(
-                            Box::new(InvertedProjection::new(self_proj)),
-                            view_proj,
-                        )),
-                        Box::new(AddDimensionProjection::new(0.0)),
-                    ))
-                };
-
-            for feature in &self.features {
-                let Some(geom) = feature.geometry().project(&*projection) else {
-                    continue;
-                };
-                let ids = self
-                    .symbol
-                    .render(feature, &geom, &mut bundle, lod.min_resolution);
-                render_map.push(RenderMapEntry {
-                    bundle_index: render_bundles.len(),
-                    primitive_ids: ids,
-                });
-
-                if bundle.approx_buffer_size() > self.options.buffer_size_limit {
-                    let full_bundle = std::mem::replace(&mut bundle, canvas.create_bundle());
-                    render_bundles.push(full_bundle);
-                }
-            }
-
-            render_bundles.push(bundle);
-        }
-
-        self.render_internal(lod, canvas, view);
+        let projection = self.get_projection(view.crs());
+        self.render_with_projection(view, canvas, projection);
     }
 
     fn prepare(&self, _view: &MapView) {
@@ -417,6 +465,23 @@ where
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+impl<P, F, S> FeatureLayer<P, F, S, CartesianSpace3d>
+where
+    P: NewCartesianPoint3d + 'static,
+    P::Num: AsPrimitive<f32>,
+    F: Feature + MaybeSend + MaybeSync + 'static,
+    F::Geom: Geometry<Point = P>,
+    S: Symbol<F> + MaybeSend + MaybeSync + 'static,
+{
+    fn get_projection(&self) -> IdentityProjection<P, Point3d, CartesianSpace3d> {
+        IdentityProjection::new()
+    }
+
+    pub fn update_features(&mut self, indices: &[usize], _view: &MapView, in_place: bool) {
+        self.update_features_internal(indices, &self.get_projection(), in_place)
     }
 }
 
@@ -434,41 +499,8 @@ where
             return;
         }
 
-        let lod = self.select_lod(view.resolution());
-
-        if lod.render_bundles.read().unwrap().is_empty() {
-            let mut render_bundles = lod.render_bundles.write().unwrap();
-
-            let mut bundle = canvas.create_bundle();
-            let mut render_map = lod.feature_render_map.write().unwrap();
-
-            for feature in &self.features {
-                let projection = IdentityProjection::<_, Point3d, _>::new();
-                if let Some(geometry) = feature.geometry().project(&projection) {
-                    let ids =
-                        self.symbol
-                            .render(feature, &geometry, &mut bundle, lod.min_resolution);
-                    render_map.push(RenderMapEntry {
-                        bundle_index: render_bundles.len(),
-                        primitive_ids: ids,
-                    });
-                } else {
-                    render_map.push(RenderMapEntry {
-                        bundle_index: render_bundles.len(),
-                        primitive_ids: vec![],
-                    });
-                };
-
-                if bundle.approx_buffer_size() > self.options.buffer_size_limit {
-                    let full_bundle = std::mem::replace(&mut bundle, canvas.create_bundle());
-                    render_bundles.push(full_bundle);
-                }
-            }
-
-            render_bundles.push(bundle);
-        }
-
-        self.render_internal(lod, canvas, view);
+        let projection = self.get_projection();
+        self.render_with_projection(view, canvas, &projection);
     }
 
     fn prepare(&self, _view: &MapView) {
