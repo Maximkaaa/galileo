@@ -141,6 +141,7 @@ impl TessellatingRenderBundle {
                 .collect(),
             clip_area: bundle.clip_area.map(|v| v.into_typed_unchecked()),
             buffer_size: bundle.bundle_size,
+            vacant_ids: vec![],
         }
     }
 }
