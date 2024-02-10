@@ -39,7 +39,7 @@ impl<Point> Contour<Point> {
 
     pub fn project_points<P, Proj>(&self, projection: &Proj) -> Option<Contour<P>>
     where
-        Proj: Projection<InPoint = Point, OutPoint = P>,
+        Proj: Projection<InPoint = Point, OutPoint = P> + ?Sized,
     {
         let points = self
             .points
@@ -65,7 +65,7 @@ impl<Point> ClosedContour<Point> {
 
     pub fn project_points<P, Proj>(&self, projection: &Proj) -> Option<ClosedContour<P>>
     where
-        Proj: Projection<InPoint = Point, OutPoint = P>,
+        Proj: Projection<InPoint = Point, OutPoint = P> + ?Sized,
     {
         let points = self
             .points
