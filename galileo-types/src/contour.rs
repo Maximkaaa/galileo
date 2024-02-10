@@ -31,7 +31,7 @@ pub trait Contour {
         projection: &Proj,
     ) -> Option<crate::cartesian::impls::contour::Contour<Proj::OutPoint>>
     where
-        Proj: Projection<InPoint = Self::Point>,
+        Proj: Projection<InPoint = Self::Point> + ?Sized,
     {
         Some(crate::cartesian::impls::contour::Contour::new(
             self.iter_points()
