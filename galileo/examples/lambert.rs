@@ -55,8 +55,6 @@ pub async fn run(builder: MapBuilder) {
             if let UserEvent::PointerMoved(event) = ev {
                 let mut layer = feature_layer.write().unwrap();
 
-                let mut to_update = vec![];
-
                 let mut new_selected = usize::MAX;
                 let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {
                     return EventPropagation::Stop;
@@ -73,28 +71,26 @@ pub async fn run(builder: MapBuilder) {
                     return EventPropagation::Stop;
                 };
 
-                if let Some((index, feature)) = layer
+                if let Some(feature_container) = layer
                     .get_features_at_mut(&projected, map.view().resolution() * 2.0)
-                    .first_mut()
+                    .next()
                 {
-                    if *index == selected_index.load(Ordering::Relaxed) {
+                    let index = feature_container.index();
+                    if index == selected_index.load(Ordering::Relaxed) {
                         return EventPropagation::Stop;
                     }
-                    feature.is_selected = true;
-                    new_selected = *index;
-                    to_update.push(*index);
+
+                    feature_container.edit_style().is_selected = true;
+                    new_selected = index;
                 }
 
                 let selected = selected_index.swap(new_selected, Ordering::Relaxed);
                 if selected != usize::MAX {
-                    let feature = layer.features_mut().skip(selected).next().unwrap();
-                    feature.is_selected = false;
-                    to_update.push(selected);
+                    let feature = layer.features_mut().get_mut(selected).unwrap();
+                    feature.edit_style().is_selected = false;
                 }
 
-                if !to_update.is_empty() {
-                    layer.update_features(&to_update, map.view(), true);
-                }
+                map.redraw();
 
                 return EventPropagation::Stop;
             }

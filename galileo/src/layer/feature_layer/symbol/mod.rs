@@ -24,8 +24,4 @@ pub trait Symbol<F> {
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N> + Clone;
-
-    fn use_antialiasing(&self) -> bool {
-        true
-    }
 }
