@@ -1,6 +1,6 @@
 use crate::error::GalileoError;
-use crate::layer::data_provider::url_image_provider::dummy::DummyCacheController;
-use crate::layer::data_provider::{DataProvider, PersistentCacheController};
+use crate::layer::data_provider::dummy::DummyCacheController;
+use crate::layer::data_provider::{DataProvider, PersistentCacheController, UrlSource};
 use crate::platform::{PlatformService, PlatformServiceImpl};
 use crate::primitives::DecodedImage;
 use bytes::Bytes;
@@ -10,9 +10,7 @@ use std::marker::PhantomData;
 #[cfg(target_arch = "wasm32")]
 use std::future::Future;
 
-pub trait UrlSource<Key>: (Fn(&Key) -> String) + MaybeSend + MaybeSync {}
-impl<Key, T: Fn(&Key) -> String> UrlSource<Key> for T where T: MaybeSend + MaybeSync {}
-
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub struct UrlImageProvider<Key, Cache = DummyCacheController> {
     url_source: Box<dyn UrlSource<Key>>,
     cache: Option<Cache>,
@@ -21,17 +19,32 @@ pub struct UrlImageProvider<Key, Cache = DummyCacheController> {
     _phantom_key: PhantomData<Key>,
 }
 
-impl<Key, Cache> UrlImageProvider<Key, Cache> {
-    pub fn new(url_source: impl UrlSource<Key> + 'static, cache: Option<Cache>) -> Self {
+impl<Key> UrlImageProvider<Key, DummyCacheController> {
+    pub fn new(url_source: impl UrlSource<Key> + 'static) -> Self {
         Self {
             url_source: Box::new(url_source),
-            cache,
+            cache: None,
+            platform_service: PlatformServiceImpl::new(),
+            offline_mode: false,
+            _phantom_key: Default::default(),
+        }
+    }
+}
+
+impl<Key, Cache> UrlImageProvider<Key, Cache> {
+    pub fn new_cached(url_source: impl UrlSource<Key> + 'static, cache: Cache) -> Self {
+        Self {
+            url_source: Box::new(url_source),
+            cache: Some(cache),
             platform_service: PlatformServiceImpl::new(),
             offline_mode: false,
             _phantom_key: Default::default(),
         }
     }
 
+    /// If offline mode is enabled, the provider will not attempt to download data from Internet, and will only use
+    /// its cache as the source of data.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn set_offline_mode(&mut self, enabled: bool) {
         if enabled && self.cache.is_none() {
             log::warn!("Offline mode for url image provider is enabled, but no persistent cache is configured.\
@@ -105,27 +118,5 @@ where
     async fn load(&self, key: &Key, _context: ()) -> Result<DecodedImage, GalileoError> {
         let url = (self.url_source)(key);
         self.platform_service.load_image_url(&url).await
-    }
-}
-
-mod dummy {
-    use crate::error::GalileoError;
-    use crate::layer::data_provider::PersistentCacheController;
-    use bytes::Bytes;
-
-    #[allow(dead_code)]
-    pub struct DummyCacheController {
-        // Guarantees that the controller cannot be instantiated.
-        private_field: u8,
-    }
-
-    impl<Key> PersistentCacheController<Key, Bytes> for DummyCacheController {
-        fn get(&self, _key: &Key) -> Option<Bytes> {
-            unreachable!()
-        }
-
-        fn insert(&self, _key: &Key, _data: &Bytes) -> Result<(), GalileoError> {
-            unreachable!()
-        }
     }
 }

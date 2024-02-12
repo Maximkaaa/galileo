@@ -1,6 +1,6 @@
 use crate::error::GalileoError;
-use crate::layer::data_provider::url_data_provider::{UrlDataProvider, UrlSource};
-use crate::layer::data_provider::{DataProvider, EmptyCache};
+use crate::layer::data_provider::url_data_provider::UrlDataProvider;
+use crate::layer::data_provider::{DataProvider, UrlSource};
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::vt_processor::{
     VectorTileDecodeContext, VtProcessor,
@@ -293,8 +293,8 @@ pub fn init_vt_worker() {
         .unwrap();
 }
 
-fn vt_data_provider() -> UrlDataProvider<str, VtProcessor, EmptyCache> {
-    UrlDataProvider::new(|v: &str| v.to_string(), VtProcessor {}, EmptyCache {})
+fn vt_data_provider() -> UrlDataProvider<str, VtProcessor> {
+    UrlDataProvider::new(|v: &str| v.to_string(), VtProcessor {})
 }
 
 #[wasm_bindgen]

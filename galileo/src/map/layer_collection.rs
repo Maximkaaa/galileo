@@ -13,10 +13,14 @@ use std::ops::{Index, IndexMut, RangeBounds};
 /// to obtain a concrete layer type you work with.
 ///
 /// ```no_run
-/// use galileo::galileo_map::VectorTileProvider;
 /// use galileo::layer::{RasterTileLayer, VectorTileLayer};
+/// use galileo::layer::data_provider::file_cache::FileCacheController;
+/// use galileo::layer::data_provider::url_data_provider::UrlDataProvider;
+/// use galileo::layer::vector_tile_layer::tile_provider::rayon_provider::RayonProvider;
+/// use galileo::layer::vector_tile_layer::tile_provider::vt_processor::VtProcessor;
 /// use galileo::map::layer_collection::LayerCollection;
 /// use galileo::MapBuilder;
+/// use galileo::tile_scheme::TileIndex;
 ///
 /// let raster_tiles = MapBuilder::create_raster_tile_layer(|index| format!("url from {index:?}"), todo!());
 /// let vector_tiles = MapBuilder::create_vector_tile_layer(|index| format!("url from {index:?}"), todo!(), todo!());
@@ -25,7 +29,7 @@ use std::ops::{Index, IndexMut, RangeBounds};
 /// collection.push(raster_tiles);
 /// collection.push(vector_tiles);
 ///
-/// assert!(collection[1].as_any().downcast_ref::<VectorTileLayer<VectorTileProvider>>().is_some());
+/// assert!(collection[1].as_any().downcast_ref::<VectorTileLayer<RayonProvider<UrlDataProvider<TileIndex, VtProcessor, FileCacheController>>>>().is_some());
 /// ```
 #[derive(Default)]
 pub struct LayerCollection(Vec<LayerEntry>);

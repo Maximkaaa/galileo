@@ -5,6 +5,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use log::info;
 
+pub mod map_builder;
+
 #[derive(Debug, Clone)]
 pub struct NativePlatformService {
     http_client: reqwest::Client,

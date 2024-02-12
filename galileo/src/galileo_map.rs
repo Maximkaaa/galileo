@@ -1,11 +1,8 @@
 use crate::control::custom::{CustomEventHandler, EventHandler};
 use crate::control::event_processor::EventProcessor;
 use crate::control::map::MapController;
-use crate::layer::data_provider::file_cache::FileCacheController;
-use crate::layer::data_provider::url_image_provider::{UrlImageProvider, UrlSource};
-use crate::layer::raster_tile::RasterTileLayer;
+use crate::layer::data_provider::UrlSource;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::layer::vector_tile_layer::VectorTileLayer;
 use crate::layer::Layer;
 use crate::map::Map;
 use crate::render::wgpu::WgpuRenderer;
@@ -20,31 +17,8 @@ use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 
-#[cfg(not(target_arch = "wasm32"))]
-use crate::layer::data_provider::url_data_provider::UrlDataProvider;
-#[cfg(not(target_arch = "wasm32"))]
-use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
-#[cfg(not(target_arch = "wasm32"))]
-use crate::render::render_bundle::RenderBundle;
-
 #[cfg(target_arch = "wasm32")]
-use crate::layer::data_provider::EmptyCache;
-#[cfg(target_arch = "wasm32")]
-use js_sys::wasm_bindgen::prelude::wasm_bindgen;
-
-#[cfg(not(target_arch = "wasm32"))]
-pub type VectorTileProvider =
-    crate::layer::vector_tile_layer::tile_provider::rayon_provider::RayonProvider<
-        UrlDataProvider<
-            TileIndex,
-            crate::layer::vector_tile_layer::tile_provider::vt_processor::VtProcessor,
-            FileCacheController,
-        >,
-    >;
-
-#[cfg(target_arch = "wasm32")]
-pub type VectorTileProvider =
-    crate::layer::vector_tile_layer::tile_provider::web_worker_provider::WebWorkerVectorTileProvider;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct GalileoMap {
@@ -160,96 +134,18 @@ impl GalileoMap {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct MapBuilder {
-    position: GeoPoint2d,
-    resolution: f64,
-    view: Option<MapView>,
-    layers: Vec<Box<dyn Layer>>,
-    event_handlers: Vec<CustomEventHandler>,
-    window: Option<Window>,
-    event_loop: Option<EventLoop<()>>,
+    pub(crate) position: GeoPoint2d,
+    pub(crate) resolution: f64,
+    pub(crate) view: Option<MapView>,
+    pub(crate) layers: Vec<Box<dyn Layer>>,
+    pub(crate) event_handlers: Vec<CustomEventHandler>,
+    pub(crate) window: Option<Window>,
+    pub(crate) event_loop: Option<EventLoop<()>>,
 }
 
 impl Default for MapBuilder {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-impl MapBuilder {
-    pub fn new() -> Self {
-        #[cfg(target_arch = "wasm32")]
-        {
-            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-            console_log::init_with_level(log::Level::Info).expect("Couldn't init logger");
-        }
-
-        Self {
-            position: GeoPoint2d::default(),
-            resolution: 156543.03392800014 / 16.0,
-            view: None,
-            layers: vec![],
-            event_handlers: vec![],
-            window: None,
-            event_loop: None,
-        }
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    pub fn with_raster_tiles(mut self, tile_source: js_sys::Function) -> Self {
-        let tile_source_int = move |index: &TileIndex| {
-            log::info!("{index:?}");
-            let this = wasm_bindgen::JsValue::null();
-            tile_source
-                .call1(&this, &(*index).into())
-                .unwrap()
-                .as_string()
-                .unwrap()
-        };
-
-        let tile_provider = UrlImageProvider::new(tile_source_int, None::<EmptyCache>);
-        self.layers.push(Box::new(RasterTileLayer::new(
-            TileSchema::web(18),
-            tile_provider,
-            None,
-        )));
-
-        self
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    pub async fn build_into(mut self, container: web_sys::Element) -> GalileoMap {
-        use winit::platform::web::WindowExtWebSys;
-
-        let event_loop = self
-            .event_loop
-            .take()
-            .unwrap_or_else(|| EventLoop::new().unwrap());
-        let window = self.window.take().unwrap_or_else(|| {
-            WindowBuilder::new()
-                .with_inner_size(PhysicalSize {
-                    width: 1024,
-                    height: 1024,
-                })
-                .build(&event_loop)
-                .unwrap()
-        });
-
-        let canvas = web_sys::Element::from(window.canvas().unwrap());
-        container.append_child(&canvas).unwrap();
-
-        let width = container.client_width() as u32;
-        let height = container.client_height() as u32;
-        log::info!("Requesting canvas size: {width} - {height}");
-
-        let _ = window.request_inner_size(PhysicalSize { width, height });
-
-        sleep(1).await;
-
-        self.window = Some(window);
-        self.event_loop = Some(event_loop);
-
-        self.build().await
     }
 }
 
@@ -319,57 +215,6 @@ impl MapBuilder {
         self
     }
 
-    pub fn create_raster_tile_layer(
-        tile_source: impl UrlSource<TileIndex> + 'static,
-        tile_scheme: TileSchema,
-    ) -> RasterTileLayer<UrlImageProvider<TileIndex, FileCacheController>> {
-        #[cfg(not(target_os = "android"))]
-        let cache_controller = Some(FileCacheController::new(".tile_cache"));
-
-        #[cfg(target_os = "android")]
-        let cache_controller = Some(FileCacheController::new(
-            "/data/data/com.example.rastertilesandroid/.tile_cache",
-        ));
-
-        let tile_provider = UrlImageProvider::new(tile_source, cache_controller);
-        RasterTileLayer::new(tile_scheme, tile_provider, None)
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn with_raster_tiles(
-        mut self,
-        tile_source: impl UrlSource<TileIndex> + 'static,
-        tile_scheme: TileSchema,
-    ) -> Self {
-        self.layers.push(Box::new(Self::create_raster_tile_layer(
-            tile_source,
-            tile_scheme,
-        )));
-        self
-    }
-
-    pub fn create_vector_tile_layer(
-        tile_source: impl UrlSource<TileIndex> + 'static,
-        tile_scheme: TileSchema,
-        style: VectorTileStyle,
-    ) -> VectorTileLayer<VectorTileProvider> {
-        #[cfg(not(target_arch = "wasm32"))]
-        let tile_provider = VectorTileProvider::new(
-            None,
-            tile_scheme.clone(),
-            UrlDataProvider::new(
-                tile_source,
-                crate::layer::vector_tile_layer::tile_provider::vt_processor::VtProcessor {},
-                FileCacheController::new(".tile_cache"),
-            ),
-            RenderBundle::Tessellating(TessellatingRenderBundle::new()),
-        );
-
-        #[cfg(target_arch = "wasm32")]
-        let tile_provider = VectorTileProvider::new(4, None, tile_source, tile_scheme.clone());
-        VectorTileLayer::from_url(tile_provider, style, tile_scheme)
-    }
-
     pub fn with_vector_tiles(
         mut self,
         tile_source: impl UrlSource<TileIndex> + 'static,
@@ -409,18 +254,4 @@ impl MapBuilder {
 
         Arc::new(RwLock::new(map))
     }
-}
-
-#[cfg(target_arch = "wasm32")]
-async fn sleep(duration: i32) {
-    let mut cb = |resolve: js_sys::Function, _reject: js_sys::Function| {
-        web_sys::window()
-            .unwrap()
-            .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, duration)
-            .unwrap();
-    };
-
-    let p = js_sys::Promise::new(&mut cb);
-
-    wasm_bindgen_futures::JsFuture::from(p).await.unwrap();
 }

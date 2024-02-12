@@ -7,12 +7,11 @@ use std::sync::{Arc, RwLock};
 
 pub mod data_provider;
 pub mod feature_layer;
-pub mod raster_tile;
-pub mod tile_provider;
+pub mod raster_tile_layer;
 pub mod vector_tile_layer;
 
 pub use feature_layer::FeatureLayer;
-pub use raster_tile::RasterTileLayer;
+pub use raster_tile_layer::RasterTileLayer;
 pub use vector_tile_layer::VectorTileLayer;
 
 pub trait Layer: MaybeSend + MaybeSync {
