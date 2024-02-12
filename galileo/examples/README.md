@@ -73,6 +73,7 @@ cargo run
 - Change properties of the features when hovering mouse over them
 - Modify how the features are displayed based on changed properties
 - Get information about features by click
+- Hide/show features by clicking on them
 
 </td>
 </tr>

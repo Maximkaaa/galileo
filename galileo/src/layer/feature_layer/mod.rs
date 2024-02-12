@@ -1,10 +1,13 @@
 use crate::layer::feature_layer::feature::Feature;
+use crate::layer::feature_layer::feature_store::{
+    FeatureContainer, FeatureContainerMut, FeatureEntry, FeatureStore, FeatureUpdate,
+};
 use crate::layer::feature_layer::symbol::Symbol;
 use crate::layer::Layer;
 use crate::messenger::Messenger;
-use crate::render::render_bundle::RenderBundle;
-use crate::render::{Canvas, PackedBundle, PrimitiveId, RenderOptions};
+use crate::render::{Canvas, RenderOptions};
 use crate::view::MapView;
+use feature_render_store::FeatureRenderStore;
 use galileo_types::cartesian::impls::point::{Point2d, Point3d};
 use galileo_types::cartesian::rect::Rect;
 use galileo_types::cartesian::traits::cartesian_point::{
@@ -23,17 +26,24 @@ use num_traits::AsPrimitive;
 use std::any::Any;
 use std::marker::PhantomData;
 use std::ops::Deref;
-use std::sync::RwLock;
+use std::sync::{Mutex, RwLock};
 
 pub mod feature;
+pub mod feature_render_store;
+pub mod feature_store;
 pub mod symbol;
 
+/// Feature layers render a set of [features](Feature) using [symbols](Symbol).
+///
+/// After the layer is created, the [internal features storage](FeatureStore) can be accessed through [FeatureLayer::features] and
+/// [FeatureLayer::features_mut] methods. This storage provides methods to edit features or hide/show them without
+/// deleting from the layer.
 pub struct FeatureLayer<P, F, S, Space>
 where
     F: Feature,
     F::Geom: Geometry<Point = P>,
 {
-    features: Vec<F>,
+    features: FeatureStore<F>,
     symbol: S,
     crs: Crs,
     lods: Vec<Lod>,
@@ -43,6 +53,7 @@ where
     space: PhantomData<Space>,
 }
 
+/// Configuration of a [FeatureLayer].
 #[derive(Debug, Copy, Clone)]
 pub struct FeatureLayerOptions {
     /// If set to true, images drawn by the layer will be sorted by the depth value (relative to viewer) before being
@@ -62,6 +73,10 @@ pub struct FeatureLayerOptions {
     /// slightly improve performance when rendering, bun drastically improve performance when updating just a
     /// few features from the set.
     pub buffer_size_limit: usize,
+
+    /// If set to true, the layer will be rendered with anti-aliasing. It makes rendered lines look smoother but is a
+    /// little less performant.
+    pub use_antialiasing: bool,
 }
 
 impl Default for FeatureLayerOptions {
@@ -69,20 +84,27 @@ impl Default for FeatureLayerOptions {
         Self {
             sort_by_depth: false,
             buffer_size_limit: 10_000_000,
+            use_antialiasing: true,
         }
     }
 }
 
 struct Lod {
     min_resolution: f64,
-    render_bundles: RwLock<Vec<RenderBundle>>,
-    packed_bundles: RwLock<Vec<Option<Box<dyn PackedBundle>>>>,
-    feature_render_map: RwLock<Vec<RenderMapEntry>>,
+    contents: Mutex<FeatureRenderStore>,
 }
 
-struct RenderMapEntry {
-    bundle_index: usize,
-    primitive_ids: Vec<PrimitiveId>,
+impl Lod {
+    fn new(id: usize, min_resolution: f64, buffer_size_limit: usize) -> Self {
+        Self {
+            min_resolution,
+            contents: Mutex::new(FeatureRenderStore::new(
+                id,
+                min_resolution,
+                buffer_size_limit,
+            )),
+        }
+    }
 }
 
 impl<P, F, S, Space> FeatureLayer<P, F, S, Space>
@@ -92,76 +114,47 @@ where
     S: Symbol<F>,
 {
     pub fn new(features: Vec<F>, style: S, crs: Crs) -> Self {
+        let options = FeatureLayerOptions::default();
         Self {
-            features,
+            features: FeatureStore::new(features.into_iter()),
             symbol: style,
             crs,
             messenger: RwLock::new(None),
-            lods: vec![Lod {
-                min_resolution: 1.0,
-                render_bundles: RwLock::new(vec![]),
-                packed_bundles: RwLock::new(vec![]),
-                feature_render_map: RwLock::new(Vec::new()),
-            }],
-            options: Default::default(),
+            lods: vec![Lod::new(0, 1.0, options.buffer_size_limit)],
+            options,
             space: Default::default(),
         }
     }
 
     pub fn with_lods(features: Vec<F>, style: S, crs: Crs, lods: &[f64]) -> Self {
+        let options = FeatureLayerOptions::default();
         let mut lods: Vec<_> = lods
             .iter()
-            .map(|&min_resolution| Lod {
-                min_resolution,
-                render_bundles: RwLock::new(vec![]),
-                packed_bundles: RwLock::new(vec![]),
-                feature_render_map: RwLock::new(Vec::new()),
-            })
+            .enumerate()
+            .map(|(id, &min_resolution)| Lod::new(id, min_resolution, options.buffer_size_limit))
             .collect();
         lods.sort_by(|a, b| b.min_resolution.total_cmp(&a.min_resolution));
 
         Self {
-            features,
+            features: FeatureStore::new(features.into_iter()),
             symbol: style,
             crs,
             messenger: RwLock::new(None),
             lods,
-            options: Default::default(),
+            options,
             space: Default::default(),
         }
     }
 
     pub fn with_options(mut self, options: FeatureLayerOptions) -> Self {
         self.options = options;
-        self
-    }
 
-    fn render_internal(&self, lod: &Lod, canvas: &mut dyn Canvas, view: &MapView) {
-        let mut packed_bundles = lod.packed_bundles.write().unwrap();
-        let mut bundles = lod.render_bundles.write().unwrap();
-        for (index, bundle) in bundles.iter_mut().enumerate() {
-            if packed_bundles.len() == index {
-                packed_bundles.push(None);
-            }
-
-            if self.options.sort_by_depth {
-                bundle.sort_by_depth(view);
-            }
-
-            if packed_bundles[index].is_none() || self.options.sort_by_depth {
-                packed_bundles[index] = Some(canvas.pack_bundle(bundle))
-            }
+        for lod in &mut self.lods {
+            let lock = lod.contents.get_mut().expect("mutex is poisoned");
+            lock.set_buffer_size_limit(options.buffer_size_limit);
         }
 
-        canvas.draw_bundles(
-            &packed_bundles
-                .iter()
-                .filter_map(|v| v.as_ref().map(|v| &**v))
-                .collect::<Vec<_>>(),
-            RenderOptions {
-                antialias: self.symbol.use_antialiasing(),
-            },
-        );
+        self
     }
 }
 
@@ -175,7 +168,7 @@ where
         let projection = crs.get_projection::<P, Point2d>()?;
         self.features
             .iter()
-            .filter_map(|f| f.geometry().project(&*projection))
+            .filter_map(|f| f.as_ref().geometry().project(&*projection))
             .map(|g| g.bounding_rectangle())
             .collect()
     }
@@ -187,44 +180,55 @@ where
     F: Feature,
     F::Geom: Geometry<Point = P>,
 {
-    pub fn get_features_at(
-        &self,
-        point: &impl CartesianPoint2d<Num = P::Num>,
+    /// Returns an iterator of features that are withing `tolerance` units from the `point`. Note that the `point` is
+    /// expected to be set in the layer's CRS.
+    ///
+    /// At this moment this method just iterates over all features checking for each one if it is at the point. But
+    /// in future it may be changed into using geo-index to make this more efficient. So this method should be preferred
+    /// to manually checking every feature.
+    pub fn get_features_at<'a>(
+        &'a self,
+        point: &'a impl CartesianPoint2d<Num = P::Num>,
         tolerance: P::Num,
-    ) -> Vec<(usize, &F)>
+    ) -> impl Iterator<Item = FeatureContainer<'a, F>> + 'a
     where
         F::Geom: CartesianGeometry2d<P>,
     {
         self.features
             .iter()
-            .enumerate()
-            .filter(|(_, f)| f.geometry().is_point_inside(point, tolerance))
-            .collect()
+            .filter(move |f| f.as_ref().geometry().is_point_inside(point, tolerance))
     }
 
-    pub fn get_features_at_mut(
-        &mut self,
-        point: &impl CartesianPoint2d<Num = P::Num>,
+    /// Returns a mutable iterator of features that are withing `tolerance` units from the `point`. Note that the `point` is
+    /// expected to be set in the layer's CRS.
+    ///
+    /// At this moment this method just iterates over all features checking for each one if it is at the point. But
+    /// in future it may be changed into using geo-index to make this more efficient. So this method should be preferred
+    /// to manually checking every feature.
+    pub fn get_features_at_mut<'a>(
+        &'a mut self,
+        point: &'a impl CartesianPoint2d<Num = P::Num>,
         tolerance: P::Num,
-    ) -> Vec<(usize, &mut F)>
+    ) -> impl Iterator<Item = FeatureContainerMut<'a, F>> + 'a
     where
         F::Geom: CartesianGeometry2d<P>,
     {
         self.features
             .iter_mut()
-            .enumerate()
-            .filter(|(_, f)| f.geometry().is_point_inside(point, tolerance))
-            .collect()
+            .filter(move |f| f.as_ref().geometry().is_point_inside(point, tolerance))
     }
 
-    pub fn features(&self) -> impl Iterator + '_ {
-        self.features.iter()
+    /// Returns a reference to the feature store.
+    pub fn features(&self) -> &FeatureStore<F> {
+        &self.features
     }
 
-    pub fn features_mut(&mut self) -> impl Iterator<Item = &'_ mut F> + '_ {
-        self.features.iter_mut()
+    /// Returns a mutable reference to the feature store.
+    pub fn features_mut(&mut self) -> &mut FeatureStore<F> {
+        &mut self.features
     }
 
+    /// Returns the CRS of the layer.
     pub fn crs(&self) -> &Crs {
         &self.crs
     }
@@ -236,82 +240,16 @@ where
     F::Geom: Geometry<Point = P>,
     S: Symbol<F>,
 {
-    fn update_features_internal<Proj: Projection<InPoint = P, OutPoint = Point3d> + ?Sized>(
-        &mut self,
-        indices: &[usize],
-        projection: impl Deref<Target = Proj>,
-        in_place: bool,
-    ) {
-        if indices.is_empty() {
-            return;
-        }
-
-        for lod in &self.lods {
-            let mut bundles = lod.render_bundles.write().unwrap();
-            let mut packed_bundles = lod.packed_bundles.write().unwrap();
-
-            let mut feature_render_map = lod.feature_render_map.write().unwrap();
-            if feature_render_map.is_empty() {
-                return;
-            }
-
-            for index in indices {
-                let entry = &mut feature_render_map[*index];
-                let Some(bundle) = bundles.get_mut(entry.bundle_index) else {
-                    return;
-                };
-
-                if !in_place {
-                    for id in &entry.primitive_ids {
-                        if let Err(err) = bundle.remove(*id) {
-                            log::error!("Failed to remove primitive from the bundle: {err:?}");
-                        }
-                    }
-                }
-
-                let feature = self.features.get(*index).unwrap();
-                if let Some(geometry) = feature.geometry().project(&*projection) {
-                    let primitives = self.symbol.render(feature, &geometry, lod.min_resolution);
-
-                    if primitives.len() == entry.primitive_ids.len() && in_place {
-                        for (primitive, id) in
-                            primitives.into_iter().zip(entry.primitive_ids.iter())
-                        {
-                            if let Err(err) = bundle.update(*id, primitive) {
-                                log::error!("failed to update a primitive: {err:?}");
-                            }
-                        }
-                    } else {
-                        let mut ids = vec![];
-                        for primitive in primitives {
-                            ids.push(bundle.add(primitive, lod.min_resolution));
-                        }
-
-                        entry.primitive_ids = ids;
-                    }
-                }
-
-                if let Some(bundle) = packed_bundles.get_mut(entry.bundle_index) {
-                    bundle.take();
-                }
-            }
-
-            if let Some(messenger) = &(*self.messenger.read().unwrap()) {
-                messenger.request_redraw();
-            }
-        }
-    }
-
-    fn select_lod(&self, resolution: f64) -> &Lod {
+    fn select_lod(&self, resolution: f64) -> &Mutex<FeatureRenderStore> {
         debug_assert!(!self.lods.is_empty());
 
         for lod in &self.lods {
             if lod.min_resolution < resolution {
-                return lod;
+                return &lod.contents;
             }
         }
 
-        &self.lods[self.lods.len() - 1]
+        &self.lods[self.lods.len() - 1].contents
     }
 
     fn render_with_projection<Proj: Projection<InPoint = P, OutPoint = Point3d> + ?Sized>(
@@ -320,45 +258,121 @@ where
         canvas: &mut dyn Canvas,
         projection: impl Deref<Target = Proj>,
     ) {
-        if self.features.is_empty() {
-            return;
+        let updates = self.features.drain_updates();
+        if !updates.is_empty() {
+            self.update_feature_renders(canvas, projection, &updates);
         }
 
-        let lod = self.select_lod(view.resolution());
-        if lod.render_bundles.read().unwrap().is_empty() {
-            let mut render_bundles = lod.render_bundles.write().unwrap();
+        let lod = self
+            .select_lod(view.resolution())
+            .lock()
+            .expect("mutex is poisoned");
 
-            let mut bundle = canvas.create_bundle();
-            let mut render_map = lod.feature_render_map.write().unwrap();
+        canvas.draw_bundles(
+            &lod.bundles(),
+            RenderOptions {
+                antialias: self.options.use_antialiasing,
+            },
+        );
+    }
 
-            for feature in &self.features {
-                let Some(projected): Option<Geom<Point3d>> =
-                    feature.geometry().project(&*projection)
-                else {
-                    continue;
-                };
+    fn update_feature_renders<Proj: Projection<InPoint = P, OutPoint = Point3d> + ?Sized>(
+        &self,
+        canvas: &dyn Canvas,
+        projection: impl Deref<Target = Proj>,
+        updates: &[FeatureUpdate],
+    ) {
+        for update in updates {
+            if let FeatureUpdate::Delete { render_indices } = update {
+                for (render_index, lod_index) in render_indices
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(lod_index, render_index)| render_index.map(|v| (v, lod_index)))
+                {
+                    self.lods[lod_index]
+                        .contents
+                        .lock()
+                        .expect("mutex is poisoned")
+                        .remove_render(render_index);
+                }
+            }
+        }
 
-                let primitives = self.symbol.render(feature, &projected, lod.min_resolution);
-                let ids = primitives
-                    .into_iter()
-                    .map(|primitive| bundle.add(primitive, lod.min_resolution))
-                    .collect();
+        for lod in &self.lods {
+            let mut lod = lod.contents.lock().expect("mutex is poisoned");
 
-                render_map.push(RenderMapEntry {
-                    bundle_index: render_bundles.len(),
-                    primitive_ids: ids,
-                });
+            for update in updates {
+                lod.init_bundle(|| canvas.create_bundle());
 
-                if bundle.approx_buffer_size() > self.options.buffer_size_limit {
-                    let full_bundle = std::mem::replace(&mut bundle, canvas.create_bundle());
-                    render_bundles.push(full_bundle);
+                match update {
+                    FeatureUpdate::Update { feature_index } => {
+                        let Some(feature_entry) = self.features.get_entry(*feature_index) else {
+                            log::warn!("Feature {feature_index} is not present in the store");
+                            continue;
+                        };
+
+                        if let Some(render_index) = feature_entry.render_index(lod.id()) {
+                            lod.remove_render(render_index);
+                        }
+
+                        self.render_feature(feature_entry, &*projection, &mut lod);
+                    }
+                    FeatureUpdate::UpdateStyle { feature_index } => {
+                        let Some(feature_entry) = self.features.get_entry(*feature_index) else {
+                            log::warn!("Feature {feature_index} is not present in the store");
+                            continue;
+                        };
+
+                        if let Some(render_index) = feature_entry.render_index(lod.id()) {
+                            self.update_feature(
+                                feature_entry.feature(),
+                                &*projection,
+                                render_index,
+                                &mut lod,
+                            );
+                        }
+                    }
+                    _ => {}
                 }
             }
 
-            render_bundles.push(bundle);
+            lod.pack(canvas);
         }
+    }
 
-        self.render_internal(lod, canvas, view);
+    fn render_feature<Proj: Projection<InPoint = P, OutPoint = Point3d> + ?Sized>(
+        &self,
+        feature_entry: &FeatureEntry<F>,
+        projection: &Proj,
+        lod: &mut FeatureRenderStore,
+    ) {
+        let feature = feature_entry.feature();
+        let Some(projected): Option<Geom<Point3d>> = feature.geometry().project(projection) else {
+            return;
+        };
+
+        let primitives = self
+            .symbol
+            .render(feature, &projected, lod.min_resolution());
+        let index = lod.add_primitives(primitives);
+        feature_entry.set_render_index(index, lod.id());
+    }
+
+    fn update_feature<Proj: Projection<InPoint = P, OutPoint = Point3d> + ?Sized>(
+        &self,
+        feature: &F,
+        projection: &Proj,
+        render_index: usize,
+        lod: &mut FeatureRenderStore,
+    ) {
+        let Some(projected): Option<Geom<Point3d>> = feature.geometry().project(projection) else {
+            return;
+        };
+
+        let primitives = self
+            .symbol
+            .render(feature, &projected, lod.min_resolution());
+        lod.update_renders(render_index, primitives);
     }
 }
 
@@ -374,10 +388,6 @@ where
             crs.get_projection::<P, Point2d>().unwrap(),
             Box::new(AddDimensionProjection::new(0.0)),
         )
-    }
-
-    pub fn update_features(&mut self, indices: &[usize], view: &MapView, in_place: bool) {
-        self.update_features_internal(indices, &self.get_projection(view.crs()), in_place)
     }
 }
 
@@ -433,10 +443,6 @@ where
             ))
         }
     }
-
-    pub fn update_features(&mut self, indices: &[usize], view: &MapView, in_place: bool) {
-        self.update_features_internal(indices, self.get_projection(view.crs()), in_place)
-    }
 }
 
 impl<P, F, S> Layer for FeatureLayer<P, F, S, CartesianSpace2d>
@@ -478,10 +484,6 @@ where
 {
     fn get_projection(&self) -> IdentityProjection<P, Point3d, CartesianSpace3d> {
         IdentityProjection::new()
-    }
-
-    pub fn update_features(&mut self, indices: &[usize], _view: &MapView, in_place: bool) {
-        self.update_features_internal(indices, &self.get_projection(), in_place)
     }
 }
 

@@ -8,6 +8,7 @@
 /// optimizations may be done by Galileo in future, but at this point it's up to the application.
 use galileo::galileo_map::MapBuilder;
 use galileo::layer::feature_layer::feature::Feature;
+use galileo::layer::feature_layer::FeatureLayerOptions;
 use galileo::layer::FeatureLayer;
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
@@ -107,10 +108,6 @@ impl Symbol<ColoredPoint> for ColoredPointSymbol {
             vec![]
         }
     }
-
-    fn use_antialiasing(&self) -> bool {
-        false
-    }
 }
 
 pub async fn run(builder: MapBuilder) {
@@ -127,11 +124,14 @@ pub async fn run(builder: MapBuilder) {
             },
             TileSchema::web(18),
         )
-        .with_layer(FeatureLayer::new(
-            points,
-            ColoredPointSymbol {},
-            Crs::EPSG3857,
-        ))
+        .with_layer(
+            FeatureLayer::new(points, ColoredPointSymbol {}, Crs::EPSG3857).with_options(
+                FeatureLayerOptions {
+                    use_antialiasing: true,
+                    ..Default::default()
+                },
+            ),
+        )
         .build()
         .await
         .run();
