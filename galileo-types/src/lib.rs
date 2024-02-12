@@ -1,3 +1,5 @@
+#![warn(clippy::unwrap_used)]
+
 pub mod cartesian;
 pub mod contour;
 pub mod disambig;

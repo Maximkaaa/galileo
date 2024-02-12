@@ -89,7 +89,10 @@ impl Map {
             / animation.duration.as_millis() as f64;
 
         if k >= 1.0 {
-            let animation = self.animation.take().unwrap();
+            let animation = self
+                .animation
+                .take()
+                .expect("the value was removed unexpectedly");
             self.view = animation.end_view;
         } else {
             self.view = animation.start_view.interpolate(&animation.end_view, k);

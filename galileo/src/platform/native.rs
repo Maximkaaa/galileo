@@ -18,7 +18,7 @@ impl PlatformService for NativePlatformService {
         let http_client = reqwest::Client::builder()
             .user_agent("galileo/0.1")
             .build()
-            .unwrap();
+            .expect("Failed to initialize http client");
 
         Self { http_client }
     }

@@ -13,7 +13,11 @@ pub struct VectorTileStyle {
 impl VectorTileStyle {
     pub fn get_style_rule(&self, layer_name: &str, feature: &MvtFeature) -> Option<&StyleRule> {
         self.rules.iter().find(|&rule| {
-            (rule.layer_name.is_none() || rule.layer_name.as_ref().unwrap() == layer_name)
+            let layer_name_check_passed = match &rule.layer_name {
+                Some(name) => name == layer_name,
+                None => true,
+            };
+            layer_name_check_passed
                 && (rule.properties.is_empty()
                     || rule.properties.iter().all(|(key, value)| {
                         feature.properties.get(key).map(|v| v.to_string())

@@ -29,7 +29,6 @@ impl PersistentCacheController<str, Bytes> for FileCacheController {
 
     fn insert(&self, key: &str, data: &Bytes) -> Result<(), GalileoError> {
         let file_path = self.get_file_path(key);
-        ensure_folder_exists(file_path.parent().unwrap()).unwrap();
         std::fs::write(&file_path, data)?;
 
         debug!("Entry {key} saved to cache file {file_path:?}");
@@ -40,7 +39,7 @@ impl PersistentCacheController<str, Bytes> for FileCacheController {
 
 impl FileCacheController {
     pub fn new(path: impl AsRef<Path>) -> Self {
-        ensure_folder_exists(path.as_ref()).unwrap();
+        ensure_folder_exists(path.as_ref()).expect("Failed to initialize file cache controller.");
         Self {
             folder_path: path.as_ref().into(),
         }

@@ -135,7 +135,7 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
     }
 
     pub fn magnify(&self, factor: N) -> Self {
-        let two = N::from_f64(2.0).unwrap();
+        let two = N::from_f64(2.0).expect("const conversion failed");
         let cx = (self.x_min + self.x_max) / two;
         let cy = (self.y_min + self.y_max) / two;
         let half_width = self.width() / two * factor;
@@ -175,8 +175,8 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
 
     pub fn center(&self) -> Point2<N> {
         Point2::new(
-            (self.x_min + self.x_max) / N::from_f64(2.0).unwrap(),
-            (self.y_min + self.y_max) / N::from_f64(2.0).unwrap(),
+            (self.x_min + self.x_max) / N::from_f64(2.0).expect("const conversion failed"),
+            (self.y_min + self.y_max) / N::from_f64(2.0).expect("const conversion failed"),
         )
     }
 
@@ -194,18 +194,6 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
             && self.x_min <= other.x_max
             && self.y_max >= other.y_max
             && self.y_min <= other.y_max
-    }
-}
-
-impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> FromIterator<Rect<N>> for Rect<N> {
-    fn from_iter<T: IntoIterator<Item = Rect<N>>>(iter: T) -> Self {
-        let mut iter = iter.into_iter();
-        let mut curr = iter.next().unwrap();
-        for rect in iter {
-            curr = curr.merge(rect);
-        }
-
-        curr
     }
 }
 

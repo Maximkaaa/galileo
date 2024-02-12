@@ -136,15 +136,14 @@ where
             }
 
             if !substituted {
-                let required_bbox = self.tile_scheme.tile_bbox(index).unwrap();
+                let Some(required_bbox) = self.tile_scheme.tile_bbox(index) else {
+                    continue;
+                };
                 for prev in prev_drawn.iter() {
-                    if !substitute_indices.contains(prev)
-                        && self
-                            .tile_scheme
-                            .tile_bbox(*prev)
-                            .unwrap()
-                            .intersects(required_bbox)
-                    {
+                    let Some(prev_bbox) = self.tile_scheme.tile_bbox(*prev) else {
+                        continue;
+                    };
+                    if !substitute_indices.contains(prev) && prev_bbox.intersects(required_bbox) {
                         substitute_indices.insert(*prev);
                         let Some(tile) = self.tiles.get(prev) else {
                             continue;
@@ -191,10 +190,13 @@ where
                         requires_redraw = true;
                     }
 
-                    rendered
+                    if let Err(err) = rendered
                         .render_bundle
                         .modify_image(primitive_id, ImagePaint { opacity })
-                        .unwrap();
+                    {
+                        log::warn!("Failed to update image style: {err}");
+                    }
+
                     let packed = canvas.pack_bundle(&rendered.render_bundle);
                     rendered.packed_bundle = packed;
                     rendered.is_opaque = is_opaque;
@@ -217,12 +219,14 @@ where
                         0
                     };
 
+                    let Some(tile_bbox) = self.tile_scheme.tile_bbox(*index) else {
+                        log::warn!("Failed to get bbox for tile {index:?}");
+                        continue;
+                    };
+
                     let id = bundle.add_image(
                         owned,
-                        self.tile_scheme
-                            .tile_bbox(*index)
-                            .unwrap()
-                            .into_quadrangle(),
+                        tile_bbox.into_quadrangle(),
                         ImagePaint { opacity },
                     );
                     let packed = canvas.pack_bundle(&bundle);

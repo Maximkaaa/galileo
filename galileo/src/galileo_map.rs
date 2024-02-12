@@ -84,16 +84,20 @@ impl GalileoMap {
                             }
                             WindowEvent::Resized(size) => {
                                 log::info!("Window resized to: {size:?}");
-                                if let Some(backend) = backend.write().unwrap().as_mut() {
+                                if let Some(backend) =
+                                    backend.write().expect("lock is poisoned").as_mut()
+                                {
                                     backend.resize(Size::new(size.width, size.height));
 
-                                    let mut map = map.write().unwrap();
+                                    let mut map = map.write().expect("lock is poisoned");
                                     map.set_size(Size::new(size.width as f64, size.height as f64));
                                 }
                             }
                             WindowEvent::RedrawRequested => {
-                                if let Some(backend) = backend.read().unwrap().as_ref() {
-                                    let map = map.read().unwrap();
+                                if let Some(backend) =
+                                    backend.read().expect("lock is poisoned").as_ref()
+                                {
+                                    let map = map.read().expect("lock is poisoned");
                                     map.load_layers();
                                     if let Err(err) = backend.render(&map) {
                                         log::error!("Render error: {err:?}");
@@ -114,8 +118,10 @@ impl GalileoMap {
                                 if let Some(raw_event) =
                                     input_handler.process_user_input(&other, scale)
                                 {
-                                    if let Some(backend) = backend.read().unwrap().as_ref() {
-                                        let mut map = map.write().unwrap();
+                                    if let Some(backend) =
+                                        backend.read().expect("lock is poisoned").as_ref()
+                                    {
+                                        let mut map = map.write().expect("lock is poisoned");
                                         event_processor.handle(raw_event, &mut map, backend);
                                     }
                                 }
@@ -123,12 +129,12 @@ impl GalileoMap {
                         }
                     }
                     Event::AboutToWait => {
-                        map.write().unwrap().animate();
+                        map.write().expect("lock is poisoned").animate();
                     }
                     _ => (),
                 }
             })
-            .unwrap();
+            .expect("error processing event loop");
     }
 }
 
@@ -154,7 +160,7 @@ impl MapBuilder {
         let event_loop = self
             .event_loop
             .take()
-            .unwrap_or_else(|| EventLoop::new().unwrap());
+            .unwrap_or_else(|| EventLoop::new().expect("Failed to create event loop."));
 
         log::info!("Trying to get window");
 
@@ -165,7 +171,7 @@ impl MapBuilder {
                     height: 1024,
                 })
                 .build(&event_loop)
-                .unwrap()
+                .expect("Failed to init a window.")
         });
 
         let window = Arc::new(window);

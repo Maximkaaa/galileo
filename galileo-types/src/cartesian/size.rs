@@ -16,7 +16,7 @@ impl<Num: num_traits::Num + FromPrimitive + PartialOrd + Copy + NumCast> Size<Nu
     }
 
     pub fn half_width(&self) -> Num {
-        self.width / Num::from_f64(2.0).unwrap()
+        self.width / Num::from_f64(2.0).expect("const conversion failed")
     }
 
     pub fn height(&self) -> Num {
@@ -24,7 +24,7 @@ impl<Num: num_traits::Num + FromPrimitive + PartialOrd + Copy + NumCast> Size<Nu
     }
 
     pub fn half_height(&self) -> Num {
-        self.height / Num::from_f64(2.0).unwrap()
+        self.height / Num::from_f64(2.0).expect("const conversion failed")
     }
 
     pub fn is_zero(&self) -> bool {
@@ -35,8 +35,8 @@ impl<Num: num_traits::Num + FromPrimitive + PartialOrd + Copy + NumCast> Size<Nu
         &self,
     ) -> Size<T> {
         Size {
-            width: NumCast::from(self.width).unwrap(),
-            height: NumCast::from(self.height).unwrap(),
+            width: NumCast::from(self.width).expect("invalid value"),
+            height: NumCast::from(self.height).expect("invalid value"),
         }
     }
 }
