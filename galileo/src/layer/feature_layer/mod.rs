@@ -169,7 +169,7 @@ where
         self.features
             .iter()
             .filter_map(|f| f.as_ref().geometry().project(&*projection))
-            .map(|g| g.bounding_rectangle())
+            .filter_map(|g| g.bounding_rectangle())
             .collect()
     }
 }
@@ -383,11 +383,14 @@ where
     F::Geom: Geometry<Point = P>,
     S: Symbol<F> + MaybeSend + MaybeSync + 'static,
 {
-    fn get_projection(&self, crs: &Crs) -> impl Projection<InPoint = P, OutPoint = Point3d> {
-        ChainProjection::new(
-            crs.get_projection::<P, Point2d>().unwrap(),
+    fn get_projection(
+        &self,
+        crs: &Crs,
+    ) -> Option<impl Projection<InPoint = P, OutPoint = Point3d>> {
+        Some(ChainProjection::new(
+            crs.get_projection::<P, Point2d>()?,
             Box::new(AddDimensionProjection::new(0.0)),
-        )
+        ))
     }
 }
 
@@ -399,7 +402,9 @@ where
     S: Symbol<F> + MaybeSend + MaybeSync + 'static,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
-        let projection = self.get_projection(view.crs());
+        let Some(projection) = self.get_projection(view.crs()) else {
+            return;
+        };
         self.render_with_projection(view, canvas, &projection);
     }
 
@@ -408,7 +413,7 @@ where
     }
 
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
-        *self.messenger.write().unwrap() = Some(messenger);
+        *self.messenger.write().expect("lock is poisoned") = Some(messenger);
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -427,20 +432,23 @@ where
     F::Geom: Geometry<Point = P>,
     S: Symbol<F> + MaybeSend + MaybeSync + 'static,
 {
-    fn get_projection(&self, crs: &Crs) -> Box<dyn Projection<InPoint = P, OutPoint = Point3d>> {
+    fn get_projection(
+        &self,
+        crs: &Crs,
+    ) -> Option<Box<dyn Projection<InPoint = P, OutPoint = Point3d>>> {
         if crs == &self.crs {
-            Box::new(AddDimensionProjection::new(0.0))
+            Some(Box::new(AddDimensionProjection::new(0.0)))
         } else {
-            let self_proj = self.crs.get_projection::<GeoPoint2d, P>().unwrap();
+            let self_proj = self.crs.get_projection::<GeoPoint2d, P>()?;
             let view_proj: Box<dyn Projection<InPoint = _, OutPoint = Point2d>> =
-                crs.get_projection().unwrap();
-            Box::new(ChainProjection::new(
+                crs.get_projection()?;
+            Some(Box::new(ChainProjection::new(
                 Box::new(ChainProjection::new(
                     Box::new(InvertedProjection::new(self_proj)),
                     view_proj,
                 )),
                 Box::new(AddDimensionProjection::new(0.0)),
-            ))
+            )))
         }
     }
 }
@@ -453,7 +461,9 @@ where
     S: Symbol<F> + MaybeSend + MaybeSync + 'static,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
-        let projection = self.get_projection(view.crs());
+        let Some(projection) = self.get_projection(view.crs()) else {
+            return;
+        };
         self.render_with_projection(view, canvas, projection);
     }
 
@@ -462,7 +472,7 @@ where
     }
 
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
-        *self.messenger.write().unwrap() = Some(messenger);
+        *self.messenger.write().expect("lock is poisoned") = Some(messenger);
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -510,7 +520,7 @@ where
     }
 
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
-        *self.messenger.write().unwrap() = Some(messenger);
+        *self.messenger.write().expect("lock is poisoned") = Some(messenger);
     }
 
     fn as_any(&self) -> &dyn Any {

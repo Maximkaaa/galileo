@@ -24,15 +24,19 @@ pub trait Layer: MaybeSend + MaybeSync {
 
 impl<T: Layer + 'static> Layer for Arc<RwLock<T>> {
     fn render(&self, position: &MapView, canvas: &mut dyn Canvas) {
-        self.read().unwrap().render(position, canvas)
+        self.read()
+            .expect("lock is poisoned")
+            .render(position, canvas)
     }
 
     fn prepare(&self, view: &MapView) {
-        self.read().unwrap().prepare(view)
+        self.read().expect("lock is poisoned").prepare(view)
     }
 
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
-        self.write().unwrap().set_messenger(messenger)
+        self.write()
+            .expect("lock is poisoned")
+            .set_messenger(messenger)
     }
 
     fn as_any(&self) -> &dyn Any {

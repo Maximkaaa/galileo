@@ -79,7 +79,7 @@ where
             }
         }
 
-        if let Some(messenger) = &(*self.messenger.read().unwrap()) {
+        if let Some(messenger) = &(*self.messenger.read().expect("lock is poisoned")) {
             messenger.request_redraw();
         }
     }
@@ -91,7 +91,7 @@ where
     }
 
     fn set_messenger(&self, messenger: Box<dyn Messenger>) {
-        *self.messenger.write().unwrap() = Some(messenger)
+        *self.messenger.write().expect("lock is poisoned") = Some(messenger)
     }
 }
 

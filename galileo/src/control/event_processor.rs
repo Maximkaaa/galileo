@@ -222,7 +222,12 @@ impl EventProcessor {
                         ));
                     }
                 } else if self.touches.len() == 2 {
-                    let other_touch = self.touches.iter().find(|t| t.id != touch_info.id).unwrap();
+                    let Some(other_touch) = self.touches.iter().find(|t| t.id != touch_info.id)
+                    else {
+                        log::warn!("Unexpected touch id");
+                        return None;
+                    };
+
                     let distance = (other_touch.prev_position - position).magnitude();
                     let prev_distance =
                         (other_touch.prev_position - touch_info.prev_position).magnitude();

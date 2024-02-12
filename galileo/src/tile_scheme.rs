@@ -176,9 +176,12 @@ impl TileSchema {
         const ORIGIN: Point2d = Point2d::new(-20037508.342787, 20037508.342787);
         const TOP_RESOLUTION: f64 = 156543.03392800014;
 
-        let mut lods = vec![Lod::new(TOP_RESOLUTION, 0).unwrap()];
+        let mut lods = vec![Lod::new(TOP_RESOLUTION, 0).expect("invalid const parameters")];
         for i in 1..lods_count {
-            lods.push(Lod::new(lods[(i - 1) as usize].resolution() / 2.0, i).unwrap());
+            lods.push(
+                Lod::new(lods[(i - 1) as usize].resolution() / 2.0, i)
+                    .expect("invalid const parameters"),
+            );
         }
 
         TileSchema {

@@ -562,24 +562,24 @@ impl TessellatingRenderBundle {
         let start_index = tessellation.vertices.len();
         let start_index_count = tessellation.indices.len();
 
-        tesselator
-            .tessellate_path(
-                &path,
-                &StrokeOptions::DEFAULT
-                    .with_line_cap(paint.line_cap.into())
-                    .with_line_width(paint.width as f32)
-                    .with_miter_limit(1.0)
-                    .with_tolerance(0.1)
-                    .with_line_join(LineJoin::Round),
-                &mut BuffersBuilder::new(tessellation, vertex_constructor),
-            )
-            .unwrap();
+        if let Err(err) = tesselator.tessellate_path(
+            &path,
+            &StrokeOptions::DEFAULT
+                .with_line_cap(paint.line_cap.into())
+                .with_line_width(paint.width as f32)
+                .with_miter_limit(1.0)
+                .with_tolerance(0.1)
+                .with_line_join(LineJoin::Round),
+            &mut BuffersBuilder::new(tessellation, vertex_constructor),
+        ) {
+            log::error!("Tessellation failed: {err}");
+            return 0..0;
+        }
 
         let end_index = tessellation.vertices.len();
 
-        self.buffer_size += (end_index - start_index) * std::mem::size_of::<PolyVertex>();
-        self.buffer_size +=
-            (tessellation.indices.len() - start_index_count) * std::mem::size_of::<u32>();
+        self.buffer_size += (end_index - start_index) * size_of::<PolyVertex>();
+        self.buffer_size += (tessellation.indices.len() - start_index_count) * size_of::<u32>();
 
         start_index..end_index
     }
@@ -670,8 +670,8 @@ impl TessellatingRenderBundle {
 
         let end_index = lod.vertices.len();
 
-        self.buffer_size += (end_index - start_index) * std::mem::size_of::<PolyVertex>();
-        self.buffer_size += (lod.indices.len() - start_index_count) * std::mem::size_of::<u32>();
+        self.buffer_size += (end_index - start_index) * size_of::<PolyVertex>();
+        self.buffer_size += (lod.indices.len() - start_index_count) * size_of::<u32>();
 
         start_index..end_index
     }
@@ -717,13 +717,13 @@ impl TessellatingRenderBundle {
         };
         let mut tesselator = FillTessellator::new();
 
-        tesselator
-            .tessellate(
-                &path,
-                &FillOptions::DEFAULT,
-                &mut BuffersBuilder::new(tessellation, vertex_constructor),
-            )
-            .unwrap();
+        if let Err(err) = tesselator.tessellate(
+            &path,
+            &FillOptions::DEFAULT,
+            &mut BuffersBuilder::new(tessellation, vertex_constructor),
+        ) {
+            log::error!("Tessellation failed: {err:?}");
+        }
     }
 
     pub fn add_shape<N, P>(

@@ -134,8 +134,13 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
         let mut features = vec![];
         if let Some(iter) = self.tile_scheme.iter_tiles(view) {
             for index in iter {
-                let tile_bbox = self.tile_scheme.tile_bbox(index).unwrap();
-                let lod_resolution = self.tile_scheme.lod_resolution(index.z).unwrap();
+                let Some(tile_bbox) = self.tile_scheme.tile_bbox(index) else {
+                    continue;
+                };
+                let Some(lod_resolution) = self.tile_scheme.lod_resolution(index.z) else {
+                    continue;
+                };
+
                 let tile_resolution = lod_resolution * self.tile_scheme.tile_width() as f64;
 
                 let tile_point = Point2::new(

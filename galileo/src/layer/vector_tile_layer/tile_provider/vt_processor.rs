@@ -54,8 +54,12 @@ impl VtProcessor {
         style: &VectorTileStyle,
         tile_scheme: &TileSchema,
     ) -> Result<(), GalileoError> {
-        let bbox = tile_scheme.tile_bbox(index).unwrap();
-        let lod_resolution = tile_scheme.lod_resolution(index.z).unwrap();
+        let bbox = tile_scheme
+            .tile_bbox(index)
+            .ok_or_else(|| GalileoError::Generic("cannot get tile bbox".into()))?;
+        let lod_resolution = tile_scheme.lod_resolution(index.z).ok_or_else(|| {
+            GalileoError::Generic(format!("cannot get lod resolution for lod {}", index.z))
+        })?;
         let tile_resolution = lod_resolution * tile_scheme.tile_width() as f64;
 
         let bounds = Polygon::new(
@@ -170,8 +174,8 @@ impl VtProcessor {
         tile_bbox: Rect,
         tile_resolution: f64,
     ) -> Point3d {
-        let x = tile_bbox.x_min() + p_in.x().to_f64().unwrap() * tile_resolution;
-        let y = tile_bbox.y_max() - p_in.y().to_f64().unwrap() * tile_resolution;
+        let x = tile_bbox.x_min() + p_in.x().to_f64().expect("double overflow") * tile_resolution;
+        let y = tile_bbox.y_max() - p_in.y().to_f64().expect("double overflow") * tile_resolution;
         Point3d::new(x, y, 0.0)
     }
 }

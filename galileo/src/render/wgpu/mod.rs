@@ -211,7 +211,7 @@ impl WgpuRenderer {
     where
         W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
     {
-        let (surface, adapter) = Self::get_window_surface(window).await.unwrap();
+        let (surface, adapter) = Self::get_window_surface(window).await?;
         let (device, queue) = Self::create_device(&adapter).await;
 
         let config = Self::get_surface_configuration(&surface, &adapter, size);
@@ -308,7 +308,7 @@ impl WgpuRenderer {
             } else {
                 let backends = wgpu::Backends::all();
             }
-        };
+        }
 
         wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends,
@@ -336,7 +336,7 @@ impl WgpuRenderer {
                 None,
             )
             .await
-            .unwrap()
+            .expect("Failed to obtain WGPU device")
     }
 
     fn create_multisample_texture(
@@ -500,10 +500,24 @@ impl WgpuRenderer {
         let buffer_slice = buffer.slice(..);
         let (tx, rx) = futures_intrusive::channel::shared::oneshot_channel();
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-            tx.send(result).unwrap();
+            if let Err(err) = tx.send(result) {
+                log::error!("Failed to send by channel: {err:?}");
+            }
         });
         self.device.poll(wgpu::Maintain::Wait);
-        rx.receive().await.unwrap().unwrap();
+        match rx.receive().await {
+            Some(result) => match result {
+                Ok(()) => {}
+                Err(err) => {
+                    log::error!("Writing to image buffer failed: {err:?}.");
+                    return Err(SurfaceError::Lost);
+                }
+            },
+            None => {
+                log::error!("Channel was closed");
+                return Err(SurfaceError::Lost);
+            }
+        }
 
         let data = buffer_slice.get_mapped_range();
         Ok(data.to_vec())
@@ -574,7 +588,11 @@ impl WgpuRenderer {
         let Some(render_set) = &self.render_set else {
             return;
         };
-        let mut canvas = WgpuCanvas::new(self, render_set, texture_view, view.clone());
+        let Some(mut canvas) = WgpuCanvas::new(self, render_set, texture_view, view.clone()) else {
+            log::warn!("Layer cannot be rendered to the map view.");
+            return;
+        };
+
         layer.render(view, &mut canvas);
     }
 
@@ -605,7 +623,7 @@ impl<'a> WgpuCanvas<'a> {
         render_set: &'a RenderSet,
         view: &'a TextureView,
         map_view: MapView,
-    ) -> Self {
+    ) -> Option<Self> {
         let rotation_mtx = Rotation3::new(Vector3::new(
             map_view.rotation_x(),
             0.0,
@@ -616,7 +634,7 @@ impl<'a> WgpuCanvas<'a> {
             render_set.pipelines.map_view_buffer(),
             0,
             bytemuck::cast_slice(&[ViewUniform {
-                view_proj: map_view.map_to_scene_mtx().unwrap(),
+                view_proj: map_view.map_to_scene_mtx()?,
                 view_rotation: rotation_mtx.cast::<f32>().data.0,
                 inv_screen_size: [
                     1.0 / renderer.size().width() as f32,
@@ -627,11 +645,11 @@ impl<'a> WgpuCanvas<'a> {
             }]),
         );
 
-        Self {
+        Some(Self {
             renderer,
             render_set,
             view,
-        }
+        })
     }
 }
 

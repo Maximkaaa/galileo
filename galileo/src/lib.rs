@@ -68,6 +68,8 @@
 //!   some intermediate representation, more convenient to deal with, and some
 //! * [`controls`](control) that actually change state of the map or layers based on the user input.
 
+#![warn(clippy::unwrap_used)]
+
 pub mod async_runtime;
 pub mod bounding_box;
 pub mod color;
