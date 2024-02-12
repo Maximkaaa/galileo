@@ -1,6 +1,6 @@
 use galileo::bounding_box::BoundingBox;
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
-use galileo::galileo_map::{MapBuilder, VectorTileProvider};
+use galileo::galileo_map::MapBuilder;
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
 use galileo::layer::vector_tile_layer::VectorTileLayer;
 use galileo::lod::Lod;
@@ -8,6 +8,22 @@ use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
 use galileo_types::cartesian::impls::point::Point2d;
 use galileo_types::geo::crs::Crs;
 use std::sync::{Arc, RwLock};
+
+#[cfg(not(target_arch = "wasm32"))]
+use galileo::layer::{
+    data_provider::{file_cache::FileCacheController, url_data_provider::UrlDataProvider},
+    vector_tile_layer::tile_provider::{rayon_provider::RayonProvider, vt_processor::VtProcessor},
+};
+
+#[cfg(not(target_arch = "wasm32"))]
+type VectorTileProvider =
+    RayonProvider<UrlDataProvider<TileIndex, VtProcessor, FileCacheController>>;
+
+#[cfg(target_arch = "wasm32")]
+use galileo::layer::vector_tile_layer::tile_provider::web_worker_provider::WebWorkerVectorTileProvider;
+
+#[cfg(target_arch = "wasm32")]
+type VectorTileProvider = WebWorkerVectorTileProvider;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn get_layer_style() -> Option<VectorTileStyle> {

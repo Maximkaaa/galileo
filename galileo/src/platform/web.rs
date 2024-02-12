@@ -14,6 +14,8 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlImageElement, WorkerGlobalScope};
 use web_sys::{Request, RequestInit, RequestMode, Response};
 
+pub mod map_builder;
+
 pub struct WebPlatformService {}
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]

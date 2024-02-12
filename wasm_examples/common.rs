@@ -4,9 +4,6 @@ use winit::platform::web::WindowExtWebSys;
 use winit::window::{Window, WindowBuilder};
 
 pub async fn set_up() -> (Window, EventLoop<()>) {
-    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    console_log::init_with_level(log::Level::Info).expect("Couldn't init logger");
-
     let event_loop = EventLoop::new().unwrap();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     let window = window;

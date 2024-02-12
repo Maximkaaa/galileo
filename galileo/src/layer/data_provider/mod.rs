@@ -1,6 +1,8 @@
-pub mod file_cache;
 pub mod url_data_provider;
 pub mod url_image_provider;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod file_cache;
 
 use crate::error::GalileoError;
 use bytes::Bytes;
@@ -43,13 +45,27 @@ pub trait PersistentCacheController<Key: ?Sized, Data> {
     fn insert(&self, key: &Key, data: &Data) -> Result<(), GalileoError>;
 }
 
-pub struct EmptyCache {}
-impl<Key: ?Sized, Data> PersistentCacheController<Key, Data> for EmptyCache {
-    fn get(&self, _key: &Key) -> Option<Data> {
-        None
+pub trait UrlSource<Key: ?Sized>: (Fn(&Key) -> String) + MaybeSend + MaybeSync {}
+impl<Key: ?Sized, T: Fn(&Key) -> String> UrlSource<Key> for T where T: MaybeSend + MaybeSync {}
+
+mod dummy {
+    use crate::error::GalileoError;
+    use crate::layer::data_provider::PersistentCacheController;
+    use bytes::Bytes;
+
+    #[allow(dead_code)]
+    pub struct DummyCacheController {
+        // Guarantees that the controller cannot be instantiated.
+        private_field: u8,
     }
 
-    fn insert(&self, _key: &Key, _data: &Data) -> Result<(), GalileoError> {
-        Ok(())
+    impl<Key: ?Sized> PersistentCacheController<Key, Bytes> for DummyCacheController {
+        fn get(&self, _key: &Key) -> Option<Bytes> {
+            unreachable!()
+        }
+
+        fn insert(&self, _key: &Key, _data: &Bytes) -> Result<(), GalileoError> {
+            unreachable!()
+        }
     }
 }
