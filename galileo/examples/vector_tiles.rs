@@ -1,4 +1,3 @@
-use galileo::bounding_box::BoundingBox;
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
 use galileo::galileo_map::MapBuilder;
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
@@ -21,6 +20,7 @@ type VectorTileProvider =
 
 #[cfg(target_arch = "wasm32")]
 use galileo::layer::vector_tile_layer::tile_provider::web_worker_provider::WebWorkerVectorTileProvider;
+use galileo_types::cartesian::rect::Rect;
 
 #[cfg(target_arch = "wasm32")]
 type VectorTileProvider = WebWorkerVectorTileProvider;
@@ -91,7 +91,7 @@ pub fn tile_scheme() -> TileSchema {
 
     TileSchema {
         origin: ORIGIN,
-        bounds: BoundingBox::new(
+        bounds: Rect::new(
             -20037508.342787,
             -20037508.342787,
             20037508.342787,

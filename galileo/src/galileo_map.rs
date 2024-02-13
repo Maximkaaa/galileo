@@ -1,6 +1,4 @@
-use crate::control::custom::{CustomEventHandler, EventHandler};
-use crate::control::event_processor::EventProcessor;
-use crate::control::map::MapController;
+use crate::control::{EventProcessor, EventPropagation, MapController, UserEvent};
 use crate::layer::data_provider::UrlSource;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::Layer;
@@ -11,12 +9,14 @@ use crate::view::MapView;
 use crate::winit::{WinitInputHandler, WinitMessenger};
 use galileo_types::cartesian::size::Size;
 use galileo_types::geo::impls::point::GeoPoint2d;
+use maybe_sync::{MaybeSend, MaybeSync};
 use std::sync::{Arc, RwLock};
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 
+use crate::render::Renderer;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -144,7 +144,13 @@ pub struct MapBuilder {
     pub(crate) resolution: f64,
     pub(crate) view: Option<MapView>,
     pub(crate) layers: Vec<Box<dyn Layer>>,
-    pub(crate) event_handlers: Vec<CustomEventHandler>,
+    pub(crate) event_handlers: Vec<
+        Box<
+            dyn (Fn(&UserEvent, &mut Map, &dyn Renderer) -> EventPropagation)
+                + MaybeSend
+                + MaybeSync,
+        >,
+    >,
     pub(crate) window: Option<Window>,
     pub(crate) event_loop: Option<EventLoop<()>>,
 }
@@ -240,10 +246,14 @@ impl MapBuilder {
         self
     }
 
-    pub fn with_event_handler(mut self, handler: impl EventHandler + 'static) -> Self {
-        let mut event_handler = CustomEventHandler::default();
-        event_handler.set_input_handler(handler);
-        self.event_handlers.push(event_handler);
+    pub fn with_event_handler(
+        mut self,
+        handler: impl (Fn(&UserEvent, &mut Map, &dyn Renderer) -> EventPropagation)
+            + MaybeSend
+            + MaybeSync
+            + 'static,
+    ) -> Self {
+        self.event_handlers.push(Box::new(handler));
         self
     }
 

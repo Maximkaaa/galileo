@@ -8,7 +8,6 @@ use std::collections::BTreeSet;
 #[cfg(target_arch = "wasm32")]
 use js_sys::wasm_bindgen::prelude::wasm_bindgen;
 
-use crate::bounding_box::BoundingBox;
 use crate::lod::Lod;
 use crate::view::MapView;
 
@@ -32,7 +31,7 @@ pub struct TileIndex {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TileSchema {
     pub origin: Point2d,
-    pub bounds: BoundingBox,
+    pub bounds: Rect,
     pub lods: BTreeSet<Lod>,
     pub tile_width: u32,
     pub tile_height: u32,
@@ -186,7 +185,7 @@ impl TileSchema {
 
         TileSchema {
             origin: ORIGIN,
-            bounds: BoundingBox::new(
+            bounds: Rect::new(
                 -20037508.342787,
                 -20037508.342787,
                 20037508.342787,
@@ -276,7 +275,7 @@ mod tests {
     fn simple_schema() -> TileSchema {
         TileSchema {
             origin: Point2d::default(),
-            bounds: BoundingBox::new(0.0, 0.0, 2048.0, 2048.0),
+            bounds: Rect::new(0.0, 0.0, 2048.0, 2048.0),
             lods: [
                 Lod::new(8.0, 0).unwrap(),
                 Lod::new(4.0, 1).unwrap(),

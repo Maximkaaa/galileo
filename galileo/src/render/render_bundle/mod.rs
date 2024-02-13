@@ -14,15 +14,17 @@ use tessellating::TessellatingRenderBundle;
 pub mod tessellating;
 
 #[derive(Debug, Clone)]
-#[non_exhaustive]
-pub enum RenderBundle {
+pub struct RenderBundle(pub(crate) RenderBundleType);
+
+#[derive(Debug, Clone)]
+pub(crate) enum RenderBundleType {
     Tessellating(TessellatingRenderBundle),
 }
 
 impl RenderBundle {
     pub fn approx_buffer_size(&self) -> usize {
-        match self {
-            RenderBundle::Tessellating(inner) => inner.approx_buffer_size(),
+        match &self.0 {
+            RenderBundleType::Tessellating(inner) => inner.approx_buffer_size(),
         }
     }
 
@@ -33,8 +35,8 @@ impl RenderBundle {
         Poly: Polygon,
         Poly::Contour: Contour<Point = P>,
     {
-        match self {
-            RenderBundle::Tessellating(inner) => inner.clip_area(polygon),
+        match &mut self.0 {
+            RenderBundleType::Tessellating(inner) => inner.clip_area(polygon),
         }
     }
 
@@ -44,8 +46,8 @@ impl RenderBundle {
         vertices: [Point2d; 4],
         paint: ImagePaint,
     ) -> PrimitiveId {
-        match self {
-            RenderBundle::Tessellating(inner) => inner.add_image(image, vertices, paint),
+        match &mut self.0 {
+            RenderBundleType::Tessellating(inner) => inner.add_image(image, vertices, paint),
         }
     }
 
@@ -61,14 +63,14 @@ impl RenderBundle {
         Poly: Polygon + Clone,
         Poly::Contour: Contour<Point = P>,
     {
-        match self {
-            RenderBundle::Tessellating(inner) => inner.add(primitive, min_resolution),
+        match &mut self.0 {
+            RenderBundleType::Tessellating(inner) => inner.add(primitive, min_resolution),
         }
     }
 
     pub fn remove(&mut self, primitive_id: PrimitiveId) -> Result<(), GalileoError> {
-        match self {
-            RenderBundle::Tessellating(inner) => inner.remove(primitive_id),
+        match &mut self.0 {
+            RenderBundleType::Tessellating(inner) => inner.remove(primitive_id),
         }
     }
 
@@ -84,69 +86,26 @@ impl RenderBundle {
         Poly: Polygon + Clone,
         Poly::Contour: Contour<Point = P>,
     {
-        match self {
-            RenderBundle::Tessellating(inner) => inner.update(primitive_id, primitive),
-        }
-    }
-
-    pub fn add_point<N, P>(&mut self, point: &P, paint: PointPaint) -> PrimitiveId
-    where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N>,
-    {
-        match self {
-            RenderBundle::Tessellating(inner) => inner.add_point(point, paint),
-        }
-    }
-
-    pub fn add_line<N, P, C>(
-        &mut self,
-        line: &C,
-        paint: LinePaint,
-        min_resolution: f64,
-    ) -> PrimitiveId
-    where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N>,
-        C: Contour<Point = P>,
-    {
-        match self {
-            RenderBundle::Tessellating(inner) => inner.add_line(line, paint, min_resolution),
-        }
-    }
-
-    pub fn add_polygon<N, P, Poly>(
-        &mut self,
-        polygon: &Poly,
-        paint: PolygonPaint,
-        min_resolution: f64,
-    ) -> PrimitiveId
-    where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N>,
-        Poly: Polygon,
-        Poly::Contour: Contour<Point = P>,
-    {
-        match self {
-            RenderBundle::Tessellating(inner) => inner.add_polygon(polygon, paint, min_resolution),
+        match &mut self.0 {
+            RenderBundleType::Tessellating(inner) => inner.update(primitive_id, primitive),
         }
     }
 
     pub fn is_empty(&self) -> bool {
-        match self {
-            RenderBundle::Tessellating(inner) => inner.is_empty(),
+        match &self.0 {
+            RenderBundleType::Tessellating(inner) => inner.is_empty(),
         }
     }
 
     pub fn modify_image(&mut self, id: PrimitiveId, paint: ImagePaint) -> Result<(), GalileoError> {
-        match self {
-            RenderBundle::Tessellating(inner) => inner.modify_image(id, paint),
+        match &mut self.0 {
+            RenderBundleType::Tessellating(inner) => inner.modify_image(id, paint),
         }
     }
 
     pub fn sort_by_depth(&mut self, view: &MapView) {
-        match self {
-            RenderBundle::Tessellating(inner) => inner.sort_by_depth(view),
+        match &mut self.0 {
+            RenderBundleType::Tessellating(inner) => inner.sort_by_depth(view),
         }
     }
 }

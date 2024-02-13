@@ -107,10 +107,7 @@ struct CountrySymbol {}
 impl CountrySymbol {
     fn get_polygon_symbol(&self, feature: &Country) -> SimplePolygonSymbol {
         let stroke_color = feature.color;
-        let fill_color = Color {
-            a: if feature.is_selected() { 255 } else { 150 },
-            ..stroke_color
-        };
+        let fill_color = stroke_color.with_alpha(if feature.is_selected() { 255 } else { 150 });
         SimplePolygonSymbol::new(fill_color)
             .with_stroke_color(stroke_color)
             .with_stroke_width(2.0)

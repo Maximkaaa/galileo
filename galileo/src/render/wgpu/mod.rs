@@ -20,7 +20,7 @@ use crate::map::Map;
 use crate::render::render_bundle::tessellating::{
     PointInstance, PolyVertex, TessellatingRenderBundle,
 };
-use crate::render::render_bundle::RenderBundle;
+use crate::render::render_bundle::{RenderBundle, RenderBundleType};
 use crate::render::wgpu::pipelines::image::WgpuImage;
 use crate::render::wgpu::pipelines::Pipelines;
 use crate::view::MapView;
@@ -606,7 +606,9 @@ impl WgpuRenderer {
     }
 
     fn create_bundle(&self) -> RenderBundle {
-        RenderBundle::Tessellating(TessellatingRenderBundle::new())
+        RenderBundle(RenderBundleType::Tessellating(
+            TessellatingRenderBundle::new(),
+        ))
     }
 }
 
@@ -664,7 +666,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
 
     fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle> {
         match bundle {
-            RenderBundle::Tessellating(inner) => {
+            RenderBundle(RenderBundleType::Tessellating(inner)) => {
                 Box::new(WgpuPackedBundle::new(inner, self.renderer, self.render_set))
             }
         }

@@ -1,14 +1,41 @@
+//! This module contains traits and structs that provide interactivity of a Galileo map.
+//!
+//! User interaction handling is done in several steps:
+//! 1. OS event is converted to a common [`RawUserEvent`] enum. For example, apps that use `winit` can use
+//! [`WinitInputHandler`](crate::winit::WinitInputHandler) to convert [winit::event::WindowEvent] into `RawUserEvent`.
+//! 2. `RawUserEvent` is given to the [`EventProcessor`], that converts it into a [`UserEvent`]. `EventProcessor`
+//! keeps track of input state (which keys, modifiers and mouse buttons) are pressed, and provides a more convenient
+//! way to handle user interactions for the application.
+//! 3. `EventProcessor` has a list of [`UserEventHandler`]s, which change the state of application based on the events.
+//!
+//! To write a user interaction logic, the app must provide an implementation of [`UserEventHandler`] trait (or use
+//! a provided one like [`CustomEventHandler`]) and add it to the `EventProcessor` handler list.
+
 use crate::map::Map;
 use crate::render::Renderer;
 use galileo_types::cartesian::impls::point::Point2d;
+use maybe_sync::{MaybeSend, MaybeSync};
 use nalgebra::Vector2;
 
-pub mod custom;
-pub mod event_processor;
-pub mod map;
+mod event_processor;
+mod map;
 
+pub use event_processor::EventProcessor;
+pub use map::MapController;
+
+/// User input handler.
 pub trait UserEventHandler {
+    /// Handle the event.
     fn handle(&self, event: &UserEvent, map: &mut Map, backend: &dyn Renderer) -> EventPropagation;
+}
+
+impl<T: Fn(&UserEvent, &mut Map, &dyn Renderer) -> EventPropagation> UserEventHandler for T
+where
+    T: MaybeSync + MaybeSend,
+{
+    fn handle(&self, event: &UserEvent, map: &mut Map, backend: &dyn Renderer) -> EventPropagation {
+        self(event, map, backend)
+    }
 }
 
 pub enum RawUserEvent {

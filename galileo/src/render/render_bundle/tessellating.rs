@@ -28,7 +28,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
-pub struct TessellatingRenderBundle {
+pub(crate) struct TessellatingRenderBundle {
     pub poly_tessellation: VertexBuffers<PolyVertex, u32>,
     pub points: Vec<PointInstance>,
     pub screen_ref: ScreenRefTessellation,
@@ -44,14 +44,14 @@ pub(crate) type ScreenRefTessellation = VertexBuffers<ScreenRefVertex, u32>;
 
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
-pub struct ScreenRefVertex {
+pub(crate) struct ScreenRefVertex {
     position: [f32; 3],
     normal: [f32; 2],
     color: [u8; 4],
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum PrimitiveInfo {
+pub(crate) enum PrimitiveInfo {
     Vacant,
     MapRef { vertex_range: Range<usize> },
     ScreenRef { vertex_range: Range<usize> },
@@ -1095,7 +1095,7 @@ impl FillVertexConstructor<ScreenRefVertex> for ScreenRefVertexConstructor {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
-pub struct PolyVertex {
+pub(crate) struct PolyVertex {
     pub position: [f32; 3],
     pub color: [f32; 4],
     pub normal: [f32; 2],
@@ -1104,14 +1104,14 @@ pub struct PolyVertex {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct PointInstance {
+pub(crate) struct PointInstance {
     pub position: [f32; 3],
     pub color: [u8; 4],
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct ImageVertex {
+pub(crate) struct ImageVertex {
     pub position: [f32; 2],
     pub opacity: f32,
     pub tex_coords: [f32; 2],

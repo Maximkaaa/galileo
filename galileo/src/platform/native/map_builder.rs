@@ -6,7 +6,7 @@ use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::rayon_provider::RayonProvider;
 use crate::layer::{RasterTileLayer, VectorTileLayer};
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
-use crate::render::render_bundle::RenderBundle;
+use crate::render::render_bundle::{RenderBundle, RenderBundleType};
 use crate::tile_scheme::TileIndex;
 use crate::{MapBuilder, TileSchema};
 use galileo_types::geo::impls::point::GeoPoint2d;
@@ -72,7 +72,9 @@ impl MapBuilder {
                 crate::layer::vector_tile_layer::tile_provider::vt_processor::VtProcessor {},
                 FileCacheController::new(".tile_cache"),
             ),
-            RenderBundle::Tessellating(TessellatingRenderBundle::new()),
+            RenderBundle(RenderBundleType::Tessellating(
+                TessellatingRenderBundle::new(),
+            )),
         );
 
         VectorTileLayer::from_url(tile_provider, style, tile_scheme)
