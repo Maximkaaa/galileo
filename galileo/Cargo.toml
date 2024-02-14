@@ -10,7 +10,7 @@ documentation = "https://docs.rs/galileo"
 description = "Cross-platform general purpose map rendering engine"
 readme = "../README.md"
 exclude = [
-    "examples",
+    "examples/data",
 ]
 
 [lib]
