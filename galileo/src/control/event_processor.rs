@@ -3,8 +3,7 @@ use crate::control::{
     UserEventHandler,
 };
 use crate::map::Map;
-use galileo_types::cartesian::CartesianPoint2d;
-use galileo_types::cartesian::Point2d;
+use galileo_types::cartesian::{CartesianPoint2d, Point2d};
 use web_time::SystemTime;
 
 const DRAG_THRESHOLD: f64 = 3.0;

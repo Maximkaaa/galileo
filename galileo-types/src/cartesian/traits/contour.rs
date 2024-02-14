@@ -97,10 +97,8 @@ mod tests {
 
     #[test]
     fn iter_points_closing() {
-        let contour = crate::impls::Contour::open(vec![
-            Point2d::new(0.0, 0.0),
-            Point2d::new(1.0, 1.0),
-        ]);
+        let contour =
+            crate::impls::Contour::open(vec![Point2d::new(0.0, 0.0), Point2d::new(1.0, 1.0)]);
         assert_eq!(contour.iter_points_closing().count(), 2);
         assert_eq!(
             *contour.iter_points_closing().last().unwrap(),
@@ -122,10 +120,8 @@ mod tests {
         let contour = crate::impls::Contour::open(vec![Point2d::new(0.0, 0.0)]);
         assert_eq!(contour.iter_segments().count(), 0);
 
-        let contour = crate::impls::Contour::open(vec![
-            Point2d::new(0.0, 0.0),
-            Point2d::new(1.0, 1.0),
-        ]);
+        let contour =
+            crate::impls::Contour::open(vec![Point2d::new(0.0, 0.0), Point2d::new(1.0, 1.0)]);
         assert_eq!(contour.iter_segments().count(), 1);
         assert_eq!(
             contour.iter_segments().last().unwrap(),

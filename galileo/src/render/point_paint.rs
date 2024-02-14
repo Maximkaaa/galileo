@@ -1,3 +1,5 @@
+//! [`PointPaint`] specifies the way a point should be drawn to the map.
+
 use crate::decoded_image::DecodedImage;
 use crate::render::{LineCap, LinePaint};
 use crate::Color;
@@ -5,6 +7,7 @@ use galileo_types::impls::ClosedContour;
 use nalgebra::{Point2, Vector2};
 use std::sync::Arc;
 
+/// Specifies the way a point should be drawn to the map.
 #[derive(Debug, Clone)]
 pub struct PointPaint<'a> {
     pub(crate) shape: PointShape<'a>,
@@ -12,6 +15,7 @@ pub struct PointPaint<'a> {
 }
 
 impl<'a> PointPaint<'a> {
+    /// Creates a paint that draws a circle of fixed diameter (in pixels) not dependant on map resolution.
     pub fn circle(color: Color, diameter: f32) -> Self {
         Self {
             offset: Vector2::default(),
@@ -23,6 +27,7 @@ impl<'a> PointPaint<'a> {
         }
     }
 
+    /// Creates a paint that draws a sector of a circle of fixed diameter (in pixels) not dependant on map resolution.
     pub fn sector(color: Color, diameter: f32, start_angle: f32, end_angle: f32) -> Self {
         Self {
             offset: Vector2::default(),
@@ -36,6 +41,7 @@ impl<'a> PointPaint<'a> {
         }
     }
 
+    /// Creates a paint that draws a square of fixed size (in pixels).
     pub fn square(color: Color, size: f32) -> Self {
         Self {
             offset: Vector2::default(),
@@ -47,6 +53,7 @@ impl<'a> PointPaint<'a> {
         }
     }
 
+    /// Creates a paint that draws a single one-pixel dot of given color.
     pub fn dot(color: Color) -> Self {
         Self {
             offset: Vector2::default(),
@@ -54,6 +61,7 @@ impl<'a> PointPaint<'a> {
         }
     }
 
+    /// Creates a paint that draws a given shape (in screen coordinates).
     pub fn shape(color: Color, contour: &'a ClosedContour<Point2<f32>>, scale: f32) -> Self {
         Self {
             offset: Vector2::default(),
@@ -66,6 +74,8 @@ impl<'a> PointPaint<'a> {
         }
     }
 
+    /// Creates a paint that draws a point as an image of fixed pixel size. Offset is given as a portion of image size,
+    /// e.g. offset `[0.5, 1.0]` will create an image with anchor point at the center-bottom point of the image.
     pub fn image(image: Arc<DecodedImage>, offset: Vector2<f32>, scale: f32) -> Self {
         let width = image.dimensions.0 as f32 * scale;
         let height = image.dimensions.1 as f32 * scale;
@@ -80,6 +90,7 @@ impl<'a> PointPaint<'a> {
         }
     }
 
+    /// Sets an outline for the symbol (if applicable).
     pub fn with_outline(mut self, color: Color, width: f32) -> Self {
         match &mut self.shape {
             PointShape::Circle { outline, .. }

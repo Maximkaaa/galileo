@@ -1,22 +1,21 @@
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
-use galileo::galileo_map::MapBuilder;
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
 use galileo::layer::vector_tile_layer::VectorTileLayer;
-use galileo::lod::Lod;
 use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
-use galileo_types::cartesian::impls::point::Point2d;
-use galileo_types::geo::crs::Crs;
+use galileo::{Lod, MapBuilder};
+use galileo_types::cartesian::Point2d;
+use galileo_types::geo::Crs;
 use std::sync::{Arc, RwLock};
 
 #[cfg(not(target_arch = "wasm32"))]
 use galileo::layer::{
     data_provider::{FileCacheController, UrlDataProvider},
-    vector_tile_layer::tile_provider::{rayon_provider::RayonProvider, vt_processor::VtProcessor},
+    vector_tile_layer::tile_provider::{ThreadedProvider, VtProcessor},
 };
 
 #[cfg(not(target_arch = "wasm32"))]
 type VectorTileProvider =
-    RayonProvider<UrlDataProvider<TileIndex, VtProcessor, FileCacheController>>;
+    ThreadedProvider<UrlDataProvider<TileIndex, VtProcessor, FileCacheController>>;
 
 #[cfg(target_arch = "wasm32")]
 use galileo::layer::vector_tile_layer::tile_provider::web_worker_provider::WebWorkerVectorTileProvider;
@@ -58,7 +57,7 @@ pub async fn run(builder: MapBuilder, style: VectorTileStyle) {
 
     builder
         .with_layer(layer.clone())
-        .with_event_handler(move |ev, map, _| match ev {
+        .with_event_handler(move |ev, map| match ev {
             UserEvent::Click(MouseButton::Left, mouse_event) => {
                 let view = map.view().clone();
                 let position = map
@@ -101,8 +100,6 @@ pub fn tile_scheme() -> TileSchema {
         tile_width: 1024,
         tile_height: 1024,
         y_direction: VerticalDirection::TopToBottom,
-        max_tile_scale: 8.0,
-        cycle_x: true,
         crs: Crs::EPSG3857,
     }
 }

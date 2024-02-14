@@ -1,7 +1,6 @@
 use crate::cartesian::NewCartesianPoint2d;
 use crate::geo::datum::Datum;
-use crate::geo::impls::projection::GeodesyProjection;
-use crate::geo::impls::projection::WebMercator;
+use crate::geo::impls::projection::{GeodesyProjection, WebMercator};
 use crate::geo::traits::point::NewGeoPoint;
 use crate::geo::traits::projection::Projection;
 use serde::{Deserialize, Serialize};
@@ -49,7 +48,7 @@ impl Crs {
     }
 
     /// Returns a projection that converts geographic coordinates into the coordinates of this CRS.
-    /// 
+    ///
     /// Returns `None` if the CRS coordinates cannot be projected from geographic coordinates.
     pub fn get_projection<In, Out>(
         &self,

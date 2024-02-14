@@ -1,5 +1,4 @@
-use crate::cartesian::CartesianPoint2d;
-use crate::cartesian::Rect;
+use crate::cartesian::{CartesianPoint2d, Rect};
 use crate::geo::Projection;
 use crate::geometry::{
     CartesianGeometry2d, CartesianGeometry2dSpecialization, Geom, GeometrySpecialization,

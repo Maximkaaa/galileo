@@ -1,5 +1,4 @@
-use crate::cartesian::Rect;
-use crate::cartesian::{CartesianPoint2d, CartesianPolygon};
+use crate::cartesian::{CartesianPoint2d, CartesianPolygon, Rect};
 use crate::contour::Contour;
 use crate::geo::Projection;
 use crate::geometry::{

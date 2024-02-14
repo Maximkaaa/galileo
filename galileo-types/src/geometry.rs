@@ -3,15 +3,10 @@
 //! * [`CartesianGeometry2d`] for projected geometries.
 //! * [`Geom`] enum that includes all geometry types to allow functions to operation on all of them
 
-use crate::cartesian::CartesianPoint2d;
-use crate::cartesian::Rect;
+use crate::cartesian::{CartesianPoint2d, Rect};
 use crate::geo::Projection;
 use crate::geometry_type::{CartesianSpace2d, GeometryType, PointGeometryType};
-use crate::impls::Contour;
-use crate::impls::MultiContour;
-use crate::impls::MultiPoint;
-use crate::impls::MultiPolygon;
-use crate::impls::Polygon;
+use crate::impls::{Contour, MultiContour, MultiPoint, MultiPolygon, Polygon};
 
 /// Enum of different geometry types. This enum implements the [`Geometry`] trait so you can use any generic geometry
 /// method without knowing a specific geometry type you are working with.

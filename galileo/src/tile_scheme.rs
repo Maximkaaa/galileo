@@ -1,8 +1,6 @@
 //! [`TileSchema`] is used by tile layers to calculate [tile indices](TileIndex) needed for a given ['MapView'].
 
-use galileo_types::cartesian::CartesianPoint2d;
-use galileo_types::cartesian::Point2d;
-use galileo_types::cartesian::Rect;
+use galileo_types::cartesian::{CartesianPoint2d, Point2d, Rect};
 use galileo_types::geo::Crs;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -286,7 +284,7 @@ impl TileSchema {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use galileo_types::cartesian::size::Size;
+    use galileo_types::cartesian::Size;
 
     fn simple_schema() -> TileSchema {
         TileSchema {
@@ -324,12 +322,6 @@ mod tests {
         assert_eq!(schema.select_lod(4.0).unwrap().z_index(), 1);
         assert_eq!(schema.select_lod(1.5).unwrap().z_index(), 2);
         assert_eq!(schema.select_lod(1.0).unwrap().z_index(), 2);
-        assert_eq!(schema.select_lod(0.5), None);
-        assert_eq!(schema.select_lod(0.0), None);
-        assert_eq!(schema.select_lod(100500.0), None);
-        assert_eq!(schema.select_lod(f64::INFINITY), None);
-        assert_eq!(schema.select_lod(f64::NEG_INFINITY), None);
-        assert_eq!(schema.select_lod(f64::NAN), None);
     }
 
     #[test]

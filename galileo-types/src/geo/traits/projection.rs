@@ -45,7 +45,7 @@ impl<IN, OUT> Projection for InvertedProjection<IN, OUT> {
 }
 
 /// Chain two projections together.
-/// 
+///
 /// The chain projection does two consequent projections on the point, e.g. first project it with the first projection,
 /// and then project with the second projection, and return the result. `unproject` does projection in the reverse
 /// order.

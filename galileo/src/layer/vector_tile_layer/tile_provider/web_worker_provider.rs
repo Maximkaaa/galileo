@@ -314,7 +314,7 @@ async fn try_load_tile(payload: LoadTilePayload) -> Result<DecodedVectorTile, Ga
     let context = VectorTileDecodeContext {
         index: payload.index,
         style: payload.style,
-        tile_scheme: payload.tile_scheme,
+        tile_schema: payload.tile_scheme,
         bundle: RenderBundle::Tessellating(TessellatingRenderBundle::new()),
     };
 

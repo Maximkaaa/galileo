@@ -20,8 +20,7 @@
 //! deals with the last segment of closed contours with [`Contour::iter_points_closing`] and
 //! [`Contour::iter_segments`] methods instead.
 
-use crate::cartesian::CartesianPoint2d;
-use crate::cartesian::Rect;
+use crate::cartesian::{CartesianPoint2d, Rect};
 use crate::geo::Projection;
 use crate::geometry::{CartesianGeometry2dSpecialization, Geom, Geometry, GeometrySpecialization};
 use crate::geometry_type::{CartesianSpace2d, ContourGeometryType, GeometryType};

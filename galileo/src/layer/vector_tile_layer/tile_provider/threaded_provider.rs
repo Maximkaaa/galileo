@@ -14,7 +14,8 @@ use maybe_sync::{MaybeSend, MaybeSync};
 use quick_cache::unsync::Cache;
 use std::sync::{Arc, Mutex, RwLock};
 
-pub struct RayonProvider<Provider>
+/// Provider that uses background threads to load, decode and pack vector tiles.
+pub struct ThreadedProvider<Provider>
 where
     Provider: DataProvider<TileIndex, (RenderBundle, MvtTile), VectorTileDecodeContext>
         + MaybeSend
@@ -28,7 +29,7 @@ where
     empty_bundle: RenderBundle,
 }
 
-impl<Provider> Clone for RayonProvider<Provider>
+impl<Provider> Clone for ThreadedProvider<Provider>
 where
     Provider: DataProvider<TileIndex, (RenderBundle, MvtTile), VectorTileDecodeContext>
         + MaybeSend
@@ -46,7 +47,7 @@ where
     }
 }
 
-impl<Provider> VectorTileProvider for RayonProvider<Provider>
+impl<Provider> VectorTileProvider for ThreadedProvider<Provider>
 where
     Provider: DataProvider<TileIndex, (RenderBundle, MvtTile), VectorTileDecodeContext>
         + MaybeSend
@@ -95,13 +96,14 @@ where
     }
 }
 
-impl<Provider> RayonProvider<Provider>
+impl<Provider> ThreadedProvider<Provider>
 where
     Provider: DataProvider<TileIndex, (RenderBundle, MvtTile), VectorTileDecodeContext>
         + MaybeSend
         + MaybeSync
         + 'static,
 {
+    /// Creates a new provider.
     pub fn new(
         messenger: Option<Box<dyn Messenger>>,
         tile_scheme: TileSchema,
@@ -142,7 +144,7 @@ where
     }
 
     fn load_tile_internal(&self, index: TileIndex, style: &VectorTileStyle) {
-        let provider: RayonProvider<Provider> = (*self).clone();
+        let provider: ThreadedProvider<Provider> = (*self).clone();
         let style = style.clone();
         crate::async_runtime::spawn(async move {
             match provider.clone().load_tile_async(index, style).await {
@@ -191,7 +193,7 @@ where
         let context = VectorTileDecodeContext {
             index,
             style: style.clone(),
-            tile_scheme: self.tile_schema.clone(),
+            tile_schema: self.tile_schema.clone(),
             bundle,
         };
         let (bundle, mvt_tile) = self.data_provider.decode(bytes, context)?;

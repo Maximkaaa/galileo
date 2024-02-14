@@ -1,15 +1,23 @@
-use galileo_types::cartesian::CartesianPoint2d;
-use galileo_types::cartesian::Point2d;
-use galileo_types::cartesian::Rect;
-use galileo_types::cartesian::Size;
+use galileo_types::cartesian::{CartesianPoint2d, Point2d, Rect, Size};
 use galileo_types::geo::impls::GeoPoint2d;
-use galileo_types::geo::Crs;
-use galileo_types::geo::GeoPoint;
+use galileo_types::geo::{Crs, GeoPoint};
 use nalgebra::{
     Matrix4, OMatrix, Perspective3, Point2, Point3, Rotation3, Scale3, Translation3, Vector2,
     Vector3, U4,
 };
 
+/// Map view specifies the area of the map that should be drawn. In other words, it sets the position of "camera" that
+/// looks at the map.
+///
+/// The main view parameters are:
+/// * position - coordinates of the point in the center of the map
+/// * resolution - number of map units in a single pixel at the center of the map
+/// * size - size of the rendering area in pixels
+/// * crs - coordinate system that the map will be rendered to. This specifies the geographic projection that the map is
+///   displayed in. Note, that currently geographic CRSs are not supported, and a map with such a view will not be
+///   drawn.
+///
+/// The view can also specify rotation along *x* (tilt) and *z* (rotation) axis.
 #[derive(Debug, Clone)]
 pub struct MapView {
     projected_position: Option<Point3<f64>>,
@@ -21,14 +29,12 @@ pub struct MapView {
 }
 
 impl MapView {
+    /// Creates a new view with the given position and resolution with default CRS (web-mercator EPSG:3857).
     pub fn new(position: &impl GeoPoint<Num = f64>, resolution: f64) -> Self {
         Self::new_with_crs(position, resolution, Crs::EPSG3857)
     }
 
-    pub fn new_typed(position: GeoPoint2d, resolution: f64) -> MapView {
-        Self::new(&position, resolution)
-    }
-
+    /// Creates a new view with the given CRS.
     pub fn new_with_crs(position: &impl GeoPoint<Num = f64>, resolution: f64, crs: Crs) -> Self {
         let projected = crs
             .get_projection()
@@ -44,10 +50,12 @@ impl MapView {
         }
     }
 
+    /// Creates a new view, taking position value as projected coordinates. Default CRS is used (EPSG:3857).
     pub fn new_projected(position: &impl CartesianPoint2d<Num = f64>, resolution: f64) -> Self {
         Self::new_projected_with_crs(position, resolution, Crs::EPSG3857)
     }
 
+    /// Creates a new view, taking position value as projected coordinates.
     pub fn new_projected_with_crs(
         position: &impl CartesianPoint2d<Num = f64>,
         resolution: f64,
@@ -63,10 +71,14 @@ impl MapView {
         }
     }
 
+    /// CRS of the view.
     pub fn crs(&self) -> &Crs {
         &self.crs
     }
 
+    /// Position of the center point of the map (screen).
+    ///
+    /// If the projected position cannot be projected into geographic coordinates, `None` is returned.
     pub fn position(&self) -> Option<GeoPoint2d> {
         self.projected_position.and_then(|p| {
             self.crs
@@ -75,10 +87,12 @@ impl MapView {
         })
     }
 
+    /// Resolution at the center of the map.
     pub fn resolution(&self) -> f64 {
         self.resolution
     }
 
+    /// Creates a new view, same as the current one, but with the given resolution.
     pub fn with_resolution(&self, resolution: f64) -> Self {
         Self {
             resolution,
@@ -87,10 +101,12 @@ impl MapView {
         }
     }
 
+    /// Size of the view in pixels.
     pub fn size(&self) -> Size {
         self.size
     }
 
+    /// Creates a new view, same as the current one, but with the given size.
     pub fn with_size(&self, new_size: Size) -> Self {
         Self {
             size: new_size,
@@ -99,6 +115,7 @@ impl MapView {
         }
     }
 
+    /// Returns bounding rectangle of the view (in projected coordinates).
     pub fn get_bbox(&self) -> Option<Rect> {
         let points = [
             Point2::new(0.0, 0.0),
@@ -160,23 +177,32 @@ impl MapView {
         .to_homogeneous()
     }
 
+    /// Returns transformation matrix that transforms map coordinates to scene coordinates.
+    ///
+    /// Scene coordinates are `[-1.0, 1.0]` coordinates of the render area with *Y* going from bottom to top.
     pub fn map_to_scene_transform(&self) -> Option<OMatrix<f64, U4, U4>> {
         let scale = Scale3::new(1.0, 1.0, 0.5).to_homogeneous();
         Some(scale * self.map_to_screen_center_transform()?)
     }
 
+    /// Returns transformation matrix that transforms map coordinates to scene coordinates.
+    ///
+    /// Scene coordinates are `[-1.0, 1.0]` coordinates of the render area with *Y* going from bottom to top.
     pub fn map_to_scene_mtx(&self) -> Option<[[f32; 4]; 4]> {
         Some(self.map_to_scene_transform()?.cast::<f32>().data.0)
     }
 
+    /// Rotation angle around *X* axis in radians (tilt).
     pub fn rotation_x(&self) -> f64 {
         self.rotation_x
     }
 
+    /// Rotation angle around *Z* axis in radians.
     pub fn rotation_z(&self) -> f64 {
         self.rotation_z
     }
 
+    /// Creates a new view, same as the current one, but with the given rotation x.
     pub fn with_rotation_x(&self, rotation_x: f64) -> Self {
         Self {
             rotation_x,
@@ -185,6 +211,7 @@ impl MapView {
         }
     }
 
+    /// Creates a new view, same as the current one, but with the given rotation z.
     pub fn with_rotation_z(&self, rotation_z: f64) -> Self {
         Self {
             rotation_z,
@@ -193,6 +220,7 @@ impl MapView {
         }
     }
 
+    /// Creates a new view, same as the current one, but with the given rotation values.
     pub fn with_rotation(&self, rotation_x: f64, rotation_z: f64) -> Self {
         Self {
             rotation_x,
@@ -202,6 +230,10 @@ impl MapView {
         }
     }
 
+    /// Projects the given screen point into map coordinates at the 0 elevation.
+    ///
+    /// Returns `None` if the point is outside of map (this can be possible, if the map is tilted and the point is
+    /// above the horizon, or if the point is outside the projection bounds).
     pub fn screen_to_map(&self, px_position: Point2d) -> Option<Point2d> {
         // todo: this must be calculated with matrices somehow but I'm not bright enough
         // to figure out how to do it...
@@ -234,6 +266,11 @@ impl MapView {
         Some(Point2::new(transformed.x, transformed.y))
     }
 
+    /// Projects the given screen point into map coordinates at the 0 elevation, and then projects them into
+    /// geographic coordinates.
+    ///
+    /// Returns `None` if the point is outside of map (this can be possible, if the map is tilted and the point is
+    /// above the horizon, or if the point is outside the projection bounds).
     pub fn screen_to_map_geo(&self, px_position: Point2d) -> Option<GeoPoint2d> {
         self.screen_to_map(px_position).and_then(|p| {
             self.crs
@@ -242,6 +279,8 @@ impl MapView {
         })
     }
 
+    /// Creates a new view, same as the current one, but translated so that point `from` on the current view becomes
+    /// the point `to` in the new view.
     pub fn translate_by_pixels(&self, from: Point2d, to: Point2d) -> Self {
         let Some(from_projected) = self.screen_to_map(from) else {
             return self.clone();
@@ -263,6 +302,7 @@ impl MapView {
         self.translate(delta.xy())
     }
 
+    /// Move the vew by the given projected coorinates delta.
     pub fn translate(&self, delta: Vector2<f64>) -> Self {
         match self.projected_position {
             Some(v) => {

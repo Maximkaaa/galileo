@@ -12,8 +12,7 @@ use std::sync::Arc;
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::error::GalileoError;
-use galileo_types::impls::Contour;
-use galileo_types::impls::Polygon;
+use galileo_types::impls::{Contour, Polygon};
 #[cfg(not(target_arch = "wasm32"))]
 use std::ops::Deref;
 
@@ -56,6 +55,8 @@ impl<F> Symbol<F> for CirclePointSymbol {
     }
 }
 
+/// Symbol that renders a point with an image. The image size is fixed on the screen and does not depend on map
+/// resolution.
 pub struct ImagePointSymbol {
     image: Arc<DecodedImage>,
     offset: Vector2<f32>,
@@ -63,6 +64,7 @@ pub struct ImagePointSymbol {
 }
 
 impl ImagePointSymbol {
+    /// Loads the image from the file system path.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn from_path(path: &str, offset: Vector2<f32>, scale: f32) -> Result<Self, GalileoError> {
         use image::GenericImageView;

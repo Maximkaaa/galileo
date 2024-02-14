@@ -1,5 +1,4 @@
-use crate::cartesian::CartesianPoint2d;
-use crate::cartesian::Orientation;
+use crate::cartesian::{CartesianPoint2d, Orientation};
 use num_traits::{One, Zero};
 
 /// A strait line segment between two points.

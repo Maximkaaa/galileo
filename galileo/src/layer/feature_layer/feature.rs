@@ -2,10 +2,7 @@ use galileo_types::cartesian::{Point2d, Point3d};
 use galileo_types::geo::impls::GeoPoint2d;
 use galileo_types::geometry::Geometry;
 use galileo_types::geometry_type::GeometryType;
-use galileo_types::impls::Contour;
-use galileo_types::impls::MultiContour;
-use galileo_types::impls::MultiPolygon;
-use galileo_types::impls::Polygon;
+use galileo_types::impls::{Contour, MultiContour, MultiPolygon, Polygon};
 use galileo_types::Disambig;
 
 /// A feature is an arbitrary geographic object.

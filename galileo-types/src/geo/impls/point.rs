@@ -52,7 +52,7 @@ impl Geometry for GeoPoint2d {
 }
 
 /// Creates a new GeoPoint2d from latitude and longitude values (in degrees).
-/// 
+///
 /// ```
 /// use galileo_types::geo::GeoPoint;
 /// use galileo_types::latlon;
@@ -63,6 +63,8 @@ impl Geometry for GeoPoint2d {
 #[macro_export]
 macro_rules! latlon {
     ($lat:expr, $lon:expr) => {
-        <galileo_types::geo::impls::point::GeoPoint2d as galileo_types::geo::traits::point::NewGeoPoint<f64>>::latlon($lat, $lon)
+        <::galileo_types::geo::impls::GeoPoint2d as ::galileo_types::geo::NewGeoPoint<f64>>::latlon(
+            $lat, $lon,
+        )
     };
 }

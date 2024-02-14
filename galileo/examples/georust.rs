@@ -1,11 +1,10 @@
-use galileo::galileo_map::MapBuilder;
 use galileo::layer::feature_layer::{FeatureLayer, FeatureLayerOptions};
-use galileo::symbol::point::ImagePointSymbol;
+use galileo::symbol::ImagePointSymbol;
 use galileo::tile_scheme::TileSchema;
-use galileo_types::disambig::{Disambig, Disambiguate};
-use galileo_types::geo::crs::Crs;
+use galileo::MapBuilder;
+use galileo_types::geo::Crs;
 use galileo_types::geometry_type::GeoSpace2d;
-use galileo_types::latlon;
+use galileo_types::{latlon, Disambig, Disambiguate};
 use geozero::geojson::GeoJson;
 use geozero::ToGeo;
 use nalgebra::Vector2;

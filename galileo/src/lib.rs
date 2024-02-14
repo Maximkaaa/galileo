@@ -13,7 +13,7 @@
 //! use galileo::layer::FeatureLayer;
 //! use galileo::symbol::CirclePointSymbol;
 //! use galileo::galileo_types::latlon;
-//! use galileo_types::geo::crs::Crs;
+//! use galileo_types::geo::Crs;
 //! use galileo::Color;
 //!
 //! # tokio_test::block_on(async {
@@ -96,8 +96,8 @@ pub use galileo_map::{GalileoMap, MapBuilder};
 pub use color::Color;
 pub use layer::feature_layer::symbol;
 pub use lod::Lod;
-pub use map::Map;
-pub use messenger::Messenger;
+pub use map::{LayerCollection, Map};
+pub use messenger::{DummyMessenger, Messenger};
 pub use tile_scheme::TileSchema;
 pub use view::MapView;
 

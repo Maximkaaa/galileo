@@ -5,15 +5,12 @@ use crate::messenger::Messenger;
 use crate::render::{Canvas, RenderOptions};
 use crate::view::MapView;
 use feature_render_store::FeatureRenderStore;
-use galileo_types::cartesian::Rect;
-use galileo_types::cartesian::{CartesianPoint2d, NewCartesianPoint2d, NewCartesianPoint3d};
-use galileo_types::cartesian::{Point2d, Point3d};
-use galileo_types::geo::impls::projection::AddDimensionProjection;
-use galileo_types::geo::impls::projection::IdentityProjection;
+use galileo_types::cartesian::{
+    CartesianPoint2d, NewCartesianPoint2d, NewCartesianPoint3d, Point2d, Point3d, Rect,
+};
+use galileo_types::geo::impls::projection::{AddDimensionProjection, IdentityProjection};
 use galileo_types::geo::impls::GeoPoint2d;
-use galileo_types::geo::Crs;
-use galileo_types::geo::NewGeoPoint;
-use galileo_types::geo::{ChainProjection, InvertedProjection, Projection};
+use galileo_types::geo::{ChainProjection, Crs, InvertedProjection, NewGeoPoint, Projection};
 use galileo_types::geometry::{CartesianGeometry2d, Geom, Geometry};
 use galileo_types::geometry_type::{CartesianSpace2d, CartesianSpace3d, GeoSpace2d};
 use maybe_sync::{MaybeSend, MaybeSync};

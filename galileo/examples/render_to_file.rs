@@ -8,18 +8,14 @@
 //! ```
 
 use anyhow::{anyhow, Result};
-use galileo::layer::data_provider::file_cache::FileCacheController;
-use galileo::layer::data_provider::url_image_provider::UrlImageProvider;
+use galileo::layer::data_provider::{FileCacheController, UrlImageProvider};
 use galileo::layer::{FeatureLayer, RasterTileLayer};
-use galileo::map::Map;
-use galileo::messenger::{DummyMessenger, Messenger};
-use galileo::render::wgpu::WgpuRenderer;
-use galileo::symbol::arbitrary::ArbitraryGeometrySymbol;
+use galileo::render::WgpuRenderer;
+use galileo::symbol::ArbitraryGeometrySymbol;
 use galileo::tile_scheme::TileIndex;
-use galileo::view::MapView;
-use galileo::TileSchema;
-use galileo_types::cartesian::size::Size;
-use galileo_types::geo::crs::Crs;
+use galileo::{DummyMessenger, Map, MapView, Messenger, TileSchema};
+use galileo_types::cartesian::Size;
+use galileo_types::geo::Crs;
 use geojson::{FeatureCollection, GeoJson};
 use image::{ImageBuffer, Rgba};
 use std::sync::Arc;
@@ -66,7 +62,7 @@ async fn main() -> Result<()> {
 
     // Create OSM layer for background
     let cache_controller = Some(FileCacheController::new(".tile_cache"));
-    let tile_provider = UrlImageProvider::new(
+    let tile_provider = UrlImageProvider::new_cached(
         |index: &TileIndex| {
             format!(
                 "https://tile.openstreetmap.org/{}/{}/{}.png",

@@ -3,8 +3,7 @@ use crate::symbol::{CirclePointSymbol, SimpleContourSymbol, SimplePolygonSymbol,
 use crate::Color;
 use galileo_types::cartesian::CartesianPoint3d;
 use galileo_types::geometry::Geom;
-use galileo_types::impls::Contour;
-use galileo_types::impls::Polygon;
+use galileo_types::impls::{Contour, Polygon};
 use num_traits::AsPrimitive;
 
 /// Renders any type of the geometry with the set inner symbols.

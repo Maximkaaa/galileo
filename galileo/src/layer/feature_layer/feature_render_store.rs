@@ -1,8 +1,7 @@
 use crate::render::render_bundle::{RenderBundle, RenderPrimitive};
 use crate::render::{Canvas, PackedBundle, PrimitiveId};
 use galileo_types::cartesian::Point3d;
-use galileo_types::impls::Contour;
-use galileo_types::impls::Polygon;
+use galileo_types::impls::{Contour, Polygon};
 use std::collections::{HashMap, HashSet};
 
 pub(super) struct FeatureRenderStore {

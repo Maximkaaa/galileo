@@ -7,20 +7,23 @@ use crate::tile_scheme::TileIndex;
 use crate::TileSchema;
 use bytes::Bytes;
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
-use galileo_types::cartesian::CartesianPoint2d;
-use galileo_types::cartesian::Point3d;
-use galileo_types::cartesian::Rect;
-use galileo_types::impls::ClosedContour;
-use galileo_types::impls::Polygon;
+use galileo_types::cartesian::{CartesianPoint2d, Point3d, Rect};
+use galileo_types::impls::{ClosedContour, Polygon};
 use galileo_types::Contour;
 use num_traits::ToPrimitive;
 
+/// Data processor that decodes vector tiles.
 pub struct VtProcessor {}
 
+/// Vector tiles decoding context.
 pub struct VectorTileDecodeContext {
+    /// Index of the tile.
     pub index: TileIndex,
+    /// Vector tile layer style.
     pub style: VectorTileStyle,
-    pub tile_scheme: TileSchema,
+    /// Vector tile layer tile schema.
+    pub tile_schema: TileSchema,
+    /// Render bundle to add render primitives to.
     pub bundle: RenderBundle,
 }
 
@@ -39,7 +42,7 @@ impl DataProcessor for VtProcessor {
             mut bundle,
             index,
             style,
-            tile_scheme,
+            tile_schema: tile_scheme,
         } = context;
         Self::prepare(&mvt_tile, &mut bundle, index, &style, &tile_scheme)?;
 

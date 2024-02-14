@@ -9,7 +9,7 @@ use crate::polygon::Polygon;
 use std::marker::PhantomData;
 
 /// Wrapper type that disambiguates coordinate space for generic geometries.
-/// 
+///
 /// See [`Disambiguate`] trait documentation for details.
 pub struct Disambig<T, Space> {
     inner: T,

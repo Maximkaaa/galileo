@@ -1,10 +1,8 @@
 use crate::error::GalileoMvtError;
 use crate::vector_tile::tile::GeomType;
 use bytes::Buf;
-use galileo_types::cartesian::CartesianPoint2d;
-use galileo_types::cartesian::{CartesianClosedContour, Winding};
-use galileo_types::impls::Polygon;
-use galileo_types::impls::{ClosedContour, Contour};
+use galileo_types::cartesian::{CartesianClosedContour, CartesianPoint2d, Winding};
+use galileo_types::impls::{ClosedContour, Contour, Polygon};
 use nalgebra::Point2;
 use prost::Message;
 use serde::{Deserialize, Serialize};
