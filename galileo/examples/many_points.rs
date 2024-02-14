@@ -6,12 +6,12 @@ use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
 use galileo::tile_scheme::TileSchema;
 use galileo::Color;
-use galileo_types::cartesian::impls::contour::Contour;
 use galileo_types::cartesian::impls::point::Point3d;
-use galileo_types::cartesian::impls::polygon::Polygon;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
 use galileo_types::geo::crs::Crs;
 use galileo_types::geometry::Geom;
+use galileo_types::impls::contour::Contour;
+use galileo_types::impls::polygon::Polygon;
 use num_traits::AsPrimitive;
 
 #[cfg(not(target_arch = "wasm32"))]

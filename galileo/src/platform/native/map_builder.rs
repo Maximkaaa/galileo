@@ -1,7 +1,6 @@
-use crate::layer::data_provider::file_cache::FileCacheController;
-use crate::layer::data_provider::url_data_provider::UrlDataProvider;
-use crate::layer::data_provider::url_image_provider::UrlImageProvider;
-use crate::layer::data_provider::UrlSource;
+use crate::layer::data_provider::{
+    FileCacheController, UrlDataProvider, UrlImageProvider, UrlSource,
+};
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::rayon_provider::RayonProvider;
 use crate::layer::{RasterTileLayer, VectorTileLayer};
@@ -9,7 +8,7 @@ use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
 use crate::render::render_bundle::{RenderBundle, RenderBundleType};
 use crate::tile_scheme::TileIndex;
 use crate::{MapBuilder, TileSchema};
-use galileo_types::geo::impls::point::GeoPoint2d;
+use galileo_types::geo::impls::GeoPoint2d;
 
 impl MapBuilder {
     pub fn new() -> Self {

@@ -1,9 +1,10 @@
-use crate::cartesian::traits::cartesian_point::{NewCartesianPoint2d, NewCartesianPoint3d};
+use crate::cartesian::{NewCartesianPoint2d, NewCartesianPoint3d};
 use crate::geo::traits::point::NewGeoPoint;
 use crate::geo::traits::projection::Projection;
 use crate::geometry_type::{CartesianSpace2d, CartesianSpace3d, GeoSpace2d};
 use std::marker::PhantomData;
 
+/// Projection that doesn't change the input geometry (but may change the type of geometry).
 #[derive(Default)]
 pub struct IdentityProjection<IN, OUT, Space> {
     phantom_in: PhantomData<IN>,
@@ -12,6 +13,7 @@ pub struct IdentityProjection<IN, OUT, Space> {
 }
 
 impl<IN, OUT, Space> IdentityProjection<IN, OUT, Space> {
+    /// Creates a new instance.
     pub fn new() -> Self {
         Self {
             phantom_in: Default::default(),

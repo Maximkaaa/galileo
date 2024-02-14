@@ -1,7 +1,7 @@
-use crate::primitives::DecodedImage;
+use crate::decoded_image::DecodedImage;
 use crate::render::{LineCap, LinePaint};
 use crate::Color;
-use galileo_types::cartesian::impls::contour::ClosedContour;
+use galileo_types::impls::ClosedContour;
 use nalgebra::{Point2, Vector2};
 use std::sync::Arc;
 

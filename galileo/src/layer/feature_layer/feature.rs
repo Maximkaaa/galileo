@@ -1,15 +1,18 @@
-use galileo_types::cartesian::impls::contour::Contour;
-use galileo_types::cartesian::impls::multipolygon::MultiPolygon;
-use galileo_types::cartesian::impls::point::{Point2d, Point3d};
-use galileo_types::cartesian::impls::polygon::Polygon;
-use galileo_types::disambig::Disambig;
-use galileo_types::geo::impls::point::GeoPoint2d;
+use galileo_types::cartesian::{Point2d, Point3d};
+use galileo_types::geo::impls::GeoPoint2d;
 use galileo_types::geometry::Geometry;
 use galileo_types::geometry_type::GeometryType;
-use galileo_types::impls::multi_contour::MultiContour;
+use galileo_types::impls::Contour;
+use galileo_types::impls::MultiContour;
+use galileo_types::impls::MultiPolygon;
+use galileo_types::impls::Polygon;
+use galileo_types::Disambig;
 
+/// A feature is an arbitrary geographic object.
 pub trait Feature {
+    /// Type of the geometry the feature returns.
     type Geom: Geometry;
+    /// Returns the geometry of the feature.
     fn geometry(&self) -> &Self::Geom;
 }
 

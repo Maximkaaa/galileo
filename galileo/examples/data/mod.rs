@@ -1,14 +1,14 @@
 use galileo::layer::feature_layer::feature::Feature;
 use galileo::Color;
-use galileo_types::cartesian::impls::multipolygon::MultiPolygon;
 use galileo_types::cartesian::impls::point::Point2d;
-use galileo_types::cartesian::impls::polygon::Polygon;
-use galileo_types::cartesian::rect::Rect;
 use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
+use galileo_types::cartesian::Rect;
 use galileo_types::geo::impls::point::GeoPoint2d;
 use galileo_types::geo::traits::point::{GeoPoint, NewGeoPoint};
 use galileo_types::geo::traits::projection::Projection;
 use galileo_types::geometry::{CartesianGeometry2d, Geom, Geometry};
+use galileo_types::impls::multi_polygon::MultiPolygon;
+use galileo_types::impls::polygon::Polygon;
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]

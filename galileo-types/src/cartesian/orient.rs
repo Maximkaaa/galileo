@@ -1,13 +1,18 @@
-use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
+use crate::cartesian::CartesianPoint2d;
 
+/// Orientation of a triplet of points.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Orientation {
+    /// Clockwise
     Clockwise,
+    /// Counterclockwise
     Counterclockwise,
+    /// Collinear
     Collinear,
 }
 
 impl Orientation {
+    /// Determines orientation of a triplet of points.
     pub fn triplet<Num: num_traits::Num + PartialOrd>(
         p: &impl CartesianPoint2d<Num = Num>,
         q: &impl CartesianPoint2d<Num = Num>,

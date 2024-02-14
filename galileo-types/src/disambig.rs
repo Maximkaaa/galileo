@@ -1,6 +1,6 @@
-use crate::cartesian::traits::cartesian_point::{CartesianPoint2d, NewCartesianPoint2d};
+use crate::cartesian::{CartesianPoint2d, NewCartesianPoint2d};
 use crate::contour::Contour;
-use crate::geo::traits::point::{GeoPoint, NewGeoPoint};
+use crate::geo::{GeoPoint, NewGeoPoint};
 use crate::geometry_type::{AmbiguousSpace, CartesianSpace2d, GeoSpace2d, GeometryType};
 use crate::multi_contour::MultiContour;
 use crate::multi_point::MultiPoint;
@@ -8,12 +8,16 @@ use crate::multi_polygon::MultiPolygon;
 use crate::polygon::Polygon;
 use std::marker::PhantomData;
 
+/// Wrapper type that disambiguates coordinate space for generic geometries.
+/// 
+/// See [`Disambiguate`] trait documentation for details.
 pub struct Disambig<T, Space> {
     inner: T,
     space: PhantomData<Space>,
 }
 
 impl<T, Space> Disambig<T, Space> {
+    /// Creates a new instance.
     pub fn new(inner: T) -> Self {
         Self {
             inner,
@@ -120,7 +124,10 @@ impl<T: MultiPolygon, Space> MultiPolygon for Disambig<T, Space> {
     }
 }
 
+/// A trait used to convert a geometry with no specified coordinate space into one of the specific coordinate spaces.
+/// This trait is auto-implemented for all types, that implement `GeometryType<Space = AmbiguousSpace>` trait.
 pub trait Disambiguate {
+    /// Specifies that the geometry is in geographic coordinates.
     fn to_geo2d(self) -> Disambig<Self, GeoSpace2d>
     where
         Self: Sized,
@@ -128,6 +135,7 @@ pub trait Disambiguate {
         Disambig::new(self)
     }
 
+    /// Specifies that the geometry is in cartesian coordinates.
     fn to_cartesian2d(self) -> Disambig<Self, CartesianSpace2d>
     where
         Self: Sized,

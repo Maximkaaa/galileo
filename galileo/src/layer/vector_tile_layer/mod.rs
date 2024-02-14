@@ -1,3 +1,6 @@
+//! [Vector tile layers](VectorTileLayer) load prepared vector tiles using a [data provider](VectorTileProvider)
+//! and draw them to the map with the given [`VectorTileStyle`].
+
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, PackedBundle, RenderOptions};
@@ -11,7 +14,7 @@ use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::{LockedTileStore, VectorTileProvider};
 use crate::layer::vector_tile_layer::vector_tile::VectorTile;
 use galileo_mvt::{MvtFeature, MvtGeometry};
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
+use galileo_types::cartesian::CartesianPoint2d;
 use galileo_types::geometry::CartesianGeometry2d;
 
 pub mod style;

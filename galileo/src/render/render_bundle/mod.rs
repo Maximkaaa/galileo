@@ -1,12 +1,12 @@
+use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
-use crate::primitives::DecodedImage;
 use crate::render::point_paint::PointPaint;
 use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
 use crate::view::MapView;
-use galileo_types::cartesian::impls::point::Point2d;
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
+use galileo_types::cartesian::CartesianPoint3d;
+use galileo_types::cartesian::Point2d;
 use galileo_types::contour::Contour;
-use galileo_types::polygon::Polygon;
+use galileo_types::Polygon;
 use num_traits::AsPrimitive;
 use std::borrow::Cow;
 use tessellating::TessellatingRenderBundle;

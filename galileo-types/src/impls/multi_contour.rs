@@ -1,6 +1,7 @@
-use crate::cartesian::impls::contour::Contour;
 use crate::geometry_type::{GeometryType, MultiContourGeometryType};
+use crate::impls::contour::Contour;
 
+/// A set of contours.
 pub struct MultiContour<P>(Vec<Contour<P>>);
 
 impl<P> crate::multi_contour::MultiContour for MultiContour<P> {

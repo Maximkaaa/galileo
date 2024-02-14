@@ -1,10 +1,10 @@
-use galileo_types::cartesian::impls::point::Point2d;
-use galileo_types::cartesian::rect::Rect;
-use galileo_types::cartesian::size::Size;
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
-use galileo_types::geo::crs::Crs;
-use galileo_types::geo::impls::point::GeoPoint2d;
-use galileo_types::geo::traits::point::GeoPoint;
+use galileo_types::cartesian::CartesianPoint2d;
+use galileo_types::cartesian::Point2d;
+use galileo_types::cartesian::Rect;
+use galileo_types::cartesian::Size;
+use galileo_types::geo::impls::GeoPoint2d;
+use galileo_types::geo::Crs;
+use galileo_types::geo::GeoPoint;
 use nalgebra::{
     Matrix4, OMatrix, Perspective3, Point2, Point3, Rotation3, Scale3, Translation3, Vector2,
     Vector3, U4,

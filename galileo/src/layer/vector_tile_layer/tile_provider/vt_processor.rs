@@ -7,11 +7,12 @@ use crate::tile_scheme::TileIndex;
 use crate::TileSchema;
 use bytes::Bytes;
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
-use galileo_types::cartesian::impls::contour::{ClosedContour, Contour};
-use galileo_types::cartesian::impls::point::Point3d;
-use galileo_types::cartesian::impls::polygon::Polygon;
-use galileo_types::cartesian::rect::Rect;
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
+use galileo_types::cartesian::CartesianPoint2d;
+use galileo_types::cartesian::Point3d;
+use galileo_types::cartesian::Rect;
+use galileo_types::impls::ClosedContour;
+use galileo_types::impls::Polygon;
+use galileo_types::Contour;
 use num_traits::ToPrimitive;
 
 pub struct VtProcessor {}
@@ -64,17 +65,17 @@ impl VtProcessor {
 
         let bounds = Polygon::new(
             ClosedContour::new(vec![
-                Point3d::new(bbox.x_min, bbox.y_min, 0.0),
-                Point3d::new(bbox.x_min, bbox.y_max, 0.0),
-                Point3d::new(bbox.x_max, bbox.y_max, 0.0),
-                Point3d::new(bbox.x_max, bbox.y_min, 0.0),
+                Point3d::new(bbox.x_min(), bbox.y_min(), 0.0),
+                Point3d::new(bbox.x_min(), bbox.y_max(), 0.0),
+                Point3d::new(bbox.x_max(), bbox.y_max(), 0.0),
+                Point3d::new(bbox.x_max(), bbox.y_min(), 0.0),
             ]),
             vec![],
         );
         bundle.clip_area(&bounds);
 
         bundle.add(
-            RenderPrimitive::<_, _, Contour<_>, _>::new_polygon_ref(
+            RenderPrimitive::<_, _, galileo_types::impls::Contour<_>, _>::new_polygon_ref(
                 &bounds,
                 PolygonPaint {
                     color: style.background,
@@ -95,16 +96,15 @@ impl VtProcessor {
                             for contour in contours {
                                 bundle.add(
                                     RenderPrimitive::<_, _, _, Polygon<_>>::new_contour_ref(
-                                        &Contour {
-                                            is_closed: false,
-                                            points: contour
-                                                .points
-                                                .iter()
+                                        &galileo_types::impls::Contour::new(
+                                            contour
+                                                .iter_points()
                                                 .map(|p| {
                                                     Self::transform_point(p, bbox, tile_resolution)
                                                 })
                                                 .collect(),
-                                        },
+                                            false,
+                                        ),
                                         paint,
                                     ),
                                     lod_resolution,
@@ -116,7 +116,7 @@ impl VtProcessor {
                         if let Some(paint) = Self::get_polygon_symbol(style, &layer.name, feature) {
                             for polygon in polygons {
                                 bundle.add(
-                                    RenderPrimitive::<_, _, Contour<_>, _>::new_polygon_ref(
+                                    RenderPrimitive::<_, _, galileo_types::impls::Contour<_>, _>::new_polygon_ref(
                                         &polygon.cast_points(|p| {
                                             Self::transform_point(p, bbox, tile_resolution)
                                         }),

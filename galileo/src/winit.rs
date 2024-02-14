@@ -1,14 +1,18 @@
+//! Types that help using `Galileo` with `winit`.
+
 use crate::control::{MouseButton, RawUserEvent, TouchEvent};
 use crate::messenger::Messenger;
-use galileo_types::cartesian::impls::point::Point2d;
+use galileo_types::cartesian::Point2d;
 use std::sync::Arc;
 use winit::event::{ElementState, MouseScrollDelta, Touch, TouchPhase, WindowEvent};
 use winit::window::Window;
 
+/// Converts `winit` events into `Galileo` [`RawUserEvent`]s.
 #[derive(Debug, Default)]
 pub struct WinitInputHandler {}
 
 impl WinitInputHandler {
+    /// Convert `winit` event into `Galileo` event.
     pub fn process_user_input(
         &mut self,
         winit_event: &WindowEvent,
@@ -70,12 +74,14 @@ impl From<&winit::event::MouseButton> for MouseButton {
     }
 }
 
+/// Messenger for a `winit` window.
 #[derive(Debug, Clone)]
 pub struct WinitMessenger {
     window: Arc<Window>,
 }
 
 impl WinitMessenger {
+    /// Creates a new messenger.
     pub fn new(window: Arc<Window>) -> Self {
         Self { window }
     }

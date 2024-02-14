@@ -1,17 +1,35 @@
-use crate::cartesian::rect::Rect;
-use crate::geo::traits::projection::Projection;
+use crate::cartesian::Rect;
+use crate::geo::Projection;
 use crate::geometry::{CartesianGeometry2dSpecialization, Geom, GeometrySpecialization};
 use crate::geometry_type::{CartesianSpace2d, GeometryType, PointGeometryType};
-use crate::point::{CartesianPointType, Point, PointHelper};
 use nalgebra::{Point2, Scalar, Vector2};
 use num_traits::{Bounded, Float, FromPrimitive, Num};
 
+/// Point in a 2d cartesian space.
+///
+/// Only two methods require an implementation to get access all the methods of this trait:
+///
+/// ```
+/// use galileo_types::cartesian::CartesianPoint2d;
+///
+/// struct MyPoint(f64, f64);
+///
+/// impl CartesianPoint2d for MyPoint {
+///     type Num = f64;
+///     fn x(&self) -> Self::Num { self.0 }
+///     fn y(&self) -> Self::Num { self.1 }
+/// }
+/// ```
 pub trait CartesianPoint2d {
+    /// Number type used for coordinates.
     type Num: Num + Copy + PartialOrd + Bounded + Scalar + FromPrimitive;
 
+    /// First coordinate.
     fn x(&self) -> Self::Num;
+    /// Second coordinate.
     fn y(&self) -> Self::Num;
 
+    /// Returns true, if both *x* and *y* of two points are exactly equal.
     fn equal(&self, other: &Self) -> bool
     where
         Self: Sized,
@@ -19,6 +37,7 @@ pub trait CartesianPoint2d {
         self.x() == other.x() && self.y() == other.y()
     }
 
+    /// Moves the point by the `vec`.
     fn add(&self, vec: Vector2<Self::Num>) -> Point2<Self::Num>
     where
         Self: Sized,
@@ -26,15 +45,18 @@ pub trait CartesianPoint2d {
         Point2::new(self.x() + vec.x, self.y() + vec.y)
     }
 
+    /// Returns a vector between this and the `other` points.
     fn sub(&self, other: &impl CartesianPoint2d<Num = Self::Num>) -> Vector2<Self::Num> {
         Vector2::new(self.x() - other.x(), self.y() - other.y())
     }
 
+    /// Returns squared euclidean distance between two points.
     fn distance_sq(&self, other: &impl CartesianPoint2d<Num = Self::Num>) -> Self::Num {
         let v = self.sub(other);
         v.x * v.x + v.y * v.y
     }
 
+    /// Returns [taxicab distance](https://en.wikipedia.org/wiki/Taxicab_geometry) between two points.
     fn taxicab_distance(&self, other: &impl CartesianPoint2d<Num = Self::Num>) -> Self::Num {
         let dx = if self.x() >= other.x() {
             self.x() - other.x()
@@ -51,28 +73,34 @@ pub trait CartesianPoint2d {
     }
 }
 
+/// Point in a 3d cartesian space.
 pub trait CartesianPoint3d {
+    /// Number type used for coordinates.
     type Num;
 
+    /// First coordinate.
     fn x(&self) -> Self::Num;
+    /// Second coordinate.
     fn y(&self) -> Self::Num;
+    /// Third coordinate.
     fn z(&self) -> Self::Num;
 }
 
-impl<T> PointHelper<CartesianPointType> for T where
-    T: CartesianPoint2d + Point<Type = CartesianPointType>
-{
-}
-
+/// A 2d cartesian point that can be constructed from only the coordinates.
 pub trait NewCartesianPoint2d<Num = f64>: CartesianPoint2d<Num = Num> {
+    /// Creates a new point with the given coordinates.
     fn new(x: Num, y: Num) -> Self;
 }
 
+/// A 3d cartesian point that can be constructed from only the coordinates.
 pub trait NewCartesianPoint3d<Num = f64>: CartesianPoint3d<Num = Num> {
+    /// Creates a new point with the given coordinates.
     fn new(x: Num, y: Num, z: Num) -> Self;
 }
 
+/// Methods that apply only when a point has float-type coordinates.
 pub trait CartesianPoint2dFloat<N: Float = f64>: CartesianPoint2d<Num = N> {
+    /// Euclidean distance between two points.
     fn distance(&self, other: &impl CartesianPoint2d<Num = N>) -> N {
         self.distance_sq(other).sqrt()
     }

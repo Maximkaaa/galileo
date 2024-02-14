@@ -1,5 +1,5 @@
-use crate::cartesian::traits::cartesian_point::{CartesianPoint2d, NewCartesianPoint2d};
-use crate::geo::traits::point::{GeoPoint, NewGeoPoint};
+use crate::cartesian::{CartesianPoint2d, NewCartesianPoint2d};
+use crate::geo::{GeoPoint, NewGeoPoint};
 use crate::geometry_type::{AmbiguousSpace, GeometryType, PointGeometryType};
 use geo_types::{coord, Coord, CoordNum};
 use nalgebra::Scalar;

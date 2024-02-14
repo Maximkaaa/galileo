@@ -1,6 +1,6 @@
+use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::platform::PlatformService;
-use crate::primitives::DecodedImage;
 use async_trait::async_trait;
 use js_sys::Uint8Array;
 use std::cell::Cell;

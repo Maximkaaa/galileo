@@ -1,16 +1,19 @@
-use crate::cartesian::impls::polygon::Polygon;
-use crate::cartesian::rect::Rect;
-use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
+use crate::cartesian::CartesianPoint2d;
+use crate::cartesian::Rect;
 use crate::contour::Contour;
-use crate::geo::traits::projection::Projection;
+use crate::geo::Projection;
 use crate::geometry::{
     CartesianGeometry2d, CartesianGeometry2dSpecialization, Geom, Geometry, GeometrySpecialization,
 };
 use crate::geometry_type::{CartesianSpace2d, GeometryType, MultiPolygonGeometryType};
+use crate::impls::Polygon;
 
+/// Geometry consisting of several polygons.
 pub trait MultiPolygon {
+    /// Polygon type.
     type Polygon: crate::polygon::Polygon;
 
+    /// Iterates over polygons.
     fn polygons(&self) -> impl Iterator<Item = &Self::Polygon>;
 }
 

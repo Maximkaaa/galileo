@@ -10,7 +10,7 @@ use std::sync::{Arc, RwLock};
 
 #[cfg(not(target_arch = "wasm32"))]
 use galileo::layer::{
-    data_provider::{file_cache::FileCacheController, url_data_provider::UrlDataProvider},
+    data_provider::{FileCacheController, UrlDataProvider},
     vector_tile_layer::tile_provider::{rayon_provider::RayonProvider, vt_processor::VtProcessor},
 };
 
@@ -20,7 +20,7 @@ type VectorTileProvider =
 
 #[cfg(target_arch = "wasm32")]
 use galileo::layer::vector_tile_layer::tile_provider::web_worker_provider::WebWorkerVectorTileProvider;
-use galileo_types::cartesian::rect::Rect;
+use galileo_types::cartesian::Rect;
 
 #[cfg(target_arch = "wasm32")]
 type VectorTileProvider = WebWorkerVectorTileProvider;

@@ -1,14 +1,17 @@
-use crate::cartesian::rect::Rect;
-use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
-use crate::geo::traits::projection::Projection;
+use crate::cartesian::CartesianPoint2d;
+use crate::cartesian::Rect;
+use crate::geo::Projection;
 use crate::geometry::{
     CartesianGeometry2d, CartesianGeometry2dSpecialization, Geom, GeometrySpecialization,
 };
 use crate::geometry_type::{CartesianSpace2d, GeometryType, MultiPointGeometryType};
 
+/// Geometry type consisting of several points.
 pub trait MultiPoint {
+    /// Point type.
     type Point;
 
+    /// Iterates over points.
     fn iter_points(&self) -> impl Iterator<Item = &'_ Self::Point>;
 }
 

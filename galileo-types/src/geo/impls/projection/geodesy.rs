@@ -1,9 +1,10 @@
-use crate::cartesian::traits::cartesian_point::NewCartesianPoint2d;
+use crate::cartesian::NewCartesianPoint2d;
 use crate::geo::traits::point::NewGeoPoint;
 use crate::geo::traits::projection::Projection;
 use geodesy::prelude::*;
 use std::marker::PhantomData;
 
+/// A projection constructed by `geodesy` crate.
 pub struct GeodesyProjection<In, Out> {
     context: Minimal,
     op: OpHandle,
@@ -12,6 +13,7 @@ pub struct GeodesyProjection<In, Out> {
 }
 
 impl<In, Out> GeodesyProjection<In, Out> {
+    /// Creates a new projection with the given definition.
     pub fn new(definition: &str) -> Option<Self> {
         let mut context = Minimal::new();
         let op = context.op(definition).ok()?;
@@ -54,19 +56,18 @@ impl<In: NewGeoPoint<f64>, Out: NewCartesianPoint2d<f64>> Projection
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
-    // use crate::cartesian::impls::point::Point2d;
-    // use crate::geo::impls::point::GeoPoint2d;
+    use super::*;
+    use crate::cartesian::Point2d;
+    use crate::geo::impls::point::GeoPoint2d;
 
     #[test]
     fn lambert_projection() {
-        // todo: uncomment after geodesy crate is updated on crates.io
-        // let pr = GeodesyProjection::new("laea lon_0=10 lat_0=52 x_0=4321000 y_0=3210000").unwrap();
-        // let center = GeoPoint2d::latlon(52.0, 10.0);
-        // let projected: Point2d = pr.project(&center).unwrap();
-        // let unprojected = pr.unproject(&projected).unwrap();
-        //
-        // dbg!(center, projected, unprojected);
-        // assert_eq!(center, unprojected);
+        let pr = GeodesyProjection::new("laea lon_0=10 lat_0=52 x_0=4321000 y_0=3210000").unwrap();
+        let center = GeoPoint2d::latlon(52.0, 10.0);
+        let projected: Point2d = pr.project(&center).unwrap();
+        let unprojected = pr.unproject(&projected).unwrap();
+
+        dbg!(center, projected, unprojected);
+        assert_eq!(center, unprojected);
     }
 }

@@ -1,9 +1,11 @@
-use crate::cartesian::impls::polygon::Polygon;
 use crate::geometry_type::{GeometryType, MultiPolygonGeometryType};
+use crate::impls::polygon::Polygon;
 use serde::{Deserialize, Serialize};
 
+/// A set of polygons.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MultiPolygon<P> {
+    /// Inner polygons.
     pub parts: Vec<Polygon<P>>,
 }
 
@@ -14,6 +16,7 @@ impl<P> From<Vec<Polygon<P>>> for MultiPolygon<P> {
 }
 
 impl<P> MultiPolygon<P> {
+    /// Returns reference to the inner polygons.
     pub fn parts(&self) -> &[Polygon<P>] {
         &self.parts
     }

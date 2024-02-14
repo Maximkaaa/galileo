@@ -1,15 +1,18 @@
-use crate::cartesian::rect::Rect;
-use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
+use crate::cartesian::CartesianPoint2d;
+use crate::cartesian::Rect;
 use crate::contour::Contour;
-use crate::geo::traits::projection::Projection;
+use crate::geo::Projection;
 use crate::geometry::{
     CartesianGeometry2d, CartesianGeometry2dSpecialization, Geom, Geometry, GeometrySpecialization,
 };
 use crate::geometry_type::{CartesianSpace2d, GeometryType, MultiContourGeometryType};
 
+/// Geometry consisting of several contours.
 pub trait MultiContour {
+    /// Contour type.
     type Contour: Contour;
 
+    /// Iterator over contours.
     fn contours(&self) -> impl Iterator<Item = &Self::Contour>;
 }
 
@@ -32,7 +35,7 @@ where
                     _ => None,
                 })
             })
-            .collect::<Option<Vec<crate::cartesian::impls::contour::Contour<Proj::OutPoint>>>>()?;
+            .collect::<Option<Vec<crate::impls::Contour<Proj::OutPoint>>>>()?;
         Some(Geom::MultiContour(contours.into()))
     }
 }

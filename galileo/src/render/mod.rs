@@ -1,11 +1,19 @@
+//! Rendering backends for a map.
+//!
+//! The backends use [`Canvas`] instances to render map layers to the render target (screen, image, etc.).
+//!
+//! At this point only [`WgpuRenderer`] is implemented.
+
 use crate::Color;
-use galileo_types::cartesian::size::Size;
+use galileo_types::cartesian::Size;
 use maybe_sync::{MaybeSend, MaybeSync};
 use render_bundle::RenderBundle;
 use std::any::Any;
 
 #[cfg(feature = "wgpu")]
-pub mod wgpu;
+mod wgpu;
+#[cfg(feature = "wgpu")]
+pub use wgpu::WgpuRenderer;
 
 pub mod point_paint;
 pub mod render_bundle;
@@ -13,7 +21,7 @@ pub mod render_bundle;
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct PrimitiveId(usize);
 
-pub trait Renderer: MaybeSend + MaybeSync {
+pub(crate) trait Renderer: MaybeSend + MaybeSync {
     fn as_any(&self) -> &dyn Any;
 }
 

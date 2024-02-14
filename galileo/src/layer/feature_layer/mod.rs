@@ -1,24 +1,19 @@
-use crate::layer::feature_layer::feature::Feature;
-use crate::layer::feature_layer::feature_store::{
-    FeatureContainer, FeatureContainerMut, FeatureEntry, FeatureStore, FeatureUpdate,
-};
-use crate::layer::feature_layer::symbol::Symbol;
+//! [`FeatureLayer`] stores features in a [`FeatureStore`] and renders them with a [`Symbol`].
+
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, RenderOptions};
 use crate::view::MapView;
 use feature_render_store::FeatureRenderStore;
-use galileo_types::cartesian::impls::point::{Point2d, Point3d};
-use galileo_types::cartesian::rect::Rect;
-use galileo_types::cartesian::traits::cartesian_point::{
-    CartesianPoint2d, NewCartesianPoint2d, NewCartesianPoint3d,
-};
-use galileo_types::geo::crs::Crs;
-use galileo_types::geo::impls::point::GeoPoint2d;
-use galileo_types::geo::impls::projection::dimensions::AddDimensionProjection;
-use galileo_types::geo::impls::projection::identity::IdentityProjection;
-use galileo_types::geo::traits::point::NewGeoPoint;
-use galileo_types::geo::traits::projection::{ChainProjection, InvertedProjection, Projection};
+use galileo_types::cartesian::Rect;
+use galileo_types::cartesian::{CartesianPoint2d, NewCartesianPoint2d, NewCartesianPoint3d};
+use galileo_types::cartesian::{Point2d, Point3d};
+use galileo_types::geo::impls::projection::AddDimensionProjection;
+use galileo_types::geo::impls::projection::IdentityProjection;
+use galileo_types::geo::impls::GeoPoint2d;
+use galileo_types::geo::Crs;
+use galileo_types::geo::NewGeoPoint;
+use galileo_types::geo::{ChainProjection, InvertedProjection, Projection};
 use galileo_types::geometry::{CartesianGeometry2d, Geom, Geometry};
 use galileo_types::geometry_type::{CartesianSpace2d, CartesianSpace3d, GeoSpace2d};
 use maybe_sync::{MaybeSend, MaybeSync};
@@ -28,16 +23,28 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::{Mutex, RwLock};
 
-pub mod feature;
-pub mod feature_render_store;
-pub mod feature_store;
+mod feature;
+mod feature_render_store;
+mod feature_store;
 pub mod symbol;
+
+pub use feature::Feature;
+pub use feature_store::*;
+pub use symbol::Symbol;
 
 /// Feature layers render a set of [features](Feature) using [symbols](Symbol).
 ///
 /// After the layer is created, the [internal features storage](FeatureStore) can be accessed through [FeatureLayer::features] and
 /// [FeatureLayer::features_mut] methods. This storage provides methods to edit features or hide/show them without
 /// deleting from the layer.
+///
+/// All features added to the layer must be in the `CRS` of the layer. Layer will not attempt to convert geometries
+/// from incorrect CRS (as there's no way for the layer to know which CRS the geometry is projected to). On the other
+/// hand, the CRS of the layer doesn't have to be same as the CRS of the map. When the layer is requested to be rendered,
+/// it will project all its features into needed CRS automatically.
+///
+/// Feature layer can render features differently at different resolutions. See [`FeatureLayer::new_with_lods`] for
+/// details.
 pub struct FeatureLayer<P, F, S, Space>
 where
     F: Feature,
@@ -113,6 +120,7 @@ where
     F::Geom: Geometry<Point = P>,
     S: Symbol<F>,
 {
+    /// Creates a new layer with the given parameters.
     pub fn new(features: Vec<F>, style: S, crs: Crs) -> Self {
         let options = FeatureLayerOptions::default();
         Self {
@@ -126,6 +134,9 @@ where
         }
     }
 
+    /// Creates a new layer with specified levels of detail.
+    ///
+    /// Levels of details specify resolution boundaries at which feature must be rendered separately.
     pub fn with_lods(features: Vec<F>, style: S, crs: Crs, lods: &[f64]) -> Self {
         let options = FeatureLayerOptions::default();
         let mut lods: Vec<_> = lods
@@ -146,6 +157,7 @@ where
         }
     }
 
+    /// Set the rendering options for the layer.
     pub fn with_options(mut self, options: FeatureLayerOptions) -> Self {
         self.options = options;
 
@@ -164,6 +176,10 @@ where
     F: Feature,
     F::Geom: Geometry<Point = P>,
 {
+    /// Extend (bounding rectangle) of the layer, projected into given CRS.
+    ///
+    /// If the layer doesn't contain any features, or if at least one of them cannot be projected into the given
+    /// CRS, `None` will be returned.
     pub fn extent_projected(&self, crs: &Crs) -> Option<Rect> {
         let projection = crs.get_projection::<P, Point2d>()?;
         self.features

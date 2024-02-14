@@ -4,12 +4,18 @@ use num_traits::{One, Zero};
 use std::cmp::Ordering;
 use std::fmt::Debug;
 
+/// Methods specific to closed contours in 2d cartesian space. This trait is auto-implemented for all types implementing
+/// [`ClosedContour`] trait and consist of [`CartesianPoint2d`].
 pub trait CartesianClosedContour {
+    /// Type of the contour points.
     type Point: CartesianPoint2d;
 
+    /// [Signed area](https://en.wikipedia.org/wiki/Signed_area) of the contour.
     fn area_signed(&self) -> <Self::Point as CartesianPoint2d>::Num
     where
         Self: Sized;
+
+    /// Winding direction of the contour.
     fn winding(&self) -> Winding
     where
         Self: Sized;
@@ -56,13 +62,18 @@ where
     }
 }
 
+/// [Winding](https://en.wikipedia.org/wiki/Winding_number) direction of the contour.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Winding {
+    /// Positive winding.
     Clockwise,
+    /// Negative winding.
     CounterClockwise,
 }
 
+/// Methods for contours in 2d cartesian space. This trait is auto-implemented if applicable.
 pub trait CartesianContour<P: CartesianPoint2d>: Contour<Point = P> {
+    /// Squared distance from the point to the closest segment of the contour.
     fn distance_to_point_sq<Point>(&self, point: &Point) -> Option<P::Num>
     where
         Self: Sized,
@@ -79,14 +90,14 @@ impl<T: Contour<Point = P>, P: CartesianPoint2d> CartesianContour<P> for T {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cartesian::impls::contour::ClosedContour;
-    use crate::cartesian::impls::point::Point2d;
+    use crate::cartesian::impls::Point2d;
     use crate::contour::Contour;
+    use crate::impls::ClosedContour;
     use crate::segment::Segment;
 
     #[test]
     fn iter_points_closing() {
-        let contour = crate::cartesian::impls::contour::Contour::open(vec![
+        let contour = crate::impls::Contour::open(vec![
             Point2d::new(0.0, 0.0),
             Point2d::new(1.0, 1.0),
         ]);
@@ -108,10 +119,10 @@ mod tests {
 
     #[test]
     fn iter_segments() {
-        let contour = crate::cartesian::impls::contour::Contour::open(vec![Point2d::new(0.0, 0.0)]);
+        let contour = crate::impls::Contour::open(vec![Point2d::new(0.0, 0.0)]);
         assert_eq!(contour.iter_segments().count(), 0);
 
-        let contour = crate::cartesian::impls::contour::Contour::open(vec![
+        let contour = crate::impls::Contour::open(vec![
             Point2d::new(0.0, 0.0),
             Point2d::new(1.0, 1.0),
         ]);

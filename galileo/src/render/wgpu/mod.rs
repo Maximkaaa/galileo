@@ -1,5 +1,5 @@
 use cfg_if::cfg_if;
-use galileo_types::cartesian::size::Size;
+use galileo_types::cartesian::Size;
 use lyon::tessellation::VertexBuffers;
 use nalgebra::{Rotation3, Vector3};
 use std::any::Any;
@@ -731,7 +731,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
     }
 }
 
-pub struct WgpuPackedBundle {
+struct WgpuPackedBundle {
     clip_area_buffers: Option<WgpuPolygonBuffers>,
     map_ref_buffers: WgpuPolygonBuffers,
     screen_ref_buffers: Option<ScreenRefBuffers>,

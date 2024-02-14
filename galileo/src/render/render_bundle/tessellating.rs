@@ -1,15 +1,15 @@
+use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
-use crate::primitives::DecodedImage;
 use crate::render::point_paint::{CircleFill, PointPaint, PointShape, SectorParameters};
 use crate::render::render_bundle::RenderPrimitive;
 use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
 use crate::view::MapView;
 use crate::Color;
-use galileo_types::cartesian::impls::contour::ClosedContour;
-use galileo_types::cartesian::impls::point::{Point2d, Point3d};
-use galileo_types::cartesian::traits::cartesian_point::{CartesianPoint2d, CartesianPoint3d};
+use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d};
+use galileo_types::cartesian::{Point2d, Point3d};
 use galileo_types::contour::Contour;
-use galileo_types::polygon::Polygon;
+use galileo_types::impls::ClosedContour;
+use galileo_types::Polygon;
 use lyon::lyon_tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor, LineJoin,
     Side, StrokeOptions, StrokeTessellator, StrokeVertex, StrokeVertexConstructor, VertexBuffers,
@@ -1125,12 +1125,12 @@ pub(crate) mod serialization;
 mod tests {
     use super::*;
 
-    type C = galileo_types::cartesian::impls::contour::Contour<Point3d>;
+    type C = galileo_types::impls::contour::Contour<Point3d>;
 
     #[test]
     fn remove_map_ref() {
         let mut bundle = TessellatingRenderBundle::new();
-        let polygon = galileo_types::cartesian::impls::polygon::Polygon::from(vec![
+        let polygon = galileo_types::impls::polygon::Polygon::from(vec![
             Point3d::new(0.0, 0.0, 0.0),
             Point3d::new(1.0, 0.0, 0.0),
             Point3d::new(1.0, 1.0, 0.0),

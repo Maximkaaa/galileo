@@ -1,4 +1,4 @@
-use crate::primitives::DecodedImage;
+use crate::decoded_image::DecodedImage;
 use crate::render::render_bundle::tessellating::ImageVertex;
 use crate::render::wgpu::pipelines;
 use crate::render::wgpu::pipelines::default_targets;

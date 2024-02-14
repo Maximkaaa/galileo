@@ -8,6 +8,7 @@ use bytes::Bytes;
 use maybe_sync::{MaybeSend, MaybeSync};
 use std::marker::PhantomData;
 
+/// Loads data from Internet and uses `Cache` persistent cache to save data locally.
 pub struct UrlDataProvider<Key, Decoder, Cache = DummyCacheController>
 where
     Key: ?Sized,
@@ -27,6 +28,7 @@ where
     Key: ?Sized,
     Decoder: DataProcessor<Input = Bytes>,
 {
+    /// Creates a new instance without persistent cache.
     pub fn new(url_source: impl UrlSource<Key> + 'static, decoder: Decoder) -> Self {
         Self {
             url_source: Box::new(url_source),
@@ -46,6 +48,7 @@ where
     Decoder::Context: MaybeSend + MaybeSync,
     Cache: PersistentCacheController<str, Bytes> + MaybeSend + MaybeSync,
 {
+    /// Creates a new instance with persistent cache.
     pub fn new_cached(
         url_source: impl UrlSource<Key> + 'static,
         decoder: Decoder,

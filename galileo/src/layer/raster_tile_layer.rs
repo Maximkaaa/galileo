@@ -1,6 +1,6 @@
+use crate::decoded_image::DecodedImage;
 use crate::layer::data_provider::DataProvider;
 use crate::messenger::Messenger;
-use crate::primitives::DecodedImage;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{Canvas, ImagePaint, PackedBundle, PrimitiveId, RenderOptions};
 use crate::tile_scheme::{TileIndex, TileSchema};
