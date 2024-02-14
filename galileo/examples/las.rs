@@ -1,3 +1,10 @@
+use galileo::layer::feature_layer::{Feature, FeatureLayerOptions};
+use galileo::layer::FeatureLayer;
+use galileo::render::point_paint::PointPaint;
+use galileo::render::render_bundle::RenderPrimitive;
+use galileo::symbol::Symbol;
+use galileo::tile_scheme::TileSchema;
+use galileo::Color;
 /// This example demonstrates rendering of 19_000_000 points from lidar scanning on the map. To be run it requires
 /// a file `Clifton_Suspension_Bridge.laz` to be added to the `./data` directory. This file is too large to be added
 /// to git repository, but it can be downloaded from https://geoslam.com/sample-data/
@@ -6,21 +13,11 @@
 /// to demonstrate the capability of Galileo engine to render large amounts of data. In real applications the input
 /// data should probably be preprocessed, as many of those 19M points have virtually the same coordinate. These
 /// optimizations may be done by Galileo in future, but at this point it's up to the application.
-use galileo::galileo_map::MapBuilder;
-use galileo::layer::feature_layer::feature::Feature;
-use galileo::layer::feature_layer::FeatureLayerOptions;
-use galileo::layer::FeatureLayer;
-use galileo::render::point_paint::PointPaint;
-use galileo::render::render_bundle::RenderPrimitive;
-use galileo::symbol::Symbol;
-use galileo::tile_scheme::TileSchema;
-use galileo::Color;
-use galileo_types::cartesian::impls::contour::Contour;
-use galileo_types::cartesian::impls::point::Point3d;
-use galileo_types::cartesian::impls::polygon::Polygon;
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
-use galileo_types::geo::crs::Crs;
+use galileo::MapBuilder;
+use galileo_types::cartesian::{CartesianPoint3d, Point3d};
+use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
+use galileo_types::impls::{Contour, Polygon};
 use galileo_types::latlon;
 use las::Read;
 use nalgebra::{Rotation3, Translation3, Vector3};

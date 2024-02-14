@@ -1,22 +1,16 @@
 use data::Country;
 use galileo::control::{EventPropagation, UserEvent};
-use galileo::galileo_map::MapBuilder;
-use galileo::layer::feature_layer::symbol::polygon::SimplePolygonSymbol;
-use galileo::layer::feature_layer::symbol::Symbol;
+use galileo::layer::feature_layer::symbol::{SimplePolygonSymbol, Symbol};
 use galileo::layer::feature_layer::FeatureLayer;
 use galileo::render::render_bundle::RenderPrimitive;
-use galileo::view::MapView;
-use galileo::Color;
-use galileo_types::cartesian::impls::contour::Contour;
-use galileo_types::cartesian::impls::point::Point2d;
-use galileo_types::cartesian::impls::polygon::Polygon;
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
-use galileo_types::geo::crs::{Crs, ProjectionType};
-use galileo_types::geo::datum::Datum;
-use galileo_types::geo::impls::point::GeoPoint2d;
-use galileo_types::geo::traits::point::NewGeoPoint;
-use galileo_types::geo::traits::projection::{ChainProjection, InvertedProjection, Projection};
+use galileo::{MapBuilder, MapView};
+use galileo_types::cartesian::{CartesianPoint3d, Point2d};
+use galileo_types::geo::impls::GeoPoint2d;
+use galileo_types::geo::{
+    ChainProjection, Crs, Datum, InvertedProjection, NewGeoPoint, Projection, ProjectionType,
+};
 use galileo_types::geometry::Geom;
+use galileo_types::impls::{Contour, Polygon};
 use num_traits::AsPrimitive;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
@@ -51,7 +45,7 @@ pub async fn run(builder: MapBuilder) {
             ),
         ))
         .with_layer(feature_layer.clone())
-        .with_event_handler(move |ev, map, _backend| {
+        .with_event_handler(move |ev, map| {
             if let UserEvent::PointerMoved(event) = ev {
                 let mut layer = feature_layer.write().unwrap();
 
@@ -107,10 +101,7 @@ struct CountrySymbol {}
 impl CountrySymbol {
     fn get_polygon_symbol(&self, feature: &Country) -> SimplePolygonSymbol {
         let stroke_color = feature.color;
-        let fill_color = Color {
-            a: if feature.is_selected() { 255 } else { 150 },
-            ..stroke_color
-        };
+        let fill_color = stroke_color.with_alpha(if feature.is_selected() { 255 } else { 150 });
         SimplePolygonSymbol::new(fill_color)
             .with_stroke_color(stroke_color)
             .with_stroke_width(2.0)

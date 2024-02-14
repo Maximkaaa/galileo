@@ -1,6 +1,6 @@
+use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::platform::PlatformService;
-use crate::primitives::DecodedImage;
 use async_trait::async_trait;
 use js_sys::Uint8Array;
 use std::cell::Cell;
@@ -11,8 +11,10 @@ use std::task::{Context, Poll};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlImageElement, WorkerGlobalScope};
-use web_sys::{Request, RequestInit, RequestMode, Response};
+use web_sys::{
+    CanvasRenderingContext2d, HtmlCanvasElement, HtmlImageElement, Request, RequestInit,
+    RequestMode, Response, WorkerGlobalScope,
+};
 
 pub mod map_builder;
 

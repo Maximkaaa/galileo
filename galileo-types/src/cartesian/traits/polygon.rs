@@ -4,9 +4,12 @@ use crate::polygon::Polygon;
 use crate::segment::Segment;
 use nalgebra::Point2;
 
+/// Polygon in 2d cartesian coordinates. This trait is auto-implemented for all illegible types.
 pub trait CartesianPolygon {
+    /// Type of the points of the polygon.
     type Point: CartesianPoint2d;
 
+    /// Returns true if the `point` lies inside or on one of the polygon's sides.
     fn contains_point<P>(&self, point: &P) -> bool
     where
         P: CartesianPoint2d<Num = <Self::Point as CartesianPoint2d>::Num>;
@@ -58,13 +61,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::cartesian::impls::point::Point2d;
+    use crate::cartesian::impls::Point2d;
     use crate::cartesian::traits::polygon::*;
 
     #[test]
     fn contains_point() {
-        let polygon = crate::cartesian::impls::polygon::Polygon {
-            outer_contour: crate::cartesian::impls::contour::ClosedContour {
+        let polygon = crate::impls::Polygon {
+            outer_contour: crate::impls::ClosedContour {
                 points: vec![
                     Point2d::new(0.0, 0.0),
                     Point2d::new(1.0, 1.0),

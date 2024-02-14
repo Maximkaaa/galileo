@@ -1,17 +1,49 @@
-use crate::cartesian::rect::Rect;
-use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
-use crate::geo::traits::projection::Projection;
+//! Contour is a sequence of points.
+//!
+//! Contours can be:
+//! * **open** - meaning that the first and the last points of the contour are not connected. For example, a road on
+//!   the map can be represented as an open contour.
+//! * **closed** - when the first and the last points of the contour are connected. For example, a shoreline can be
+//!   represented as a closed contour.
+//!
+//! Both open and closed contours are represented by the [`Contour`] trait, but there is also a separate [`ClosedContour`]
+//! traits for situations when only closed contour makes sense. For example, a [`Polygon`](super::Polygon) can
+//! consist only of closed contours. All closed contours also implement the `Contour` trait automatically.
+//!
+//! # Contour vs OGC LineString
+//!
+//! In the OGC Simple Feature Access standard, the corresponding geometry type is called a `LineString`. There is
+//! a important difference between them thought.
+//!
+//! `LineString` is considered to be closed when the first and the last points in the sequence are exactly same. `Contour`
+//! does not have that requirement. Even more, it should not duplicate the first and the last points. `Contour` trait
+//! deals with the last segment of closed contours with [`Contour::iter_points_closing`] and
+//! [`Contour::iter_segments`] methods instead.
+
+use crate::cartesian::{CartesianPoint2d, Rect};
+use crate::geo::Projection;
 use crate::geometry::{CartesianGeometry2dSpecialization, Geom, Geometry, GeometrySpecialization};
 use crate::geometry_type::{CartesianSpace2d, ContourGeometryType, GeometryType};
 use crate::segment::Segment;
 
+/// Sequence of points. See module level documentation for details.
 pub trait Contour {
+    /// Type of the points the contour is consisted of.
     type Point;
 
+    /// Whether the contour is closed.
+    ///
+    /// A closed contour has a segment connecting the last and the first points.
     fn is_closed(&self) -> bool;
 
+    /// Iterate over the points of the contour.
+    ///
+    /// Note, that the last point shall not be the same as the first one even for the closed contours. If you want to
+    /// include the first point at the end of iterator for closed contours, use [`Contour::iter_points_closing`]
+    /// instead.
     fn iter_points(&self) -> impl Iterator<Item = &'_ Self::Point>;
 
+    /// Same as [`Contour::iter_points`] but for closed contours repeats the first point again at the end of the iterator.
     fn iter_points_closing(&self) -> impl Iterator<Item = &Self::Point> {
         Box::new(ContourPointsIterator::new(
             self.iter_points(),
@@ -19,6 +51,8 @@ pub trait Contour {
         ))
     }
 
+    /// Iterates over segments of the contour. For closed contours this includes the segment between the last and the
+    /// first points of the contour.
     fn iter_segments(&self) -> impl Iterator<Item = Segment<'_, Self::Point>> {
         ContourSegmentIterator::new(ContourPointsIterator::new(
             self.iter_points(),
@@ -26,14 +60,15 @@ pub trait Contour {
         ))
     }
 
+    /// Project all the points of the contour with the given `projection`.
     fn project_points<Proj>(
         &self,
         projection: &Proj,
-    ) -> Option<crate::cartesian::impls::contour::Contour<Proj::OutPoint>>
+    ) -> Option<crate::impls::Contour<Proj::OutPoint>>
     where
         Proj: Projection<InPoint = Self::Point> + ?Sized,
     {
-        Some(crate::cartesian::impls::contour::Contour::new(
+        Some(crate::impls::Contour::new(
             self.iter_points()
                 .map(|p| projection.project(p))
                 .collect::<Option<Vec<Proj::OutPoint>>>()?,
@@ -42,8 +77,16 @@ pub trait Contour {
     }
 }
 
+/// A closed contour. See module documentation for details.
 pub trait ClosedContour {
+    /// Type of the points the contour is consisted of.
     type Point;
+
+    /// Iterate over the points of the contour.
+    ///
+    /// Note, that the last point shall not be the same as the first one even for the closed contours. If you want to
+    /// include the first point at the end of iterator for closed contours, use [`Contour::iter_points_closing`]
+    /// instead.
     fn iter_points(&self) -> impl Iterator<Item = &'_ Self::Point>;
 }
 
@@ -59,6 +102,7 @@ impl<P, T: ClosedContour<Point = P>> Contour for T {
     }
 }
 
+/// Iterator of contour points.
 pub struct ContourPointsIterator<'a, P, Iter>
 where
     Iter: Iterator<Item = &'a P>,
@@ -101,6 +145,7 @@ where
     }
 }
 
+/// Iterator of contour segements.
 pub struct ContourSegmentIterator<'a, P: 'a, Iter>
 where
     Iter: Iterator<Item = &'a P>,
@@ -152,10 +197,7 @@ where
             .iter_points()
             .map(|p| projection.project(p))
             .collect::<Option<Vec<Proj::OutPoint>>>()?;
-        Some(Geom::Contour(crate::cartesian::impls::contour::Contour {
-            points,
-            is_closed: true,
-        }))
+        Some(Geom::Contour(crate::impls::Contour::new(points, true)))
     }
 }
 
@@ -168,10 +210,11 @@ where
 {
     fn is_point_inside_spec<Other: CartesianPoint2d<Num = P::Num>>(
         &self,
-        _point: &Other,
-        _tolerance: P::Num,
+        point: &Other,
+        tolerance: P::Num,
     ) -> bool {
-        todo!()
+        self.iter_segments()
+            .any(|segment| segment.distance_to_point_sq(point) <= tolerance * tolerance)
     }
 
     fn bounding_rectangle_spec(&self) -> Option<Rect<P::Num>> {

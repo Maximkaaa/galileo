@@ -1,16 +1,15 @@
-use crate::control::custom::{CustomEventHandler, EventHandler};
-use crate::control::event_processor::EventProcessor;
-use crate::control::map::MapController;
+use crate::control::{EventProcessor, EventPropagation, MapController, UserEvent};
 use crate::layer::data_provider::UrlSource;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::Layer;
 use crate::map::Map;
-use crate::render::wgpu::WgpuRenderer;
+use crate::render::WgpuRenderer;
 use crate::tile_scheme::{TileIndex, TileSchema};
 use crate::view::MapView;
 use crate::winit::{WinitInputHandler, WinitMessenger};
-use galileo_types::cartesian::size::Size;
-use galileo_types::geo::impls::point::GeoPoint2d;
+use galileo_types::cartesian::Size;
+use galileo_types::geo::impls::GeoPoint2d;
+use maybe_sync::{MaybeSend, MaybeSync};
 use std::sync::{Arc, RwLock};
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, WindowEvent};
@@ -20,6 +19,11 @@ use winit::window::{Window, WindowBuilder};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
+/// Convenience struct holding all necessary parts of a interactive map, including window handle and an event loop.
+///
+/// Usually an application using `Galileo` will have control over the window, event loop and rendering backend. This
+/// structure can be used for developing map-related functionality separately from an application, or as a reference
+/// of how to set up the event loop for Galileo map.
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct GalileoMap {
     window: Arc<Window>,
@@ -32,6 +36,7 @@ pub struct GalileoMap {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl GalileoMap {
+    /// Runs the main event loop.
     pub fn run(self) {
         let Self {
             window,
@@ -118,12 +123,8 @@ impl GalileoMap {
                                 if let Some(raw_event) =
                                     input_handler.process_user_input(&other, scale)
                                 {
-                                    if let Some(backend) =
-                                        backend.read().expect("lock is poisoned").as_ref()
-                                    {
-                                        let mut map = map.write().expect("lock is poisoned");
-                                        event_processor.handle(raw_event, &mut map, backend);
-                                    }
+                                    let mut map = map.write().expect("lock is poisoned");
+                                    event_processor.handle(raw_event, &mut map);
                                 }
                             }
                         }
@@ -138,13 +139,19 @@ impl GalileoMap {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+type EventHandler = dyn (Fn(&UserEvent, &mut Map) -> EventPropagation);
+#[cfg(not(target_arch = "wasm32"))]
+type EventHandler = dyn (Fn(&UserEvent, &mut Map) -> EventPropagation) + MaybeSend + MaybeSync;
+
+/// Builder for a [`GalileoMap`].
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct MapBuilder {
     pub(crate) position: GeoPoint2d,
     pub(crate) resolution: f64,
     pub(crate) view: Option<MapView>,
     pub(crate) layers: Vec<Box<dyn Layer>>,
-    pub(crate) event_handlers: Vec<CustomEventHandler>,
+    pub(crate) event_handlers: Vec<Box<EventHandler>>,
     pub(crate) window: Option<Window>,
     pub(crate) event_loop: Option<EventLoop<()>>,
 }
@@ -156,6 +163,7 @@ impl Default for MapBuilder {
 }
 
 impl MapBuilder {
+    /// Consturct [`GalileoMap`].
     pub async fn build(mut self) -> GalileoMap {
         let event_loop = self
             .event_loop
@@ -196,31 +204,37 @@ impl MapBuilder {
         }
     }
 
+    /// Use the given window instead of creating a default one.
     pub fn with_window(mut self, window: Window) -> Self {
         self.window = Some(window);
         self
     }
 
+    /// Use the given event loop instead of creating a default one.
     pub fn with_event_loop(mut self, event_loop: EventLoop<()>) -> Self {
         self.event_loop = Some(event_loop);
         self
     }
 
+    /// Set the center of the map.
     pub fn center(mut self, position: GeoPoint2d) -> Self {
         self.position = position;
         self
     }
 
+    /// Set the resolution of the map. For explanation about resolution, see [`MapView::resolution`].
     pub fn resolution(mut self, resolution: f64) -> Self {
         self.resolution = resolution;
         self
     }
 
+    /// Set the view of the map.
     pub fn with_view(mut self, view: MapView) -> Self {
         self.view = Some(view);
         self
     }
 
+    /// Add a vector tile layer with the given parameters.
     pub fn with_vector_tiles(
         mut self,
         tile_source: impl UrlSource<TileIndex> + 'static,
@@ -235,15 +249,18 @@ impl MapBuilder {
         self
     }
 
+    /// Add a give layer to the map.
     pub fn with_layer(mut self, layer: impl Layer + 'static) -> Self {
         self.layers.push(Box::new(layer));
         self
     }
 
-    pub fn with_event_handler(mut self, handler: impl EventHandler + 'static) -> Self {
-        let mut event_handler = CustomEventHandler::default();
-        event_handler.set_input_handler(handler);
-        self.event_handlers.push(event_handler);
+    /// Add an event handler.
+    pub fn with_event_handler(
+        mut self,
+        handler: impl (Fn(&UserEvent, &mut Map) -> EventPropagation) + MaybeSend + MaybeSync + 'static,
+    ) -> Self {
+        self.event_handlers.push(Box::new(handler));
         self
     }
 

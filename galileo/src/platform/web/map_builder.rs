@@ -1,18 +1,19 @@
 use crate::galileo_map::{GalileoMap, MapBuilder};
-use crate::layer::data_provider::url_image_provider::UrlImageProvider;
+use crate::layer::data_provider::UrlImageProvider;
 use crate::layer::data_provider::UrlSource;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::layer::vector_tile_layer::tile_provider::web_worker_provider::WebWorkerVectorTileProvider;
+use crate::layer::vector_tile_layer::tile_provider::WebWorkerVectorTileProvider;
 use crate::layer::{RasterTileLayer, VectorTileLayer};
 use crate::tile_scheme::TileIndex;
 use crate::TileSchema;
-use galileo_types::geo::impls::point::GeoPoint2d;
+use galileo_types::geo::impls::GeoPoint2d;
 use wasm_bindgen::prelude::wasm_bindgen;
 use winit::dpi::PhysicalSize;
 use winit::event_loop::EventLoop;
 use winit::window::WindowBuilder;
 
 impl MapBuilder {
+    /// Creates a raster tile layer.
     pub fn create_raster_tile_layer(
         tile_source: impl UrlSource<TileIndex> + 'static,
         tile_scheme: TileSchema,
@@ -21,6 +22,7 @@ impl MapBuilder {
         RasterTileLayer::new(tile_scheme, tile_provider, None)
     }
 
+    /// Creates a vector tile layer.
     pub fn create_vector_tile_layer(
         tile_source: impl UrlSource<TileIndex> + 'static,
         tile_scheme: TileSchema,
@@ -34,6 +36,7 @@ impl MapBuilder {
 
 #[wasm_bindgen]
 impl MapBuilder {
+    /// Creates a new map builder and intializes console logger.
     pub fn new() -> Self {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init_with_level(log::Level::Info).expect("Couldn't init logger");
@@ -49,6 +52,7 @@ impl MapBuilder {
         }
     }
 
+    /// Builds the map and adds it to the given parent HTML element.
     pub async fn build_into(mut self, container: web_sys::Element) -> GalileoMap {
         use winit::platform::web::WindowExtWebSys;
 
@@ -83,6 +87,7 @@ impl MapBuilder {
         self.build().await
     }
 
+    /// Adds a new raster tile layer to the layer list.
     pub fn with_raster_tiles(mut self, tile_source: js_sys::Function) -> Self {
         let tile_source_int = move |index: &TileIndex| {
             log::info!("{index:?}");

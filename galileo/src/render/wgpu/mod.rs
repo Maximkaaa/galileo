@@ -1,5 +1,5 @@
 use cfg_if::cfg_if;
-use galileo_types::cartesian::size::Size;
+use galileo_types::cartesian::Size;
 use lyon::tessellation::VertexBuffers;
 use nalgebra::{Rotation3, Vector3};
 use std::any::Any;
@@ -20,7 +20,7 @@ use crate::map::Map;
 use crate::render::render_bundle::tessellating::{
     PointInstance, PolyVertex, TessellatingRenderBundle,
 };
-use crate::render::render_bundle::RenderBundle;
+use crate::render::render_bundle::{RenderBundle, RenderBundleType};
 use crate::render::wgpu::pipelines::image::WgpuImage;
 use crate::render::wgpu::pipelines::Pipelines;
 use crate::view::MapView;
@@ -34,6 +34,7 @@ const DEFAULT_BACKGROUND: Color = Color::WHITE;
 const DEPTH_FORMAT: TextureFormat = TextureFormat::Depth24PlusStencil8;
 const TARGET_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
 
+/// Render backend that uses `wgpu` crate to render the map.
 pub struct WgpuRenderer {
     device: Arc<Device>,
     queue: Arc<Queue>,
@@ -110,6 +111,9 @@ impl Renderer for WgpuRenderer {
 }
 
 impl WgpuRenderer {
+    /// Creates a new wgpu renderer with default parameters.
+    ///
+    /// Returns `None` if a device adapter cannot be acquired.
     pub async fn new() -> Option<Self> {
         let instance = Self::create_instance();
         let adapter = instance
@@ -130,6 +134,9 @@ impl WgpuRenderer {
         })
     }
 
+    /// Creates a new wgpu renderer that renders the map to an image buffer of the given size.
+    ///
+    /// Returns `None` if a device adapter cannot be acquired.
     pub async fn new_with_texture_rt(size: Size<u32>) -> Option<Self> {
         let mut renderer = Self::new().await?;
         renderer.init_target_texture(size);
@@ -207,6 +214,10 @@ impl WgpuRenderer {
         }
     }
 
+    /// Creates a new wgpu renderer that renders the map to the given window. The given size must be equal to the
+    /// window size.
+    ///
+    /// Returns `None` if a device adapter cannot be acquired.
     pub async fn new_with_window<W>(window: &W, size: Size<u32>) -> Option<Self>
     where
         W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
@@ -226,6 +237,9 @@ impl WgpuRenderer {
         ))
     }
 
+    /// Creates a wgpu surface for the given window.
+    ///
+    /// Returns `None` if a device adapter cannot be acquired.
     pub async fn get_window_surface<W>(window: &W) -> Option<(Surface, Adapter)>
     where
         W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
@@ -275,6 +289,7 @@ impl WgpuRenderer {
         }
     }
 
+    /// Creates a new renderer from the initialized wgpu structs.
     pub fn new_with_device_and_surface(
         device: Arc<Device>,
         surface: Arc<Surface>,
@@ -293,10 +308,12 @@ impl WgpuRenderer {
         renderer
     }
 
+    /// Set the background color for the map.
     pub fn set_background(&mut self, color: Color) {
         self.background = color;
     }
 
+    /// Returns `true` if the renderer can be used to draw to.
     pub fn initialized(&self) -> bool {
         self.render_set.is_some()
     }
@@ -381,10 +398,14 @@ impl WgpuRenderer {
         texture.create_view(&TextureViewDescriptor::default())
     }
 
+    /// De-initializes the renderer.
     pub fn clear_render_target(&mut self) {
         self.render_set = None;
     }
 
+    /// Re-initializes the renderer with the given window.
+    ///
+    /// Returns an error if a device adapter cannot be acquired.
     pub async fn init_with_window<W>(
         &mut self,
         window: &W,
@@ -401,6 +422,7 @@ impl WgpuRenderer {
         Ok(())
     }
 
+    /// Re-initializes the renderer with the given surface and adapter.
     pub fn init_with_surface(&mut self, surface: Surface, adapter: Adapter, size: Size<u32>) {
         let config = Self::get_surface_configuration(&surface, &adapter, size);
         surface.configure(&self.device, &config);
@@ -412,6 +434,9 @@ impl WgpuRenderer {
         self.init_render_set(render_target);
     }
 
+    /// Changes the size of the buffer to be drawn to.
+    ///
+    /// This must be called if a window size is change before any render calls are done.
     pub fn resize(&mut self, new_size: Size<u32>) {
         let format = self.target_format();
         let Some(render_set) = &mut self.render_set else {
@@ -453,6 +478,7 @@ impl WgpuRenderer {
         }
     }
 
+    /// Returns the image of the last render operation.
     pub async fn get_image(&self) -> Result<Vec<u8>, SurfaceError> {
         let Some(render_set) = &self.render_set else {
             return Err(SurfaceError::Lost);
@@ -523,7 +549,7 @@ impl WgpuRenderer {
         Ok(data.to_vec())
     }
 
-    pub fn render_to_texture_view(&self, map: &Map, view: &TextureView) {
+    pub(crate) fn render_to_texture_view(&self, map: &Map, view: &TextureView) {
         if let Some(render_set) = &self.render_set {
             let mut encoder = self
                 .device
@@ -562,6 +588,7 @@ impl WgpuRenderer {
         self.render_map(map, view);
     }
 
+    /// Renders the map.
     pub fn render(&self, map: &Map) -> Result<(), SurfaceError> {
         let Some(render_set) = &self.render_set else {
             return Ok(());
@@ -596,6 +623,7 @@ impl WgpuRenderer {
         layer.render(view, &mut canvas);
     }
 
+    /// Returns the size of the rendering area.
     pub fn size(&self) -> Size {
         let size = match &self.render_set {
             Some(set) => set.render_target.size(),
@@ -606,7 +634,9 @@ impl WgpuRenderer {
     }
 
     fn create_bundle(&self) -> RenderBundle {
-        RenderBundle::Tessellating(TessellatingRenderBundle::new())
+        RenderBundle(RenderBundleType::Tessellating(
+            TessellatingRenderBundle::new(),
+        ))
     }
 }
 
@@ -664,7 +694,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
 
     fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle> {
         match bundle {
-            RenderBundle::Tessellating(inner) => {
+            RenderBundle(RenderBundleType::Tessellating(inner)) => {
                 Box::new(WgpuPackedBundle::new(inner, self.renderer, self.render_set))
             }
         }
@@ -729,7 +759,7 @@ impl<'a> Canvas for WgpuCanvas<'a> {
     }
 }
 
-pub struct WgpuPackedBundle {
+struct WgpuPackedBundle {
     clip_area_buffers: Option<WgpuPolygonBuffers>,
     map_ref_buffers: WgpuPolygonBuffers,
     screen_ref_buffers: Option<ScreenRefBuffers>,

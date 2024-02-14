@@ -13,7 +13,7 @@
 //! use galileo::layer::FeatureLayer;
 //! use galileo::symbol::CirclePointSymbol;
 //! use galileo::galileo_types::latlon;
-//! use galileo_types::geo::crs::Crs;
+//! use galileo_types::geo::Crs;
 //! use galileo::Color;
 //!
 //! # tokio_test::block_on(async {
@@ -51,8 +51,8 @@
 //!
 //! As surprising as it is, everything in a mapping library revolves around
 //!
-//! * [`Map`](map::Map) struct, which is quite simple by itself and contains only currently displayed
-//!   [`MapView`](view::MapView), inner state, such as animation parameters, and a set of
+//! * [`Map`](Map) struct, which is quite simple by itself and contains only currently displayed
+//!   [`MapView`](MapView), inner state, such as animation parameters, and a set of
 //! * [`layers`](layer) that actually contain data and know how it should be displayed. There are different
 //!   types of layers depending on what kind of data they use (images, vector tiles, geometric features etc) and on
 //!   their capabilities for transforming that data into what a user wants to see. To render the data layers use
@@ -69,34 +69,37 @@
 //! * [`controls`](control) that actually change state of the map or layers based on the user input.
 
 #![warn(clippy::unwrap_used)]
+#![warn(missing_docs)]
 
-pub mod async_runtime;
-pub mod bounding_box;
-pub mod color;
+pub(crate) mod async_runtime;
+mod color;
 pub mod control;
+pub(crate) mod decoded_image;
 pub mod error;
 pub mod layer;
-pub mod lod;
-pub mod map;
-pub mod messenger;
+mod lod;
+mod map;
+mod messenger;
 mod platform;
-pub mod primitives;
 pub mod render;
 pub mod tile_scheme;
-pub mod view;
+mod view;
 
 #[cfg(feature = "winit")]
 pub mod winit;
 
 #[cfg(all(feature = "winit", feature = "wgpu"))]
-pub mod galileo_map;
+mod galileo_map;
 #[cfg(all(feature = "winit", feature = "wgpu"))]
-pub use galileo_map::MapBuilder;
+pub use galileo_map::{GalileoMap, MapBuilder};
 
 pub use color::Color;
-
 pub use layer::feature_layer::symbol;
+pub use lod::Lod;
+pub use map::{LayerCollection, Map};
+pub use messenger::{DummyMessenger, Messenger};
 pub use tile_scheme::TileSchema;
+pub use view::MapView;
 
 // Reexport galileo_types
 pub use galileo_types;

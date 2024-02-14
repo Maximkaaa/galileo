@@ -1,14 +1,18 @@
-use crate::cartesian::impls::contour::ClosedContour;
 use crate::geometry_type::{GeometryType, PolygonGeometryType};
+use crate::impls::contour::ClosedContour;
 use serde::{Deserialize, Serialize};
 
+/// Simple implementation of the [`Polygon`](crate::Polygon) trait.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Polygon<P> {
+    /// Outer contour.
     pub outer_contour: ClosedContour<P>,
+    /// Inner contours.
     pub inner_contours: Vec<ClosedContour<P>>,
 }
 
 impl<P> Polygon<P> {
+    /// Creates a new polygon.
     pub fn new(outer_contour: ClosedContour<P>, inner_contours: Vec<ClosedContour<P>>) -> Self {
         Self {
             outer_contour,
@@ -16,10 +20,7 @@ impl<P> Polygon<P> {
         }
     }
 
-    pub fn iter_contours(&self) -> impl Iterator<Item = &ClosedContour<P>> {
-        std::iter::once(&self.outer_contour).chain(self.inner_contours.iter())
-    }
-
+    /// Casts all points of the polygon into a different numeric type.
     pub fn cast_points<T>(&self, mut cast: impl Fn(&P) -> T) -> Polygon<T> {
         Polygon {
             outer_contour: ClosedContour::new(

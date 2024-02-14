@@ -1,6 +1,6 @@
+use crate::decoded_image::DecodedImage;
 use crate::layer::data_provider::DataProvider;
 use crate::messenger::Messenger;
-use crate::primitives::DecodedImage;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{Canvas, ImagePaint, PackedBundle, PrimitiveId, RenderOptions};
 use crate::tile_scheme::{TileIndex, TileSchema};
@@ -14,6 +14,7 @@ use web_time::{Duration, SystemTime};
 
 use super::Layer;
 
+/// Raster tile layers load prerender tile sets using [`Provider`](DataProvider) and render them to the map.
 pub struct RasterTileLayer<Provider>
 where
     Provider: DataProvider<TileIndex, DecodedImage, ()> + MaybeSync + MaybeSend,
@@ -45,6 +46,7 @@ impl<Provider> RasterTileLayer<Provider>
 where
     Provider: DataProvider<TileIndex, DecodedImage, ()> + MaybeSync + MaybeSend,
 {
+    /// Creates anew layer.
     pub fn new(
         tile_scheme: TileSchema,
         tile_provider: Provider,
@@ -60,6 +62,7 @@ where
         }
     }
 
+    /// Sets fade in duration for newly loaded tiles.
     pub fn set_fade_in_duration(&mut self, duration: Duration) {
         self.fade_in_duration = duration;
     }
@@ -283,6 +286,7 @@ where
         }
     }
 
+    /// Preload tiles for the given `view`.
     pub async fn load_tiles(&self, view: &MapView) {
         if let Some(iter) = self.tile_scheme.iter_tiles(view) {
             for index in iter {

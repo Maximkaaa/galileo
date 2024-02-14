@@ -1,9 +1,10 @@
-use crate::cartesian::traits::cartesian_point::NewCartesianPoint2d;
+use crate::cartesian::NewCartesianPoint2d;
 use crate::geo::datum::Datum;
 use crate::geo::traits::point::NewGeoPoint;
 use crate::geo::traits::projection::Projection;
 use std::marker::PhantomData;
 
+/// Web Mercator projection.
 #[derive(Debug, Copy, Clone)]
 pub struct WebMercator<In, Out> {
     datum: Datum,
@@ -12,6 +13,7 @@ pub struct WebMercator<In, Out> {
 }
 
 impl<In, Out> WebMercator<In, Out> {
+    /// Creates a new projection with the given `datum`.
     pub fn new(datum: Datum) -> Self {
         Self {
             datum,

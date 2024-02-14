@@ -3,9 +3,7 @@ use crate::control::{
     UserEventHandler,
 };
 use crate::map::Map;
-use crate::render::Renderer;
-use galileo_types::cartesian::impls::point::Point2d;
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
+use galileo_types::cartesian::{CartesianPoint2d, Point2d};
 use web_time::SystemTime;
 
 const DRAG_THRESHOLD: f64 = 3.0;
@@ -19,6 +17,10 @@ struct TouchInfo {
     prev_position: Point2d,
 }
 
+/// Stores input state, converts [`RawUserEvent`] into [`UserEvent`] and manages a list of event handlers.
+///
+/// When an even is called, the `EventProcessor` will go through event handlers one by one until a handler returns
+/// [`EventPropagation::Consume`] or [`EventPropagation::Stop`]. At this point the event is considered to be handled.
 pub struct EventProcessor {
     handlers: Vec<Box<dyn UserEventHandler>>,
     pointer_position: Point2d,
@@ -49,11 +51,13 @@ impl Default for EventProcessor {
 }
 
 impl EventProcessor {
+    /// Adds a new handler to the end of the handler list.
     pub fn add_handler(&mut self, handler: impl UserEventHandler + 'static) {
         self.handlers.push(Box::new(handler));
     }
 
-    pub fn handle(&mut self, event: RawUserEvent, map: &mut Map, backend: &dyn Renderer) {
+    /// Handles the event.
+    pub fn handle(&mut self, event: RawUserEvent, map: &mut Map) {
         if let Some(user_events) = self.process(event) {
             for user_event in user_events {
                 let mut drag_start_target = None;
@@ -81,7 +85,7 @@ impl EventProcessor {
                         }
                     }
 
-                    match handler.handle(&user_event, map, backend) {
+                    match handler.handle(&user_event, map) {
                         EventPropagation::Propagate => {}
                         EventPropagation::Stop => break,
                         EventPropagation::Consume => {

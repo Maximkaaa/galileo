@@ -1,14 +1,15 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+/// Color representation.
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(from = "String", into = "String"))]
 pub struct Color {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-    pub a: u8,
+    r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
 }
 
 impl From<String> for Color {
@@ -24,17 +25,25 @@ impl From<Color> for String {
 }
 
 impl Color {
+    /// Transparent color: `#00000000`
     pub const TRANSPARENT: Color = Color::rgba(0, 0, 0, 0);
+    /// Red color: `#FF0000FF`
     pub const RED: Color = Color::rgba(255, 0, 0, 255);
+    /// Green color: `#00FF00FF`
     pub const GREEN: Color = Color::rgba(0, 255, 0, 255);
+    /// Blue color: `#0000FFFF`
     pub const BLUE: Color = Color::rgba(0, 0, 255, 255);
+    /// White color: `#FFFFFFFF`
     pub const WHITE: Color = Color::rgba(255, 255, 255, 255);
+    /// Black color: `#000000FF`
     pub const BLACK: Color = Color::rgba(0, 0, 0, 255);
 
+    /// Constructs color from its RGBA channels.
     pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self { r, g, b, a }
     }
 
+    /// Converts the color into f32 array as used by wgpu.
     pub fn to_f32_array(&self) -> [f32; 4] {
         [
             self.r as f32 / 255.0,
@@ -44,14 +53,17 @@ impl Color {
         ]
     }
 
+    /// Converts the color into u8 array (RGBA).
     pub fn to_u8_array(&self) -> [u8; 4] {
         [self.r, self.g, self.b, self.a]
     }
 
+    /// Converts the color into HEX8 string: `#RRGGBBAA`.
     pub fn to_hex(&self) -> String {
         format!("#{:02X}{:02X}{:02X}{:02X}", self.r, self.g, self.b, self.a)
     }
 
+    /// Parses a color from the hex string. Hex string can be either HEX6 (`#RRGGBB`) or HEX8 (`#RRGGBBAA`).
     pub fn try_from_hex(hex_string: &str) -> Option<Self> {
         if hex_string.len() != 7 && hex_string.len() != 9 || hex_string.chars().next()? != '#' {
             return None;
@@ -69,6 +81,11 @@ impl Color {
         Some(Self { r, g, b, a })
     }
 
+    /// Parses a color from the hex string. Hex string can be either HEX6 (`#RRGGBB`) or HEX8 (`#RRGGBBAA`).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the parsing fails.
     pub const fn from_hex(hex_string: &'static str) -> Self {
         let bytes = hex_string.as_bytes();
         if bytes.len() != 7 && bytes.len() != 9 || bytes[0] != b'#' {
@@ -87,10 +104,12 @@ impl Color {
         Self { r, g, b, a }
     }
 
+    /// Returns a new color instance, copied from the base one but with the given alpha channel.
     pub fn with_alpha(&self, a: u8) -> Self {
         Self { a, ..*self }
     }
 
+    /// Returns true if the color is fully transparent (`a == 0`).
     pub fn is_transparent(&self) -> bool {
         self.a == 0
     }

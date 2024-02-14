@@ -1,0 +1,2 @@
+# I uncluded this empty file to prevent user-defined configuration to influence how `fmt` works inside the project.
+# This may or may not include configuration in the future.

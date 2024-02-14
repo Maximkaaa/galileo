@@ -1,48 +1,61 @@
-use galileo_types::cartesian::impls::point::Point2d;
-use galileo_types::cartesian::rect::Rect;
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
-use galileo_types::geo::crs::Crs;
+//! [`TileSchema`] is used by tile layers to calculate [tile indices](TileIndex) needed for a given ['MapView'].
+
+use galileo_types::cartesian::{CartesianPoint2d, Point2d, Rect};
+use galileo_types::geo::Crs;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 #[cfg(target_arch = "wasm32")]
 use js_sys::wasm_bindgen::prelude::wasm_bindgen;
 
-use crate::bounding_box::BoundingBox;
 use crate::lod::Lod;
 use crate::view::MapView;
 
 const RESOLUTION_TOLERANCE: f64 = 0.01;
 
+/// Direction of the Y index of tiles.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum VerticalDirection {
+    /// Tiles with `Y == 0` are at the top of the map.
     TopToBottom,
+    /// Tiles with `Y == 0` are at the bottom of the map.
     BottomToTop,
 }
 
+/// Index of a tile.
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, Serialize, Deserialize)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct TileIndex {
+    /// Z index.
     pub z: u32,
+    /// X index.
     pub x: i32,
+    /// Y index.
     pub y: i32,
-    pub display_x: i32,
+    pub(crate) display_x: i32,
 }
 
+/// Tile schema specifies how tile indices are calculated based on the map position and resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TileSchema {
+    /// Position where all tiles have `X == 0, Y == 0` indices.
     pub origin: Point2d,
-    pub bounds: BoundingBox,
+    /// Rectangle that contains all tiles of the tile scheme.
+    pub bounds: Rect,
+    /// Sorted set of levels of detail that specify resolutions for each z-level.
     pub lods: BTreeSet<Lod>,
+    /// Width of a single tile in pixels.
     pub tile_width: u32,
+    /// Height of a single tile in pixels.
     pub tile_height: u32,
+    /// Direction of the Y-axis.
     pub y_direction: VerticalDirection,
-    pub max_tile_scale: f64,
-    pub cycle_x: bool,
+    /// Crs of the scheme.
     pub crs: Crs,
 }
 
 impl TileSchema {
+    /// Resolution of the given z-level, if exists.
     pub fn lod_resolution(&self, z: u32) -> Option<f64> {
         for lod in &self.lods {
             if lod.z_index() == z {
@@ -53,14 +66,17 @@ impl TileSchema {
         None
     }
 
+    /// Width of a single tile.
     pub fn tile_width(&self) -> u32 {
         self.tile_width
     }
 
+    /// Height of a single tile.
     pub fn tile_height(&self) -> u32 {
         self.tile_height
     }
 
+    /// Select a level of detail for the given resolution.
     pub fn select_lod(&self, resolution: f64) -> Option<Lod> {
         if !resolution.is_finite() {
             return None;
@@ -76,15 +92,10 @@ impl TileSchema {
             prev_lod = lod;
         }
 
-        if prev_lod.resolution() / resolution > self.max_tile_scale
-            || resolution / prev_lod.resolution() > self.max_tile_scale
-        {
-            None
-        } else {
-            Some(*prev_lod)
-        }
+        Some(*prev_lod)
     }
 
+    /// Iterate over tile indices that should be displayed for the given map view.
     pub fn iter_tiles(&self, view: &MapView) -> Option<impl Iterator<Item = TileIndex>> {
         if *view.crs() != self.crs {
             return None;
@@ -139,7 +150,10 @@ impl TileSchema {
         }))
     }
 
-    pub fn get_substitutes(&self, index: TileIndex) -> Option<impl Iterator<Item = TileIndex>> {
+    pub(crate) fn get_substitutes(
+        &self,
+        index: TileIndex,
+    ) -> Option<impl Iterator<Item = TileIndex>> {
         let lod = self.lod_over(index.z)?;
         // todo: we don't really need shrink here, but .iter_tiles_over_bbox return extra tiles
         // when borders of tiles are exactly on bbox border.
@@ -172,6 +186,7 @@ impl TileSchema {
         }
     }
 
+    /// Standard Web Mercator based tile scheme (used, for example, by OSM and Google maps).
     pub fn web(lods_count: u32) -> Self {
         const ORIGIN: Point2d = Point2d::new(-20037508.342787, 20037508.342787);
         const TOP_RESOLUTION: f64 = 156543.03392800014;
@@ -186,7 +201,7 @@ impl TileSchema {
 
         TileSchema {
             origin: ORIGIN,
-            bounds: BoundingBox::new(
+            bounds: Rect::new(
                 -20037508.342787,
                 -20037508.342787,
                 20037508.342787,
@@ -196,13 +211,11 @@ impl TileSchema {
             tile_width: 256,
             tile_height: 256,
             y_direction: VerticalDirection::TopToBottom,
-            max_tile_scale: 1024.0,
-            cycle_x: true,
             crs: Crs::EPSG3857,
         }
     }
 
-    pub fn tile_bbox(&self, index: TileIndex) -> Option<Rect> {
+    pub(crate) fn tile_bbox(&self, index: TileIndex) -> Option<Rect> {
         let resolution = self
             .lods
             .iter()
@@ -271,12 +284,12 @@ impl TileSchema {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use galileo_types::cartesian::size::Size;
+    use galileo_types::cartesian::Size;
 
     fn simple_schema() -> TileSchema {
         TileSchema {
             origin: Point2d::default(),
-            bounds: BoundingBox::new(0.0, 0.0, 2048.0, 2048.0),
+            bounds: Rect::new(0.0, 0.0, 2048.0, 2048.0),
             lods: [
                 Lod::new(8.0, 0).unwrap(),
                 Lod::new(4.0, 1).unwrap(),
@@ -286,8 +299,6 @@ mod tests {
             tile_width: 256,
             tile_height: 256,
             y_direction: VerticalDirection::BottomToTop,
-            max_tile_scale: 2.0,
-            cycle_x: false,
             crs: Crs::EPSG3857,
         }
     }
@@ -311,33 +322,6 @@ mod tests {
         assert_eq!(schema.select_lod(4.0).unwrap().z_index(), 1);
         assert_eq!(schema.select_lod(1.5).unwrap().z_index(), 2);
         assert_eq!(schema.select_lod(1.0).unwrap().z_index(), 2);
-        assert_eq!(schema.select_lod(0.5), None);
-        assert_eq!(schema.select_lod(0.0), None);
-        assert_eq!(schema.select_lod(100500.0), None);
-        assert_eq!(schema.select_lod(f64::INFINITY), None);
-        assert_eq!(schema.select_lod(f64::NEG_INFINITY), None);
-        assert_eq!(schema.select_lod(f64::NAN), None);
-    }
-
-    #[test]
-    fn select_lod_considers_max_tile_scale() {
-        let mut schema = simple_schema();
-        assert!(schema.select_lod(16.0).is_some());
-        assert!(schema.select_lod(1.0).is_some());
-        assert!(schema.select_lod(17.0).is_none());
-        assert!(schema.select_lod(0.9).is_none());
-
-        schema.max_tile_scale = 1.5;
-        assert!(schema.select_lod(16.0).is_none());
-        assert!(schema.select_lod(1.0).is_none());
-        assert!(schema.select_lod(17.0).is_none());
-        assert!(schema.select_lod(0.9).is_none());
-
-        schema.max_tile_scale = 2.5;
-        assert!(schema.select_lod(16.0).is_some());
-        assert!(schema.select_lod(1.0).is_some());
-        assert!(schema.select_lod(17.0).is_some());
-        assert!(schema.select_lod(0.9).is_some());
     }
 
     #[test]

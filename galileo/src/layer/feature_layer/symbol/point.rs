@@ -1,29 +1,32 @@
+use crate::decoded_image::DecodedImage;
 use crate::layer::feature_layer::symbol::Symbol;
-use crate::primitives::DecodedImage;
 use crate::render::point_paint::PointPaint;
 use crate::render::render_bundle::RenderPrimitive;
 use crate::Color;
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
+use galileo_types::cartesian::CartesianPoint3d;
 use galileo_types::geometry::Geom;
-use galileo_types::multi_point::MultiPoint;
+use galileo_types::MultiPoint;
 use nalgebra::Vector2;
 use num_traits::AsPrimitive;
 use std::sync::Arc;
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::error::GalileoError;
-use galileo_types::cartesian::impls::contour::Contour;
-use galileo_types::cartesian::impls::polygon::Polygon;
+use galileo_types::impls::{Contour, Polygon};
 #[cfg(not(target_arch = "wasm32"))]
 use std::ops::Deref;
 
+/// Renders a point as a circle of fixes size.
 #[derive(Debug, Copy, Clone)]
 pub struct CirclePointSymbol {
+    /// Color of the circle.
     pub color: Color,
+    /// Diameter of the circle.
     pub size: f64,
 }
 
 impl CirclePointSymbol {
+    /// Create a new instance.
     pub fn new(color: Color, size: f64) -> Self {
         Self { color, size }
     }
@@ -52,6 +55,8 @@ impl<F> Symbol<F> for CirclePointSymbol {
     }
 }
 
+/// Symbol that renders a point with an image. The image size is fixed on the screen and does not depend on map
+/// resolution.
 pub struct ImagePointSymbol {
     image: Arc<DecodedImage>,
     offset: Vector2<f32>,
@@ -59,6 +64,7 @@ pub struct ImagePointSymbol {
 }
 
 impl ImagePointSymbol {
+    /// Loads the image from the file system path.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn from_path(path: &str, offset: Vector2<f32>, scale: f32) -> Result<Self, GalileoError> {
         use image::GenericImageView;

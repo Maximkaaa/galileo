@@ -1,5 +1,5 @@
-use galileo::galileo_map::MapBuilder;
 use galileo::tile_scheme::TileSchema;
+use galileo::MapBuilder;
 use galileo_types::latlon;
 
 #[cfg(not(target_arch = "wasm32"))]

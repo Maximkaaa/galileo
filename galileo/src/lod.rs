@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+/// Level of detail of a layer or map.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Lod {
     resolution: f64,
@@ -7,6 +8,7 @@ pub struct Lod {
 }
 
 impl Lod {
+    /// Creates new level of detail.
     pub fn new(resolution: f64, z_index: u32) -> Option<Lod> {
         if resolution.is_finite() && resolution != 0.0 {
             Some(Self {
@@ -18,10 +20,12 @@ impl Lod {
         }
     }
 
+    /// Z-index associated with this LOD.
     pub fn z_index(&self) -> u32 {
         self.z_index
     }
 
+    /// Resolution of the LOD.
     pub fn resolution(&self) -> f64 {
         self.resolution
     }
@@ -55,8 +59,8 @@ mod tests {
 
     #[test]
     fn lod_comparison() {
-        assert!(Lod::new(1.0, 1) == Lod::new(1.0, 1));
-        assert!(Lod::new(1.0, 1) == Lod::new(1.0, 2));
+        assert_eq!(Lod::new(1.0, 1), Lod::new(1.0, 1));
+        assert_eq!(Lod::new(1.0, 1), Lod::new(1.0, 2));
         assert!(Lod::new(2.0, 1) > Lod::new(1.0, 1));
         assert!(Lod::new(2.0, 1) < Lod::new(4.0, 1));
     }

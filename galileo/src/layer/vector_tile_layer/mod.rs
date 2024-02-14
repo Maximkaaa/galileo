@@ -1,3 +1,6 @@
+//! [Vector tile layers](VectorTileLayer) load prepared vector tiles using a [data provider](VectorTileProvider)
+//! and draw them to the map with the given [`VectorTileStyle`].
+
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, PackedBundle, RenderOptions};
@@ -9,15 +12,18 @@ use std::collections::HashSet;
 
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::{LockedTileStore, VectorTileProvider};
-use crate::layer::vector_tile_layer::vector_tile::VectorTile;
 use galileo_mvt::{MvtFeature, MvtGeometry};
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
+use galileo_types::cartesian::CartesianPoint2d;
 use galileo_types::geometry::CartesianGeometry2d;
 
 pub mod style;
 pub mod tile_provider;
-pub mod vector_tile;
+mod vector_tile;
 
+pub use vector_tile::VectorTile;
+
+/// Vector tile layers use [`Providers`](VectorTileProvider) to load prepared vector tiles, and then render them using
+/// specified [styles](VectorTileStyle).
 pub struct VectorTileLayer<Provider: VectorTileProvider> {
     tile_provider: Provider,
     tile_scheme: TileSchema,
@@ -55,10 +61,12 @@ impl<Provider: VectorTileProvider + 'static> Layer for VectorTileLayer<Provider>
 }
 
 impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
+    /// Style of the layer.
     pub fn style(&self) -> &VectorTileStyle {
         &self.style
     }
 
+    /// Creates a new layer with the given url source.
     pub fn from_url(
         tile_provider: Provider,
         style: VectorTileStyle,
@@ -120,11 +128,13 @@ impl<Provider: VectorTileProvider> VectorTileLayer<Provider> {
         tiles.into_iter().map(|(_, tile)| tile).collect()
     }
 
+    /// Change style of the layer and redraw it.
     pub fn update_style(&mut self, style: VectorTileStyle) {
         self.style = style;
         self.tile_provider.update_style();
     }
 
+    /// Returns features, visible in the layer at the given point with the given map view.
     pub fn get_features_at(
         &self,
         point: &impl CartesianPoint2d<Num = f64>,

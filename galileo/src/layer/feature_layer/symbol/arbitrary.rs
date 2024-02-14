@@ -1,12 +1,12 @@
 use crate::render::render_bundle::RenderPrimitive;
 use crate::symbol::{CirclePointSymbol, SimpleContourSymbol, SimplePolygonSymbol, Symbol};
 use crate::Color;
-use galileo_types::cartesian::impls::contour::Contour;
-use galileo_types::cartesian::impls::polygon::Polygon;
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint3d;
+use galileo_types::cartesian::CartesianPoint3d;
 use galileo_types::geometry::Geom;
+use galileo_types::impls::{Contour, Polygon};
 use num_traits::AsPrimitive;
 
+/// Renders any type of the geometry with the set inner symbols.
 #[derive(Debug, Clone)]
 pub struct ArbitraryGeometrySymbol {
     point: CirclePointSymbol,
@@ -15,6 +15,7 @@ pub struct ArbitraryGeometrySymbol {
 }
 
 impl ArbitraryGeometrySymbol {
+    /// Creates a new symbol. Geometries of corresponding types will use one of the given symbol to be drawn.
     pub fn new(
         point: CirclePointSymbol,
         contour: SimpleContourSymbol,

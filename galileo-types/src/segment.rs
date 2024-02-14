@@ -1,11 +1,17 @@
-use crate::cartesian::orient::Orientation;
-use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
+use crate::cartesian::{CartesianPoint2d, Orientation};
 use num_traits::{One, Zero};
 
+/// A strait line segment between two points.
 #[derive(Debug, PartialEq)]
 pub struct Segment<'a, Point>(pub &'a Point, pub &'a Point);
 
 impl<'a, P: CartesianPoint2d> Segment<'a, P> {
+    /// Shortest euclidian distance (squared) between a point and the segment:
+    ///
+    /// * if the normal from the point to the segment ends inside the segment, the returned value is the squared length
+    ///   of the normal
+    /// * if the normal from the point to the segment ends outside of the segment, the returned value is the smaller one
+    ///   of the distances between the point and the segment's endpoints
     pub fn distance_to_point_sq<Point: CartesianPoint2d<Num = P::Num>>(
         &self,
         point: &Point,
@@ -29,6 +35,7 @@ impl<'a, P: CartesianPoint2d> Segment<'a, P> {
         }
     }
 
+    /// Returns true, if the segment has at least one common point with the `other` segment.
     pub fn intersects<Point: CartesianPoint2d<Num = P::Num>>(
         &self,
         other: &Segment<Point>,

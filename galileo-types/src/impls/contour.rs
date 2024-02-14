@@ -1,18 +1,21 @@
-use crate::geo::traits::projection::Projection;
+use crate::geo::Projection;
 use crate::geometry_type::{ContourGeometryType, GeometryType};
 use serde::{Deserialize, Serialize};
 
+/// Simple [`crate::Contour`] implementation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Contour<Point> {
-    pub points: Vec<Point>,
-    pub is_closed: bool,
+    points: Vec<Point>,
+    is_closed: bool,
 }
 
 impl<Point> Contour<Point> {
+    /// Creates a new contour.
     pub fn new(points: Vec<Point>, is_closed: bool) -> Self {
         Self { points, is_closed }
     }
 
+    /// Creates a new open contour.
     pub fn open(points: Vec<Point>) -> Self {
         Self {
             points,
@@ -20,6 +23,7 @@ impl<Point> Contour<Point> {
         }
     }
 
+    /// Creates a new closed contour.
     pub fn closed(points: Vec<Point>) -> Self {
         Self {
             points,
@@ -27,6 +31,8 @@ impl<Point> Contour<Point> {
         }
     }
 
+    /// Converts self into a `ClosedContour` instance if the contour is closed, or returns `None` if the contour is
+    /// open.
     pub fn into_closed(self) -> Option<ClosedContour<Point>> {
         if self.is_closed {
             Some(ClosedContour {
@@ -37,6 +43,7 @@ impl<Point> Contour<Point> {
         }
     }
 
+    /// Projects all the points of the contour with the given projection.
     pub fn project_points<P, Proj>(&self, projection: &Proj) -> Option<Contour<P>>
     where
         Proj: Projection<InPoint = Point, OutPoint = P> + ?Sized,
@@ -53,16 +60,20 @@ impl<Point> Contour<Point> {
     }
 }
 
+/// Closed contour implementation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClosedContour<Point> {
+    /// Points of the contour.
     pub points: Vec<Point>,
 }
 
 impl<Point> ClosedContour<Point> {
+    /// Creates a new closed contour.
     pub fn new(points: Vec<Point>) -> Self {
         Self { points }
     }
 
+    /// Projects all the points of the contour with the given projection.
     pub fn project_points<P, Proj>(&self, projection: &Proj) -> Option<ClosedContour<P>>
     where
         Proj: Projection<InPoint = Point, OutPoint = P> + ?Sized,
@@ -93,12 +104,6 @@ impl<P> crate::contour::ClosedContour for ClosedContour<P> {
     }
 }
 
-// impl<'a, P> crate::traits::contour::ClosedContour<'a> for ClosedContour<P> {
-//     fn iter_points(&'a self) -> Self::PointIterator {
-//         todo!()
-//     }
-// }
-
 impl<P> crate::contour::Contour for Contour<P> {
     type Point = P;
 
@@ -110,11 +115,6 @@ impl<P> crate::contour::Contour for Contour<P> {
         self.points.iter()
     }
 }
-
-// impl<'a, Num: Float, P: CartesianPoint2d<Num = Num> + 'a> CartesianContour<'a, Num, P>
-//     for Contour<P>
-// {
-// }
 
 impl<P: GeometryType> GeometryType for Contour<P> {
     type Type = ContourGeometryType;

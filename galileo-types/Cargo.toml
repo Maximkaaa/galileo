@@ -10,13 +10,13 @@ documentation = "https://docs.rs/galileo-types"
 description = "Trait based geo geometries and algorithms"
 
 [features]
-default = ["geo-types"]
+default = ["geo-types", "geodesy"]
 
 [dependencies]
 num-traits = "0.2.17"
 nalgebra = "0.32"
 serde = { version = "1.0", features = ["derive"] }
-geodesy = "0.11.1"
+geodesy = { version = "0.12", optional = true }
 geo-types = { version = "0.7", optional = true }
 geojson = { version = "0.24", optional = true }
 thiserror = "1.0"

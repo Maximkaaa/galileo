@@ -1,17 +1,17 @@
-use crate::layer::data_provider::file_cache::FileCacheController;
-use crate::layer::data_provider::url_data_provider::UrlDataProvider;
-use crate::layer::data_provider::url_image_provider::UrlImageProvider;
-use crate::layer::data_provider::UrlSource;
+use crate::layer::data_provider::{
+    FileCacheController, UrlDataProvider, UrlImageProvider, UrlSource,
+};
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::layer::vector_tile_layer::tile_provider::rayon_provider::RayonProvider;
+use crate::layer::vector_tile_layer::tile_provider::ThreadedProvider;
 use crate::layer::{RasterTileLayer, VectorTileLayer};
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
-use crate::render::render_bundle::RenderBundle;
+use crate::render::render_bundle::{RenderBundle, RenderBundleType};
 use crate::tile_scheme::TileIndex;
 use crate::{MapBuilder, TileSchema};
-use galileo_types::geo::impls::point::GeoPoint2d;
+use galileo_types::geo::impls::GeoPoint2d;
 
 impl MapBuilder {
+    /// Creates a new instance.
     pub fn new() -> Self {
         Self {
             position: GeoPoint2d::default(),
@@ -24,6 +24,7 @@ impl MapBuilder {
         }
     }
 
+    /// Create a new raster tile layer.
     pub fn create_raster_tile_layer(
         tile_source: impl UrlSource<TileIndex> + 'static,
         tile_scheme: TileSchema,
@@ -39,6 +40,7 @@ impl MapBuilder {
         RasterTileLayer::new(tile_scheme, tile_provider, None)
     }
 
+    /// Add a new raster layer to the layer list.
     pub fn with_raster_tiles(
         mut self,
         tile_source: impl UrlSource<TileIndex> + 'static,
@@ -51,28 +53,31 @@ impl MapBuilder {
         self
     }
 
+    /// Create a new vector tile layer.
     pub fn create_vector_tile_layer(
         tile_source: impl UrlSource<TileIndex> + 'static,
         tile_scheme: TileSchema,
         style: VectorTileStyle,
     ) -> VectorTileLayer<
-        RayonProvider<
+        ThreadedProvider<
             UrlDataProvider<
                 TileIndex,
-                crate::layer::vector_tile_layer::tile_provider::vt_processor::VtProcessor,
+                crate::layer::vector_tile_layer::tile_provider::VtProcessor,
                 FileCacheController,
             >,
         >,
     > {
-        let tile_provider = RayonProvider::new(
+        let tile_provider = ThreadedProvider::new(
             None,
             tile_scheme.clone(),
             UrlDataProvider::new_cached(
                 tile_source,
-                crate::layer::vector_tile_layer::tile_provider::vt_processor::VtProcessor {},
+                crate::layer::vector_tile_layer::tile_provider::VtProcessor {},
                 FileCacheController::new(".tile_cache"),
             ),
-            RenderBundle::Tessellating(TessellatingRenderBundle::new()),
+            RenderBundle(RenderBundleType::Tessellating(
+                TessellatingRenderBundle::new(),
+            )),
         );
 
         VectorTileLayer::from_url(tile_provider, style, tile_scheme)

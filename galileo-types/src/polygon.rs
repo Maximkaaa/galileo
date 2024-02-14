@@ -1,24 +1,31 @@
-use crate::cartesian::rect::Rect;
-use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
-use crate::cartesian::traits::polygon::CartesianPolygon;
+use crate::cartesian::{CartesianPoint2d, CartesianPolygon, Rect};
 use crate::contour::Contour;
-use crate::geo::traits::projection::Projection;
+use crate::geo::Projection;
 use crate::geometry::{
     CartesianGeometry2d, CartesianGeometry2dSpecialization, Geom, Geometry, GeometrySpecialization,
 };
 use crate::geometry_type::{CartesianSpace2d, GeometryType, PolygonGeometryType};
 use crate::segment::Segment;
 
+/// Polygon geometry. Polygon consists of one outer contour, and zero or more inner contours.
+///
+/// Zero contours represent *holes* in a polygon. If one inner contour is inside another inner contour, it represents
+/// non-hole area inside a hole.
 pub trait Polygon {
+    /// Contour type.
     type Contour: Contour;
 
+    /// Outer contour of the polygon.
     fn outer_contour(&self) -> &Self::Contour;
+    /// iterates over inner contours.
     fn inner_contours(&self) -> impl Iterator<Item = &'_ Self::Contour>;
 
+    /// Iterates over all contours of the polygon starting with the outer one.
     fn iter_contours(&self) -> impl Iterator<Item = &'_ Self::Contour> {
         Box::new(std::iter::once(self.outer_contour()).chain(self.inner_contours()))
     }
 
+    /// Iterates over all segments of the polygon contour lines.
     fn iter_segments(
         &self,
     ) -> impl Iterator<Item = Segment<'_, <Self::Contour as Contour>::Point>> {
@@ -48,8 +55,8 @@ where
                     _ => None,
                 })
             })
-            .collect::<Option<Vec<crate::cartesian::impls::contour::ClosedContour<Proj::OutPoint>>>>()?;
-        Some(Geom::Polygon(crate::cartesian::impls::polygon::Polygon {
+            .collect::<Option<Vec<crate::impls::ClosedContour<Proj::OutPoint>>>>()?;
+        Some(Geom::Polygon(crate::impls::Polygon {
             outer_contour: outer_contour.into_closed()?,
             inner_contours,
         }))

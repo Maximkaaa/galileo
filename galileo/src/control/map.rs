@@ -1,12 +1,12 @@
 use crate::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
 use crate::map::Map;
-use crate::render::Renderer;
 use crate::view::MapView;
 use nalgebra::Vector2;
 use std::time::Duration;
 
 const DEFAULT_ZOOM_DURATION: Duration = Duration::from_millis(50);
 
+/// Event handler of a map, providing panning, zooming and tilting capabilities.
 #[derive(Default)]
 pub struct MapController {
     parameters: MapControllerParameters,
@@ -36,12 +36,7 @@ impl Default for MapControllerParameters {
 }
 
 impl UserEventHandler for MapController {
-    fn handle(
-        &self,
-        event: &UserEvent,
-        map: &mut Map,
-        _backend: &dyn Renderer,
-    ) -> EventPropagation {
+    fn handle(&self, event: &UserEvent, map: &mut Map) -> EventPropagation {
         match event {
             UserEvent::DragStarted(button, _)
                 if *button == MouseButton::Left

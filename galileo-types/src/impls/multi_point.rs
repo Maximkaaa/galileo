@@ -1,5 +1,6 @@
 use crate::geometry_type::{GeometryType, MultiPointGeometryType};
 
+/// A set of points.
 pub struct MultiPoint<P>(Vec<P>);
 
 impl<P> crate::multi_point::MultiPoint for MultiPoint<P> {

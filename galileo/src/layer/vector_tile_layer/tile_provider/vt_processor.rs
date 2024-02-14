@@ -1,25 +1,29 @@
 use crate::error::GalileoError;
 use crate::layer::data_provider::DataProcessor;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::render::render_bundle::RenderBundle;
+use crate::render::render_bundle::{RenderBundle, RenderPrimitive};
 use crate::render::{LineCap, LinePaint, PolygonPaint};
 use crate::tile_scheme::TileIndex;
 use crate::TileSchema;
 use bytes::Bytes;
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
-use galileo_types::cartesian::impls::contour::{ClosedContour, Contour};
-use galileo_types::cartesian::impls::point::Point3d;
-use galileo_types::cartesian::impls::polygon::Polygon;
-use galileo_types::cartesian::rect::Rect;
-use galileo_types::cartesian::traits::cartesian_point::CartesianPoint2d;
+use galileo_types::cartesian::{CartesianPoint2d, Point3d, Rect};
+use galileo_types::impls::{ClosedContour, Polygon};
+use galileo_types::Contour;
 use num_traits::ToPrimitive;
 
+/// Data processor that decodes vector tiles.
 pub struct VtProcessor {}
 
+/// Vector tiles decoding context.
 pub struct VectorTileDecodeContext {
+    /// Index of the tile.
     pub index: TileIndex,
+    /// Vector tile layer style.
     pub style: VectorTileStyle,
-    pub tile_scheme: TileSchema,
+    /// Vector tile layer tile schema.
+    pub tile_schema: TileSchema,
+    /// Render bundle to add render primitives to.
     pub bundle: RenderBundle,
 }
 
@@ -38,7 +42,7 @@ impl DataProcessor for VtProcessor {
             mut bundle,
             index,
             style,
-            tile_scheme,
+            tile_schema: tile_scheme,
         } = context;
         Self::prepare(&mvt_tile, &mut bundle, index, &style, &tile_scheme)?;
 
@@ -64,20 +68,22 @@ impl VtProcessor {
 
         let bounds = Polygon::new(
             ClosedContour::new(vec![
-                Point3d::new(bbox.x_min, bbox.y_min, 0.0),
-                Point3d::new(bbox.x_min, bbox.y_max, 0.0),
-                Point3d::new(bbox.x_max, bbox.y_max, 0.0),
-                Point3d::new(bbox.x_max, bbox.y_min, 0.0),
+                Point3d::new(bbox.x_min(), bbox.y_min(), 0.0),
+                Point3d::new(bbox.x_min(), bbox.y_max(), 0.0),
+                Point3d::new(bbox.x_max(), bbox.y_max(), 0.0),
+                Point3d::new(bbox.x_max(), bbox.y_min(), 0.0),
             ]),
             vec![],
         );
         bundle.clip_area(&bounds);
 
-        bundle.add_polygon(
-            &bounds,
-            PolygonPaint {
-                color: style.background,
-            },
+        bundle.add(
+            RenderPrimitive::<_, _, galileo_types::impls::Contour<_>, _>::new_polygon_ref(
+                &bounds,
+                PolygonPaint {
+                    color: style.background,
+                },
+            ),
             lod_resolution,
         );
 
@@ -91,18 +97,19 @@ impl VtProcessor {
                     MvtGeometry::LineString(contours) => {
                         if let Some(paint) = Self::get_line_symbol(style, &layer.name, feature) {
                             for contour in contours {
-                                bundle.add_line(
-                                    &Contour {
-                                        is_closed: false,
-                                        points: contour
-                                            .points
-                                            .iter()
-                                            .map(|p| {
-                                                Self::transform_point(p, bbox, tile_resolution)
-                                            })
-                                            .collect(),
-                                    },
-                                    paint,
+                                bundle.add(
+                                    RenderPrimitive::<_, _, _, Polygon<_>>::new_contour_ref(
+                                        &galileo_types::impls::Contour::new(
+                                            contour
+                                                .iter_points()
+                                                .map(|p| {
+                                                    Self::transform_point(p, bbox, tile_resolution)
+                                                })
+                                                .collect(),
+                                            false,
+                                        ),
+                                        paint,
+                                    ),
                                     lod_resolution,
                                 );
                             }
@@ -111,11 +118,13 @@ impl VtProcessor {
                     MvtGeometry::Polygon(polygons) => {
                         if let Some(paint) = Self::get_polygon_symbol(style, &layer.name, feature) {
                             for polygon in polygons {
-                                bundle.add_polygon(
-                                    &polygon.cast_points(|p| {
-                                        Self::transform_point(p, bbox, tile_resolution)
-                                    }),
-                                    paint,
+                                bundle.add(
+                                    RenderPrimitive::<_, _, galileo_types::impls::Contour<_>, _>::new_polygon_ref(
+                                        &polygon.cast_points(|p| {
+                                            Self::transform_point(p, bbox, tile_resolution)
+                                        }),
+                                        paint,
+                                    ),
                                     lod_resolution,
                                 );
                             }

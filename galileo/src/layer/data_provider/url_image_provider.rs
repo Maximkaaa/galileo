@@ -1,8 +1,8 @@
+use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::layer::data_provider::dummy::DummyCacheController;
 use crate::layer::data_provider::{DataProvider, PersistentCacheController, UrlSource};
 use crate::platform::{PlatformService, PlatformServiceImpl};
-use crate::primitives::DecodedImage;
 use bytes::Bytes;
 use maybe_sync::{MaybeSend, MaybeSync};
 use std::marker::PhantomData;
@@ -10,6 +10,7 @@ use std::marker::PhantomData;
 #[cfg(target_arch = "wasm32")]
 use std::future::Future;
 
+/// Loads an image from Internet and uses `Cache` persistent cache controller to save it locally.
 #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub struct UrlImageProvider<Key, Cache = DummyCacheController> {
     url_source: Box<dyn UrlSource<Key>>,
@@ -20,6 +21,7 @@ pub struct UrlImageProvider<Key, Cache = DummyCacheController> {
 }
 
 impl<Key> UrlImageProvider<Key, DummyCacheController> {
+    /// Creates a new instance without persistent cache.
     pub fn new(url_source: impl UrlSource<Key> + 'static) -> Self {
         Self {
             url_source: Box::new(url_source),
@@ -32,6 +34,7 @@ impl<Key> UrlImageProvider<Key, DummyCacheController> {
 }
 
 impl<Key, Cache> UrlImageProvider<Key, Cache> {
+    /// Creates a new instance with persistent cache.
     pub fn new_cached(url_source: impl UrlSource<Key> + 'static, cache: Cache) -> Self {
         Self {
             url_source: Box::new(url_source),
