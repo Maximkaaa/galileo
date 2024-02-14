@@ -8,6 +8,7 @@ license.workspace = true
 keywords.workspace = true
 documentation = "https://docs.rs/galileo-mvt"
 description = "Mapbox Vector Tile format reader"
+readme = "../README.md"
 exclude = [
     "test-data/*"
 ]

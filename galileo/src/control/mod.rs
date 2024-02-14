@@ -8,8 +8,8 @@
 //! way to handle user interactions for the application.
 //! 3. `EventProcessor` has a list of [`UserEventHandler`]s, which change the state of application based on the events.
 //!
-//! To write a user interaction logic, the app must provide an implementation of [`UserEventHandler`] trait (or use
-//! a provided one like [`CustomEventHandler`]) and add it to the `EventProcessor` handler list.
+//! To write a user interaction logic, the app must provide an implementation of [`UserEventHandler`] trait and add it
+//! to the `EventProcessor` handler list.
 
 use crate::map::Map;
 use galileo_types::cartesian::Point2d;
@@ -95,7 +95,7 @@ pub enum UserEvent {
     Zoom(f64, Point2d),
 }
 
-/// Value returned by an [`EventHandler`] to indicate the status of the event.
+/// Value returned by an [`UserEventHandler`] to indicate the status of the event.
 pub enum EventPropagation {
     /// Event should be propagated to the next handler.
     Propagate,
@@ -103,7 +103,7 @@ pub enum EventPropagation {
     Stop,
     /// Event should not be propagated to the next handler, and the current event handler should be considered the
     /// owner of the event. This is used, for example, to indicate, that the handler wants to take ownership of
-    /// the [`UserEvent::DragStart`], so that all consequent drag events are only processed by this handler.
+    /// the [`UserEvent::DragStarted`], so that all consequent drag events are only processed by this handler.
     Consume,
 }
 

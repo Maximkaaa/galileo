@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 ///
 /// All access operations in the storage return [FeatureContainer] or [FeatureContainerMut] structs. These containers
 /// then allow access to references to the features themselves. When a feature is modified through
-/// [FeatureContainerMut::into_mut] or [FeatureContainerMut::edit_style], the `FeatureLayer` containing them
+/// [AsMut::as_mut] or [FeatureContainerMut::edit_style], the `FeatureLayer` containing them
 /// is automatically notified of the change, and the layer can update rendering of the given features without redrawing
 /// the whole feature set.
 #[derive(Default)]

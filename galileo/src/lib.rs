@@ -1,9 +1,6 @@
 //! Galileo is a cross-platform map rendering engine. It supports raster and vector layers, custom and flexible styling,
 //! working with different coordinate systems and projects.
 //!
-//! <div class="warning">This crate is in pre-release alpha stage. Documentation is not complete and some parts do not
-//! work yet.</div>
-//!
 //! # Quick start
 //!
 //! You can create a simple interactive map with two layers by this code:
@@ -41,7 +38,7 @@
 //! care of creating a window, setting up GPU context and configuring user interactions to control the map position
 //! with mouse or touch.
 //!
-//! Calling [`.run()`](galileo_map::GalileoMap) starts `winit` event loop, which will run until the user
+//! Calling [`.run()`](GalileoMap) starts `winit` event loop, which will run until the user
 //! closes the window.
 //!
 //! Running the map in a dedicated window is quite straightforward, but to integrate Galileo map into your application
@@ -51,8 +48,8 @@
 //!
 //! As surprising as it is, everything in a mapping library revolves around
 //!
-//! * [`Map`](Map) struct, which is quite simple by itself and contains only currently displayed
-//!   [`MapView`](MapView), inner state, such as animation parameters, and a set of
+//! * [`Map`] struct, which is quite simple by itself and contains only currently displayed
+//!   [`MapView`], inner state, such as animation parameters, and a set of
 //! * [`layers`](layer) that actually contain data and know how it should be displayed. There are different
 //!   types of layers depending on what kind of data they use (images, vector tiles, geometric features etc) and on
 //!   their capabilities for transforming that data into what a user wants to see. To render the data layers use
@@ -64,7 +61,7 @@
 //!
 //! In case a user is supposed to interact with the map in your application, you would also need
 //!
-//! * [`EventProcessor`](control::event_processor::EventProcessor) to convert raw system event into
+//! * [`EventProcessor`](control::EventProcessor) to convert raw system event into
 //!   some intermediate representation, more convenient to deal with, and some
 //! * [`controls`](control) that actually change state of the map or layers based on the user input.
 

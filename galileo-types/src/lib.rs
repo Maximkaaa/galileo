@@ -18,8 +18,8 @@
 //!
 //! Because of that, `galileo-types` crate makes strong distinction between geographic and cartesian coordinates. Basic
 //! trait for coordinates in any space is a point:
-//! * [`GeoPoint`] is defined in [`geo`] module, and represents a point in geographic coordinate system
-//! * [`CartesianPoint2d`] is defined in [`cartesian`] module, and represents a point in cartesian coordinate system
+//! * [`GeoPoint`](geo::GeoPoint) is defined in [`geo`] module, and represents a point in geographic coordinate system
+//! * [`CartesianPoint2d`](cartesian::CartesianPoint2d) is defined in [`cartesian`] module, and represents a point in cartesian coordinate system
 //!   on a flat surface of the Earth (or another stellar body)
 //!
 //! Geometry traits are generic over point type they are constructed with.
@@ -45,16 +45,17 @@
 //! different set of methods with their own meaning.
 //!
 //! At this point, one such trait is defined:
-//! * [`CartesianPoint3d`] - a point in *XYZ* coordinate system, where *Z* is defined in projection units.
+//! * [`CartesianPoint3d`](cartesian::CartesianPoint3d) - a point in *XYZ* coordinate system, where *Z* is defined in projection units.
 //!
 //! # Converting between coordinate systems
 //!
-//! Converting between different types of coordinates is done using [`Projections`](Projection).
+//! Converting between different types of coordinates is done using [`Projections`](geo::Projection).
 //!
 //! # Geometry types
 //!
 //! A subset of OGC geometry types are supported at the moment:
-//! * [`GeoPoint`], [`CartesianPoint2d`], [`CartesianPoint3d`] (correspond to OGC *Point* geometry)
+//! * [`GeoPoint`](geo::GeoPoint), [`CartesianPoint2d`](cartesian::CartesianPoint2d), [`CartesianPoint3d`](cartesian::CartesianPoint2d)
+//!    (correspond to OGC *Point* geometry)
 //! * [`MultiPoint`]
 //! * [`Contour`] (corresponds to OGC *LineString* geometry with slight difference, check the trait's documentation)
 //! * [`MultiContour`] (corresponds to OGC *MultiLineString* geometry)
@@ -70,7 +71,7 @@
 //! and at the same time let the user override default implementation with more specific one (because of
 //! trait specialization problem).
 //!
-//! There is a way around those limitations though. You can use [`GeometryType`] trait to make your type, implementing
+//! There is a way around those limitations though. You can use [`GeometryType`](geometry_type::GeometryType) trait to make your type, implementing
 //! any of the specific geometry traits, also implement [`Geometry`] trait automatically.
 //!
 //! # Implementation for foreign types

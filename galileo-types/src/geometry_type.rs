@@ -3,7 +3,7 @@
 /// This trait allows automatically implement [`Geometry`](crate::Geometry) trait for types that implement specific
 /// geometry traits (e.g. [`Polygon`](crate::Polygon) etc).
 pub trait GeometryType {
-    /// Type of the geometry. [`Geometry`] trait is implemented for one of the following types:
+    /// Type of the geometry. [`Geometry`](crate::Geometry) trait is implemented for one of the following types:
     /// * [`PointGeometryType`]
     /// * [`MultiPointGeometryType`]
     /// * [`ContourGeometryType`]

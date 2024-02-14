@@ -40,7 +40,7 @@ pub use symbol::Symbol;
 /// hand, the CRS of the layer doesn't have to be same as the CRS of the map. When the layer is requested to be rendered,
 /// it will project all its features into needed CRS automatically.
 ///
-/// Feature layer can render features differently at different resolutions. See [`FeatureLayer::new_with_lods`] for
+/// Feature layer can render features differently at different resolutions. See [`FeatureLayer::with_lods`] for
 /// details.
 pub struct FeatureLayer<P, F, S, Space>
 where
