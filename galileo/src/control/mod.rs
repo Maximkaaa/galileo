@@ -28,7 +28,7 @@ pub trait UserEventHandler {
     fn handle(&self, event: &UserEvent, map: &mut Map) -> EventPropagation;
 }
 
-impl<T: Fn(&UserEvent, &mut Map) -> EventPropagation> UserEventHandler for T
+impl<T: for<'a> Fn(&'a UserEvent, &'a mut Map) -> EventPropagation> UserEventHandler for T
 where
     T: MaybeSync + MaybeSend,
 {

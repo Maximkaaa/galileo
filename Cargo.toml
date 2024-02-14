@@ -3,11 +3,11 @@ members = [
     "galileo",
     "galileo-mvt",
     "galileo-types",
+    "galileo/examples/with_egui",
 ]
 resolver = "2"
 
 exclude = [
-    "galileo/examples/with_egui",
     "wasm_examples/raster_tiles",
     "wasm_examples/vector_tiles",
     "wasm_examples/feature_layers",

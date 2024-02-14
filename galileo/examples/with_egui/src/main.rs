@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod run_ui;
 mod state;
 
