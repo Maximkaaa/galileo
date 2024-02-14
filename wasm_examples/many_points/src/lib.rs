@@ -1,4 +1,4 @@
-use galileo::galileo_map::MapBuilder;
+use galileo::MapBuilder;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 #[path = "../../common.rs"]

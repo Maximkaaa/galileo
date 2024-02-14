@@ -139,6 +139,9 @@ impl GalileoMap {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+type EventHandler = dyn (Fn(&UserEvent, &mut Map) -> EventPropagation);
+#[cfg(not(target_arch = "wasm32"))]
 type EventHandler = dyn (Fn(&UserEvent, &mut Map) -> EventPropagation) + MaybeSend + MaybeSync;
 
 /// Builder for a [`GalileoMap`].

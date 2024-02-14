@@ -1,5 +1,5 @@
 use crate::error::GalileoError;
-use crate::layer::data_provider::url_data_provider::UrlDataProvider;
+use crate::layer::data_provider::UrlDataProvider;
 use crate::layer::data_provider::{DataProvider, UrlSource};
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::vt_processor::{
@@ -11,7 +11,7 @@ use crate::layer::vector_tile_layer::tile_provider::{
 use crate::messenger::Messenger;
 use crate::render::render_bundle::tessellating::serialization::TessellatingRenderBundleBytes;
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
-use crate::render::render_bundle::RenderBundle;
+use crate::render::render_bundle::{RenderBundle, RenderBundleType};
 use crate::tile_scheme::{TileIndex, TileSchema};
 use galileo_mvt::MvtTile;
 use quick_cache::unsync::Cache;
@@ -25,6 +25,7 @@ use wasm_bindgen::prelude::*;
 const WORKER_URL: &str = "./vt_worker.js";
 const READY_MESSAGE: f64 = 42.0;
 
+/// Vector tile provider that uses web workers to download and decode the tiles.
 pub struct WebWorkerVectorTileProvider {
     worker_pool: Vec<Rc<RefCell<WorkerState>>>,
     next_worker: AtomicUsize,
@@ -80,6 +81,7 @@ impl VectorTileProvider for WebWorkerVectorTileProvider {
 }
 
 impl WebWorkerVectorTileProvider {
+    /// Creates a new provider with `pool_size` workers.
     pub fn new(
         pool_size: usize,
         messenger: Option<Box<dyn Messenger>>,
@@ -240,9 +242,9 @@ fn store_vector_tile(
         Some(TileState::Loading | TileState::Updating(_)) => {
             let converted: TessellatingRenderBundleBytes =
                 bincode::deserialize(&bundle_bytes).unwrap();
-            let bundle = RenderBundle::Tessellating(
+            let bundle = RenderBundle(RenderBundleType::Tessellating(
                 TessellatingRenderBundle::from_bytes_unchecked(converted),
-            );
+            ));
             let mvt_tile = MvtTile::decode(bytes::Bytes::from(mvt_tile), true).unwrap();
             store.insert(
                 index,
@@ -315,12 +317,14 @@ async fn try_load_tile(payload: LoadTilePayload) -> Result<DecodedVectorTile, Ga
         index: payload.index,
         style: payload.style,
         tile_schema: payload.tile_scheme,
-        bundle: RenderBundle::Tessellating(TessellatingRenderBundle::new()),
+        bundle: RenderBundle(RenderBundleType::Tessellating(
+            TessellatingRenderBundle::new(),
+        )),
     };
 
     let bytes = data_provider.load_raw(&payload.url).await?;
     let (bundle, _) = data_provider.decode(bytes.clone(), context)?;
-    let RenderBundle::Tessellating(bundle) = bundle;
+    let RenderBundleType::Tessellating(bundle) = bundle.0;
 
     let serialized = bincode::serialize(&bundle.into_bytes()).unwrap();
 

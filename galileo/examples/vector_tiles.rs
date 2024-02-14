@@ -18,7 +18,7 @@ type VectorTileProvider =
     ThreadedProvider<UrlDataProvider<TileIndex, VtProcessor, FileCacheController>>;
 
 #[cfg(target_arch = "wasm32")]
-use galileo::layer::vector_tile_layer::tile_provider::web_worker_provider::WebWorkerVectorTileProvider;
+use galileo::layer::vector_tile_layer::tile_provider::WebWorkerVectorTileProvider;
 use galileo_types::cartesian::Rect;
 
 #[cfg(target_arch = "wasm32")]

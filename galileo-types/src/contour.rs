@@ -210,10 +210,11 @@ where
 {
     fn is_point_inside_spec<Other: CartesianPoint2d<Num = P::Num>>(
         &self,
-        _point: &Other,
-        _tolerance: P::Num,
+        point: &Other,
+        tolerance: P::Num,
     ) -> bool {
-        todo!()
+        self.iter_segments()
+            .any(|segment| segment.distance_to_point_sq(point) <= tolerance * tolerance)
     }
 
     fn bounding_rectangle_spec(&self) -> Option<Rect<P::Num>> {
