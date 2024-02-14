@@ -1,14 +1,13 @@
-use crate::geo::traits::projection::Projection;
+use crate::geo::Projection;
 use crate::geojson::point::GeoJsonPoint;
 use crate::geometry::{Geom, Geometry};
-use crate::impls::contour::Contour;
-use crate::impls::multi_contour::MultiContour;
-use crate::impls::multi_point::MultiPoint;
-use crate::impls::multi_polygon::MultiPolygon;
-use crate::impls::polygon::Polygon;
+use crate::impls::Contour;
+use crate::impls::MultiContour;
+use crate::impls::MultiPoint;
+use crate::impls::MultiPolygon;
+use crate::impls::Polygon;
 use geojson::{LineStringType, PolygonType, Position, Value};
 
-// mod line;
 mod point;
 
 impl Geometry for geojson::Geometry {
