@@ -32,11 +32,26 @@ impl PersistentCacheController<str, Bytes> for FileCacheController {
 
     fn insert(&self, key: &str, data: &Bytes) -> Result<(), GalileoError> {
         let file_path = self.get_file_path(key);
-        std::fs::write(&file_path, data)?;
-
-        debug!("Entry {key} saved to cache file {file_path:?}");
-
-        Ok(())
+        match file_path.parent() {
+            Some(folder) => match ensure_folder_exists(folder) {
+                Ok(()) => {
+                    debug!("Saving entry {key} to the cache file {file_path:?}");
+                    std::fs::write(&file_path, data)?;
+                    debug!("Entry {key} saved to cache file {file_path:?}");
+                    Ok(())
+                }
+                Err(err) => {
+                    debug!("Failed to add {key} entry to the cache failed {file_path:?} - failed to create folder: {err:?}");
+                    Err(err.into())
+                }
+            },
+            None => {
+                debug!(
+                    "Failed to add {key} entry to the cache failed {file_path:?} - no parent folder"
+                );
+                Err(GalileoError::IO)
+            }
+        }
     }
 }
 

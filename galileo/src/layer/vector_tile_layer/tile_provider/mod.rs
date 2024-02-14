@@ -83,7 +83,9 @@ impl<'a> LockedTileStore<'a> {
     /// Returns a tile with the given index, if the tile was loaded and packed.
     pub fn get_tile(&'a self, index: TileIndex) -> Option<&'a VectorTile> {
         self.guard.get(&index).and_then(|v| match v {
-            TileState::Packed(tile) => Some(tile),
+            TileState::Packed(tile) | TileState::Outdated(tile) | TileState::Updating(tile) => {
+                Some(tile)
+            }
             _ => None,
         })
     }

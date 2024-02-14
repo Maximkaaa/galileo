@@ -57,7 +57,7 @@ where
             tile_scheme,
             prev_drawn_tiles: Mutex::new(vec![]),
             fade_in_duration: Duration::from_millis(300),
-            tiles: Arc::new(Cache::new(1000)),
+            tiles: Arc::new(Cache::new(5000)),
             messenger,
         }
     }
@@ -271,6 +271,12 @@ where
 
                 match load_result {
                     Ok(decoded_image) => {
+                        if let Some(v) = tiles.get(&index) {
+                            if matches!(*v, TileState::Rendered(_)) {
+                                log::error!("This should not happen to {index:?}");
+                            }
+                        }
+
                         tiles.insert(
                             index,
                             Arc::new(TileState::Loaded(Mutex::new(decoded_image))),

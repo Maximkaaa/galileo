@@ -54,7 +54,7 @@ impl VectorTileProvider for WebWorkerVectorTileProvider {
                 continue;
             };
             let tile_state = &mut *entry;
-            if matches!(*tile_state, TileState::Loaded(_)) {
+            if matches!(*tile_state, TileState::Packed(_)) {
                 let TileState::Packed(tile) = std::mem::replace(tile_state, TileState::Error)
                 else {
                     log::error!("Type of value changed unexpectedly during updating style.");
@@ -129,6 +129,7 @@ impl WebWorkerVectorTileProvider {
                 continue;
             }
 
+            log::info!("Requesting loading a tile");
             let payload = LoadTilePayload {
                 index,
                 url,
@@ -233,6 +234,7 @@ fn store_vector_tile(
     store: &mut Cache<TileIndex, TileState>,
     messenger: &Arc<RwLock<Option<Box<dyn Messenger>>>>,
 ) {
+    log::info!("Storing tile");
     let DecodedVectorTile {
         index,
         mvt_tile,
