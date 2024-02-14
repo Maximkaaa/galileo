@@ -549,7 +549,8 @@ impl WgpuRenderer {
         Ok(data.to_vec())
     }
 
-    pub(crate) fn render_to_texture_view(&self, map: &Map, view: &TextureView) {
+    /// Renders the map to the given texture.
+    pub fn render_to_texture_view(&self, map: &Map, view: &TextureView) {
         if let Some(render_set) = &self.render_set {
             let mut encoder = self
                 .device

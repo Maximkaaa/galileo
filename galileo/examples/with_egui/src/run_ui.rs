@@ -1,6 +1,6 @@
 use egui::Context;
-use galileo_types::geo::impls::point::GeoPoint2d;
-use galileo_types::geo::traits::point::GeoPoint;
+use galileo_types::geo::impls::GeoPoint2d;
+use galileo_types::geo::GeoPoint;
 
 #[derive(Clone, Default, Debug)]
 pub struct UiState {

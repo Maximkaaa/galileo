@@ -64,11 +64,11 @@ impl EguiState {
         self.context
             .set_pixels_per_point(wgpu_frame.window.scale_factor() as f32);
 
-        let raw_input = self.state.take_egui_input(&wgpu_frame.window);
+        let raw_input = self.state.take_egui_input(wgpu_frame.window);
         let full_output = self.context.run(raw_input, run_ui);
 
         self.state
-            .handle_platform_output(&wgpu_frame.window, full_output.platform_output);
+            .handle_platform_output(wgpu_frame.window, full_output.platform_output);
 
         let paint_jobs = self
             .context
@@ -76,7 +76,7 @@ impl EguiState {
 
         for (id, image_delta) in &full_output.textures_delta.set {
             self.renderer
-                .update_texture(&wgpu_frame.device, &wgpu_frame.queue, *id, &image_delta);
+                .update_texture(wgpu_frame.device, wgpu_frame.queue, *id, image_delta);
         }
 
         self.renderer.update_buffers(
@@ -93,7 +93,7 @@ impl EguiState {
                     .encoder
                     .begin_render_pass(&wgpu::RenderPassDescriptor {
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &wgpu_frame.texture_view,
+                            view: wgpu_frame.texture_view,
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Load,

@@ -102,7 +102,6 @@ impl State {
             Arc::clone(&surface),
             Arc::clone(&queue),
             config.clone(),
-            size,
         );
 
         Self {

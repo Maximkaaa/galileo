@@ -3,8 +3,6 @@ edition = "2021"
 name = "with_egui"
 version = "0.1.0"
 
-[workspace]
-
 [[bin]]
 name = "with_egui"
 

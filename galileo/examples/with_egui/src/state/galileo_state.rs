@@ -1,29 +1,26 @@
 use std::sync::{Arc, RwLock};
 
 use crate::run_ui::Positions;
-use galileo::control::custom::CustomEventHandler;
+use crate::state::WgpuFrame;
 use galileo::control::{EventPropagation, MouseEvent, UserEvent};
 use galileo::{
-    control::{event_processor::EventProcessor, map::MapController},
-    layer::data_provider::file_cache::FileCacheController,
-    render::wgpu::WgpuRenderer,
+    control::{EventProcessor, MapController},
+    render::WgpuRenderer,
     tile_scheme::TileIndex,
-    view::MapView,
     winit::WinitInputHandler,
-    TileSchema,
+    Map, MapBuilder, MapView, TileSchema,
 };
-use galileo_types::cartesian::impls::point::Point2d;
-use galileo_types::{cartesian::size::Size, latlon};
+use galileo_types::cartesian::Point2d;
+use galileo_types::{cartesian::Size, latlon};
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
+use winit::dpi::PhysicalSize;
 use winit::window::Window;
-
-use super::WgpuFrame;
 
 pub struct GalileoState {
     input_handler: WinitInputHandler,
     event_processor: EventProcessor,
     renderer: Arc<RwLock<WgpuRenderer>>,
-    map: Arc<RwLock<galileo::map::Map>>,
+    map: Arc<RwLock<galileo::Map>>,
     pointer_position: Arc<RwLock<Point2d>>,
 }
 
@@ -34,7 +31,6 @@ impl GalileoState {
         surface: Arc<Surface>,
         queue: Arc<Queue>,
         config: SurfaceConfiguration,
-        size: winit::dpi::PhysicalSize<u32>,
     ) -> Self {
         let messenger = galileo::winit::WinitMessenger::new(window);
 
@@ -45,8 +41,9 @@ impl GalileoState {
 
         let pointer_position = Arc::new(RwLock::new(Point2d::default()));
         let pointer_position_clone = pointer_position.clone();
-        let mut pointer_tracker = CustomEventHandler::default();
-        pointer_tracker.set_input_handler(move |ev, _, _| {
+
+        let mut event_processor = EventProcessor::default();
+        event_processor.add_handler(move |ev: &UserEvent, _map: &mut Map| {
             if let UserEvent::PointerMoved(MouseEvent {
                 screen_pointer_position,
                 ..
@@ -57,20 +54,12 @@ impl GalileoState {
 
             EventPropagation::Propagate
         });
-
-        let mut event_processor = EventProcessor::default();
-        event_processor.add_handler(pointer_tracker);
         event_processor.add_handler(MapController::default());
 
         let view = MapView::new(
             &latlon!(37.566, 126.9784),
             TileSchema::web(18).lod_resolution(8).unwrap(),
         );
-
-        #[cfg(not(target_arch = "wasm32"))]
-        let cache_controller = Some(FileCacheController::new(".tile_cache"));
-        #[cfg(target_arch = "wasm32")]
-        let cache_controller: Option<FileCacheController> = None;
 
         let tile_source = |index: &TileIndex| {
             format!(
@@ -79,19 +68,12 @@ impl GalileoState {
             )
         };
 
-        let tile_provider =
-            galileo::layer::data_provider::url_image_provider::UrlImageProvider::new(
-                tile_source,
-                cache_controller,
-            );
-
-        let layer = Box::new(galileo::layer::RasterTileLayer::new(
-            galileo::TileSchema::web(18),
-            tile_provider,
-            None,
+        let layer = Box::new(MapBuilder::create_raster_tile_layer(
+            tile_source,
+            TileSchema::web(18),
         ));
 
-        let map = Arc::new(RwLock::new(galileo::map::Map::new(
+        let map = Arc::new(RwLock::new(galileo::Map::new(
             view,
             vec![layer],
             Some(messenger),
@@ -122,10 +104,8 @@ impl GalileoState {
     }
 
     pub fn render(&self, wgpu_frame: &WgpuFrame<'_>) {
-        let cast: Arc<RwLock<dyn galileo::render::Renderer>> = self.renderer.clone();
-
         let galileo_map = self.map.read().unwrap();
-        galileo_map.load_layers(&cast);
+        galileo_map.load_layers();
 
         self.renderer
             .write()
@@ -146,11 +126,7 @@ impl GalileoState {
 
         if let Some(raw_event) = self.input_handler.process_user_input(event, scale) {
             let mut map = self.map.write().expect("poisoned lock");
-            self.event_processor.handle(
-                raw_event,
-                &mut map,
-                &(*self.renderer.read().expect("poisoned lock")),
-            );
+            self.event_processor.handle(raw_event, &mut map);
         }
     }
 
