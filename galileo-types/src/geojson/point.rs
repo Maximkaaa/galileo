@@ -1,5 +1,5 @@
 use crate::error::GalileoTypesError;
-use crate::geo::traits::point::{GeoPoint, NewGeoPoint};
+use crate::geo::{GeoPoint, NewGeoPoint};
 use crate::geometry_type::{GeoSpace2d, GeometryType, PointGeometryType};
 use geojson::Position;
 
