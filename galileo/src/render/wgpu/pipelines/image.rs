@@ -4,7 +4,7 @@ use crate::render::wgpu::pipelines;
 use crate::render::wgpu::pipelines::default_targets;
 use crate::render::RenderOptions;
 use std::sync::Arc;
-use wgpu::util::DeviceExt;
+use wgpu::util::{DeviceExt, TextureDataOrder};
 use wgpu::{
     BindGroup, BindGroupLayout, Device, Queue, RenderPass, RenderPipeline,
     RenderPipelineDescriptor, TextureFormat,
@@ -110,6 +110,7 @@ impl ImagePipeline {
                 label: None,
                 view_formats: &[],
             },
+            TextureDataOrder::default(),
             &image.bytes,
         );
 

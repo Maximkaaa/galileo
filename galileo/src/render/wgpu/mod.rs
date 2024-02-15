@@ -1,6 +1,7 @@
 use cfg_if::cfg_if;
 use galileo_types::cartesian::Size;
 use lyon::tessellation::VertexBuffers;
+use maybe_sync::{MaybeSend, MaybeSync};
 use nalgebra::{Rotation3, Vector3};
 use std::any::Any;
 use std::mem::size_of;
@@ -53,7 +54,7 @@ struct RenderSet {
 enum RenderTarget {
     Surface {
         config: SurfaceConfiguration,
-        surface: Arc<Surface>,
+        surface: Arc<Surface<'static>>,
     },
     Texture(Texture, Size<u32>),
 }
@@ -218,9 +219,13 @@ impl WgpuRenderer {
     /// window size.
     ///
     /// Returns `None` if a device adapter cannot be acquired.
-    pub async fn new_with_window<W>(window: &W, size: Size<u32>) -> Option<Self>
+    pub async fn new_with_window<W>(window: Arc<W>, size: Size<u32>) -> Option<Self>
     where
-        W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+        W: raw_window_handle::HasWindowHandle
+            + raw_window_handle::HasDisplayHandle
+            + MaybeSync
+            + MaybeSend
+            + 'static,
     {
         let (surface, adapter) = Self::get_window_surface(window).await?;
         let (device, queue) = Self::create_device(&adapter).await;
@@ -240,14 +245,18 @@ impl WgpuRenderer {
     /// Creates a wgpu surface for the given window.
     ///
     /// Returns `None` if a device adapter cannot be acquired.
-    pub async fn get_window_surface<W>(window: &W) -> Option<(Surface, Adapter)>
+    pub async fn get_window_surface<W>(window: Arc<W>) -> Option<(Surface<'static>, Adapter)>
     where
-        W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+        W: raw_window_handle::HasWindowHandle
+            + raw_window_handle::HasDisplayHandle
+            + MaybeSync
+            + MaybeSend
+            + 'static,
     {
         let instance = Self::create_instance();
 
         log::info!("Creating new surface");
-        let surface = match unsafe { instance.create_surface(window) } {
+        let surface = match instance.create_surface(window) {
             Ok(s) => s,
             Err(err) => {
                 log::warn!("Failed to create a surface from window: {err:?}");
@@ -257,7 +266,7 @@ impl WgpuRenderer {
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::default(),
+                power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })
@@ -284,6 +293,7 @@ impl WgpuRenderer {
             width: size.width(),
             height: size.height(),
             present_mode: surface_caps.present_modes[0],
+            desired_maximum_frame_latency: 2,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
         }
@@ -292,7 +302,7 @@ impl WgpuRenderer {
     /// Creates a new renderer from the initialized wgpu structs.
     pub fn new_with_device_and_surface(
         device: Arc<Device>,
-        surface: Arc<Surface>,
+        surface: Arc<Surface<'static>>,
         queue: Arc<Queue>,
         config: SurfaceConfiguration,
     ) -> Self {
@@ -339,8 +349,8 @@ impl WgpuRenderer {
         adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    features: wgpu::Features::empty(),
-                    limits: if cfg!(any(target_arch = "wasm32", target_os = "android")) {
+                    required_features: wgpu::Features::empty(),
+                    required_limits: if cfg!(any(target_arch = "wasm32", target_os = "android")) {
                         wgpu::Limits {
                             max_texture_dimension_2d: 4096,
                             ..wgpu::Limits::downlevel_webgl2_defaults()
@@ -408,11 +418,15 @@ impl WgpuRenderer {
     /// Returns an error if a device adapter cannot be acquired.
     pub async fn init_with_window<W>(
         &mut self,
-        window: &W,
+        window: Arc<W>,
         size: Size<u32>,
     ) -> Result<(), GalileoError>
     where
-        W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+        W: raw_window_handle::HasWindowHandle
+            + raw_window_handle::HasDisplayHandle
+            + MaybeSend
+            + MaybeSync
+            + 'static,
     {
         let Some((surface, adapter)) = Self::get_window_surface(window).await else {
             return Err(GalileoError::Generic("Failed to create surface".into()));
@@ -423,7 +437,12 @@ impl WgpuRenderer {
     }
 
     /// Re-initializes the renderer with the given surface and adapter.
-    pub fn init_with_surface(&mut self, surface: Surface, adapter: Adapter, size: Size<u32>) {
+    pub fn init_with_surface(
+        &mut self,
+        surface: Surface<'static>,
+        adapter: Adapter,
+        size: Size<u32>,
+    ) {
         let config = Self::get_surface_configuration(&surface, &adapter, size);
         surface.configure(&self.device, &config);
 
