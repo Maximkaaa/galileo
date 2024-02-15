@@ -28,7 +28,7 @@ impl GalileoState {
     pub fn new(
         window: Arc<Window>,
         device: Arc<Device>,
-        surface: Arc<Surface>,
+        surface: Arc<Surface<'static>>,
         queue: Arc<Queue>,
         config: SurfaceConfiguration,
     ) -> Self {

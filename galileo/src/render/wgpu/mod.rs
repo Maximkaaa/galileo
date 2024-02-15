@@ -1,7 +1,6 @@
 use cfg_if::cfg_if;
 use galileo_types::cartesian::Size;
 use lyon::tessellation::VertexBuffers;
-use maybe_sync::{MaybeSend, MaybeSync};
 use nalgebra::{Rotation3, Vector3};
 use std::any::Any;
 use std::mem::size_of;
@@ -12,7 +11,7 @@ use wgpu::{
     ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, Origin3d, Queue,
     RenderPassDepthStencilAttachment, StoreOp, Surface, SurfaceConfiguration, SurfaceError,
     SurfaceTexture, Texture, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat,
-    TextureUsages, TextureView, TextureViewDescriptor,
+    TextureUsages, TextureView, TextureViewDescriptor, WasmNotSendSync,
 };
 
 use crate::error::GalileoError;
@@ -223,8 +222,7 @@ impl WgpuRenderer {
     where
         W: raw_window_handle::HasWindowHandle
             + raw_window_handle::HasDisplayHandle
-            + MaybeSync
-            + MaybeSend
+            + WasmNotSendSync
             + 'static,
     {
         let (surface, adapter) = Self::get_window_surface(window).await?;
@@ -249,8 +247,7 @@ impl WgpuRenderer {
     where
         W: raw_window_handle::HasWindowHandle
             + raw_window_handle::HasDisplayHandle
-            + MaybeSync
-            + MaybeSend
+            + WasmNotSendSync
             + 'static,
     {
         let instance = Self::create_instance();
@@ -424,8 +421,7 @@ impl WgpuRenderer {
     where
         W: raw_window_handle::HasWindowHandle
             + raw_window_handle::HasDisplayHandle
-            + MaybeSend
-            + MaybeSync
+            + WasmNotSendSync
             + 'static,
     {
         let Some((surface, adapter)) = Self::get_window_surface(window).await else {
