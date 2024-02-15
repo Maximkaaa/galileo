@@ -61,7 +61,7 @@ impl GalileoMap {
                             let size = window.inner_size();
 
                             let mut renderer = WgpuRenderer::new_with_window(
-                                &window,
+                                window.clone(),
                                 Size::new(size.width, size.height),
                             )
                             .await
