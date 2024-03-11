@@ -165,6 +165,21 @@ where
 
         self
     }
+
+    /// Returns a reference to the feature store.
+    pub fn features(&self) -> &FeatureStore<F> {
+        &self.features
+    }
+
+    /// Returns a mutable reference to the feature store.
+    pub fn features_mut(&mut self) -> &mut FeatureStore<F> {
+        &mut self.features
+    }
+
+    /// Returns the CRS of the layer.
+    pub fn crs(&self) -> &Crs {
+        &self.crs
+    }
 }
 
 impl<P, F, S> FeatureLayer<P, F, S, GeoSpace2d>
@@ -229,21 +244,6 @@ where
         self.features
             .iter_mut()
             .filter(move |f| f.as_ref().geometry().is_point_inside(point, tolerance))
-    }
-
-    /// Returns a reference to the feature store.
-    pub fn features(&self) -> &FeatureStore<F> {
-        &self.features
-    }
-
-    /// Returns a mutable reference to the feature store.
-    pub fn features_mut(&mut self) -> &mut FeatureStore<F> {
-        &mut self.features
-    }
-
-    /// Returns the CRS of the layer.
-    pub fn crs(&self) -> &Crs {
-        &self.crs
     }
 }
 
