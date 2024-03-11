@@ -94,6 +94,10 @@ impl Pipelines {
                 .render(&bundle.map_ref_buffers, render_pass, render_options);
         }
 
+        if let Some(clip) = &bundle.clip_area_buffers {
+            self.clip.unclip(clip, render_pass, render_options);
+        }
+
         if let Some(screen_ref_buffers) = &bundle.screen_ref_buffers {
             self.screen_ref
                 .render(screen_ref_buffers, render_pass, render_options);
@@ -101,10 +105,6 @@ impl Pipelines {
 
         if let Some(dot_buffers) = &bundle.dot_buffers {
             self.dot.render(dot_buffers, render_pass, render_options);
-        }
-
-        if let Some(clip) = &bundle.clip_area_buffers {
-            self.clip.unclip(clip, render_pass, render_options);
         }
     }
 

@@ -9,6 +9,7 @@ use galileo_types::cartesian::Size;
 use maybe_sync::{MaybeSend, MaybeSync};
 use render_bundle::RenderBundle;
 use std::any::Any;
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "wgpu")]
 mod wgpu;
@@ -17,6 +18,7 @@ pub use wgpu::WgpuRenderer;
 
 pub mod point_paint;
 pub mod render_bundle;
+pub mod text;
 
 /// Id of a rendering primitive
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -69,14 +71,14 @@ impl Default for RenderOptions {
 }
 
 /// Parameters to draw a polygon primitive with.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct PolygonPaint {
     /// Fill color of the polygon.
     pub color: Color,
 }
 
 /// Parameter to draw a line primitive with.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct LinePaint {
     /// Color of the line.
     pub color: Color,
@@ -90,7 +92,7 @@ pub struct LinePaint {
 }
 
 /// Cap (end point) style of the line.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum LineCap {
     /// Half-circle cap.
     Round,

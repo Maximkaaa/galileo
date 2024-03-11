@@ -19,6 +19,7 @@ type VectorTileProvider =
 
 #[cfg(target_arch = "wasm32")]
 use galileo::layer::vector_tile_layer::tile_provider::WebWorkerVectorTileProvider;
+use galileo::render::text::font_service::FontService;
 use galileo_types::cartesian::Rect;
 
 #[cfg(target_arch = "wasm32")]

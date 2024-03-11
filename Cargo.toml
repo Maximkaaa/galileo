@@ -11,6 +11,7 @@ exclude = [
     "wasm_examples/raster_tiles",
     "wasm_examples/vector_tiles",
     "wasm_examples/feature_layers",
+    "wasm_examples/labels",
     "wasm_examples/many_points",
     "wasm_examples/lambert",
     "wasm_examples/with_egui",

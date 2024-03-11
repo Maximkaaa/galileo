@@ -1,21 +1,24 @@
 //! [`PointPaint`] specifies the way a point should be drawn to the map.
 
 use crate::decoded_image::DecodedImage;
+use crate::render::text::TextStyle;
 use crate::render::{LineCap, LinePaint};
 use crate::Color;
 use galileo_types::impls::ClosedContour;
 use nalgebra::{Point2, Vector2};
+use std::borrow::Cow;
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 
 /// Specifies the way a point should be drawn to the map.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PointPaint<'a> {
     pub(crate) shape: PointShape<'a>,
     pub(crate) offset: Vector2<f32>,
 }
 
 impl<'a> PointPaint<'a> {
-    /// Creates a paint that draws a circle of fixed diameter (in pixels) not dependant on map resolution.
+    /// Creates a paint that draws a circle of fixed diameter (in pixels) not dependent on map resolution.
     pub fn circle(color: Color, diameter: f32) -> Self {
         Self {
             offset: Vector2::default(),
@@ -27,7 +30,7 @@ impl<'a> PointPaint<'a> {
         }
     }
 
-    /// Creates a paint that draws a sector of a circle of fixed diameter (in pixels) not dependant on map resolution.
+    /// Creates a paint that draws a sector of a circle of fixed diameter (in pixels) not dependent on map resolution.
     pub fn sector(color: Color, diameter: f32, start_angle: f32, end_angle: f32) -> Self {
         Self {
             offset: Vector2::default(),
@@ -69,7 +72,7 @@ impl<'a> PointPaint<'a> {
                 fill: color,
                 scale,
                 outline: None,
-                shape: contour,
+                shape: Cow::Borrowed(contour),
             },
         }
     }
@@ -77,8 +80,8 @@ impl<'a> PointPaint<'a> {
     /// Creates a paint that draws a point as an image of fixed pixel size. Offset is given as a portion of image size,
     /// e.g. offset `[0.5, 1.0]` will create an image with anchor point at the center-bottom point of the image.
     pub fn image(image: Arc<DecodedImage>, offset: Vector2<f32>, scale: f32) -> Self {
-        let width = image.dimensions.0 as f32 * scale;
-        let height = image.dimensions.1 as f32 * scale;
+        let width = image.width() as f32 * scale;
+        let height = image.height() as f32 * scale;
         Self {
             offset,
             shape: PointShape::Image {
@@ -86,6 +89,16 @@ impl<'a> PointPaint<'a> {
                 opacity: 255,
                 width,
                 height,
+            },
+        }
+    }
+
+    pub fn label(text: &'a String, style: &'a TextStyle) -> Self {
+        Self {
+            offset: Vector2::new(0.0, 0.0),
+            shape: PointShape::Label {
+                text: Cow::Borrowed(text),
+                style: Cow::Borrowed(style),
             },
         }
     }
@@ -110,7 +123,8 @@ impl<'a> PointPaint<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub(crate) enum PointShape<'a> {
     Dot {
         color: Color,
@@ -130,7 +144,7 @@ pub(crate) enum PointShape<'a> {
         fill: Color,
         scale: f32,
         outline: Option<LinePaint>,
-        shape: &'a ClosedContour<Point2<f32>>,
+        shape: Cow<'a, ClosedContour<Point2<f32>>>,
     },
     Image {
         image: Arc<DecodedImage>,
@@ -138,9 +152,13 @@ pub(crate) enum PointShape<'a> {
         width: f32,
         height: f32,
     },
+    Label {
+        text: Cow<'a, String>,
+        style: Cow<'a, TextStyle>,
+    },
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub(crate) struct SectorParameters {
     pub fill: CircleFill,
     pub radius: f32,
@@ -149,7 +167,7 @@ pub(crate) struct SectorParameters {
     pub outline: Option<LinePaint>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub(crate) struct CircleFill {
     pub center_color: Color,
     pub side_color: Color,

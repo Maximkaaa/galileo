@@ -17,6 +17,10 @@ fn android_main(app: AndroidApp) {
 
     log::info!("Starting up Galileo");
 
+    FontService::init();
+    let fonts = FontService::load().unwrap().system_font_list();
+    log::warn!("{fonts:?}");
+
     Runtime::new()
         .expect("failed to create tokio runtime")
         .block_on(async move {

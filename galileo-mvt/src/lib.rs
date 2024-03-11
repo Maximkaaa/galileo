@@ -8,6 +8,7 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use strfmt::DisplayStr;
 
 pub mod error;
 
@@ -175,6 +176,13 @@ impl Display for MvtValue {
             MvtValue::Bool(v) => write!(f, "{v}"),
             MvtValue::Unknown => write!(f, "<NONE>"),
         }
+    }
+}
+
+impl DisplayStr for MvtValue {
+    fn display_str(&self, f: &mut strfmt::Formatter) -> strfmt::Result<()> {
+        f.str(&self.to_string())?;
+        Ok(())
     }
 }
 

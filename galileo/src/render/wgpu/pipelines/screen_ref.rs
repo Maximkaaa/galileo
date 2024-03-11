@@ -29,7 +29,7 @@ impl ScreenRefPipeline {
             push_constant_ranges: &[],
         });
         let stencil_state = StencilFaceState {
-            compare: CompareFunction::Equal,
+            compare: CompareFunction::Always,
             fail_op: StencilOperation::Keep,
             depth_fail_op: StencilOperation::Keep,
             pass_op: StencilOperation::Keep,

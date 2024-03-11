@@ -17,7 +17,7 @@ exclude = [
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["wgpu", "serde", "winit"]
+default = ["wgpu", "serde", "winit", "cosmic-text"]
 wgpu = ["dep:wgpu", "raw-window-handle"]
 geojson = ["dep:geojson", "galileo-types/geojson"]
 
@@ -36,7 +36,7 @@ lyon = { version = "1" }
 galileo-types = { path = "../galileo-types", version = "0.1.1" }
 galileo-mvt = { path = "../galileo-mvt", version = "0.1.1" }
 num-traits = "0.2.17"
-serde = { version = "1.0", optional = true, features = ["std", "derive"] }
+serde = { version = "1.0", optional = true, features = ["std", "derive", "rc"] }
 web-time = "1.0"
 thiserror = "1.0"
 nalgebra = "0.32"
@@ -44,6 +44,10 @@ quick_cache = "0.4"
 futures-intrusive = "0.5"
 geojson = { version = "0.24", optional = true }
 raw-window-handle = { version = "0.6", optional = true }
+static_init = "1.0"
+cosmic-text = { version = "0.11", optional = true }
+base64 = "0.21"
+strfmt = "0.2"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 wgpu = { version = "0.19", optional = true }
