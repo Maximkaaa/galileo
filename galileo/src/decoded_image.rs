@@ -29,4 +29,25 @@ impl DecodedImage {
             dimensions,
         })
     }
+
+    /// Create a DecodedImage from a buffer of raw RGBA pixels.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn from_raw(
+        bytes: impl Into<Vec<u8>>,
+        width: u32,
+        height: u32,
+    ) -> Result<Self, GalileoError> {
+        let bytes = bytes.into();
+
+        if bytes.len() != 4 * width as usize * height as usize {
+            return Err(GalileoError::Generic(
+                "invalid image dimensions for buffer size".into(),
+            ));
+        }
+
+        Ok(Self {
+            bytes,
+            dimensions: (width, height),
+        })
+    }
 }
