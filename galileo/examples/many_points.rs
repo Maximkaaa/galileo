@@ -2,6 +2,7 @@ use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::{Feature, FeatureLayer};
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
+#[cfg(not(target_arch = "wasm32"))]
 use galileo::tile_scheme::TileSchema;
 use galileo::{Color, MapBuilder};
 use galileo_types::cartesian::{CartesianPoint3d, Point3d};
@@ -83,16 +84,23 @@ fn generate_points() -> Vec<ColoredPoint> {
 }
 
 pub async fn run(builder: MapBuilder) {
+    #[cfg(not(target_arch = "wasm32"))]
+    let builder = builder.with_raster_tiles(
+        |index| {
+            format!(
+                "https://tile.openstreetmap.org/{}/{}/{}.png",
+                index.z, index.x, index.y
+            )
+        },
+        TileSchema::web(18),
+    );
+    #[cfg(target_arch = "wasm32")]
+    let builder = builder.with_raster_tiles(js_sys::Function::new_with_args(
+        "index",
+        "return `https://tile.openstreetmap.org/${index.z}/${index.x}/${index.y}.png`",
+    ));
+
     builder
-        .with_raster_tiles(
-            |index| {
-                format!(
-                    "https://tile.openstreetmap.org/{}/{}/{}.png",
-                    index.z, index.x, index.y
-                )
-            },
-            TileSchema::web(18),
-        )
         .with_layer(FeatureLayer::new(
             generate_points(),
             ColoredPointSymbol {},

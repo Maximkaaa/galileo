@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 winit = { version ="0.29", features = ["rwh_05"] }
-galileo = { path = "../../galileo", default-features = false, features = ["wgpu", "image", "web"] }
+galileo = { path = "../../galileo" }
 galileo-types = { path = "../../galileo-types" }
 serde = { version = "1.0", features = ["derive"]}
 bincode = "1.3"
@@ -25,3 +25,4 @@ web-sys = { version = "0.3", features = [
     "Window",
     "Element",
 ]}
+num-traits = "0.2.17"
