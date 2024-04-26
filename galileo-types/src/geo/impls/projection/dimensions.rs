@@ -1,8 +1,10 @@
 use crate::cartesian::{NewCartesianPoint2d, NewCartesianPoint3d};
 use crate::geo::traits::projection::Projection;
 use std::marker::PhantomData;
+use serde::{Deserialize, Serialize};
 
 /// Projection that adds a default z-value to a 2d point. Reversed projecting drops the z-value.
+#[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Hash, Deserialize, Serialize)]
 pub struct AddDimensionProjection<Num, In, Out> {
     z: Num,
     phantom_in: PhantomData<In>,

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
 /// Rectangle in 2d cartesian coordinate space.
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Hash, Deserialize, Serialize)]
 pub struct Rect<N = f64> {
     x_min: N,
     y_min: N,

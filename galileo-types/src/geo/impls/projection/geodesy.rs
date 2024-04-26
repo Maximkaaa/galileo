@@ -5,6 +5,7 @@ use geodesy::prelude::*;
 use std::marker::PhantomData;
 
 /// A projection constructed by `geodesy` crate.
+#[derive(Debug, Default)]
 pub struct GeodesyProjection<In, Out> {
     context: Minimal,
     op: OpHandle,

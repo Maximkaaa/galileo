@@ -6,14 +6,14 @@ use crate::geo::traits::projection::Projection;
 use serde::{Deserialize, Serialize};
 
 /// Coordinate reference system.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Crs {
     datum: Datum,
     projection_type: ProjectionType,
 }
 
 /// Method used for projecting coordinates.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum ProjectionType {
     /// Some method.
