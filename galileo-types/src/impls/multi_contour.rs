@@ -1,7 +1,9 @@
 use crate::geometry_type::{GeometryType, MultiContourGeometryType};
 use crate::impls::contour::Contour;
+use serde::{Deserialize, Serialize};
 
 /// A set of contours.
+#[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]
 pub struct MultiContour<P>(Vec<Contour<P>>);
 
 impl<P> crate::multi_contour::MultiContour for MultiContour<P> {

@@ -7,9 +7,11 @@ use crate::cartesian::{CartesianPoint2d, Rect};
 use crate::geo::Projection;
 use crate::geometry_type::{CartesianSpace2d, GeometryType, PointGeometryType};
 use crate::impls::{Contour, MultiContour, MultiPoint, MultiPolygon, Polygon};
+use serde::{Deserialize, Serialize};
 
 /// Enum of different geometry types. This enum implements the [`Geometry`] trait so you can use any generic geometry
 /// method without knowing a specific geometry type you are working with.
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]
 pub enum Geom<P> {
     /// Point geometry.
     Point(P),

@@ -3,7 +3,7 @@ use crate::impls::polygon::Polygon;
 use serde::{Deserialize, Serialize};
 
 /// A set of polygons.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]
 pub struct MultiPolygon<P> {
     /// Inner polygons.
     pub parts: Vec<Polygon<P>>,

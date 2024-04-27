@@ -1,7 +1,8 @@
 use num_traits::{FromPrimitive, NumCast};
+use serde::{Deserialize, Serialize};
 
 /// Generic size type. Size is not guaranteed to be non-negative.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Hash, Deserialize, Serialize)]
 pub struct Size<Num: num_traits::Num + PartialOrd + Copy + PartialEq = f64> {
     width: Num,
     height: Num,

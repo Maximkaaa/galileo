@@ -2,7 +2,11 @@ use crate::error::GalileoTypesError;
 use crate::geo::{GeoPoint, NewGeoPoint};
 use crate::geometry_type::{GeoSpace2d, GeometryType, PointGeometryType};
 use geojson::Position;
+use serde::{Deserialize, Serialize};
 
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize,
+)]
 pub struct GeoJsonPoint(Position);
 
 impl TryFrom<Position> for GeoJsonPoint {

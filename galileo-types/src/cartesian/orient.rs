@@ -1,7 +1,8 @@
 use crate::cartesian::CartesianPoint2d;
+use serde::{Deserialize, Serialize};
 
 /// Orientation of a triplet of points.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Orientation {
     /// Clockwise
     Clockwise,

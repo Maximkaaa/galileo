@@ -1,6 +1,8 @@
 use crate::geometry_type::{GeometryType, MultiPointGeometryType};
+use serde::{Deserialize, Serialize};
 
 /// A set of points.
+#[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]
 pub struct MultiPoint<P>(Vec<P>);
 
 impl<P> crate::multi_point::MultiPoint for MultiPoint<P> {
