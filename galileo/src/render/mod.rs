@@ -22,10 +22,6 @@ pub mod render_bundle;
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct PrimitiveId(usize);
 
-pub(crate) trait Renderer: MaybeSend + MaybeSync {
-    fn as_any(&self) -> &dyn Any;
-}
-
 /// Canvas that a layer can be rendered to.
 ///
 /// As layers can contain a lot of data, canvases use two-step process for rendering.
