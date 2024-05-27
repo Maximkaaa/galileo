@@ -26,7 +26,7 @@ use crate::render::wgpu::pipelines::Pipelines;
 use crate::view::MapView;
 use crate::Color;
 
-use super::{Canvas, PackedBundle, RenderOptions, Renderer};
+use super::{Canvas, PackedBundle, RenderOptions};
 
 mod pipelines;
 
@@ -101,12 +101,6 @@ impl RenderTarget {
             RenderTarget::Surface { config, .. } => config.format,
             RenderTarget::Texture(_, _) => TARGET_TEXTURE_FORMAT,
         }
-    }
-}
-
-impl Renderer for WgpuRenderer {
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 

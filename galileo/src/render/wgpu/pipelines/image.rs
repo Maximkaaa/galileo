@@ -58,7 +58,7 @@ impl ImagePipeline {
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&map_view_layout, &texture_bind_group_layout],
+            bind_group_layouts: &[map_view_layout, &texture_bind_group_layout],
             push_constant_ranges: &[],
         });
 
