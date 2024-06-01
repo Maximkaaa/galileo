@@ -12,12 +12,12 @@ use std::fmt::{Display, Formatter};
 pub mod error;
 
 #[cfg(feature = "generate_proto")]
-mod vector_tile {
+pub mod vector_tile {
     include!(concat!(env!("OUT_DIR"), "/vector_tile.rs"));
 }
 
 #[cfg(not(feature = "generate_proto"))]
-mod vector_tile {
+pub mod vector_tile {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Tile {
