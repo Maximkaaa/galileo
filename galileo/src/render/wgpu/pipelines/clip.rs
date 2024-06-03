@@ -33,7 +33,7 @@ impl ClipPipeline {
         let targets = default_targets(format);
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&map_view_layout],
+            bind_group_layouts: &[map_view_layout],
             push_constant_ranges: &[],
         });
 
