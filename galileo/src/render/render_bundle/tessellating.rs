@@ -353,7 +353,8 @@ impl TessellatingRenderBundle {
         let removed_index_count =
             Self::remove_from_tessellation(&mut self.screen_ref, range.clone())?;
         let len = range.len();
-        self.buffer_size -= size_of::<PolyVertex>() * len + size_of::<u32>() * removed_index_count;
+        self.buffer_size -=
+            size_of::<ScreenRefVertex>() * len + size_of::<u32>() * removed_index_count;
 
         for info in &mut self.primitives {
             match info {
