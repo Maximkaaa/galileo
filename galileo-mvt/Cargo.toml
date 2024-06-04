@@ -25,6 +25,7 @@ log = "0.4.20"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
 nalgebra = { version = "0.32", features = ["serde-serialize"] }
+geozero = { version = "0.13.0", features = ["with-mvt"] }
 
 [build-dependencies]
 prost-build = "0.12.2"
