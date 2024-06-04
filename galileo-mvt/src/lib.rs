@@ -2,15 +2,15 @@ use crate::error::GalileoMvtError;
 use bytes::Buf;
 use galileo_types::cartesian::{CartesianClosedContour, CartesianPoint2d, Winding};
 use galileo_types::impls::{ClosedContour, Contour, Polygon};
+use geozero::mvt::tile;
+use geozero::mvt::tile::GeomType;
+use geozero::mvt::Message as GeozeroMessage;
+use geozero::mvt::Tile;
 use nalgebra::Point2;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use geozero::mvt::Tile;
-use geozero::mvt::tile;
-use geozero::mvt::tile::GeomType;
-use geozero::mvt::Message as GeozeroMessage;
 
 pub mod error;
 
