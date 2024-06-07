@@ -44,7 +44,6 @@ quick_cache = "0.4"
 futures-intrusive = "0.5"
 geojson = { version = "0.24", optional = true }
 raw-window-handle = { version = "0.6", optional = true }
-geozero = { version = "0.12", features = ["with-mvt"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 wgpu = { version = "0.19", optional = true }
@@ -103,7 +102,6 @@ lazy_static = "1.4"
 geo = "0.27"
 csv = "1.3"
 geo-types = "0.7"
-geozero = "0.12"
 las = { version = "0.8", features = ["laz"] }
 anyhow = "1.0"
 geojson = "0.24"
