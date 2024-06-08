@@ -879,7 +879,12 @@ impl WgpuPackedBundle {
         for (image_index, vertices) in images {
             let image = render_set.pipelines.image_pipeline().create_image(
                 &renderer.device,
-                textures.get(*image_index).unwrap().clone().unwrap().clone(),
+                textures
+                    .get(*image_index)
+                    .expect("texture at index must exist")
+                    .clone()
+                    .expect("image texture must not be None")
+                    .clone(),
                 vertices,
             );
             image_buffers.push(image);
