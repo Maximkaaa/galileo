@@ -26,6 +26,7 @@ use crate::render::wgpu::pipelines::Pipelines;
 use crate::view::MapView;
 use crate::Color;
 
+use super::render_bundle::tessellating::ImageStoreInfo;
 use super::{Canvas, PackedBundle, RenderOptions};
 
 mod pipelines;
@@ -862,12 +863,15 @@ impl WgpuPackedBundle {
 
         let textures: Vec<_> = image_store
             .iter()
-            .map(|decoded_image| {
-                render_set.pipelines.image_pipeline().create_image_texture(
-                    &renderer.device,
-                    &renderer.queue,
-                    decoded_image,
-                )
+            .map(|stored| match stored {
+                ImageStoreInfo::Vacant => None,
+                ImageStoreInfo::Image(decoded_image) => {
+                    Some(render_set.pipelines.image_pipeline().create_image_texture(
+                        &renderer.device,
+                        &renderer.queue,
+                        decoded_image,
+                    ))
+                }
             })
             .collect();
 
@@ -875,7 +879,7 @@ impl WgpuPackedBundle {
         for (image_index, vertices) in images {
             let image = render_set.pipelines.image_pipeline().create_image(
                 &renderer.device,
-                textures[*image_index].clone(),
+                textures.get(*image_index).unwrap().clone().unwrap().clone(),
                 vertices,
             );
             image_buffers.push(image);

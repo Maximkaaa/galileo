@@ -33,10 +33,17 @@ pub(crate) struct TessellatingRenderBundle {
     pub screen_ref: ScreenRefTessellation,
     pub images: Vec<(usize, [ImageVertex; 4])>,
     pub clip_area: Option<VertexBuffers<PolyVertex, u32>>,
-    pub image_store: Vec<Arc<DecodedImage>>,
+    pub image_store: Vec<ImageStoreInfo>,
     pub primitives: Vec<PrimitiveInfo>,
     vacant_ids: Vec<usize>,
+    vacant_image_ids: Vec<usize>,
     buffer_size: usize,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum ImageStoreInfo {
+    Vacant,
+    Image(Arc<DecodedImage>),
 }
 
 pub(crate) type ScreenRefTessellation = VertexBuffers<ScreenRefVertex, u32>;
@@ -75,6 +82,7 @@ impl TessellatingRenderBundle {
             clip_area: None,
             image_store: Vec::new(),
             vacant_ids: vec![],
+            vacant_image_ids: vec![],
             buffer_size: 0,
         }
     }
@@ -221,15 +229,26 @@ impl TessellatingRenderBundle {
     }
 
     fn add_image_to_store(&mut self, image: Arc<DecodedImage>) -> usize {
+        println!("add image to store");
         for (i, stored) in self.image_store.iter().enumerate() {
-            if Arc::ptr_eq(stored, &image) {
-                return i;
+            match stored {
+                ImageStoreInfo::Vacant => {}
+                ImageStoreInfo::Image(stored) => {
+                    if Arc::ptr_eq(stored, &image) {
+                        return i;
+                    }
+                }
             }
         }
 
-        let index = self.image_store.len();
-        self.image_store.push(image);
-        index
+        if let Some(id) = self.vacant_image_ids.pop() {
+            self.image_store[id] = ImageStoreInfo::Image(image);
+            id
+        } else {
+            let index = self.image_store.len();
+            self.image_store.push(ImageStoreInfo::Image(image));
+            index
+        }
     }
 
     pub fn add<N, P, C, Poly>(
@@ -307,9 +326,21 @@ impl TessellatingRenderBundle {
             Err(GalileoError::Generic("index out of bounds".into()))
         } else {
             let (image_id, _) = self.images.remove(index);
-            let image = self.image_store.remove(image_id);
+            println!("remove image from store {image_id}");
+            let stored_image_unused = self.images.iter().all(|(i, _)| *i != image_id);
 
-            self.buffer_size -= image.bytes.len() + size_of::<ImageVertex>() * 4;
+            if stored_image_unused {
+                match std::mem::replace(&mut self.image_store[image_id], ImageStoreInfo::Vacant) {
+                    ImageStoreInfo::Vacant => {
+                        // this should not happen
+                    }
+                    ImageStoreInfo::Image(image) => {
+                        self.vacant_image_ids.push(image_id);
+
+                        self.buffer_size -= image.bytes.len() + size_of::<ImageVertex>() * 4;
+                    }
+                }
+            }
 
             for info in &mut self.primitives {
                 match info {
