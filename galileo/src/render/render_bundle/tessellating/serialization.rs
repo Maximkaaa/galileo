@@ -1,6 +1,6 @@
 use crate::decoded_image::DecodedImage;
 use crate::render::render_bundle::tessellating::{
-    PolyVertex, PrimitiveInfo, ScreenRefVertex, TessellatingRenderBundle,
+    ImageStoreInfo, PolyVertex, PrimitiveInfo, ScreenRefVertex, TessellatingRenderBundle,
 };
 use lyon::lyon_tessellation::VertexBuffers;
 use serde::{Deserialize, Serialize};
@@ -14,7 +14,8 @@ pub(crate) struct TessellatingRenderBundleBytes {
     pub screen_ref: ScreenRefVertexBuffersBytes,
     pub images: Vec<ImageBytes>,
     pub primitives: Vec<PrimitiveInfo>,
-    pub image_store: Vec<(u32, u32, Vec<u8>)>,
+    pub image_store: Vec<Option<(u32, u32, Vec<u8>)>>,
+    pub vacant_image_ids: Vec<usize>,
     pub clip_area: Option<PolyVertexBuffersBytes>,
     pub bundle_size: usize,
 }
@@ -98,8 +99,14 @@ impl TessellatingRenderBundle {
             image_store: self
                 .image_store
                 .into_iter()
-                .map(|image| (image.dimensions.0, image.dimensions.1, image.bytes.clone()))
+                .map(|image_info| match image_info {
+                    ImageStoreInfo::Vacant => None,
+                    ImageStoreInfo::Image(image) => {
+                        Some((image.dimensions.0, image.dimensions.1, image.bytes.clone()))
+                    }
+                })
                 .collect(),
+            vacant_image_ids: self.vacant_image_ids,
             clip_area: self.clip_area.map(|v| v.into()),
             bundle_size: self.buffer_size,
         };
@@ -132,13 +139,15 @@ impl TessellatingRenderBundle {
             image_store: bundle
                 .image_store
                 .into_iter()
-                .map(|(width, height, bytes)| {
-                    Arc::new(DecodedImage {
+                .map(|stored| match stored {
+                    Some((width, height, bytes)) => ImageStoreInfo::Image(Arc::new(DecodedImage {
                         bytes,
                         dimensions: (width, height),
-                    })
+                    })),
+                    None => ImageStoreInfo::Vacant,
                 })
                 .collect(),
+            vacant_image_ids: bundle.vacant_image_ids,
             clip_area: bundle.clip_area.map(|v| v.into_typed_unchecked()),
             buffer_size: bundle.bundle_size,
             vacant_ids: vec![],
