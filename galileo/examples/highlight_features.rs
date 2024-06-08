@@ -1,18 +1,31 @@
 use std::sync::{Arc, RwLock};
 
 use galileo::control::{EventPropagation, UserEvent};
+use galileo::decoded_image::DecodedImage;
 use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::{Feature, FeatureLayer};
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
 use galileo::tile_scheme::TileSchema;
-use galileo::{Color, MapBuilder};
+use galileo::MapBuilder;
 use galileo_types::cartesian::{CartesianPoint3d, Point2d};
 use galileo_types::geo::{Crs, Projection};
 use galileo_types::geometry::Geom;
 use galileo_types::impls::{Contour, Polygon};
-use galileo_types::{CartesianGeometry2d, Geometry};
+use galileo_types::{latlon, CartesianGeometry2d, Geometry};
+use lazy_static::lazy_static;
+use nalgebra::Vector2;
 use num_traits::AsPrimitive;
+
+const YELLOW_PIN: &[u8] = include_bytes!("data/pin-yellow.png");
+const GREEN_PIN: &[u8] = include_bytes!("data/pin-green.png");
+
+lazy_static! {
+    static ref YELLOW_PIN_IMAGE: Arc<DecodedImage> =
+        Arc::new(DecodedImage::new(YELLOW_PIN).expect("Must have Yellow Pin Image"));
+    static ref GREEN_PIN_IMAGE: Arc<DecodedImage> =
+        Arc::new(DecodedImage::new(GREEN_PIN).expect("Must have Green Pin Image"));
+}
 
 #[tokio::main]
 async fn main() {
@@ -20,7 +33,7 @@ async fn main() {
     run(MapBuilder::new()).await;
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Default)]
 pub(crate) struct PointMarker {
     pub(crate) point: Point2d,
     pub(crate) highlighted: bool,
@@ -71,35 +84,6 @@ impl CartesianGeometry2d<Point2d> for PointMarker {
 
 struct ColoredPointSymbol {}
 
-fn generate_points() -> Vec<PointMarker> {
-    const LEVELS: u32 = 2;
-    let phi = std::f64::consts::PI * (5f64.sqrt() - 1.0);
-    let mut points = vec![];
-
-    for level in 1..=LEVELS {
-        let points_count = level * level * 10;
-        let radius = 50_000.0 * level as f64;
-
-        for i in 0..points_count {
-            let z = 1.0 - (i as f64 / (points_count - 1) as f64);
-            let rel_radius = (1.0 - z * z).sqrt();
-            let theta = phi * i as f64;
-            let x = theta.cos() * rel_radius;
-            let y = theta.sin() * rel_radius;
-
-            let point = Point2d::new(x * radius, y * radius);
-            points.push(PointMarker {
-                point,
-                highlighted: false,
-            });
-        }
-    }
-
-    log::info!("Generated {} points", points.len());
-
-    points
-}
-
 pub async fn run(builder: MapBuilder) {
     #[cfg(not(target_arch = "wasm32"))]
     let builder = builder.with_raster_tiles(
@@ -112,10 +96,22 @@ pub async fn run(builder: MapBuilder) {
         TileSchema::web(18),
     );
 
-    let generated_point_markers = generate_points();
+    let projection = Crs::EPSG3857
+        .get_projection()
+        .expect("must find projection");
 
     let feature_layer = FeatureLayer::new(
-        generated_point_markers,
+        [
+            latlon!(53.732562, -1.863383),
+            latlon!(53.728265, -1.839966),
+            latlon!(53.704014, -1.786128),
+        ]
+        .iter()
+        .map(|point| PointMarker {
+            point: projection.project(point).unwrap(),
+            ..Default::default()
+        })
+        .collect(),
         ColoredPointSymbol {},
         Crs::EPSG3857,
     );
@@ -123,6 +119,8 @@ pub async fn run(builder: MapBuilder) {
     let feature_layer = Arc::new(RwLock::new(feature_layer));
 
     builder
+        .center(latlon!(53.732562, -1.863383))
+        .resolution(30.0)
         .with_layer(feature_layer.clone())
         .with_event_handler(move |ev, map| {
             if let UserEvent::PointerMoved(event) = ev {
@@ -131,6 +129,10 @@ pub async fn run(builder: MapBuilder) {
                 let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {
                     return EventPropagation::Stop;
                 };
+
+                for mut feature_container in layer.features_mut().iter_mut() {
+                    feature_container.as_mut().highlighted = false;
+                }
 
                 for mut feature_container in
                     layer.get_features_at_mut(&position, map.view().resolution() * 20.0)
@@ -162,13 +164,14 @@ impl Symbol<PointMarker> for ColoredPointSymbol {
         if let Geom::Point(point) = geometry {
             vec![RenderPrimitive::new_point_ref(
                 point,
-                PointPaint::circle(
+                PointPaint::image(
                     if feature.highlighted {
-                        Color::rgba(255, 0, 0, 128)
+                        GREEN_PIN_IMAGE.clone()
                     } else {
-                        Color::rgba(0, 255, 0, 128)
+                        YELLOW_PIN_IMAGE.clone()
                     },
-                    100.0,
+                    Vector2::new(0.5, 0.5),
+                    1.0,
                 ),
             )]
         } else {
