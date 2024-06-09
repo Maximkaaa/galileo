@@ -128,40 +128,38 @@ impl TessellatingRenderBundle {
         paint: ImagePaint,
     ) -> PrimitiveId {
         let opacity = paint.opacity as f32 / 255.0;
-        let image_index = self.images.len();
 
         self.buffer_size += image.bytes.len() + std::mem::size_of::<ImageVertex>() * 4;
 
         let index = self.add_image_to_store(Arc::new(image));
-        self.images.push(ImageInfo::Image((
-            index,
-            [
-                ImageVertex {
-                    position: [vertices[0].x() as f32, vertices[0].y() as f32],
-                    opacity,
-                    tex_coords: [0.0, 1.0],
-                    offset: [0.0, 0.0],
-                },
-                ImageVertex {
-                    position: [vertices[1].x() as f32, vertices[1].y() as f32],
-                    opacity,
-                    tex_coords: [0.0, 0.0],
-                    offset: [0.0, 0.0],
-                },
-                ImageVertex {
-                    position: [vertices[3].x() as f32, vertices[3].y() as f32],
-                    opacity,
-                    tex_coords: [1.0, 1.0],
-                    offset: [0.0, 0.0],
-                },
-                ImageVertex {
-                    position: [vertices[2].x() as f32, vertices[2].y() as f32],
-                    opacity,
-                    tex_coords: [1.0, 0.0],
-                    offset: [0.0, 0.0],
-                },
-            ],
-        )));
+        let vertices = [
+            ImageVertex {
+                position: [vertices[0].x() as f32, vertices[0].y() as f32],
+                opacity,
+                tex_coords: [0.0, 1.0],
+                offset: [0.0, 0.0],
+            },
+            ImageVertex {
+                position: [vertices[1].x() as f32, vertices[1].y() as f32],
+                opacity,
+                tex_coords: [0.0, 0.0],
+                offset: [0.0, 0.0],
+            },
+            ImageVertex {
+                position: [vertices[3].x() as f32, vertices[3].y() as f32],
+                opacity,
+                tex_coords: [1.0, 1.0],
+                offset: [0.0, 0.0],
+            },
+            ImageVertex {
+                position: [vertices[2].x() as f32, vertices[2].y() as f32],
+                opacity,
+                tex_coords: [1.0, 0.0],
+                offset: [0.0, 0.0],
+            },
+        ];
+
+        let image_index = self.add_image_info(index, vertices);
 
         let id = self.primitives.len();
 
@@ -183,7 +181,6 @@ impl TessellatingRenderBundle {
         P: CartesianPoint3d<Num = N>,
     {
         let opacity = opacity as f32 / 255.0;
-        let image_index = self.images.len();
 
         self.buffer_size += image.bytes.len() + size_of::<ImageVertex>() * 4;
 
@@ -192,37 +189,48 @@ impl TessellatingRenderBundle {
         let offset_y = offset[1] * height;
 
         let index = self.add_image_to_store(image);
-        self.images.push(ImageInfo::Image((
-            index,
-            [
-                ImageVertex {
-                    position,
-                    opacity,
-                    tex_coords: [0.0, 1.0],
-                    offset: [offset_x, offset_y - height],
-                },
-                ImageVertex {
-                    position,
-                    opacity,
-                    tex_coords: [0.0, 0.0],
-                    offset: [offset_x, offset_y],
-                },
-                ImageVertex {
-                    position,
-                    opacity,
-                    tex_coords: [1.0, 1.0],
-                    offset: [offset_x + width, offset_y - height],
-                },
-                ImageVertex {
-                    position,
-                    opacity,
-                    tex_coords: [1.0, 0.0],
-                    offset: [offset_x + width, offset_y],
-                },
-            ],
-        )));
+        let vertices = [
+            ImageVertex {
+                position,
+                opacity,
+                tex_coords: [0.0, 1.0],
+                offset: [offset_x, offset_y - height],
+            },
+            ImageVertex {
+                position,
+                opacity,
+                tex_coords: [0.0, 0.0],
+                offset: [offset_x, offset_y],
+            },
+            ImageVertex {
+                position,
+                opacity,
+                tex_coords: [1.0, 1.0],
+                offset: [offset_x + width, offset_y - height],
+            },
+            ImageVertex {
+                position,
+                opacity,
+                tex_coords: [1.0, 0.0],
+                offset: [offset_x + width, offset_y],
+            },
+        ];
+
+        let image_index = self.add_image_info(index, vertices);
 
         PrimitiveInfo::Image { image_index }
+    }
+
+    fn add_image_info(&mut self, image_store_index: usize, vertices: [ImageVertex; 4]) -> usize {
+        if let Some(id) = self.vacant_image_ids.pop() {
+            self.images[id] = ImageInfo::Image((image_store_index, vertices));
+            id
+        } else {
+            let index = self.images.len();
+            self.images
+                .push(ImageInfo::Image((image_store_index, vertices)));
+            index
+        }
     }
 
     fn add_primitive_info(&mut self, info: PrimitiveInfo) -> PrimitiveId {
@@ -237,7 +245,6 @@ impl TessellatingRenderBundle {
     }
 
     fn add_image_to_store(&mut self, image: Arc<DecodedImage>) -> usize {
-        println!("add image to store");
         for (i, stored) in self.image_store.iter().enumerate() {
             match stored {
                 ImageStoreInfo::Vacant => {}
@@ -344,8 +351,6 @@ impl TessellatingRenderBundle {
                 }
             };
 
-            // let (image_id, _) = self.images.remove(index);
-            println!("remove image from store {image_id}");
             let stored_image_unused = self.images.iter().all(|info| match info {
                 ImageInfo::Vacant => false,
                 ImageInfo::Image((i, _)) => *i != image_id,
