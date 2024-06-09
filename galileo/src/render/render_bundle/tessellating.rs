@@ -31,12 +31,13 @@ pub(crate) struct TessellatingRenderBundle {
     pub poly_tessellation: VertexBuffers<PolyVertex, u32>,
     pub points: Vec<PointInstance>,
     pub screen_ref: ScreenRefTessellation,
-    pub images: Vec<(usize, [ImageVertex; 4])>,
+    pub images: Vec<ImageInfo>,
     pub clip_area: Option<VertexBuffers<PolyVertex, u32>>,
     pub image_store: Vec<ImageStoreInfo>,
     pub primitives: Vec<PrimitiveInfo>,
     vacant_ids: Vec<usize>,
     vacant_image_ids: Vec<usize>,
+    vacant_image_store_ids: Vec<usize>,
     buffer_size: usize,
 }
 
@@ -44,6 +45,12 @@ pub(crate) struct TessellatingRenderBundle {
 pub(crate) enum ImageStoreInfo {
     Vacant,
     Image(Arc<DecodedImage>),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum ImageInfo {
+    Vacant,
+    Image((usize, [ImageVertex; 4])),
 }
 
 pub(crate) type ScreenRefTessellation = VertexBuffers<ScreenRefVertex, u32>;
@@ -83,6 +90,7 @@ impl TessellatingRenderBundle {
             image_store: Vec::new(),
             vacant_ids: vec![],
             vacant_image_ids: vec![],
+            vacant_image_store_ids: vec![],
             buffer_size: 0,
         }
     }
@@ -125,7 +133,7 @@ impl TessellatingRenderBundle {
         self.buffer_size += image.bytes.len() + std::mem::size_of::<ImageVertex>() * 4;
 
         let index = self.add_image_to_store(Arc::new(image));
-        self.images.push((
+        self.images.push(ImageInfo::Image((
             index,
             [
                 ImageVertex {
@@ -153,7 +161,7 @@ impl TessellatingRenderBundle {
                     offset: [0.0, 0.0],
                 },
             ],
-        ));
+        )));
 
         let id = self.primitives.len();
 
@@ -184,7 +192,7 @@ impl TessellatingRenderBundle {
         let offset_y = offset[1] * height;
 
         let index = self.add_image_to_store(image);
-        self.images.push((
+        self.images.push(ImageInfo::Image((
             index,
             [
                 ImageVertex {
@@ -212,7 +220,7 @@ impl TessellatingRenderBundle {
                     offset: [offset_x + width, offset_y],
                 },
             ],
-        ));
+        )));
 
         PrimitiveInfo::Image { image_index }
     }
@@ -241,7 +249,7 @@ impl TessellatingRenderBundle {
             }
         }
 
-        if let Some(id) = self.vacant_image_ids.pop() {
+        if let Some(id) = self.vacant_image_store_ids.pop() {
             self.image_store[id] = ImageStoreInfo::Image(image);
             id
         } else {
@@ -325,9 +333,23 @@ impl TessellatingRenderBundle {
         if index >= self.images.len() {
             Err(GalileoError::Generic("index out of bounds".into()))
         } else {
-            let (image_id, _) = self.images.remove(index);
+            let image_id = match std::mem::replace(&mut self.images[index], ImageInfo::Vacant) {
+                ImageInfo::Vacant => {
+                    // this should not happen
+                    panic!("tried to replace vacant image with vacant slot")
+                }
+                ImageInfo::Image((image_id, _)) => {
+                    self.vacant_image_ids.push(index);
+                    image_id
+                }
+            };
+
+            // let (image_id, _) = self.images.remove(index);
             println!("remove image from store {image_id}");
-            let stored_image_unused = self.images.iter().all(|(i, _)| *i != image_id);
+            let stored_image_unused = self.images.iter().all(|info| match info {
+                ImageInfo::Vacant => false,
+                ImageInfo::Image((i, _)) => *i != image_id,
+            });
 
             if stored_image_unused {
                 match std::mem::replace(&mut self.image_store[image_id], ImageStoreInfo::Vacant) {
@@ -335,7 +357,7 @@ impl TessellatingRenderBundle {
                         // this should not happen
                     }
                     ImageStoreInfo::Image(image) => {
-                        self.vacant_image_ids.push(image_id);
+                        self.vacant_image_store_ids.push(image_id);
 
                         self.buffer_size -= image.bytes.len() + size_of::<ImageVertex>() * 4;
                     }
@@ -638,12 +660,19 @@ impl TessellatingRenderBundle {
             .ok_or(GalileoError::Generic("primitive does not exist".into()))?;
         match info {
             PrimitiveInfo::Image { image_index } => {
-                let (_, vertices) = self
+                match self
                     .images
                     .get_mut(*image_index)
-                    .ok_or(GalileoError::Generic("invalid image id".into()))?;
-                for vertex in vertices {
-                    vertex.opacity = paint.opacity as f32 / 255.0;
+                    .ok_or(GalileoError::Generic("invalid image id".into()))?
+                {
+                    ImageInfo::Vacant => {
+                        return Err(GalileoError::Generic("tried to modify vacant image".into()))
+                    }
+                    ImageInfo::Image((_, vertices)) => {
+                        for vertex in vertices {
+                            vertex.opacity = paint.opacity as f32 / 255.0;
+                        }
+                    }
                 }
             }
             _ => return Err(GalileoError::Generic("invalid primitive type".into())),
@@ -944,19 +973,27 @@ impl TessellatingRenderBundle {
         let Some(transform) = view.map_to_scene_transform() else {
             return;
         };
-        self.images.sort_by(|(_, vertex_set_a), (_, vertex_set_b)| {
-            let point_a = Point3d::new(
-                vertex_set_a[0].position[0] as f64,
-                vertex_set_a[0].position[1] as f64,
-                0.0,
-            )
-            .to_homogeneous();
-            let point_b = Point3d::new(
-                vertex_set_b[0].position[0] as f64,
-                vertex_set_b[0].position[1] as f64,
-                0.0,
-            )
-            .to_homogeneous();
+        self.images.sort_by(|info_a, info_b| {
+            let point_a = match info_a {
+                ImageInfo::Vacant => Point3d::new(0.0, 0.0, 0.0).to_homogeneous(),
+                ImageInfo::Image((_, vertex_set_a)) => Point3d::new(
+                    vertex_set_a[0].position[0] as f64,
+                    vertex_set_a[0].position[1] as f64,
+                    0.0,
+                )
+                .to_homogeneous(),
+            };
+
+            let point_b = match info_b {
+                ImageInfo::Vacant => Point3d::new(0.0, 0.0, 0.0).to_homogeneous(),
+                ImageInfo::Image((_, vertex_set_b)) => Point3d::new(
+                    vertex_set_b[0].position[0] as f64,
+                    vertex_set_b[0].position[1] as f64,
+                    0.0,
+                )
+                .to_homogeneous(),
+            };
+
             let projected_a = transform * point_a;
             let projected_b = transform * point_b;
 

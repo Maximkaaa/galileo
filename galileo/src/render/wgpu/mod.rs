@@ -26,7 +26,7 @@ use crate::render::wgpu::pipelines::Pipelines;
 use crate::view::MapView;
 use crate::Color;
 
-use super::render_bundle::tessellating::ImageStoreInfo;
+use super::render_bundle::tessellating::{ImageInfo, ImageStoreInfo};
 use super::{Canvas, PackedBundle, RenderOptions};
 
 mod pipelines;
@@ -876,18 +876,22 @@ impl WgpuPackedBundle {
             .collect();
 
         let mut image_buffers = vec![];
-        for (image_index, vertices) in images {
-            let image = render_set.pipelines.image_pipeline().create_image(
-                &renderer.device,
-                textures
-                    .get(*image_index)
-                    .expect("texture at index must exist")
-                    .clone()
-                    .expect("image texture must not be None")
-                    .clone(),
-                vertices,
-            );
-            image_buffers.push(image);
+        for image_info in images {
+            if let ImageInfo::Image((image_index, vertices)) = image_info {
+                let image = render_set.pipelines.image_pipeline().create_image(
+                    &renderer.device,
+                    textures
+                        .get(*image_index)
+                        .expect("texture at index must exist")
+                        .clone()
+                        .expect("image texture must not be None")
+                        .clone(),
+                    vertices,
+                );
+                image_buffers.push(image);
+            } else {
+                // ignore vacant image slots
+            }
         }
 
         Self {
