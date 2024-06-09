@@ -1,6 +1,6 @@
 use crate::decoded_image::DecodedImage;
 use crate::render::render_bundle::tessellating::{
-    ImageStoreInfo, PolyVertex, PrimitiveInfo, ScreenRefVertex, TessellatingRenderBundle,
+    ImageInfo, ImageStoreInfo, PolyVertex, PrimitiveInfo, ScreenRefVertex, TessellatingRenderBundle,
 };
 use lyon::lyon_tessellation::VertexBuffers;
 use serde::{Deserialize, Serialize};
@@ -12,10 +12,11 @@ pub(crate) struct TessellatingRenderBundleBytes {
     pub poly_tessellation: PolyVertexBuffersBytes,
     pub points: Vec<u32>,
     pub screen_ref: ScreenRefVertexBuffersBytes,
-    pub images: Vec<ImageBytes>,
+    pub images: Vec<Option<ImageBytes>>,
     pub primitives: Vec<PrimitiveInfo>,
     pub image_store: Vec<Option<(u32, u32, Vec<u8>)>>,
     pub vacant_image_ids: Vec<usize>,
+    pub vacant_image_store_ids: Vec<usize>,
     pub clip_area: Option<PolyVertexBuffersBytes>,
     pub bundle_size: usize,
 }
@@ -90,9 +91,12 @@ impl TessellatingRenderBundle {
             images: self
                 .images
                 .into_iter()
-                .map(|(image_index, vertices)| ImageBytes {
-                    image_index,
-                    vertices: bytemuck::cast_vec(vertices.to_vec()),
+                .map(|image_info| match image_info {
+                    ImageInfo::Vacant => None,
+                    ImageInfo::Image((image_index, vertices)) => Some(ImageBytes {
+                        image_index,
+                        vertices: bytemuck::cast_vec(vertices.to_vec()),
+                    }),
                 })
                 .collect(),
             primitives: self.primitives,
@@ -107,6 +111,7 @@ impl TessellatingRenderBundle {
                 })
                 .collect(),
             vacant_image_ids: self.vacant_image_ids,
+            vacant_image_store_ids: self.vacant_image_store_ids,
             clip_area: self.clip_area.map(|v| v.into()),
             bundle_size: self.buffer_size,
         };
@@ -122,18 +127,19 @@ impl TessellatingRenderBundle {
             images: bundle
                 .images
                 .into_iter()
-                .map(
-                    |ImageBytes {
-                         image_index,
-                         vertices,
-                     }| {
+                .map(|item| match item {
+                    Some(ImageBytes {
+                        image_index,
+                        vertices,
+                    }) => {
                         let vertices = bytemuck::cast_vec(vertices)
                             .try_into()
                             .expect("invalid vector length");
 
-                        (image_index, vertices)
-                    },
-                )
+                        ImageInfo::Image((image_index, vertices))
+                    }
+                    None => ImageInfo::Vacant,
+                })
                 .collect(),
             primitives: bundle.primitives,
             image_store: bundle
@@ -148,6 +154,7 @@ impl TessellatingRenderBundle {
                 })
                 .collect(),
             vacant_image_ids: bundle.vacant_image_ids,
+            vacant_image_store_ids: bundle.vacant_image_store_ids,
             clip_area: bundle.clip_area.map(|v| v.into_typed_unchecked()),
             buffer_size: bundle.bundle_size,
             vacant_ids: vec![],
