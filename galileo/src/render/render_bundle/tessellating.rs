@@ -343,7 +343,9 @@ impl TessellatingRenderBundle {
             let image_id = match std::mem::replace(&mut self.images[index], ImageInfo::Vacant) {
                 ImageInfo::Vacant => {
                     // this should not happen
-                    panic!("tried to replace vacant image with vacant slot")
+                    return Err(GalileoError::Generic(
+                        "tried to replace vacant image with vacant slot".into(),
+                    ));
                 }
                 ImageInfo::Image((image_id, _)) => {
                     self.vacant_image_ids.push(index);
