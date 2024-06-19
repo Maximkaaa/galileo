@@ -30,7 +30,7 @@ impl Geometry for geojson::Geometry {
 }
 
 fn convert_contour(line_string: &LineStringType) -> Option<Contour<GeoJsonPoint>> {
-    let is_closed = line_string.len() > 0 && line_string[0] == line_string[line_string.len() - 1];
+    let is_closed = !line_string.is_empty() && line_string[0] == line_string[line_string.len() - 1];
     Some(Contour::new(
         line_string
             .iter()
@@ -40,7 +40,7 @@ fn convert_contour(line_string: &LineStringType) -> Option<Contour<GeoJsonPoint>
     ))
 }
 
-fn convert_multi_point(points: &Vec<Position>) -> Option<MultiPoint<GeoJsonPoint>> {
+fn convert_multi_point(points: &[Position]) -> Option<MultiPoint<GeoJsonPoint>> {
     Some(MultiPoint::from(
         points
             .iter()
@@ -49,11 +49,11 @@ fn convert_multi_point(points: &Vec<Position>) -> Option<MultiPoint<GeoJsonPoint
     ))
 }
 
-fn convert_multi_contour(lines: &Vec<LineStringType>) -> Option<MultiContour<GeoJsonPoint>> {
+fn convert_multi_contour(lines: &[LineStringType]) -> Option<MultiContour<GeoJsonPoint>> {
     Some(MultiContour::from(
         lines
             .iter()
-            .map(|l| convert_contour(l))
+            .map(convert_contour)
             .collect::<Option<Vec<_>>>()?,
     ))
 }
@@ -68,10 +68,10 @@ fn convert_polygon(polygon: &PolygonType) -> Option<Polygon<GeoJsonPoint>> {
     ))
 }
 
-fn convert_multi_polygon(mp: &Vec<PolygonType>) -> Option<MultiPolygon<GeoJsonPoint>> {
+fn convert_multi_polygon(mp: &[PolygonType]) -> Option<MultiPolygon<GeoJsonPoint>> {
     Some(MultiPolygon::from(
         mp.iter()
-            .map(|p| convert_polygon(p))
+            .map(convert_polygon)
             .collect::<Option<Vec<_>>>()?,
     ))
 }

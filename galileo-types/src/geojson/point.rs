@@ -5,7 +5,7 @@ use geojson::Position;
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Debug, Default, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize,
+    Debug, Default, Clone, PartialEq, PartialOrd, Deserialize, Serialize,
 )]
 pub struct GeoJsonPoint(Position);
 
