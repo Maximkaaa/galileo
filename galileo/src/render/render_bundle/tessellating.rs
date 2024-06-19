@@ -31,12 +31,26 @@ pub(crate) struct TessellatingRenderBundle {
     pub poly_tessellation: VertexBuffers<PolyVertex, u32>,
     pub points: Vec<PointInstance>,
     pub screen_ref: ScreenRefTessellation,
-    pub images: Vec<(usize, [ImageVertex; 4])>,
+    pub images: Vec<ImageInfo>,
     pub clip_area: Option<VertexBuffers<PolyVertex, u32>>,
-    pub image_store: Vec<Arc<DecodedImage>>,
+    pub image_store: Vec<ImageStoreInfo>,
     pub primitives: Vec<PrimitiveInfo>,
     vacant_ids: Vec<usize>,
+    vacant_image_ids: Vec<usize>,
+    vacant_image_store_ids: Vec<usize>,
     buffer_size: usize,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum ImageStoreInfo {
+    Vacant,
+    Image(Arc<DecodedImage>),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum ImageInfo {
+    Vacant,
+    Image((usize, [ImageVertex; 4])),
 }
 
 pub(crate) type ScreenRefTessellation = VertexBuffers<ScreenRefVertex, u32>;
@@ -75,6 +89,8 @@ impl TessellatingRenderBundle {
             clip_area: None,
             image_store: Vec::new(),
             vacant_ids: vec![],
+            vacant_image_ids: vec![],
+            vacant_image_store_ids: vec![],
             buffer_size: 0,
         }
     }
@@ -112,40 +128,38 @@ impl TessellatingRenderBundle {
         paint: ImagePaint,
     ) -> PrimitiveId {
         let opacity = paint.opacity as f32 / 255.0;
-        let image_index = self.images.len();
 
         self.buffer_size += image.bytes.len() + std::mem::size_of::<ImageVertex>() * 4;
 
         let index = self.add_image_to_store(Arc::new(image));
-        self.images.push((
-            index,
-            [
-                ImageVertex {
-                    position: [vertices[0].x() as f32, vertices[0].y() as f32],
-                    opacity,
-                    tex_coords: [0.0, 1.0],
-                    offset: [0.0, 0.0],
-                },
-                ImageVertex {
-                    position: [vertices[1].x() as f32, vertices[1].y() as f32],
-                    opacity,
-                    tex_coords: [0.0, 0.0],
-                    offset: [0.0, 0.0],
-                },
-                ImageVertex {
-                    position: [vertices[3].x() as f32, vertices[3].y() as f32],
-                    opacity,
-                    tex_coords: [1.0, 1.0],
-                    offset: [0.0, 0.0],
-                },
-                ImageVertex {
-                    position: [vertices[2].x() as f32, vertices[2].y() as f32],
-                    opacity,
-                    tex_coords: [1.0, 0.0],
-                    offset: [0.0, 0.0],
-                },
-            ],
-        ));
+        let vertices = [
+            ImageVertex {
+                position: [vertices[0].x() as f32, vertices[0].y() as f32],
+                opacity,
+                tex_coords: [0.0, 1.0],
+                offset: [0.0, 0.0],
+            },
+            ImageVertex {
+                position: [vertices[1].x() as f32, vertices[1].y() as f32],
+                opacity,
+                tex_coords: [0.0, 0.0],
+                offset: [0.0, 0.0],
+            },
+            ImageVertex {
+                position: [vertices[3].x() as f32, vertices[3].y() as f32],
+                opacity,
+                tex_coords: [1.0, 1.0],
+                offset: [0.0, 0.0],
+            },
+            ImageVertex {
+                position: [vertices[2].x() as f32, vertices[2].y() as f32],
+                opacity,
+                tex_coords: [1.0, 0.0],
+                offset: [0.0, 0.0],
+            },
+        ];
+
+        let image_index = self.add_image_info(index, vertices);
 
         let id = self.primitives.len();
 
@@ -167,7 +181,6 @@ impl TessellatingRenderBundle {
         P: CartesianPoint3d<Num = N>,
     {
         let opacity = opacity as f32 / 255.0;
-        let image_index = self.images.len();
 
         self.buffer_size += image.bytes.len() + size_of::<ImageVertex>() * 4;
 
@@ -176,37 +189,48 @@ impl TessellatingRenderBundle {
         let offset_y = offset[1] * height;
 
         let index = self.add_image_to_store(image);
-        self.images.push((
-            index,
-            [
-                ImageVertex {
-                    position,
-                    opacity,
-                    tex_coords: [0.0, 1.0],
-                    offset: [offset_x, offset_y - height],
-                },
-                ImageVertex {
-                    position,
-                    opacity,
-                    tex_coords: [0.0, 0.0],
-                    offset: [offset_x, offset_y],
-                },
-                ImageVertex {
-                    position,
-                    opacity,
-                    tex_coords: [1.0, 1.0],
-                    offset: [offset_x + width, offset_y - height],
-                },
-                ImageVertex {
-                    position,
-                    opacity,
-                    tex_coords: [1.0, 0.0],
-                    offset: [offset_x + width, offset_y],
-                },
-            ],
-        ));
+        let vertices = [
+            ImageVertex {
+                position,
+                opacity,
+                tex_coords: [0.0, 1.0],
+                offset: [offset_x, offset_y - height],
+            },
+            ImageVertex {
+                position,
+                opacity,
+                tex_coords: [0.0, 0.0],
+                offset: [offset_x, offset_y],
+            },
+            ImageVertex {
+                position,
+                opacity,
+                tex_coords: [1.0, 1.0],
+                offset: [offset_x + width, offset_y - height],
+            },
+            ImageVertex {
+                position,
+                opacity,
+                tex_coords: [1.0, 0.0],
+                offset: [offset_x + width, offset_y],
+            },
+        ];
+
+        let image_index = self.add_image_info(index, vertices);
 
         PrimitiveInfo::Image { image_index }
+    }
+
+    fn add_image_info(&mut self, image_store_index: usize, vertices: [ImageVertex; 4]) -> usize {
+        if let Some(id) = self.vacant_image_ids.pop() {
+            self.images[id] = ImageInfo::Image((image_store_index, vertices));
+            id
+        } else {
+            let index = self.images.len();
+            self.images
+                .push(ImageInfo::Image((image_store_index, vertices)));
+            index
+        }
     }
 
     fn add_primitive_info(&mut self, info: PrimitiveInfo) -> PrimitiveId {
@@ -222,14 +246,24 @@ impl TessellatingRenderBundle {
 
     fn add_image_to_store(&mut self, image: Arc<DecodedImage>) -> usize {
         for (i, stored) in self.image_store.iter().enumerate() {
-            if Arc::ptr_eq(stored, &image) {
-                return i;
+            match stored {
+                ImageStoreInfo::Vacant => {}
+                ImageStoreInfo::Image(stored) => {
+                    if Arc::ptr_eq(stored, &image) {
+                        return i;
+                    }
+                }
             }
         }
 
-        let index = self.image_store.len();
-        self.image_store.push(image);
-        index
+        if let Some(id) = self.vacant_image_store_ids.pop() {
+            self.image_store[id] = ImageStoreInfo::Image(image);
+            id
+        } else {
+            let index = self.image_store.len();
+            self.image_store.push(ImageStoreInfo::Image(image));
+            index
+        }
     }
 
     pub fn add<N, P, C, Poly>(
@@ -306,10 +340,36 @@ impl TessellatingRenderBundle {
         if index >= self.images.len() {
             Err(GalileoError::Generic("index out of bounds".into()))
         } else {
-            let (image_id, _) = self.images.remove(index);
-            let image = self.image_store.remove(image_id);
+            let image_id = match std::mem::replace(&mut self.images[index], ImageInfo::Vacant) {
+                ImageInfo::Vacant => {
+                    // this should not happen
+                    return Err(GalileoError::Generic(
+                        "tried to replace vacant image with vacant slot".into(),
+                    ));
+                }
+                ImageInfo::Image((image_id, _)) => {
+                    self.vacant_image_ids.push(index);
+                    image_id
+                }
+            };
 
-            self.buffer_size -= image.bytes.len() + size_of::<ImageVertex>() * 4;
+            let stored_image_unused = self.images.iter().all(|info| match info {
+                ImageInfo::Vacant => false,
+                ImageInfo::Image((i, _)) => *i != image_id,
+            });
+
+            if stored_image_unused {
+                match std::mem::replace(&mut self.image_store[image_id], ImageStoreInfo::Vacant) {
+                    ImageStoreInfo::Vacant => {
+                        // this should not happen
+                    }
+                    ImageStoreInfo::Image(image) => {
+                        self.vacant_image_store_ids.push(image_id);
+
+                        self.buffer_size -= image.bytes.len() + size_of::<ImageVertex>() * 4;
+                    }
+                }
+            }
 
             for info in &mut self.primitives {
                 match info {
@@ -607,12 +667,19 @@ impl TessellatingRenderBundle {
             .ok_or(GalileoError::Generic("primitive does not exist".into()))?;
         match info {
             PrimitiveInfo::Image { image_index } => {
-                let (_, vertices) = self
+                match self
                     .images
                     .get_mut(*image_index)
-                    .ok_or(GalileoError::Generic("invalid image id".into()))?;
-                for vertex in vertices {
-                    vertex.opacity = paint.opacity as f32 / 255.0;
+                    .ok_or(GalileoError::Generic("invalid image id".into()))?
+                {
+                    ImageInfo::Vacant => {
+                        return Err(GalileoError::Generic("tried to modify vacant image".into()))
+                    }
+                    ImageInfo::Image((_, vertices)) => {
+                        for vertex in vertices {
+                            vertex.opacity = paint.opacity as f32 / 255.0;
+                        }
+                    }
                 }
             }
             _ => return Err(GalileoError::Generic("invalid primitive type".into())),
@@ -913,19 +980,27 @@ impl TessellatingRenderBundle {
         let Some(transform) = view.map_to_scene_transform() else {
             return;
         };
-        self.images.sort_by(|(_, vertex_set_a), (_, vertex_set_b)| {
-            let point_a = Point3d::new(
-                vertex_set_a[0].position[0] as f64,
-                vertex_set_a[0].position[1] as f64,
-                0.0,
-            )
-            .to_homogeneous();
-            let point_b = Point3d::new(
-                vertex_set_b[0].position[0] as f64,
-                vertex_set_b[0].position[1] as f64,
-                0.0,
-            )
-            .to_homogeneous();
+        self.images.sort_by(|info_a, info_b| {
+            let point_a = match info_a {
+                ImageInfo::Vacant => Point3d::new(0.0, 0.0, 0.0).to_homogeneous(),
+                ImageInfo::Image((_, vertex_set_a)) => Point3d::new(
+                    vertex_set_a[0].position[0] as f64,
+                    vertex_set_a[0].position[1] as f64,
+                    0.0,
+                )
+                .to_homogeneous(),
+            };
+
+            let point_b = match info_b {
+                ImageInfo::Vacant => Point3d::new(0.0, 0.0, 0.0).to_homogeneous(),
+                ImageInfo::Image((_, vertex_set_b)) => Point3d::new(
+                    vertex_set_b[0].position[0] as f64,
+                    vertex_set_b[0].position[1] as f64,
+                    0.0,
+                )
+                .to_homogeneous(),
+            };
+
             let projected_a = transform * point_a;
             let projected_b = transform * point_b;
 
