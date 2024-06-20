@@ -70,8 +70,6 @@ fn convert_polygon(polygon: &PolygonType) -> Option<Polygon<GeoJsonPoint>> {
 
 fn convert_multi_polygon(mp: &[PolygonType]) -> Option<MultiPolygon<GeoJsonPoint>> {
     Some(MultiPolygon::from(
-        mp.iter()
-            .map(convert_polygon)
-            .collect::<Option<Vec<_>>>()?,
+        mp.iter().map(convert_polygon).collect::<Option<Vec<_>>>()?,
     ))
 }
