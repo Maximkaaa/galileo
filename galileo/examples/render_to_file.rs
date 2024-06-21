@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
         .max(TileSchema::web(18).lod_resolution(17).unwrap());
 
     // Create OSM layer for background
-    let cache_controller = Some(FileCacheController::new(".tile_cache"));
+    let cache_controller = FileCacheController::new(".tile_cache");
     let tile_provider = UrlImageProvider::new_cached(
         |index: &TileIndex| {
             format!(
