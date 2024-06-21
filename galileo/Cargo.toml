@@ -44,6 +44,7 @@ quick_cache = "0.4"
 futures-intrusive = "0.5"
 geojson = { version = "0.24", optional = true }
 raw-window-handle = { version = "0.6", optional = true }
+geozero = "0.13.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 wgpu = { version = "0.19", optional = true }
