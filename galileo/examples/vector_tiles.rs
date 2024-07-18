@@ -5,8 +5,11 @@ use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Lod, MapBuilder};
 use galileo_types::cartesian::Point2d;
 use galileo_types::geo::Crs;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
+use tokio::sync::OnceCell;
 
+use galileo::layer::vector_tile_layer::tile_provider::loader::WebVtLoader;
+use galileo::layer::vector_tile_layer::tile_provider::processor::ThreadVtProcessor;
 #[cfg(not(target_arch = "wasm32"))]
 use galileo::layer::{
     data_provider::{FileCacheController, UrlDataProvider},
@@ -31,30 +34,38 @@ fn get_layer_style() -> Option<VectorTileStyle> {
     serde_json::from_reader(std::fs::File::open(STYLE).ok()?).ok()
 }
 
-thread_local!(
-    pub static LAYER: Arc<RwLock<VectorTileLayer<VectorTileProvider>>> =
-        Arc::new(RwLock::new(MapBuilder::create_vector_tile_layer(
-            |&index: &TileIndex| {
-                format!(
-                    "https://d1zqyi8v6vm8p9.cloudfront.net/planet/{}/{}/{}.mvt",
-                    index.z, index.x, index.y
-                )
-            },
-            tile_scheme(),
-            VectorTileStyle::default(),
-        )));
-);
-
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("galileo=trace"))
+        .init();
     run(MapBuilder::new(), get_layer_style().unwrap()).await;
 }
 
 pub async fn run(builder: MapBuilder, style: VectorTileStyle) {
-    let layer = LAYER.with(|v| v.clone());
-    layer.write().unwrap().update_style(style);
+    static LAYER: OnceCell<
+        Arc<RwLock<VectorTileLayer<WebVtLoader<FileCacheController>, ThreadVtProcessor>>>,
+    > = OnceCell::const_new();
+
+    LAYER
+        .get_or_init(move || async {
+            Arc::new(RwLock::new(
+                MapBuilder::create_vector_tile_layer(
+                    |&index: &TileIndex| {
+                        format!(
+                            "https://d1zqyi8v6vm8p9.cloudfront.net/planet/{}/{}/{}.mvt",
+                            index.z, index.x, index.y
+                        )
+                    },
+                    tile_scheme(),
+                    style,
+                )
+                .await,
+            ))
+        })
+        .await;
+
+    let layer = LAYER.get().unwrap().clone();
 
     builder
         .with_layer(layer.clone())

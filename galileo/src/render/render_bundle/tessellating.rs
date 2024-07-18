@@ -85,6 +85,10 @@ impl TessellatingRenderBundle {
         self.buffer_size
     }
 
+    pub fn set_approx_buffer_size(&mut self, size: usize) {
+        self.buffer_size = size;
+    }
+
     pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly)
     where
         N: AsPrimitive<f32>,

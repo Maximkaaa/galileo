@@ -68,7 +68,9 @@ impl ImagePointSymbol {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn from_path(path: &str, offset: Vector2<f32>, scale: f32) -> Result<Self, GalileoError> {
         use image::GenericImageView;
-        let image = image::io::Reader::open(path)?.decode()?;
+        let image = image::io::Reader::open(path)?
+            .decode()
+            .map_err(|_| GalileoError::ImageDecode)?;
 
         Ok(Self {
             image: Arc::new(DecodedImage::from_raw(

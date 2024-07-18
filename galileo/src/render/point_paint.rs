@@ -6,9 +6,9 @@ use crate::render::{LineCap, LinePaint};
 use crate::Color;
 use galileo_types::impls::ClosedContour;
 use nalgebra::{Point2, Vector2};
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
 
 /// Specifies the way a point should be drawn to the map.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,6 +99,16 @@ impl<'a> PointPaint<'a> {
             shape: PointShape::Label {
                 text: Cow::Borrowed(text),
                 style: Cow::Borrowed(style),
+            },
+        }
+    }
+
+    pub fn label_owed(text: String, style: TextStyle) -> Self {
+        Self {
+            offset: Vector2::new(0.0, 0.0),
+            shape: PointShape::Label {
+                text: Cow::Owned(text),
+                style: Cow::Owned(style),
             },
         }
     }

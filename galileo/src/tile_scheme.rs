@@ -35,6 +35,12 @@ pub struct TileIndex {
     pub(crate) display_x: i32,
 }
 
+impl TileIndex {
+    pub fn new(x: i32, y: i32, z: u32) -> Self {
+        Self { x, y, z, display_x: x }
+    }
+}
+
 /// Tile schema specifies how tile indices are calculated based on the map position and resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TileSchema {

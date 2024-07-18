@@ -4,12 +4,23 @@ use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::vector_tile::VectorTile;
 use crate::messenger::Messenger;
 use crate::render::render_bundle::RenderBundle;
-use crate::render::Canvas;
+use crate::render::{Canvas, PackedBundle};
 use crate::tile_scheme::TileIndex;
+use bytes::Bytes;
+use futures::future::Shared;
+use futures::FutureExt;
 use galileo_mvt::MvtTile;
-use maybe_sync::{MaybeSend, MaybeSync};
+use loader::VectorTileLoader;
+use maybe_sync::{AtomicU32, MaybeSend, MaybeSync};
+use processor::VectorTileProcessor;
 use quick_cache::unsync::Cache;
-use std::sync::MutexGuard;
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, Mutex, MutexGuard, RwLock};
+use std::task::{Context, Poll, Waker};
+use tokio::sync::OnceCell;
 
 #[cfg(target_arch = "wasm32")]
 mod web_worker_provider;
@@ -21,11 +32,209 @@ mod threaded_provider;
 #[cfg(not(target_arch = "wasm32"))]
 pub use threaded_provider::ThreadedProvider;
 
+pub mod loader;
+pub mod processor;
+mod tile_store;
 mod vt_processor;
+
+use crate::error::GalileoError;
+use crate::layer::data_provider::{DataProcessor, DataProvider, UrlDataProvider};
+use crate::layer::vector_tile_layer::tile_provider::tile_store::{
+    MvtTileState, PreparedTileState, TileStore,
+};
+use crate::platform::{PlatformService, PlatformServiceImpl};
+
 pub use vt_processor::{VectorTileDecodeContext, VtProcessor};
 
+mod platform {
+    use cfg_if::cfg_if;
+
+    cfg_if! {
+        if #[cfg(target_arch = "wasm32")] {
+            mod web;
+            use web::*;
+        } else {
+            mod native;
+            pub use native::*;
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct VtStyleId(u32);
+
+impl VtStyleId {
+    const INVALID: Self = Self(u32::MAX);
+
+    fn next_id() -> Self {
+        static ID: AtomicU32 = AtomicU32::new(0);
+        Self(ID.fetch_add(1, Ordering::Relaxed))
+    }
+}
+
+pub struct VectorTileProvider<Loader, Processor>
+where
+    Loader: VectorTileLoader + Send + Sync + 'static,
+    Processor: VectorTileProcessor + Send + Sync + 'static,
+{
+    tiles: Arc<RwLock<TileStore>>,
+    loader: Arc<Loader>,
+    processor: Arc<Processor>,
+    messenger: Option<Arc<dyn Messenger>>,
+}
+
+impl<Loader, Processor> Clone for VectorTileProvider<Loader, Processor>
+where
+    Loader: VectorTileLoader + Send + Sync + 'static,
+    Processor: VectorTileProcessor + Send + Sync + 'static,
+{
+    fn clone(&self) -> Self {
+        Self {
+            tiles: self.tiles.clone(),
+            loader: self.loader.clone(),
+            processor: self.processor.clone(),
+            messenger: self.messenger.clone(),
+        }
+    }
+}
+
+impl<Loader, Processor> VectorTileProvider<Loader, Processor>
+where
+    Loader: VectorTileLoader + Send + Sync + 'static,
+    Processor: VectorTileProcessor + Send + Sync + 'static,
+{
+    pub fn new(loader: Arc<Loader>, processor: Arc<Processor>) -> Self {
+        Self {
+            tiles: Arc::default(),
+            loader,
+            processor,
+            messenger: None,
+        }
+    }
+
+    pub fn get_style(&self, style_id: VtStyleId) -> Option<Arc<VectorTileStyle>> {
+        self.processor.get_style(style_id)
+    }
+
+    pub async fn add_style(&mut self, style: VectorTileStyle) -> VtStyleId {
+        let id = VtStyleId::next_id();
+        self.processor.add_style(id, style).await;
+
+        id
+    }
+
+    pub async fn drop_style(&mut self, style_id: VtStyleId) {
+        self.processor.drop_style(style_id).await;
+    }
+
+    pub fn load_tile(&self, index: TileIndex, style_id: VtStyleId) {
+        if !self.processor.has_style(style_id) {
+            log::warn!("Requested tile loading with non-existing style");
+            return;
+        }
+
+        let tile_store = self.tiles.clone();
+        if tile_store
+            .read()
+            .expect("lock is poisoned")
+            .contains(index, style_id)
+        {
+            return;
+        }
+
+        let processor = self.processor.clone();
+        let data_provider = self.loader.clone();
+        let messenger = self.messenger.clone();
+
+        crate::async_runtime::spawn(async move {
+            let cell = {
+                let mut store = tile_store.write().expect("lock is poisoned");
+                if store.contains(index, style_id) {
+                    return;
+                }
+
+                store.start_loading_tile(index, style_id)
+            };
+
+            let tile_state = cell
+                .get_or_init(|| async { Self::download(index, data_provider).await })
+                .await;
+
+            let tile_state = Self::prepare_tile(tile_state, index, style_id, processor).await;
+            tile_store
+                .write()
+                .expect("lock is poisoned")
+                .store_tile(index, style_id, cell, tile_state);
+
+            if let Some(messenger) = messenger {
+                messenger.request_redraw();
+            }
+        });
+    }
+
+    pub fn pack_tiles(&self, indices: &[TileIndex], style_id: VtStyleId, canvas: &dyn Canvas) {
+        let mut store = self.tiles.write().expect("lock is poisoned");
+        for index in indices {
+            if let Some((tile, mvt_tile)) = store.get_prepared(*index, style_id) {
+                let packed = canvas.pack_bundle(&tile);
+                store.store_tile(
+                    *index,
+                    style_id,
+                    mvt_tile,
+                    PreparedTileState::Packed(packed.into()),
+                );
+            }
+        }
+    }
+
+    pub fn get_tile(&self, index: TileIndex, style_id: VtStyleId) -> Option<Arc<dyn PackedBundle>> {
+        self.tiles
+            .read()
+            .expect("lock is poisoned")
+            .get_packed(index, style_id)
+    }
+
+    pub fn get_mvt_tile(&self, index: TileIndex) -> Option<Arc<MvtTile>> {
+        self.tiles
+            .read()
+            .expect("lock is poisoned")
+            .get_mvt_tile(index)
+    }
+
+    pub fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
+        self.messenger = Some(messenger.into());
+    }
+
+    async fn download(tile_index: TileIndex, loader: Arc<Loader>) -> MvtTileState {
+        match loader.load(tile_index).await {
+            Ok(mvt_tile) => MvtTileState::Loaded(Arc::new(mvt_tile)),
+            Err(_) => MvtTileState::Error(),
+        }
+    }
+
+    async fn prepare_tile(
+        mvt_tile_state: &MvtTileState,
+        index: TileIndex,
+        style_id: VtStyleId,
+        processor: Arc<Processor>,
+    ) -> PreparedTileState {
+        match mvt_tile_state {
+            MvtTileState::Loaded(mvt_tile) => {
+                match processor
+                    .process_tile(mvt_tile.clone(), index, style_id)
+                    .await
+                {
+                    Ok(render_bundle) => PreparedTileState::Loaded(Arc::new(render_bundle)),
+                    Err(_) => PreparedTileState::Error,
+                }
+            }
+            MvtTileState::Error() => PreparedTileState::Error,
+        }
+    }
+}
+
 /// Vector tile provider.
-pub trait VectorTileProvider: MaybeSend + MaybeSync {
+pub trait VectorTileProviderT: MaybeSend + MaybeSync {
     /// Load a tile with the given index, and prerender it with the given style.
     fn load_tile(&self, index: TileIndex, style: &VectorTileStyle);
     /// Update the style of the loaded tiles.
@@ -109,4 +318,35 @@ enum TileState {
     Updating(VectorTile),
     Packed(VectorTile),
     Error,
+}
+
+struct MvtProcessor {}
+impl DataProcessor for MvtProcessor {
+    type Input = Bytes;
+    type Output = MvtTile;
+    type Context = ();
+
+    fn process(
+        &self,
+        input: Self::Input,
+        _context: Self::Context,
+    ) -> Result<Self::Output, GalileoError> {
+        Ok(MvtTile::decode(input, false)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ids_are_unique() {
+        let id1 = VtStyleId::next_id();
+        let id2 = VtStyleId::next_id();
+        let id3 = VtStyleId::next_id();
+
+        assert_ne!(id1, id2);
+        assert_ne!(id2, id3);
+        assert_ne!(id1, id3);
+    }
 }

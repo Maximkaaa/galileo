@@ -2,13 +2,17 @@ use crate::layer::data_provider::{
     FileCacheController, UrlDataProvider, UrlImageProvider, UrlSource,
 };
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::layer::vector_tile_layer::tile_provider::ThreadedProvider;
+use crate::layer::vector_tile_layer::tile_provider::loader::WebVtLoader;
+use crate::layer::vector_tile_layer::tile_provider::processor::ThreadVtProcessor;
+use crate::layer::vector_tile_layer::tile_provider::{ThreadedProvider, VectorTileProvider};
 use crate::layer::{RasterTileLayer, VectorTileLayer};
+use crate::platform::{PlatformService, PlatformServiceImpl};
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
 use crate::render::render_bundle::{RenderBundle, RenderBundleType};
 use crate::tile_scheme::TileIndex;
 use crate::{MapBuilder, TileSchema};
 use galileo_types::geo::impls::GeoPoint2d;
+use std::sync::Arc;
 
 impl MapBuilder {
     /// Creates a new instance.
@@ -54,32 +58,31 @@ impl MapBuilder {
     }
 
     /// Create a new vector tile layer.
-    pub fn create_vector_tile_layer(
+    pub async fn create_vector_tile_layer(
         tile_source: impl UrlSource<TileIndex> + 'static,
-        tile_scheme: TileSchema,
+        tile_schema: TileSchema,
         style: VectorTileStyle,
-    ) -> VectorTileLayer<
-        ThreadedProvider<
-            UrlDataProvider<
-                TileIndex,
-                crate::layer::vector_tile_layer::tile_provider::VtProcessor,
-                FileCacheController,
-            >,
-        >,
-    > {
-        let tile_provider = ThreadedProvider::new(
-            None,
-            tile_scheme.clone(),
-            UrlDataProvider::new_cached(
-                tile_source,
-                crate::layer::vector_tile_layer::tile_provider::VtProcessor {},
-                FileCacheController::new(".tile_cache"),
-            ),
+    ) -> VectorTileLayer<WebVtLoader<FileCacheController>, ThreadVtProcessor> {
+        let tile_provider = Self::create_vector_tile_provider(tile_source, tile_schema.clone());
+        VectorTileLayer::from_url(tile_provider, style, tile_schema).await
+    }
+
+    pub fn create_vector_tile_provider(
+        tile_source: impl UrlSource<TileIndex> + 'static,
+        tile_schema: TileSchema,
+    ) -> VectorTileProvider<WebVtLoader<FileCacheController>, ThreadVtProcessor> {
+        let loader = WebVtLoader::new(
+            PlatformServiceImpl::new(),
+            FileCacheController::new(".tile_cache"),
+            tile_source,
+        );
+        let processor = ThreadVtProcessor::new(
+            tile_schema,
             RenderBundle(RenderBundleType::Tessellating(
                 TessellatingRenderBundle::new(),
             )),
         );
 
-        VectorTileLayer::from_url(tile_provider, style, tile_scheme)
+        VectorTileProvider::new(Arc::new(loader), Arc::new(processor))
     }
 }

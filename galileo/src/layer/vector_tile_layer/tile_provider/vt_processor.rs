@@ -40,7 +40,9 @@ impl DataProcessor for VtProcessor {
         input: Self::Input,
         context: Self::Context,
     ) -> Result<Self::Output, GalileoError> {
+        let start = std::time::Instant::now();
         let mvt_tile = MvtTile::decode(input, false)?;
+        let mvt_decoded_in = start.elapsed();
         let VectorTileDecodeContext {
             mut bundle,
             index,
@@ -48,13 +50,20 @@ impl DataProcessor for VtProcessor {
             tile_schema: tile_scheme,
         } = context;
         Self::prepare(&mvt_tile, &mut bundle, index, &style, &tile_scheme)?;
+        let prerendered_in = start.elapsed() - mvt_decoded_in;
+
+        log::info!(
+            "Decoded tile in {} ms, prerendered in {} ms",
+            mvt_decoded_in.as_millis(),
+            prerendered_in.as_millis()
+        );
 
         Ok((bundle, mvt_tile))
     }
 }
 
 impl VtProcessor {
-    fn prepare(
+    pub fn prepare(
         mvt_tile: &MvtTile,
         bundle: &mut RenderBundle,
         index: TileIndex,

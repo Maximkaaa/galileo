@@ -198,17 +198,6 @@
     }
   ],
   "default_symbol": {
-    "point": {
-      "shape": {
-        "type": "Label",
-        "text": "{name}",
-        "style": {
-          "font_name": "Noto Sans",
-          "font_size": 14
-        }
-      },
-      "offset": [0, 0]
-    },
     "line": {
       "stroke_color": "#00000010",
       "width": 1.0

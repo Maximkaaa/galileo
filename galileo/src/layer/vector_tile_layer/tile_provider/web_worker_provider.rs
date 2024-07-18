@@ -6,7 +6,7 @@ use crate::layer::vector_tile_layer::tile_provider::vt_processor::{
     VectorTileDecodeContext, VtProcessor,
 };
 use crate::layer::vector_tile_layer::tile_provider::{
-    LockedTileStore, TileState, UnpackedVectorTile, VectorTileProvider,
+    LockedTileStore, TileState, UnpackedVectorTile, VectorTileProviderT,
 };
 use crate::messenger::Messenger;
 use crate::render::render_bundle::tessellating::serialization::TessellatingRenderBundleBytes;
@@ -40,7 +40,7 @@ struct WorkerState {
     is_ready: bool,
 }
 
-impl VectorTileProvider for WebWorkerVectorTileProvider {
+impl VectorTileProviderT for WebWorkerVectorTileProvider {
     fn load_tile(&self, index: TileIndex, style: &VectorTileStyle) {
         self.load(index, style.clone())
     }

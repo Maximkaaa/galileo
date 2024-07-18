@@ -3,7 +3,7 @@ use crate::layer::data_provider::DataProvider;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::vt_processor::VectorTileDecodeContext;
 use crate::layer::vector_tile_layer::tile_provider::{
-    LockedTileStore, TileState, UnpackedVectorTile, VectorTileProvider,
+    LockedTileStore, TileState, UnpackedVectorTile, VectorTileProviderT,
 };
 use crate::messenger::Messenger;
 use crate::render::render_bundle::RenderBundle;
@@ -47,7 +47,7 @@ where
     }
 }
 
-impl<Provider> VectorTileProvider for ThreadedProvider<Provider>
+impl<Provider> VectorTileProviderT for ThreadedProvider<Provider>
 where
     Provider: DataProvider<TileIndex, (RenderBundle, MvtTile), VectorTileDecodeContext>
         + MaybeSend

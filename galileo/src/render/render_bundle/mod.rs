@@ -31,6 +31,19 @@ impl RenderBundle {
         }
     }
 
+    /// Sets the value for `approx_buffer_size`.
+    ///
+    /// This can be useful for better memory management when used buffers size cannot be calculated
+    /// properly.
+    ///
+    /// Note, that consequent changes to the bundle will change the given value as if it was the
+    /// calculated one.
+    pub fn set_approx_buffer_size(&mut self, size: usize) {
+        match &mut self.0 {
+            RenderBundleType::Tessellating(inner) => inner.set_approx_buffer_size(size),
+        }
+    }
+
     /// Set the clip area for drawing. Only primitives inside the clipped area will be displayed after rendering.
     pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly)
     where
