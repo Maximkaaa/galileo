@@ -4,9 +4,6 @@ use galileo_mvt::error::GalileoMvtError;
 use std::io::Error;
 use thiserror::Error;
 
-#[cfg(not(target_arch = "wasm32"))]
-use image::ImageError;
-
 /// Galileo error type.
 #[derive(Debug, Error, Clone)]
 pub enum GalileoError {

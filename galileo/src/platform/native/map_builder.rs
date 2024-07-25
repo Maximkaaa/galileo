@@ -1,10 +1,8 @@
-use crate::layer::data_provider::{
-    FileCacheController, UrlDataProvider, UrlImageProvider, UrlSource,
-};
+use crate::layer::data_provider::{FileCacheController, UrlImageProvider, UrlSource};
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::loader::WebVtLoader;
 use crate::layer::vector_tile_layer::tile_provider::processor::ThreadVtProcessor;
-use crate::layer::vector_tile_layer::tile_provider::{ThreadedProvider, VectorTileProvider};
+use crate::layer::vector_tile_layer::tile_provider::VectorTileProvider;
 use crate::layer::{RasterTileLayer, VectorTileLayer};
 use crate::platform::{PlatformService, PlatformServiceImpl};
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;

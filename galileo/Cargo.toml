@@ -46,7 +46,7 @@ futures-intrusive = "0.5"
 geojson = { version = "0.24", optional = true }
 raw-window-handle = { version = "0.6", optional = true }
 static_init = "1.0"
-cosmic-text = { version = "0.11", optional = true }
+cosmic-text = { version = "0.12", optional = true }
 base64 = "0.21"
 strfmt = "0.2"
 ahash = "0.8"

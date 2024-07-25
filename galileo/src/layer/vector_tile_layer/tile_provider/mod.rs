@@ -6,21 +6,13 @@ use crate::messenger::Messenger;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{Canvas, PackedBundle};
 use crate::tile_scheme::TileIndex;
-use bytes::Bytes;
-use futures::future::Shared;
-use futures::FutureExt;
 use galileo_mvt::MvtTile;
 use loader::VectorTileLoader;
 use maybe_sync::{AtomicU32, MaybeSend, MaybeSync};
 use processor::VectorTileProcessor;
 use quick_cache::unsync::Cache;
-use std::collections::HashMap;
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex, MutexGuard, RwLock};
-use std::task::{Context, Poll, Waker};
-use tokio::sync::OnceCell;
+use std::sync::{Arc, MutexGuard, RwLock};
 
 #[cfg(target_arch = "wasm32")]
 mod web_worker_provider;
@@ -37,35 +29,15 @@ pub mod processor;
 mod tile_store;
 mod vt_processor;
 
-use crate::error::GalileoError;
-use crate::layer::data_provider::{DataProcessor, DataProvider, UrlDataProvider};
 use crate::layer::vector_tile_layer::tile_provider::tile_store::{
     MvtTileState, PreparedTileState, TileStore,
 };
-use crate::platform::{PlatformService, PlatformServiceImpl};
-
 pub use vt_processor::{VectorTileDecodeContext, VtProcessor};
-
-mod platform {
-    use cfg_if::cfg_if;
-
-    cfg_if! {
-        if #[cfg(target_arch = "wasm32")] {
-            mod web;
-            use web::*;
-        } else {
-            mod native;
-            pub use native::*;
-        }
-    }
-}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct VtStyleId(u32);
 
 impl VtStyleId {
-    const INVALID: Self = Self(u32::MAX);
-
     fn next_id() -> Self {
         static ID: AtomicU32 = AtomicU32::new(0);
         Self(ID.fetch_add(1, Ordering::Relaxed))
@@ -318,21 +290,6 @@ enum TileState {
     Updating(VectorTile),
     Packed(VectorTile),
     Error,
-}
-
-struct MvtProcessor {}
-impl DataProcessor for MvtProcessor {
-    type Input = Bytes;
-    type Output = MvtTile;
-    type Context = ();
-
-    fn process(
-        &self,
-        input: Self::Input,
-        _context: Self::Context,
-    ) -> Result<Self::Output, GalileoError> {
-        Ok(MvtTile::decode(input, false)?)
-    }
 }
 
 #[cfg(test)]

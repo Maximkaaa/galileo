@@ -15,9 +15,7 @@ pub use vector_tile::VectorTile;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::loader::VectorTileLoader;
 use crate::layer::vector_tile_layer::tile_provider::processor::VectorTileProcessor;
-use crate::layer::vector_tile_layer::tile_provider::{
-    VectorTileProvider, VectorTileProviderT, VtStyleId,
-};
+use crate::layer::vector_tile_layer::tile_provider::{VectorTileProvider, VtStyleId};
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, PackedBundle, RenderOptions};

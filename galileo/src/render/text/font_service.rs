@@ -1,3 +1,4 @@
+use crate::render::text::cosmic_text::CosmicTextProvider;
 use crate::render::text::{FontServiceProvider, TextShaping, TextStyle};
 use cosmic_text::rustybuzz::ttf_parser::FaceParsingError;
 use maybe_sync::{MaybeSend, MaybeSync};
@@ -19,6 +20,14 @@ pub enum FontServiceError {
 
 pub struct FontService {
     pub(crate) provider: Box<dyn FontServiceProvider + MaybeSync + MaybeSend>,
+}
+
+impl Default for FontService {
+    fn default() -> Self {
+        Self {
+            provider: Box::new(CosmicTextProvider::new()),
+        }
+    }
 }
 
 impl FontService {

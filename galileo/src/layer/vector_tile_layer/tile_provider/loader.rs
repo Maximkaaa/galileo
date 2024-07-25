@@ -5,9 +5,8 @@ use crate::tile_scheme::TileIndex;
 use bytes::Bytes;
 use galileo_mvt::MvtTile;
 use maybe_sync::{MaybeSend, MaybeSync};
-use reqwest::Client;
 
-pub(super) enum TileLoadError {
+pub enum TileLoadError {
     Network,
     DoesNotExist,
     Decoding,

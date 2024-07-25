@@ -8,8 +8,8 @@ use crate::Color;
 use galileo_types::cartesian::Size;
 use maybe_sync::{MaybeSend, MaybeSync};
 use render_bundle::RenderBundle;
-use std::any::Any;
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 
 #[cfg(feature = "wgpu")]
 mod wgpu;
@@ -23,10 +23,6 @@ pub mod text;
 /// Id of a rendering primitive
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct PrimitiveId(usize);
-
-pub(crate) trait Renderer: MaybeSend + MaybeSync {
-    fn as_any(&self) -> &dyn Any;
-}
 
 /// Canvas that a layer can be rendered to.
 ///

@@ -1,9 +1,5 @@
-use crate::render::text::font_service::FontServiceError;
-use crate::render::text::{
-    FontService, FontServiceProvider, TessellatedGlyph, TextShaping, TextStyle,
-};
 use cosmic_text::rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
-use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, SwashCache};
+use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping};
 use lyon::lyon_tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor, VertexBuffers,
 };
@@ -11,16 +7,17 @@ use lyon::path::path::Builder;
 use lyon::path::Path;
 use nalgebra::Vector2;
 
+use crate::render::text::font_service::FontServiceError;
+use crate::render::text::{FontServiceProvider, TessellatedGlyph, TextShaping, TextStyle};
+
 pub struct CosmicTextProvider {
     font_system: FontSystem,
-    swash_cache: SwashCache,
 }
 
 impl CosmicTextProvider {
     pub fn new() -> Self {
         Self {
             font_system: FontSystem::new(),
-            swash_cache: SwashCache::new(),
         }
     }
 }
@@ -38,15 +35,14 @@ impl FontServiceProvider for CosmicTextProvider {
         let attrs = Attrs::new();
         let attrs = attrs.family(Family::Name(&style.font_name));
 
+        // This will hang debug build for 40 seconds: "包头市 ᠪᠤᠭᠤᠲᠤ"
+
         buffer
             .borrow_with(&mut self.font_system)
             .set_text(text, attrs, Shaping::Advanced);
         buffer
             .borrow_with(&mut self.font_system)
-            .shape_until_scroll(true);
-        buffer
-            .borrow_with(&mut self.font_system)
-            .set_size(2048.0, 2048.0);
+            .set_size(Some(2048.0), Some(2048.0));
 
         let mut tessellations = vec![];
         for run in buffer.layout_runs() {
@@ -151,13 +147,5 @@ impl FillVertexConstructor<[f32; 2]> for GlyphVertexConstructor {
             vertex.position().x + self.offset.x,
             vertex.position().y + self.offset.y,
         ]
-    }
-}
-
-impl Default for FontService {
-    fn default() -> Self {
-        Self {
-            provider: Box::new(CosmicTextProvider::new()),
-        }
     }
 }

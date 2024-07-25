@@ -10,7 +10,7 @@ use crate::render::render_bundle::RenderBundle;
 use crate::tile_scheme::TileIndex;
 use crate::TileSchema;
 
-pub(super) enum TileProcessingError {
+pub enum TileProcessingError {
     InvalidStyle,
     Rendering,
 }
