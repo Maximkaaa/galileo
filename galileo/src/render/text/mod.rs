@@ -1,4 +1,5 @@
 use crate::Color;
+use bytes::Bytes;
 use nalgebra::Vector2;
 use serde::{Deserialize, Serialize};
 
@@ -9,8 +10,11 @@ use crate::render::text::font_service::FontServiceError;
 pub use error::TextShapingError;
 pub(crate) use font_service::FontService;
 
-#[cfg(feature = "cosmic-text")]
-mod cosmic_text;
+// #[cfg(feature = "cosmic-text")]
+// mod cosmic_text;
+
+#[cfg(feature = "rustybuzz")]
+mod rustybuzz;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextStyle {
@@ -56,9 +60,11 @@ pub(crate) struct TessellatedGlyph {
 
 pub trait FontServiceProvider {
     fn shape(
-        &mut self,
+        &self,
         text: &str,
         style: &TextStyle,
         offset: Vector2<f32>,
     ) -> Result<TextShaping, FontServiceError>;
+
+    fn load_fonts(&mut self, fonts_data: Bytes) -> Result<(), FontServiceError>;
 }

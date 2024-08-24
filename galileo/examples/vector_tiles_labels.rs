@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use galileo::layer::vector_tile_layer::style::{VectorTileStyle, VectorTileSymbol};
 #[cfg(target_arch = "wasm32")]
 use galileo::layer::vector_tile_layer::tile_provider::WebWorkerVectorTileProvider;
@@ -8,6 +9,7 @@ use galileo::layer::{
     vector_tile_layer::tile_provider::{ThreadedProvider, VtProcessor},
 };
 use galileo::render::point_paint::PointPaint;
+use galileo::render::text::font_service::FontService;
 use galileo::render::text::TextStyle;
 use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Color, Lod, MapBuilder};
@@ -39,6 +41,13 @@ async fn main() {
 }
 
 pub async fn run(builder: MapBuilder, style: VectorTileStyle) {
+    FontService::with_mut(|service| {
+        let font = include_bytes!("data/NotoSansAdlam-Regular.ttf");
+        service
+            .load_fonts(Bytes::from_static(font))
+            .expect("failed to load font");
+    });
+
     let tile_provider = MapBuilder::create_vector_tile_provider(
         |&index: &TileIndex| {
             format!(
@@ -56,10 +65,10 @@ pub async fn run(builder: MapBuilder, style: VectorTileStyle) {
         rules: vec![],
         default_symbol: VectorTileSymbol {
             point: Some(PointPaint::label_owed(
-                "{name}".into(),
+                "{name_en}".into(),
                 TextStyle {
                     font_name: "Noto Sans".to_string(),
-                    font_size: 18.0,
+                    font_size: 12.0,
                     font_color: Color::BLACK,
                     horizontal_alignment: Default::default(),
                     vertical_alignment: Default::default(),

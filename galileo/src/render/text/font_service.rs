@@ -1,14 +1,16 @@
-use crate::render::text::cosmic_text::CosmicTextProvider;
+use crate::render::text::rustybuzz::RustybuzzFontServiceProvider;
 use crate::render::text::{FontServiceProvider, TextShaping, TextStyle};
-use cosmic_text::rustybuzz::ttf_parser::FaceParsingError;
+use bytes::Bytes;
+use lazy_static::lazy_static;
 use maybe_sync::{MaybeSend, MaybeSync};
 use nalgebra::Vector2;
-use static_init::dynamic;
+use rustybuzz::ttf_parser::FaceParsingError;
 use std::sync::{Arc, RwLock};
 use thiserror::Error;
 
-#[dynamic]
-static INSTANCE: Arc<RwLock<FontService>> = Arc::new(RwLock::new(FontService::default()));
+lazy_static! {
+    static ref INSTANCE: Arc<RwLock<FontService>> = Arc::new(RwLock::new(FontService::default()));
+}
 
 #[derive(Debug, Error)]
 pub enum FontServiceError {
@@ -25,7 +27,7 @@ pub struct FontService {
 impl Default for FontService {
     fn default() -> Self {
         Self {
-            provider: Box::new(CosmicTextProvider::new()),
+            provider: Box::new(RustybuzzFontServiceProvider::default()),
         }
     }
 }
@@ -44,11 +46,15 @@ impl FontService {
     }
 
     pub fn shape(
-        &mut self,
+        &self,
         text: &str,
         style: &TextStyle,
         offset: Vector2<f32>,
     ) -> Result<TextShaping, FontServiceError> {
         self.provider.shape(text, style, offset)
+    }
+
+    pub fn load_fonts(&mut self, fonts_data: Bytes) -> Result<(), FontServiceError> {
+        self.provider.load_fonts(fonts_data)
     }
 }

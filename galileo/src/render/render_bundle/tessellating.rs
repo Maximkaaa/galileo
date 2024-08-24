@@ -951,7 +951,7 @@ impl TessellatingRenderBundle {
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
-        FontService::with_mut(
+        FontService::with(
             |font_service| match font_service.shape(text, style, offset) {
                 Ok(TextShaping::Tessellation { glyphs, .. }) => {
                     let indices_start = self.screen_ref.indices.len();
