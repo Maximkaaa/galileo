@@ -199,7 +199,10 @@ where
             .iter_points()
             .map(|p| projection.project(p))
             .collect::<Option<Vec<Proj::OutPoint>>>()?;
-        Some(Geom::Contour(crate::impls::Contour::new(points, true)))
+        Some(Geom::Contour(crate::impls::Contour::new(
+            points,
+            self.is_closed(),
+        )))
     }
 }
 
