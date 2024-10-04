@@ -129,6 +129,16 @@ impl WgpuRenderer {
         })
     }
 
+    /// Creates a new wgpu renderer with provided Device and Queue
+    pub fn new_with_device(device: Arc<Device>, queue: Arc<Queue>) -> Self {
+        Self {
+            device,
+            queue,
+            render_set: None,
+            background: DEFAULT_BACKGROUND,
+        }
+    }
+
     /// Creates a new wgpu renderer that renders the map to an image buffer of the given size.
     ///
     /// Returns `None` if a device adapter cannot be acquired.
@@ -139,7 +149,22 @@ impl WgpuRenderer {
         Some(renderer)
     }
 
-    fn init_target_texture(&mut self, size: Size<u32>) {
+    /// Creates a new wgpu renderer that renders the map to an image buffer on the given device of the given size.
+    ///
+    /// Returns `None` if a device adapter cannot be acquired.
+    pub async fn new_with_device_and_texture_rt(
+        device: Arc<Device>,
+        queue: Arc<Queue>,
+        size: Size<u32>,
+    ) -> Option<Self> {
+        let mut renderer = Self::new_with_device(device, queue);
+        renderer.init_target_texture(size);
+
+        Some(renderer)
+    }
+
+    /// Re-initializes the renderer with a target texture of the given size.
+    pub fn init_target_texture(&mut self, size: Size<u32>) {
         let target_texture = Self::create_target_texture(&self.device, size);
         let render_target = RenderTarget::Texture(target_texture, size);
         self.init_renderer_targets(render_target);
