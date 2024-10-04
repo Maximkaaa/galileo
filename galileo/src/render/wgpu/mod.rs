@@ -152,7 +152,7 @@ impl WgpuRenderer {
     /// Creates a new wgpu renderer that renders the map to an image buffer on the given device of the given size.
     ///
     /// Returns `None` if a device adapter cannot be acquired.
-    pub async fn new_with_device_and_texture_rt(
+    pub fn new_with_device_and_texture_rt(
         device: Arc<Device>,
         queue: Arc<Queue>,
         size: Size<u32>,
@@ -657,6 +657,18 @@ impl WgpuRenderer {
         texture.present();
 
         Ok(())
+    }
+
+    /// Get a wgpu::TextureView of the render target
+    pub fn texture_view(&self) -> Option<TextureView> {
+        Some(
+            self.render_set
+                .as_ref()?
+                .render_target
+                .texture()
+                .ok()?
+                .view(),
+        )
     }
 
     fn render_map(&self, map: &Map, texture_view: &TextureView) {
