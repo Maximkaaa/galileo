@@ -85,7 +85,8 @@ impl UserEventHandler for MapController {
 }
 
 impl MapController {
-    fn get_zoom(&self, delta: f64, current_resolution: f64) -> f64 {
+    /// Get the zoom factor for a certain drag delta
+    pub fn get_zoom(&self, delta: f64, current_resolution: f64) -> f64 {
         let zoom = (self.parameters.zoom_speed + 1.0).powf(-delta);
         let target_resolution = current_resolution * zoom;
         if target_resolution > self.parameters.max_resolution {
@@ -97,7 +98,8 @@ impl MapController {
         }
     }
 
-    fn get_rotation(&self, curr_view: &MapView, px_delta: Vector2) -> MapView {
+    /// Rotate a `MapView` according to the mouse delta
+    pub fn get_rotation(&self, curr_view: &MapView, px_delta: Vector2) -> MapView {
         let dz = px_delta.dx() * self.parameters.rotation_speed;
 
         let rotation_z = curr_view.rotation_z() + dz;

@@ -338,7 +338,7 @@ impl MapView {
         }
     }
 
-    pub(crate) fn zoom(&self, zoom: f64, base_point: Point2) -> Self {
+    pub fn zoom(&self, zoom: f64, base_point: Point2) -> Self {
         let base_point = self.screen_to_map(base_point);
         let resolution = self.resolution * zoom;
 
@@ -358,7 +358,7 @@ impl MapView {
         }
     }
 
-    pub(crate) fn interpolate(&self, target: &MapView, k: f64) -> Self {
+    pub fn interpolate(&self, target: &MapView, k: f64) -> Self {
         let Some(source_position) = self.projected_position else {
             return self.clone();
         };
