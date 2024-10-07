@@ -643,17 +643,15 @@ impl WgpuRenderer {
         self.render_map(map, view);
     }
 
-    /// Renders the map.
+    /// Renders the map. `render_texture` and always present
     pub fn render(&self, map: &Map) -> Result<(), SurfaceError> {
-        self.render_texture(map)?;
-
-        texture.present();
+        self.render_texture(map, true)?;
 
         Ok(())
     }
 
-    /// Renders the map but doesn't present.
-    pub fn render_texture(&self, map: &Map) -> Result<(), SurfaceError> {
+    /// Renders the map and optionally present
+    pub fn render_texture(&self, map: &Map, present: bool) -> Result<(), SurfaceError> {
         let Some(renderer_targets) = &self.renderer_targets else {
             return Ok(());
         };
@@ -662,6 +660,10 @@ impl WgpuRenderer {
         let view = texture.view();
 
         self.render_to_texture_view(map, &view);
+
+        if present {
+            texture.present();
+        }
 
         Ok(())
     }
