@@ -130,11 +130,11 @@ impl WgpuRenderer {
     }
 
     /// Creates a new wgpu renderer with provided Device and Queue
-    pub fn new_with_device(device: Arc<Device>, queue: Arc<Queue>) -> Self {
+    pub fn new_with_device(device: Device, queue: Queue) -> Self {
         Self {
             device,
             queue,
-            render_set: None,
+            renderer_targets: None,
             background: DEFAULT_BACKGROUND,
         }
     }
@@ -153,8 +153,8 @@ impl WgpuRenderer {
     ///
     /// Returns `None` if a device adapter cannot be acquired.
     pub fn new_with_device_and_texture_rt(
-        device: Arc<Device>,
-        queue: Arc<Queue>,
+        device: Device,
+        queue: Queue,
         size: Size<u32>,
     ) -> Option<Self> {
         let mut renderer = Self::new_with_device(device, queue);
@@ -671,7 +671,7 @@ impl WgpuRenderer {
     /// Get a wgpu::TextureView of the render target
     pub fn texture_view(&self) -> Option<TextureView> {
         Some(
-            self.render_set
+            self.renderer_targets
                 .as_ref()?
                 .render_target
                 .texture()

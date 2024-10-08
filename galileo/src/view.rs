@@ -4,6 +4,7 @@ use galileo_types::cartesian::{
 use galileo_types::geo::impls::GeoPoint2d;
 use galileo_types::geo::{Crs, GeoPoint};
 use nalgebra::{Matrix4, OMatrix, Perspective3, Rotation3, Scale3, Translation3, U4};
+use serde::{Deserialize, Serialize};
 
 /// Map view specifies the area of the map that should be drawn. In other words, it sets the position of "camera" that
 /// looks at the map.
@@ -17,7 +18,7 @@ use nalgebra::{Matrix4, OMatrix, Perspective3, Rotation3, Scale3, Translation3, 
 ///   drawn.
 ///
 /// The view can also specify rotation along *x* (tilt) and *z* (rotation) axis.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MapView {
     projected_position: Option<Point3<f64>>,
     resolution: f64,
@@ -335,6 +336,20 @@ impl MapView {
                 crs: self.crs.clone(),
                 ..*self
             },
+        }
+    }
+
+    /// Move the view to the given Coordinates
+    pub fn translate_to(&self, position: &impl GeoPoint<Num = f64>) -> Self {
+        let projected_position = self
+            .crs
+            .get_projection()
+            .and_then(|projection| projection.project(&GeoPoint2d::from(position)))
+            .map(|p: Point2| Point3::new(p.x(), p.y(), 0.0));
+        Self {
+            projected_position,
+            crs: self.crs.clone(),
+            ..*self
         }
     }
 

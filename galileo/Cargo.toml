@@ -11,9 +11,6 @@ description = "Cross-platform general purpose map rendering engine"
 readme = "../README.md"
 exclude = ["examples/data"]
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [features]
 default = ["wgpu", "serde", "winit", "_tests", "rustybuzz", "image"]
 wgpu = ["dep:wgpu", "raw-window-handle"]
