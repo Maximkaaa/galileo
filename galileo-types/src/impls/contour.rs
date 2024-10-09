@@ -11,6 +11,19 @@ pub struct Contour<Point> {
     is_closed: bool,
 }
 
+impl<Point> std::ops::Deref for Contour<Point> {
+    type Target = Vec<Point>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.points
+    }
+}
+impl<Point> std::ops::DerefMut for Contour<Point> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.points
+    }
+}
+
 impl<Point> Contour<Point> {
     /// Creates a new contour.
     pub fn new(points: Vec<Point>, is_closed: bool) -> Self {
@@ -59,20 +72,6 @@ impl<Point> Contour<Point> {
             points,
             is_closed: self.is_closed,
         })
-    }
-
-    pub fn get<I>(&self, index: I) -> Option<&I::Output>
-    where
-        I: std::slice::SliceIndex<[Point]>,
-    {
-        self.points.get(index)
-    }
-
-    pub fn get_mut<I>(&mut self, index: I) -> Option<&mut I::Output>
-    where
-        I: std::slice::SliceIndex<[Point]>,
-    {
-        self.points.get_mut(index)
     }
 }
 
@@ -140,18 +139,4 @@ impl<P: GeometryType> GeometryType for Contour<P> {
 impl<P: GeometryType> GeometryType for ClosedContour<P> {
     type Type = ContourGeometryType;
     type Space = P::Space;
-}
-
-impl<Point> Index<usize> for Contour<Point> {
-    type Output = Point;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.points[index]
-    }
-}
-
-impl<Point> IndexMut<usize> for Contour<Point> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.points[index]
-    }
 }
