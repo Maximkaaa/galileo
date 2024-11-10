@@ -106,6 +106,20 @@ impl Lifecycle<(TileIndex, VtStyleId), TileStoreEntry> for TileStoreLc {
 }
 
 impl TileStore {
+    #[allow(dead_code)]
+    pub fn with_capacity(bytes_size: usize) -> Self {
+        Self {
+            processed: Cache::with(
+                bytes_size / AVG_TILE_SIZE,
+                bytes_size as u64,
+                TileWeighter,
+                DefaultHashBuilder::default(),
+                TileStoreLc,
+            ),
+            ..Self::default()
+        }
+    }
+
     pub fn contains(&self, tile_index: TileIndex, style_id: VtStyleId) -> bool {
         self.processed.peek(&(tile_index, style_id)).is_some()
     }
@@ -221,14 +235,6 @@ mod tests {
         bundle.set_approx_buffer_size(size);
 
         bundle
-    }
-
-    fn mvt_tile() -> Arc<MvtTile> {
-        Arc::new(MvtTile { layers: vec![] })
-    }
-
-    fn test_store() -> TileStore {
-        TileStore::with_capacity(1_000_000)
     }
 
     fn tile_with_size(size: u64) -> PreparedTileState {

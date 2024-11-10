@@ -3,11 +3,6 @@ use galileo::layer::vector_tile_layer::style::{VectorTileStyle, VectorTileSymbol
 #[cfg(target_arch = "wasm32")]
 use galileo::layer::vector_tile_layer::tile_provider::WebWorkerVectorTileProvider;
 use galileo::layer::vector_tile_layer::VectorTileLayer;
-#[cfg(not(target_arch = "wasm32"))]
-use galileo::layer::{
-    data_provider::{FileCacheController, UrlDataProvider},
-    vector_tile_layer::tile_provider::{ThreadedProvider, VtProcessor},
-};
 use galileo::render::point_paint::PointPaint;
 use galileo::render::text::font_service::FontService;
 use galileo::render::text::TextStyle;
@@ -16,10 +11,6 @@ use galileo::{Color, Lod, MapBuilder};
 use galileo_types::cartesian::Point2d;
 use galileo_types::cartesian::Rect;
 use galileo_types::geo::Crs;
-
-#[cfg(not(target_arch = "wasm32"))]
-type VectorTileProvider =
-    ThreadedProvider<UrlDataProvider<TileIndex, VtProcessor, FileCacheController>>;
 
 #[cfg(target_arch = "wasm32")]
 type VectorTileProvider = WebWorkerVectorTileProvider;
@@ -48,11 +39,15 @@ pub async fn run(builder: MapBuilder, style: VectorTileStyle) {
             .expect("failed to load font");
     });
 
+    // You can get your fee API key at https://maptiler.com
+    let api_key = std::env!("VT_API_KEY");
     let tile_provider = MapBuilder::create_vector_tile_provider(
-        |&index: &TileIndex| {
+        move |&index: &TileIndex| {
             format!(
-                "https://d1zqyi8v6vm8p9.cloudfront.net/planet/{}/{}/{}.mvt",
-                index.z, index.x, index.y
+                "https://api.maptiler.com/tiles/v3-openmaptiles/{z}/{x}/{y}.pbf?key={api_key}",
+                z = index.z,
+                x = index.x,
+                y = index.y
             )
         },
         tile_schema(),

@@ -68,7 +68,9 @@ impl CartesianGeometry2d<Point2d> for Country {
 pub struct City {
     lat: f64,
     lng: f64,
+    #[allow(dead_code)]
     pub capital: String,
+    #[allow(dead_code)]
     pub population: f64,
 }
 

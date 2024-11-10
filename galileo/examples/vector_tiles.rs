@@ -1,27 +1,16 @@
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
-use galileo::layer::vector_tile_layer::tile_provider::loader::WebVtLoader;
-use galileo::layer::vector_tile_layer::VectorTileLayer;
 use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Lod, MapBuilder};
 use galileo_types::cartesian::Point2d;
 use galileo_types::cartesian::Rect;
 use galileo_types::geo::Crs;
 use std::sync::{Arc, RwLock};
-use tokio::sync::OnceCell;
-
-#[cfg(not(target_arch = "wasm32"))]
-use galileo::layer::data_provider::FileCacheController;
-#[cfg(not(target_arch = "wasm32"))]
-use galileo::platform::native::vt_processor::ThreadVtProcessor;
 
 #[cfg(target_arch = "wasm32")]
 use galileo::layer::data_provider::dummy::DummyCacheController;
 #[cfg(target_arch = "wasm32")]
 use galileo::platform::web::vt_processor::WebWorkerVtProcessor;
-
-#[cfg(not(target_arch = "wasm32"))]
-type VtLayer = VectorTileLayer<WebVtLoader<FileCacheController>, ThreadVtProcessor>;
 
 #[cfg(target_arch = "wasm32")]
 type VtLayer = VectorTileLayer<WebVtLoader<DummyCacheController>, WebWorkerVtProcessor>;
