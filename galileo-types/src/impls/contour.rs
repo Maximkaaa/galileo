@@ -3,7 +3,7 @@ use crate::geometry_type::{ContourGeometryType, GeometryType};
 use serde::{Deserialize, Serialize};
 
 /// Simple [`crate::Contour`] implementation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]
 pub struct Contour<Point> {
     points: Vec<Point>,
     is_closed: bool,
@@ -61,7 +61,7 @@ impl<Point> Contour<Point> {
 }
 
 /// Closed contour implementation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]
 pub struct ClosedContour<Point> {
     /// Points of the contour.
     pub points: Vec<Point>,

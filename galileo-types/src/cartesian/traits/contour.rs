@@ -1,6 +1,7 @@
 use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
 use crate::contour::{ClosedContour, Contour};
 use num_traits::{One, Zero};
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::Debug;
 
@@ -63,7 +64,7 @@ where
 }
 
 /// [Winding](https://en.wikipedia.org/wiki/Winding_number) direction of the contour.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Hash, Deserialize, Serialize)]
 pub enum Winding {
     /// Positive winding.
     Clockwise,

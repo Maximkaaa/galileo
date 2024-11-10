@@ -2,10 +2,11 @@ use crate::cartesian::NewCartesianPoint2d;
 use crate::geo::datum::Datum;
 use crate::geo::traits::point::NewGeoPoint;
 use crate::geo::traits::projection::Projection;
+use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
 /// Web Mercator projection.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct WebMercator<In, Out> {
     datum: Datum,
     phantom_in: PhantomData<In>,

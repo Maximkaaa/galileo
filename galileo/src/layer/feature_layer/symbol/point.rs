@@ -76,7 +76,7 @@ impl ImagePointSymbol {
                 Vec::from(image.to_rgba8().deref()),
                 image.width(),
                 image.height(),
-            )),
+            )?),
             offset,
             scale,
         })

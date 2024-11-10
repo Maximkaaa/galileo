@@ -103,6 +103,7 @@ impl<P, T: ClosedContour<Point = P>> Contour for T {
 }
 
 /// Iterator of contour points.
+#[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct ContourPointsIterator<'a, P, Iter>
 where
     Iter: Iterator<Item = &'a P>,
@@ -146,6 +147,7 @@ where
 }
 
 /// Iterator of contour segements.
+#[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct ContourSegmentIterator<'a, P: 'a, Iter>
 where
     Iter: Iterator<Item = &'a P>,
@@ -197,7 +199,10 @@ where
             .iter_points()
             .map(|p| projection.project(p))
             .collect::<Option<Vec<Proj::OutPoint>>>()?;
-        Some(Geom::Contour(crate::impls::Contour::new(points, true)))
+        Some(Geom::Contour(crate::impls::Contour::new(
+            points,
+            self.is_closed(),
+        )))
     }
 }
 

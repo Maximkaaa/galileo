@@ -7,7 +7,10 @@ Cargo.lock
 # Ignore large sample files
 **/*.laz
 
-#Npm
+# Npm
 **/package-lock.json
 **/node_modules
 **/dist
+
+# ctags
+tags

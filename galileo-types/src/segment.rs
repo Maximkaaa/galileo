@@ -2,7 +2,7 @@ use crate::cartesian::{CartesianPoint2d, Orientation};
 use num_traits::{One, Zero};
 
 /// A strait line segment between two points.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Segment<'a, Point>(pub &'a Point, pub &'a Point);
 
 impl<'a, P: CartesianPoint2d> Segment<'a, P> {

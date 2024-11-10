@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Reference ellipsoid used to do calculations with geographic coordinates.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Datum {
     semimajor: f64,
     inv_flattening: f64,

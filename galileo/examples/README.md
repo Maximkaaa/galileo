@@ -186,5 +186,23 @@ You can generate an image yourself running this example
 
 </td>
 </tr>
+<tr>
+<td>
+
+[highlight_features](./highlight_features.rs)
+
+</td>
+<td>
+
+![i](https://maximkaaa.github.io/galileo/highlight_features.png)
+
+</td>
+<td>
+
+- Get and update features on cursor hover
+- Show a different pin image based on feature state
+
+</td>
+</tr>
 </tbody>
 </table>

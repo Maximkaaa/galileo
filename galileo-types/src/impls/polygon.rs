@@ -3,7 +3,7 @@ use crate::impls::contour::ClosedContour;
 use serde::{Deserialize, Serialize};
 
 /// Simple implementation of the [`Polygon`](crate::Polygon) trait.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]
 pub struct Polygon<P> {
     /// Outer contour.
     pub outer_contour: ClosedContour<P>,

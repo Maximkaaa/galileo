@@ -127,7 +127,7 @@ Check out [this example](android_examples/raster_tiles/README.md) to run Galileo
 Install the target:
 
 ```shell
-rustup target add x86_64-px-window-gnu
+rustup target add x86_64-pc-windows-gnu
 ```
 
 Install cross-linker. For Debian/Ubuntu:
@@ -139,7 +139,7 @@ sudo apt-get install mingw-w64
 And then build it:
 
 ```shell
-cargo build --target x86_64-px-windows-gnu
+cargo build --target x86_64-pc-windows-gnu
 ```
 
 # Sponsoring

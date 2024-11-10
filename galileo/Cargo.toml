@@ -52,6 +52,7 @@ base64 = "0.21"
 strfmt = "0.2"
 ahash = "0.8"
 rustybuzz = { version = "0.17", optional = true }
+geozero = "0.13.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 wgpu = { version = "0.19", optional = true }
@@ -109,7 +110,6 @@ approx = "0.5"
 geo = "0.27"
 csv = "1.3"
 geo-types = "0.7"
-geozero = "0.12"
 las = { version = "0.8", features = ["laz"] }
 anyhow = "1.0"
 geojson = "0.24"

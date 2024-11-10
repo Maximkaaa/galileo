@@ -1,3 +1,5 @@
+//! This module contains utilities for loading images to be rendered on the map.
+
 #[cfg(not(target_arch = "wasm32"))]
 use crate::error::GalileoError;
 #[cfg(not(target_arch = "wasm32"))]
@@ -6,20 +8,25 @@ use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 #[cfg(not(target_arch = "wasm32"))]
 use image::ImageEncoder;
-#[cfg(not(target_arch = "wasm32"))]
-use std::ops::Deref;
 
 use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::Formatter;
 
+/// An image that has been loaded into memory.
 #[derive(Debug, Clone)]
 pub struct DecodedImage {
+    /// Raw bytes of the image, in RGBA order.
     pub(crate) bytes: Vec<u8>,
+    /// Width and height of the image.
     pub(crate) dimensions: (u32, u32),
 }
 
 impl DecodedImage {
+    /// Decode an image from a byte slice.
+    ///
+    /// Attempts to guess the format of the image from the data. Non-RGBA images
+    /// will be converted to RGBA.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn new(bytes: &[u8]) -> Result<Self, GalileoError> {
         use image::GenericImageView;
@@ -28,26 +35,43 @@ impl DecodedImage {
         let dimensions = decoded.dimensions();
 
         Ok(Self {
-            bytes: Vec::from(bytes.deref()),
+            bytes: bytes.into_vec(),
             dimensions,
         })
     }
 
-    pub fn from_raw(bytes: Vec<u8>, width: u32, height: u32) -> Self {
-        Self {
+    /// Create a DecodedImage from a buffer of raw RGBA pixels.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn from_raw(
+        bytes: impl Into<Vec<u8>>,
+        width: u32,
+        height: u32,
+    ) -> Result<Self, GalileoError> {
+        let bytes = bytes.into();
+
+        if bytes.len() != 4 * width as usize * height as usize {
+            return Err(GalileoError::Generic(
+                "invalid image dimensions for buffer size".into(),
+            ));
+        }
+
+        Ok(Self {
             bytes,
             dimensions: (width, height),
-        }
+        })
     }
 
+    /// Return binary data of the image.
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
+    /// Return width of the image in pixels.
     pub fn width(&self) -> u32 {
         self.dimensions.0
     }
 
+    /// Return height of the image in pixels.
     pub fn height(&self) -> u32 {
         self.dimensions.1
     }

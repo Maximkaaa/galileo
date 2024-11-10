@@ -71,7 +71,7 @@
 pub(crate) mod async_runtime;
 mod color;
 pub mod control;
-pub(crate) mod decoded_image;
+pub mod decoded_image;
 pub mod error;
 pub mod layer;
 mod lod;
