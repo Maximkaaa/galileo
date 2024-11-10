@@ -8,16 +8,11 @@ use crate::render::{Canvas, PackedBundle};
 use crate::tile_scheme::TileIndex;
 use galileo_mvt::MvtTile;
 use loader::VectorTileLoader;
-use maybe_sync::{AtomicU32, MaybeSend, MaybeSync};
+use maybe_sync::{MaybeSend, MaybeSync};
 use processor::VectorTileProcessor;
 use quick_cache::unsync::Cache;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, MutexGuard, RwLock};
-
-#[cfg(target_arch = "wasm32")]
-mod web_worker_provider;
-#[cfg(target_arch = "wasm32")]
-pub use web_worker_provider::WebWorkerVectorTileProvider;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod threaded_provider;
@@ -34,6 +29,7 @@ use crate::layer::vector_tile_layer::tile_provider::tile_store::{
 };
 pub use vt_processor::{VectorTileDecodeContext, VtProcessor};
 
+/// Identifier of a vector tile style.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct VtStyleId(u32);
 
@@ -44,10 +40,11 @@ impl VtStyleId {
     }
 }
 
+/// Provider of vector tiles for a vector tile layer.
 pub struct VectorTileProvider<Loader, Processor>
 where
-    Loader: VectorTileLoader + Send + Sync + 'static,
-    Processor: VectorTileProcessor + Send + Sync + 'static,
+    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
+    Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
 {
     tiles: Arc<RwLock<TileStore>>,
     loader: Arc<Loader>,
@@ -57,8 +54,8 @@ where
 
 impl<Loader, Processor> Clone for VectorTileProvider<Loader, Processor>
 where
-    Loader: VectorTileLoader + Send + Sync + 'static,
-    Processor: VectorTileProcessor + Send + Sync + 'static,
+    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
+    Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
 {
     fn clone(&self) -> Self {
         Self {
@@ -72,9 +69,10 @@ where
 
 impl<Loader, Processor> VectorTileProvider<Loader, Processor>
 where
-    Loader: VectorTileLoader + Send + Sync + 'static,
-    Processor: VectorTileProcessor + Send + Sync + 'static,
+    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
+    Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
 {
+    /// Create a new instance of the provider.
     pub fn new(loader: Arc<Loader>, processor: Arc<Processor>) -> Self {
         Self {
             tiles: Arc::default(),
@@ -84,10 +82,12 @@ where
         }
     }
 
+    /// Return the style with the given id.
     pub fn get_style(&self, style_id: VtStyleId) -> Option<Arc<VectorTileStyle>> {
         self.processor.get_style(style_id)
     }
 
+    /// Register a new style in the provider.
     pub async fn add_style(&mut self, style: VectorTileStyle) -> VtStyleId {
         let id = VtStyleId::next_id();
         self.processor.add_style(id, style).await;
@@ -95,10 +95,14 @@ where
         id
     }
 
+    /// Removes the style from the list of registerred styles.
     pub async fn drop_style(&mut self, style_id: VtStyleId) {
         self.processor.drop_style(style_id).await;
     }
 
+    /// Load and pre-render the tile with given index using given style.
+    ///
+    /// A style with given id must first be registerred in the provider.
     pub fn load_tile(&self, index: TileIndex, style_id: VtStyleId) {
         if !self.processor.has_style(style_id) {
             log::warn!("Requested tile loading with non-existing style");
@@ -113,6 +117,8 @@ where
         {
             return;
         }
+
+        log::debug!("Loading vector tile {index:?}");
 
         let processor = self.processor.clone();
         let data_provider = self.loader.clone();
@@ -132,7 +138,12 @@ where
                 .get_or_init(|| async { Self::download(index, data_provider).await })
                 .await;
 
+            log::debug!("Tile {index:?} is loaded. Preparing.");
+
             let tile_state = Self::prepare_tile(tile_state, index, style_id, processor).await;
+
+            log::debug!("tile {index:?} is prepared.");
+
             tile_store
                 .write()
                 .expect("lock is poisoned")
@@ -144,6 +155,10 @@ where
         });
     }
 
+    /// Move the pre-renderred tile data into GPU memory.
+    ///
+    /// If any of the tiles with the given indices was not pre-renderred with the given style id,
+    /// it is just skipped.
     pub fn pack_tiles(&self, indices: &[TileIndex], style_id: VtStyleId, canvas: &dyn Canvas) {
         let mut store = self.tiles.write().expect("lock is poisoned");
         for index in indices {
@@ -159,6 +174,9 @@ where
         }
     }
 
+    /// Return render bundle for given tile.
+    ///
+    /// The tile must be packed before calling this method.
     pub fn get_tile(&self, index: TileIndex, style_id: VtStyleId) -> Option<Arc<dyn PackedBundle>> {
         self.tiles
             .read()
@@ -166,6 +184,7 @@ where
             .get_packed(index, style_id)
     }
 
+    /// Returns raw tile data for the given index.
     pub fn get_mvt_tile(&self, index: TileIndex) -> Option<Arc<MvtTile>> {
         self.tiles
             .read()
@@ -173,6 +192,7 @@ where
             .get_mvt_tile(index)
     }
 
+    /// Set messenger to use to notify about tile updates.
     pub fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
         self.messenger = Some(messenger.into());
     }

@@ -1,32 +1,30 @@
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
+use galileo::layer::vector_tile_layer::tile_provider::loader::WebVtLoader;
 use galileo::layer::vector_tile_layer::VectorTileLayer;
 use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Lod, MapBuilder};
 use galileo_types::cartesian::Point2d;
+use galileo_types::cartesian::Rect;
 use galileo_types::geo::Crs;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 use tokio::sync::OnceCell;
 
-use galileo::layer::vector_tile_layer::tile_provider::loader::WebVtLoader;
-use galileo::layer::vector_tile_layer::tile_provider::processor::ThreadVtProcessor;
 #[cfg(not(target_arch = "wasm32"))]
-use galileo::layer::{
-    data_provider::{FileCacheController, UrlDataProvider},
-    vector_tile_layer::tile_provider::{ThreadedProvider, VtProcessor},
-};
-
+use galileo::layer::data_provider::FileCacheController;
 #[cfg(not(target_arch = "wasm32"))]
-type VectorTileProvider =
-    ThreadedProvider<UrlDataProvider<TileIndex, VtProcessor, FileCacheController>>;
+use galileo::platform::native::vt_processor::ThreadVtProcessor;
 
 #[cfg(target_arch = "wasm32")]
-use galileo::layer::vector_tile_layer::tile_provider::WebWorkerVectorTileProvider;
-use galileo::render::text::font_service::FontService;
-use galileo_types::cartesian::Rect;
+use galileo::layer::data_provider::dummy::DummyCacheController;
+#[cfg(target_arch = "wasm32")]
+use galileo::platform::web::vt_processor::WebWorkerVtProcessor;
+
+#[cfg(not(target_arch = "wasm32"))]
+type VtLayer = VectorTileLayer<WebVtLoader<FileCacheController>, ThreadVtProcessor>;
 
 #[cfg(target_arch = "wasm32")]
-type VectorTileProvider = WebWorkerVectorTileProvider;
+type VtLayer = VectorTileLayer<WebVtLoader<DummyCacheController>, WebWorkerVtProcessor>;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn get_layer_style() -> Option<VectorTileStyle> {
@@ -43,29 +41,23 @@ async fn main() {
 }
 
 pub async fn run(builder: MapBuilder, style: VectorTileStyle) {
-    static LAYER: OnceCell<
-        Arc<RwLock<VectorTileLayer<WebVtLoader<FileCacheController>, ThreadVtProcessor>>>,
-    > = OnceCell::const_new();
+    // You can get your fee API key at https://maptiler.com
+    let api_key = std::env!("VT_API_KEY");
 
-    LAYER
-        .get_or_init(move || async {
-            Arc::new(RwLock::new(
-                MapBuilder::create_vector_tile_layer(
-                    |&index: &TileIndex| {
-                        format!(
-                            "https://d1zqyi8v6vm8p9.cloudfront.net/planet/{}/{}/{}.mvt",
-                            index.z, index.x, index.y
-                        )
-                    },
-                    tile_scheme(),
-                    style,
+    let layer =
+        Arc::new(RwLock::new(
+            MapBuilder::create_vector_tile_layer(
+                move |&index: &TileIndex| {
+                    format!(
+                    "https://api.maptiler.com/tiles/v3-openmaptiles/{z}/{x}/{y}.pbf?key={api_key}",
+                    z = index.z, x = index.x, y = index.y
                 )
-                .await,
-            ))
-        })
-        .await;
-
-    let layer = LAYER.get().unwrap().clone();
+                },
+                tile_scheme(),
+                style,
+            )
+            .await,
+        ));
 
     builder
         .with_layer(layer.clone())

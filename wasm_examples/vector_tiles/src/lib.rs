@@ -16,10 +16,10 @@ extern "C" {
 
 #[wasm_bindgen]
 pub fn set_style(style_json: JsValue) {
-    let str = style_json.as_string().unwrap();
-    let style = serde_json::from_str(&str).unwrap_or_else(|_| get_layer_style());
-    let layer = example::LAYER.with(|v| v.clone());
-    layer.write().unwrap().update_style(style);
+    // let str = style_json.as_string().unwrap();
+    // let style = serde_json::from_str(&str).unwrap_or_else(|_| get_layer_style());
+    // let layer = example::LAYER.with(|v| v.clone());
+    // layer.write().unwrap().update_style(style);
 }
 
 fn get_layer_style() -> VectorTileStyle {

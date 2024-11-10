@@ -82,7 +82,7 @@ impl ScreenRefVertexBuffersBytes {
 
 impl TessellatingRenderBundle {
     pub(crate) fn into_bytes(self) -> TessellatingRenderBundleBytes {
-        let converted = TessellatingRenderBundleBytes {
+        TessellatingRenderBundleBytes {
             poly_tessellation: self.poly_tessellation.into(),
             points: bytemuck::cast_vec(self.points),
             screen_ref: self.screen_ref.into(),
@@ -102,9 +102,7 @@ impl TessellatingRenderBundle {
                 .collect(),
             clip_area: self.clip_area.map(|v| v.into()),
             bundle_size: self.buffer_size,
-        };
-
-        converted
+        }
     }
 
     pub(crate) fn from_bytes_unchecked(bundle: TessellatingRenderBundleBytes) -> Self {

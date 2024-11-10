@@ -36,8 +36,14 @@ pub struct TileIndex {
 }
 
 impl TileIndex {
+    /// Create a new index instance.
     pub fn new(x: i32, y: i32, z: u32) -> Self {
-        Self { x, y, z, display_x: x }
+        Self {
+            x,
+            y,
+            z,
+            display_x: x,
+        }
     }
 }
 

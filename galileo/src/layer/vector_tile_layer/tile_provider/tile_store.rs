@@ -106,19 +106,6 @@ impl Lifecycle<(TileIndex, VtStyleId), TileStoreEntry> for TileStoreLc {
 }
 
 impl TileStore {
-    pub fn with_capacity(bytes_size: usize) -> Self {
-        Self {
-            processed: Cache::with(
-                bytes_size / AVG_TILE_SIZE,
-                bytes_size as u64,
-                TileWeighter,
-                DefaultHashBuilder::default(),
-                TileStoreLc,
-            ),
-            ..Self::default()
-        }
-    }
-
     pub fn contains(&self, tile_index: TileIndex, style_id: VtStyleId) -> bool {
         self.processed.peek(&(tile_index, style_id)).is_some()
     }

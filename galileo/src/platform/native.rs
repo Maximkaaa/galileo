@@ -1,3 +1,5 @@
+//! Types for native applications.
+
 use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::platform::PlatformService;
@@ -6,13 +8,15 @@ use bytes::Bytes;
 use log::info;
 
 pub mod map_builder;
+pub mod vt_processor;
 
+/// Platform service for native applications.
 #[derive(Debug, Clone)]
 pub struct NativePlatformService {
     http_client: reqwest::Client,
 }
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[async_trait]
 impl PlatformService for NativePlatformService {
     fn new() -> Self {
         let http_client = reqwest::Client::builder()

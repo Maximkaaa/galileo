@@ -1,19 +1,22 @@
 #[cfg(not(target_arch = "wasm32"))]
 use crate::error::GalileoError;
+#[cfg(not(target_arch = "wasm32"))]
 use base64::prelude::BASE64_STANDARD;
+#[cfg(not(target_arch = "wasm32"))]
 use base64::Engine;
-use image::codecs::png::PngEncoder;
-use image::{ColorType, ImageEncoder};
-use serde::de::{Error, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::Formatter;
+#[cfg(not(target_arch = "wasm32"))]
+use image::ImageEncoder;
 #[cfg(not(target_arch = "wasm32"))]
 use std::ops::Deref;
 
+use serde::de::{Error, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt::Formatter;
+
 #[derive(Debug, Clone)]
 pub struct DecodedImage {
-    bytes: Vec<u8>,
-    dimensions: (u32, u32),
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) dimensions: (u32, u32),
 }
 
 impl DecodedImage {
@@ -51,26 +54,35 @@ impl DecodedImage {
 }
 
 impl Serialize for DecodedImage {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let mut encoded = vec![];
-        let encoder = PngEncoder::new(&mut encoded);
-        if let Err(err) = encoder.write_image(
-            &self.bytes,
-            self.dimensions.0,
-            self.dimensions.1,
-            ColorType::Rgba8,
-        ) {
-            return Err(serde::ser::Error::custom(format!(
-                "failed to encode image to PNG: {err}"
-            )));
+        cfg_if::cfg_if! {
+            if #[cfg(target_arch = "wasm32")] {
+                panic!("shall not be used in WASM")
+            } else {
+                use image::ColorType;
+                use image::codecs::png::PngEncoder;
+
+                let mut encoded = vec![];
+                let encoder = PngEncoder::new(&mut encoded);
+                if let Err(err) = encoder.write_image(
+                    &self.bytes,
+                    self.dimensions.0,
+                    self.dimensions.1,
+                    ColorType::Rgba8,
+                ) {
+                    return Err(serde::ser::Error::custom(format!(
+                        "failed to encode image to PNG: {err}"
+                    )));
+                }
+
+                let base64 = BASE64_STANDARD.encode(&encoded);
+
+                _serializer.serialize_str(&base64)
+            }
         }
-
-        let base64 = BASE64_STANDARD.encode(&encoded);
-
-        serializer.serialize_str(&base64)
     }
 }
 
@@ -92,16 +104,22 @@ impl<'de> Visitor<'de> for DecodedImageVisitor {
         formatter.write_str("base64 encoded image")
     }
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    fn visit_str<E>(self, _v: &str) -> Result<Self::Value, E>
     where
         E: Error,
     {
-        let Ok(bytes) = BASE64_STANDARD.decode(v) else {
-            return Err(Error::custom("not a valid base64 string"));
-        };
+        cfg_if::cfg_if! {
+            if #[cfg(target_arch = "wasm32")] {
+                panic!("should not be used in WASM");
+            } else {
+                let Ok(bytes) = BASE64_STANDARD.decode(_v) else {
+                    return Err(Error::custom("not a valid base64 string"));
+                };
 
-        DecodedImage::new(&bytes)
-            .map_err(|err| Error::custom(format!("failed to decode image: {err}")))
+                DecodedImage::new(&bytes)
+                    .map_err(|err| Error::custom(format!("failed to decode image: {err}")))
+            }
+        }
     }
 }
 

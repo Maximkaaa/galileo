@@ -17,6 +17,8 @@ use web_sys::{
 };
 
 pub mod map_builder;
+pub mod vt_processor;
+pub mod web_workers;
 
 pub struct WebPlatformService {}
 

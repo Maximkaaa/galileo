@@ -1,9 +1,11 @@
+//! Map builder functions that are present only on native platform.
+
 use crate::layer::data_provider::{FileCacheController, UrlImageProvider, UrlSource};
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::loader::WebVtLoader;
-use crate::layer::vector_tile_layer::tile_provider::processor::ThreadVtProcessor;
 use crate::layer::vector_tile_layer::tile_provider::VectorTileProvider;
 use crate::layer::{RasterTileLayer, VectorTileLayer};
+use crate::platform::native::vt_processor::ThreadVtProcessor;
 use crate::platform::{PlatformService, PlatformServiceImpl};
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
 use crate::render::render_bundle::{RenderBundle, RenderBundleType};
@@ -65,6 +67,7 @@ impl MapBuilder {
         VectorTileLayer::from_url(tile_provider, style, tile_schema).await
     }
 
+    /// Returns a vector tile provider.
     pub fn create_vector_tile_provider(
         tile_source: impl UrlSource<TileIndex> + 'static,
         tile_schema: TileSchema,

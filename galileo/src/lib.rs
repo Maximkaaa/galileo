@@ -77,7 +77,7 @@ pub mod layer;
 mod lod;
 mod map;
 mod messenger;
-mod platform;
+pub mod platform;
 pub mod render;
 pub mod tile_scheme;
 mod view;

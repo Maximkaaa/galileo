@@ -198,9 +198,7 @@ impl EventProcessor {
                 None
             }
             RawUserEvent::TouchMove(touch) => {
-                let Some(touch_info) = self.touches.iter().find(|t| t.id == touch.touch_id) else {
-                    return None;
-                };
+                let touch_info = self.touches.iter().find(|t| t.id == touch.touch_id)?;
                 let position = touch.position;
 
                 let mut events = vec![];

@@ -62,6 +62,7 @@ impl DataProcessor for VtProcessor {
 }
 
 impl VtProcessor {
+    /// Pre-render the given tile into the given `bundle`.
     pub fn prepare(
         mvt_tile: &MvtTile,
         bundle: &mut RenderBundle,
@@ -181,7 +182,6 @@ impl VtProcessor {
     ) -> Option<PointPaint<'a>> {
         let mut paint = Self::get_point_paint(style, layer_name, feature)?.clone();
         if let PointShape::Label { text, .. } = &mut paint.shape {
-            let props = format!("{:?}", feature.properties);
             let formatted = strfmt(text, &feature.properties).ok()?;
             *text.to_mut() = formatted;
         }

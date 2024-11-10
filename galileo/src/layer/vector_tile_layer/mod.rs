@@ -1,6 +1,7 @@
 //! [Vector tile layers](VectorTileLayer) load prepared vector tiles using a [data provider](VectorTileProviderT)
 //! and draw them to the map with the given [`VectorTileStyle`].
 
+use maybe_sync::{MaybeSend, MaybeSync};
 use std::any::Any;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -30,8 +31,8 @@ mod vector_tile;
 /// specified [styles](VectorTileStyle).
 pub struct VectorTileLayer<Loader, Processor>
 where
-    Loader: VectorTileLoader + Send + Sync + 'static,
-    Processor: VectorTileProcessor + Send + Sync + 'static,
+    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
+    Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
 {
     tile_provider: VectorTileProvider<Loader, Processor>,
     tile_scheme: TileSchema,
@@ -40,8 +41,8 @@ where
 
 impl<Loader, Processor> Layer for VectorTileLayer<Loader, Processor>
 where
-    Loader: VectorTileLoader + Send + Sync + 'static,
-    Processor: VectorTileProcessor + Send + Sync + 'static,
+    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
+    Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         let tiles = self.get_tiles_to_draw(view, canvas);
@@ -73,8 +74,8 @@ where
 
 impl<Loader, Processor> VectorTileLayer<Loader, Processor>
 where
-    Loader: VectorTileLoader + Send + Sync + 'static,
-    Processor: VectorTileProcessor + Send + Sync + 'static,
+    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
+    Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
 {
     /// Style of the layer.
     pub fn style(&self) -> Arc<VectorTileStyle> {

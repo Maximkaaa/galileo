@@ -32,7 +32,7 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
         offset: Vector2<f32>,
     ) -> Result<TextShaping, FontServiceError> {
         let mut buffer = UnicodeBuffer::new();
-        buffer.push_str(&text);
+        buffer.push_str(text);
         buffer.guess_segment_properties();
 
         let Some(face) = self.select_face(&buffer) else {
@@ -83,11 +83,14 @@ impl GlyphPathBuilder {
         let vertex_constructor = GlyphVertexConstructor { offset };
         let mut tessellator = FillTessellator::new();
         let mut buffers: VertexBuffers<[f32; 2], u32> = VertexBuffers::new();
-        if let Ok(_) = tessellator.tessellate(
-            &self.builder.build(),
-            &FillOptions::default(),
-            &mut BuffersBuilder::new(&mut buffers, vertex_constructor),
-        ) {
+        if tessellator
+            .tessellate(
+                &self.builder.build(),
+                &FillOptions::default(),
+                &mut BuffersBuilder::new(&mut buffers, vertex_constructor),
+            )
+            .is_ok()
+        {
             TessellatedGlyph {
                 vertices: buffers.vertices,
                 indices: buffers.indices,

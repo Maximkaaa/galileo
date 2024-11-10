@@ -1,12 +1,19 @@
 use crate::galileo_map::{GalileoMap, MapBuilder};
+use crate::layer::data_provider::dummy::DummyCacheController;
 use crate::layer::data_provider::UrlImageProvider;
 use crate::layer::data_provider::UrlSource;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::layer::vector_tile_layer::tile_provider::WebWorkerVectorTileProvider;
+use crate::layer::vector_tile_layer::tile_provider::loader::WebVtLoader;
+use crate::layer::vector_tile_layer::tile_provider::VectorTileProvider;
 use crate::layer::{RasterTileLayer, VectorTileLayer};
+use crate::platform::web::vt_processor::WebWorkerVtProcessor;
+use crate::platform::web::web_workers::WebWorkerService;
+use crate::platform::{PlatformService, PlatformServiceImpl};
+use crate::render::render_bundle::RenderBundle;
 use crate::tile_scheme::TileIndex;
 use crate::TileSchema;
 use galileo_types::geo::impls::GeoPoint2d;
+use std::sync::Arc;
 use wasm_bindgen::prelude::wasm_bindgen;
 use winit::dpi::PhysicalSize;
 use winit::event_loop::EventLoop;
@@ -22,15 +29,29 @@ impl MapBuilder {
         RasterTileLayer::new(tile_scheme, tile_provider, None)
     }
 
-    /// Creates a vector tile layer.
-    pub fn create_vector_tile_layer(
+    /// Create a new vector tile layer.
+    pub async fn create_vector_tile_layer(
         tile_source: impl UrlSource<TileIndex> + 'static,
-        tile_scheme: TileSchema,
+        tile_schema: TileSchema,
         style: VectorTileStyle,
-    ) -> VectorTileLayer<WebWorkerVectorTileProvider> {
-        let tile_provider =
-            WebWorkerVectorTileProvider::new(4, None, tile_source, tile_scheme.clone());
-        VectorTileLayer::from_url(tile_provider, style, tile_scheme)
+    ) -> VectorTileLayer<WebVtLoader<DummyCacheController>, WebWorkerVtProcessor> {
+        let tile_provider = Self::create_vector_tile_provider(tile_source, tile_schema.clone());
+        VectorTileLayer::from_url(tile_provider, style, tile_schema).await
+    }
+
+    pub fn create_vector_tile_provider(
+        tile_source: impl UrlSource<TileIndex> + 'static,
+        tile_schema: TileSchema,
+    ) -> VectorTileProvider<WebVtLoader<DummyCacheController>, WebWorkerVtProcessor> {
+        let loader = WebVtLoader::new(
+            PlatformServiceImpl::new(),
+            DummyCacheController {},
+            tile_source,
+        );
+        let ww_service = WebWorkerService::new(4);
+        let processor = WebWorkerVtProcessor::new(tile_schema, ww_service);
+
+        VectorTileProvider::new(Arc::new(loader), Arc::new(processor))
     }
 }
 
@@ -40,6 +61,8 @@ impl MapBuilder {
     pub fn new() -> Self {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init_with_level(log::Level::Info).expect("Couldn't init logger");
+
+        log::debug!("Logger is initialized");
 
         Self {
             position: GeoPoint2d::default(),
