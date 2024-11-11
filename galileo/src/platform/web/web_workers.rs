@@ -101,8 +101,8 @@ impl TryFrom<Result<WebWorkerResponsePayload, WebWorkerError>> for RenderBundle 
     ) -> Result<Self, Self::Error> {
         match value {
             Ok(WebWorkerResponsePayload::ProcessVtTile { result }) => result.map(|bytes| {
-                let converted: TessellatingRenderBundleBytes =
-                    bincode::deserialize(&bytes).expect("Failed to deserialize render bundle bytes");
+                let converted: TessellatingRenderBundleBytes = bincode::deserialize(&bytes)
+                    .expect("Failed to deserialize render bundle bytes");
                 RenderBundle(RenderBundleType::Tessellating(
                     TessellatingRenderBundle::from_bytes_unchecked(converted),
                 ))
@@ -156,7 +156,11 @@ impl WebWorkerService {
         &self,
         payload: WebWorkerRequestPayload,
     ) -> Result<WebWorkerResponsePayload, WebWorkerError> {
-        self.is_ready.borrow_mut().wait_for(|v| *v).await.expect("failed to read is_ready channel");
+        self.is_ready
+            .borrow_mut()
+            .wait_for(|v| *v)
+            .await
+            .expect("failed to read is_ready channel");
 
         let (sender, receiver) = oneshot::channel();
         let request_id = WebWorkerRequestId::next();
@@ -184,7 +188,9 @@ impl WebWorkerService {
     fn send_request(&self, request: &WebWorkerRequest) {
         let worker = self.next_worker();
         worker
-            .post_message(&serde_wasm_bindgen::to_value(request).expect("failed to serialize ww request"))
+            .post_message(
+                &serde_wasm_bindgen::to_value(request).expect("failed to serialize ww request"),
+            )
             .expect("failed to send a message to a web worker");
     }
 

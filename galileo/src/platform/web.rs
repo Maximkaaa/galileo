@@ -76,7 +76,8 @@ impl PlatformService for WebPlatformService {
         opts.method("GET");
         opts.mode(RequestMode::Cors);
 
-        let request = Request::new_with_str_and_init(url, &opts).expect("failed to create a request object");
+        let request =
+            Request::new_with_str_and_init(url, &opts).expect("failed to create a request object");
         request
             .headers()
             .set("Accept", "application/vnd.mapbox-vector-tile")?;

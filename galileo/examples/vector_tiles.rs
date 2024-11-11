@@ -33,7 +33,12 @@ async fn main() {
 
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("galileo=trace"))
         .init();
-    run(MapBuilder::new(), get_layer_style().unwrap(), api_key.into_string().expect("invalid VT API key")).await;
+    run(
+        MapBuilder::new(),
+        get_layer_style().unwrap(),
+        api_key.into_string().expect("invalid VT API key"),
+    )
+    .await;
 }
 
 pub async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: String) {
