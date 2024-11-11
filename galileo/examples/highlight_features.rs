@@ -162,8 +162,8 @@ impl Symbol<PointMarker> for ColoredPointSymbol {
         P: CartesianPoint3d<Num = N> + Clone,
     {
         if let Geom::Point(point) = geometry {
-            vec![RenderPrimitive::new_point_ref(
-                point,
+            vec![RenderPrimitive::new_point(
+                point.clone(),
                 PointPaint::image(
                     if feature.highlighted {
                         GREEN_PIN_IMAGE.clone()

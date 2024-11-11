@@ -93,8 +93,8 @@ impl ImagePipeline {
         image: &DecodedImage,
     ) -> Arc<BindGroup> {
         let texture_size = wgpu::Extent3d {
-            width: image.dimensions.0,
-            height: image.dimensions.1,
+            width: image.width(),
+            height: image.height(),
             depth_or_array_layers: 1,
         };
 
@@ -111,7 +111,7 @@ impl ImagePipeline {
                 view_formats: &[],
             },
             TextureDataOrder::default(),
-            &image.bytes,
+            image.bytes(),
         );
 
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());

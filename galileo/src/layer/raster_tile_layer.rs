@@ -210,10 +210,7 @@ where
 
                     let owned = std::mem::replace(
                         &mut *decoded_image,
-                        DecodedImage {
-                            bytes: vec![],
-                            dimensions: (0, 0),
-                        },
+                        DecodedImage::from_raw(vec![], 0, 0).expect("empty image is always ok"),
                     );
 
                     let opacity = if self.fade_in_duration.is_zero() {

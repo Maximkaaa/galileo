@@ -79,24 +79,23 @@ pub trait PersistentCacheController<Key: ?Sized, Data> {
 pub trait UrlSource<Key: ?Sized>: (Fn(&Key) -> String) + MaybeSend + MaybeSync {}
 impl<Key: ?Sized, T: Fn(&Key) -> String> UrlSource<Key> for T where T: MaybeSend + MaybeSync {}
 
-mod dummy {
+pub(crate) mod dummy {
     use crate::error::GalileoError;
     use crate::layer::data_provider::PersistentCacheController;
     use bytes::Bytes;
 
-    #[allow(dead_code)]
-    pub struct DummyCacheController {
-        // Guarantees that the controller cannot be instantiated.
-        private_field: u8,
-    }
+    /// Cache controller that always misses.
+    pub struct DummyCacheController {}
 
     impl<Key: ?Sized> PersistentCacheController<Key, Bytes> for DummyCacheController {
         fn get(&self, _key: &Key) -> Option<Bytes> {
-            unreachable!()
+            None
         }
 
         fn insert(&self, _key: &Key, _data: &Bytes) -> Result<(), GalileoError> {
-            unreachable!()
+            Ok(())
         }
     }
 }
+
+pub use dummy::DummyCacheController;

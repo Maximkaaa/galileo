@@ -1,6 +1,7 @@
 use crate::error::GalileoError;
 use crate::layer::data_provider::DataProcessor;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
+use crate::render::point_paint::{PointPaint, PointShape};
 use crate::render::render_bundle::{RenderBundle, RenderPrimitive};
 use crate::render::{LineCap, LinePaint, PolygonPaint};
 use crate::tile_scheme::TileIndex;
@@ -11,6 +12,7 @@ use galileo_types::cartesian::{CartesianPoint2d, Point3d, Rect};
 use galileo_types::impls::{ClosedContour, Polygon};
 use galileo_types::Contour;
 use num_traits::ToPrimitive;
+use strfmt::strfmt;
 
 /// Data processor that decodes vector tiles.
 pub struct VtProcessor {}
@@ -37,7 +39,9 @@ impl DataProcessor for VtProcessor {
         input: Self::Input,
         context: Self::Context,
     ) -> Result<Self::Output, GalileoError> {
+        let start = std::time::Instant::now();
         let mvt_tile = MvtTile::decode(input, false)?;
+        let mvt_decoded_in = start.elapsed();
         let VectorTileDecodeContext {
             mut bundle,
             index,
@@ -45,13 +49,21 @@ impl DataProcessor for VtProcessor {
             tile_schema: tile_scheme,
         } = context;
         Self::prepare(&mvt_tile, &mut bundle, index, &style, &tile_scheme)?;
+        let prerendered_in = start.elapsed() - mvt_decoded_in;
+
+        log::info!(
+            "Decoded tile in {} ms, prerendered in {} ms",
+            mvt_decoded_in.as_millis(),
+            prerendered_in.as_millis()
+        );
 
         Ok((bundle, mvt_tile))
     }
 }
 
 impl VtProcessor {
-    fn prepare(
+    /// Pre-render the given tile into the given `bundle`.
+    pub fn prepare(
         mvt_tile: &MvtTile,
         bundle: &mut RenderBundle,
         index: TileIndex,
@@ -90,9 +102,35 @@ impl VtProcessor {
         for layer in &mvt_tile.layers {
             for feature in &layer.features {
                 match &feature.geometry {
-                    MvtGeometry::Point(_points) => {
-                        // todo
-                        continue;
+                    MvtGeometry::Point(points) => {
+                        // let label = if feature.properties.contains_key("name") {
+                        //     feature.properties.get("name").as_ref().unwrap().to_string()
+                        // } else {
+                        //     let Some(value) = feature.properties.values().next() else {
+                        //         continue;
+                        //     };
+                        //
+                        //     value.to_string()
+                        // };
+                        //
+                        // let label: String = label.chars().take(20).collect();
+                        // let style = TextStyle {
+                        //     font_name: "Noto Sans".into(),
+                        //     font_size: 20.0,
+                        //     font_color: Color::RED,
+                        //     horizontal_alignment: HorizontalAlignment::Left,
+                        //     vertical_alignment: VerticalAlignment::Top,
+                        // };
+
+                        let Some(paint) = Self::get_point_symbol(style, &layer.name, feature)
+                        else {
+                            continue;
+                        };
+
+                        for point in points {
+                            // let paint = PointPaint::label(&label, &style);
+                            bundle.add(RenderPrimitive::<_, _, galileo_types::impls::Contour<_>, Polygon<_>>::new_point_ref(&Self::transform_point(point, bbox, tile_resolution), &paint), lod_resolution);
+                        }
                     }
                     MvtGeometry::LineString(contours) => {
                         if let Some(paint) = Self::get_line_symbol(style, &layer.name, feature) {
@@ -135,6 +173,32 @@ impl VtProcessor {
         }
 
         Ok(())
+    }
+
+    fn get_point_symbol<'a>(
+        style: &'a VectorTileStyle,
+        layer_name: &str,
+        feature: &MvtFeature,
+    ) -> Option<PointPaint<'a>> {
+        let mut paint = Self::get_point_paint(style, layer_name, feature)?.clone();
+        if let PointShape::Label { text, .. } = &mut paint.shape {
+            let formatted = strfmt(text, &feature.properties).ok()?;
+            *text.to_mut() = formatted;
+        }
+
+        Some(paint)
+    }
+
+    fn get_point_paint<'a>(
+        style: &'a VectorTileStyle,
+        layer_name: &str,
+        feature: &MvtFeature,
+    ) -> Option<&'a PointPaint<'a>> {
+        let Some(rule) = style.get_style_rule(layer_name, feature) else {
+            return style.default_symbol.point.as_ref();
+        };
+
+        rule.symbol.point.as_ref()
     }
 
     fn get_line_symbol(

@@ -2,6 +2,7 @@ use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::render::point_paint::{CircleFill, PointPaint, PointShape, SectorParameters};
 use crate::render::render_bundle::RenderPrimitive;
+use crate::render::text::{FontService, TextShaping, TextStyle};
 use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
 use crate::view::MapView;
 use crate::Color;
@@ -65,6 +66,7 @@ pub(crate) struct ScreenRefVertex {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) enum PrimitiveInfo {
+    None,
     Vacant,
     MapRef { vertex_range: Range<usize> },
     ScreenRef { vertex_range: Range<usize> },
@@ -99,6 +101,10 @@ impl TessellatingRenderBundle {
         self.buffer_size
     }
 
+    pub fn set_approx_buffer_size(&mut self, size: usize) {
+        self.buffer_size = size;
+    }
+
     pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly)
     where
         N: AsPrimitive<f32>,
@@ -129,7 +135,7 @@ impl TessellatingRenderBundle {
     ) -> PrimitiveId {
         let opacity = paint.opacity as f32 / 255.0;
 
-        self.buffer_size += image.bytes.len() + std::mem::size_of::<ImageVertex>() * 4;
+        self.buffer_size += image.bytes().len() + std::mem::size_of::<ImageVertex>() * 4;
 
         let index = self.add_image_to_store(Arc::new(image));
         let vertices = [
@@ -182,7 +188,7 @@ impl TessellatingRenderBundle {
     {
         let opacity = opacity as f32 / 255.0;
 
-        self.buffer_size += image.bytes.len() + size_of::<ImageVertex>() * 4;
+        self.buffer_size += image.bytes().len() + size_of::<ImageVertex>() * 4;
 
         let position = [position.x().as_(), position.y().as_()];
         let offset_x = -offset[0] * width;
@@ -279,7 +285,7 @@ impl TessellatingRenderBundle {
         Poly::Contour: Contour<Point = P>,
     {
         match primitive {
-            RenderPrimitive::Point(point, paint) => self.add_point::<N, P>(point.borrow(), paint),
+            RenderPrimitive::Point(point, paint) => self.add_point::<N, P>(point.borrow(), &paint),
             RenderPrimitive::Contour(contour, paint) => {
                 self.add_line::<N, P, C>(contour.borrow(), paint, min_resolution)
             }
@@ -333,6 +339,7 @@ impl TessellatingRenderBundle {
             PrimitiveInfo::Dot { point_index } => self.remove_dot(point_index),
             PrimitiveInfo::Image { image_index } => self.remove_image(image_index),
             PrimitiveInfo::Vacant => Ok(()),
+            PrimitiveInfo::None => Ok(()),
         }
     }
 
@@ -484,7 +491,7 @@ impl TessellatingRenderBundle {
         Ok(length_before - length_after)
     }
 
-    pub fn add_point<N, P>(&mut self, point: &P, paint: PointPaint) -> PrimitiveId
+    pub fn add_point<N, P>(&mut self, point: &P, paint: &PointPaint) -> PrimitiveId
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
@@ -547,6 +554,7 @@ impl TessellatingRenderBundle {
                     vertex_range: start_index..self.screen_ref.vertices.len(),
                 }
             }
+            PointShape::Label { text, style } => self.add_label(point, text, style, paint.offset),
         };
 
         self.add_primitive_info(info)
@@ -1006,6 +1014,56 @@ impl TessellatingRenderBundle {
 
             projected_b.z.total_cmp(&projected_a.z)
         });
+    }
+
+    fn add_label<N, P>(
+        &mut self,
+        position: &P,
+        text: &str,
+        style: &TextStyle,
+        offset: Vector2<f32>,
+    ) -> PrimitiveInfo
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+    {
+        FontService::with(
+            |font_service| match font_service.shape(text, style, offset) {
+                Ok(TextShaping::Tessellation { glyphs, .. }) => {
+                    let indices_start = self.screen_ref.indices.len();
+
+                    for glyph in glyphs {
+                        let vertices_start = self.screen_ref.vertices.len() as u32;
+                        for vertex in glyph.vertices {
+                            self.screen_ref.vertices.push(ScreenRefVertex {
+                                position: [
+                                    position.x().as_(),
+                                    position.y().as_(),
+                                    position.z().as_(),
+                                ],
+                                normal: vertex,
+                                color: style.font_color.to_u8_array(),
+                            });
+                        }
+                        for index in glyph.indices {
+                            self.screen_ref.indices.push(index + vertices_start);
+                        }
+                    }
+
+                    PrimitiveInfo::ScreenRef {
+                        vertex_range: indices_start..self.screen_ref.indices.len(),
+                    }
+                }
+                Err(err) => {
+                    log::error!("Error shaping text label: {err:?}");
+                    PrimitiveInfo::None
+                }
+                _ => {
+                    log::error!("Not supported font type");
+                    PrimitiveInfo::None
+                }
+            },
+        )
     }
 }
 

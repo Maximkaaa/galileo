@@ -1,5 +1,6 @@
 //! See [`VectorTileStyle`].
 
+use crate::render::point_paint::PointPaint;
 use crate::Color;
 use galileo_mvt::MvtFeature;
 use serde::{Deserialize, Serialize};
@@ -55,7 +56,7 @@ pub struct StyleRule {
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct VectorTileSymbol {
     /// If set, points will be drawn with this symbol.
-    pub point: Option<VectorTilePointSymbol>,
+    pub point: Option<PointPaint<'static>>,
     /// If set, lines will be drawn with this symbol.
     pub line: Option<VectorTileLineSymbol>,
     /// If set, polygons will be drawn with this symbol.

@@ -31,6 +31,19 @@ impl RenderBundle {
         }
     }
 
+    /// Sets the value for `approx_buffer_size`.
+    ///
+    /// This can be useful for better memory management when used buffers size cannot be calculated
+    /// properly.
+    ///
+    /// Note, that consequent changes to the bundle will change the given value as if it was the
+    /// calculated one.
+    pub fn set_approx_buffer_size(&mut self, size: usize) {
+        match &mut self.0 {
+            RenderBundleType::Tessellating(inner) => inner.set_approx_buffer_size(size),
+        }
+    }
+
     /// Set the clip area for drawing. Only primitives inside the clipped area will be displayed after rendering.
     pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly)
     where
@@ -140,7 +153,7 @@ where
     Poly::Contour: Contour<Point = P>,
 {
     /// Point primitive
-    Point(Cow<'a, P>, PointPaint<'a>),
+    Point(Cow<'a, P>, Cow<'a, PointPaint<'a>>),
     /// Contour (line) primitive
     Contour(Cow<'a, C>, LinePaint),
     /// Polygon primitive
@@ -157,12 +170,12 @@ where
 {
     /// Creates a new point primitive.
     pub fn new_point(point: P, paint: PointPaint<'a>) -> Self {
-        Self::Point(Cow::Owned(point), paint)
+        Self::Point(Cow::Owned(point), Cow::Owned(paint))
     }
 
     /// Creates a new point primitive with the reference of the point.
-    pub fn new_point_ref(point: &'a P, paint: PointPaint<'a>) -> Self {
-        Self::Point(Cow::Borrowed(point), paint)
+    pub fn new_point_ref(point: &'a P, paint: &'a PointPaint<'a>) -> Self {
+        Self::Point(Cow::Borrowed(point), Cow::Borrowed(paint))
     }
 
     /// Creates a new contour primitive

@@ -18,13 +18,17 @@ pub trait PlatformService {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-mod native;
+pub mod native;
+
+/// Platform service implementation for the current platform.
 #[cfg(not(target_arch = "wasm32"))]
 /// Default implementation of the [`PlatformService`] for the current platform.
 pub type PlatformServiceImpl = native::NativePlatformService;
 
 #[cfg(target_arch = "wasm32")]
-mod web;
+pub mod web;
+
+/// Platform service implementation for the current platform.
 #[cfg(target_arch = "wasm32")]
 /// Default implementation of the [`PlatformService`] for the current platform.
 pub type PlatformServiceImpl = web::WebPlatformService;

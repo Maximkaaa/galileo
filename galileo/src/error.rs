@@ -1,13 +1,11 @@
 //! Error types used by the crate.
 
 use galileo_mvt::error::GalileoMvtError;
+use std::io::Error;
 use thiserror::Error;
 
-#[cfg(not(target_arch = "wasm32"))]
-use image::ImageError;
-
 /// Galileo error type.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum GalileoError {
     /// I/O error (network or file)
     #[error("failed to load data")]
@@ -23,20 +21,26 @@ pub enum GalileoError {
     NotFound,
     /// Image decoding error.
     #[cfg(not(target_arch = "wasm32"))]
-    #[error("image decode error: {0:?}")]
-    ImageDecode(#[from] ImageError),
+    #[error("image decode error")]
+    ImageDecode,
     /// Generic error - details are inside.
     #[error("{0}")]
     Generic(String),
     /// Error reading/writing data to the FS.
     #[error("failed to read file")]
-    FsIo(#[from] std::io::Error),
+    FsIo,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 impl From<reqwest::Error> for GalileoError {
     fn from(_value: reqwest::Error) -> Self {
         Self::IO
+    }
+}
+
+impl From<std::io::Error> for GalileoError {
+    fn from(_value: Error) -> Self {
+        Self::FsIo
     }
 }
 

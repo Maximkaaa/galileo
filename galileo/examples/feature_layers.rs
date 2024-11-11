@@ -183,12 +183,12 @@ impl Symbol<City> for CitySymbol {
 
         let _ = match &feature.capital[..] {
             "primary" => {
-                primitives.push(RenderPrimitive::new_point_ref(
-                    point,
+                primitives.push(RenderPrimitive::new_point(
+                    point.clone(),
                     PointPaint::circle(Color::BLACK, size * 2.0 + 4.0),
                 ));
-                primitives.push(RenderPrimitive::new_point_ref(
-                    point,
+                primitives.push(RenderPrimitive::new_point(
+                    point.clone(),
                     PointPaint::sector(
                         Color::from_hex("#ff8000"),
                         size * 2.0,
@@ -196,8 +196,8 @@ impl Symbol<City> for CitySymbol {
                         135f32.to_radians(),
                     ),
                 ));
-                primitives.push(RenderPrimitive::new_point_ref(
-                    point,
+                primitives.push(RenderPrimitive::new_point(
+                    point.clone(),
                     PointPaint::sector(
                         Color::from_hex("#ffff00"),
                         size * 2.0,
@@ -205,8 +205,8 @@ impl Symbol<City> for CitySymbol {
                         270f32.to_radians(),
                     ),
                 ));
-                primitives.push(RenderPrimitive::new_point_ref(
-                    point,
+                primitives.push(RenderPrimitive::new_point(
+                    point.clone(),
                     PointPaint::sector(
                         Color::from_hex("#00ffff"),
                         size * 2.0,
@@ -215,17 +215,17 @@ impl Symbol<City> for CitySymbol {
                     ),
                 ))
             }
-            "admin" => primitives.push(RenderPrimitive::new_point_ref(
-                point,
+            "admin" => primitives.push(RenderPrimitive::new_point(
+                point.clone(),
                 PointPaint::circle(Color::from_hex("#f5009b"), size),
             )),
-            "minor" => primitives.push(RenderPrimitive::new_point_ref(
-                point,
+            "minor" => primitives.push(RenderPrimitive::new_point(
+                point.clone(),
                 PointPaint::square(Color::from_hex("#0a85ed"), size)
                     .with_outline(Color::from_hex("#0d4101"), 2.0),
             )),
-            _ => primitives.push(RenderPrimitive::new_point_ref(
-                point,
+            _ => primitives.push(RenderPrimitive::new_point(
+                point.clone(),
                 PointPaint::circle(Color::from_hex("#4e00de"), size),
             )),
         };

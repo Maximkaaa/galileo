@@ -45,10 +45,10 @@ impl<F> Symbol<F> for CirclePointSymbol {
     {
         let paint = PointPaint::circle(self.color, self.size as f32);
         match geometry {
-            Geom::Point(point) => vec![RenderPrimitive::new_point_ref(point, paint)],
+            Geom::Point(point) => vec![RenderPrimitive::new_point(point.clone(), paint)],
             Geom::MultiPoint(points) => points
                 .iter_points()
-                .map(|p| RenderPrimitive::new_point_ref(p, paint.clone()))
+                .map(|p| RenderPrimitive::new_point(p.clone(), paint.clone()))
                 .collect(),
             _ => vec![],
         }
@@ -67,15 +67,16 @@ impl ImagePointSymbol {
     /// Loads the image from the file system path.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn from_path(path: &str, offset: Vector2<f32>, scale: f32) -> Result<Self, GalileoError> {
-        use image::GenericImageView;
-        let image = image::io::Reader::open(path)?.decode()?;
-        let dimensions = image.dimensions();
+        let image = image::io::Reader::open(path)?
+            .decode()
+            .map_err(|_| GalileoError::ImageDecode)?;
 
         Ok(Self {
-            image: Arc::new(DecodedImage {
-                bytes: Vec::from(image.to_rgba8().deref()),
-                dimensions,
-            }),
+            image: Arc::new(DecodedImage::from_raw(
+                Vec::from(image.to_rgba8().deref()),
+                image.width(),
+                image.height(),
+            )?),
             offset,
             scale,
         })
@@ -96,10 +97,10 @@ impl<F> Symbol<F> for ImagePointSymbol {
         let paint = PointPaint::image(self.image.clone(), self.offset, self.scale);
 
         match geometry {
-            Geom::Point(point) => vec![RenderPrimitive::new_point_ref(point, paint)],
+            Geom::Point(point) => vec![RenderPrimitive::new_point(point.clone(), paint)],
             Geom::MultiPoint(points) => points
                 .iter_points()
-                .map(|point| RenderPrimitive::new_point_ref(point, paint.clone()))
+                .map(|point| RenderPrimitive::new_point(point.clone(), paint.clone()))
                 .collect(),
             _ => vec![],
         }
@@ -118,7 +119,8 @@ mod tests {
             1.0,
         )
         .unwrap();
-        assert_eq!(symbol.image.dimensions, (62, 99));
-        assert_eq!(symbol.image.bytes.len(), 62 * 99 * 4);
+        assert_eq!(symbol.image.width(), 62);
+        assert_eq!(symbol.image.height(), 99);
+        assert_eq!(symbol.image.bytes().len(), 62 * 99 * 4);
     }
 }

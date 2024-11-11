@@ -235,17 +235,15 @@ impl MapBuilder {
     }
 
     /// Add a vector tile layer with the given parameters.
-    pub fn with_vector_tiles(
+    pub async fn with_vector_tiles(
         mut self,
         tile_source: impl UrlSource<TileIndex> + 'static,
         tile_scheme: TileSchema,
         style: VectorTileStyle,
     ) -> Self {
-        self.layers.push(Box::new(Self::create_vector_tile_layer(
-            tile_source,
-            tile_scheme,
-            style,
-        )));
+        self.layers.push(Box::new(
+            Self::create_vector_tile_layer(tile_source, tile_scheme, style).await,
+        ));
         self
     }
 

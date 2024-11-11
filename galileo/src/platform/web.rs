@@ -1,3 +1,5 @@
+//! Platform specific stuff for WASM32 (web) targets.
+
 use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::platform::PlatformService;
@@ -17,7 +19,10 @@ use web_sys::{
 };
 
 pub mod map_builder;
+pub mod vt_processor;
+pub mod web_workers;
 
+/// Platform service for Web target.
 pub struct WebPlatformService {}
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -71,7 +76,8 @@ impl PlatformService for WebPlatformService {
         opts.method("GET");
         opts.mode(RequestMode::Cors);
 
-        let request = Request::new_with_str_and_init(url, &opts).unwrap();
+        let request =
+            Request::new_with_str_and_init(url, &opts).expect("failed to create a request object");
         request
             .headers()
             .set("Accept", "application/vnd.mapbox-vector-tile")?;
@@ -98,12 +104,14 @@ impl PlatformService for WebPlatformService {
     }
 }
 
+/// Future for getting image with browser API
 pub struct ImageFuture {
     image: Option<HtmlImageElement>,
     load_failed: Rc<Cell<bool>>,
 }
 
 impl ImageFuture {
+    /// Create a new instance.
     pub fn new(path: &str) -> Self {
         let image = HtmlImageElement::new().expect("Cannot create HTMLImage Element");
         image.set_cross_origin(Some("anonymous"));

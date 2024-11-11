@@ -2,10 +2,10 @@
 //!
 //! User interaction handling is done in several steps:
 //! 1. OS event is converted to a common [`RawUserEvent`] enum. For example, apps that use `winit` can use
-//! [`WinitInputHandler`](crate::winit::WinitInputHandler) to convert [winit::event::WindowEvent] into `RawUserEvent`.
+//!    [`WinitInputHandler`](crate::winit::WinitInputHandler) to convert [winit::event::WindowEvent] into `RawUserEvent`.
 //! 2. `RawUserEvent` is given to the [`EventProcessor`], that converts it into a [`UserEvent`]. `EventProcessor`
-//! keeps track of input state (which keys, modifiers and mouse buttons) are pressed, and provides a more convenient
-//! way to handle user interactions for the application.
+//!    keeps track of input state (which keys, modifiers and mouse buttons) are pressed, and provides a more convenient
+//!    way to handle user interactions for the application.
 //! 3. `EventProcessor` has a list of [`UserEventHandler`]s, which change the state of application based on the events.
 //!
 //! To write a user interaction logic, the app must provide an implementation of [`UserEventHandler`] trait and add it
