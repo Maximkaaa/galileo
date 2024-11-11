@@ -133,6 +133,18 @@ impl<'a> PointPaint<'a> {
 
         self
     }
+
+    /// Sets offset of the paint.
+    ///
+    /// Offset is the distance in pixels from the base point the object will be drawn at. E.g.
+    /// offset does not depend on the map resolution.
+    ///
+    /// Positive `x` values of offset move the object to the right, positive `y` values move the
+    /// object towards the top of the screen.
+    pub fn with_offset(mut self, offset: Vector2<f32>) -> Self {
+        self.offset = offset;
+        self
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
