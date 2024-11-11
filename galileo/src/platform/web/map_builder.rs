@@ -1,3 +1,5 @@
+//! Map builder functions specific to Web target.
+
 use crate::galileo_map::{GalileoMap, MapBuilder};
 use crate::layer::data_provider::dummy::DummyCacheController;
 use crate::layer::data_provider::UrlImageProvider;
@@ -9,7 +11,6 @@ use crate::layer::{RasterTileLayer, VectorTileLayer};
 use crate::platform::web::vt_processor::WebWorkerVtProcessor;
 use crate::platform::web::web_workers::WebWorkerService;
 use crate::platform::{PlatformService, PlatformServiceImpl};
-use crate::render::render_bundle::RenderBundle;
 use crate::tile_scheme::TileIndex;
 use crate::TileSchema;
 use galileo_types::geo::impls::GeoPoint2d;
@@ -39,6 +40,7 @@ impl MapBuilder {
         VectorTileLayer::from_url(tile_provider, style, tile_schema).await
     }
 
+    /// Create a new vector tile provider.
     pub fn create_vector_tile_provider(
         tile_source: impl UrlSource<TileIndex> + 'static,
         tile_schema: TileSchema,
@@ -51,6 +53,7 @@ impl MapBuilder {
         let ww_service = WebWorkerService::new(4);
         let processor = WebWorkerVtProcessor::new(tile_schema, ww_service);
 
+        #[allow(clippy::arc_with_non_send_sync)]
         VectorTileProvider::new(Arc::new(loader), Arc::new(processor))
     }
 }

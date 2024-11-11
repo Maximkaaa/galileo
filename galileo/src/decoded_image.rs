@@ -1,7 +1,7 @@
 //! This module contains utilities for loading images to be rendered on the map.
 
-#[cfg(not(target_arch = "wasm32"))]
 use crate::error::GalileoError;
+
 #[cfg(not(target_arch = "wasm32"))]
 use base64::prelude::BASE64_STANDARD;
 #[cfg(not(target_arch = "wasm32"))]
@@ -41,7 +41,7 @@ impl DecodedImage {
     }
 
     /// Create a DecodedImage from a buffer of raw RGBA pixels.
-    #[cfg(not(target_arch = "wasm32"))]
+    // #[cfg(not(target_arch = "wasm32"))]
     pub fn from_raw(
         bytes: impl Into<Vec<u8>>,
         width: u32,

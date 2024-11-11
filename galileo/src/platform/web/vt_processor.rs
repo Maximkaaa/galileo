@@ -1,3 +1,5 @@
+//! Vector tile processor implementation for Web
+
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::processor::{
     TileProcessingError, VectorTileProcessor,
@@ -13,6 +15,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Vector tile processor that uses Web Workers to prepare tiles for rendering.
 pub struct WebWorkerVtProcessor {
     tile_schema: TileSchema,
     styles: RefCell<HashMap<VtStyleId, Arc<VectorTileStyle>>>,
@@ -20,6 +23,7 @@ pub struct WebWorkerVtProcessor {
 }
 
 impl WebWorkerVtProcessor {
+    /// Create new instance.
     pub fn new(tile_schema: TileSchema, ww_service: WebWorkerService) -> Self {
         Self {
             tile_schema,

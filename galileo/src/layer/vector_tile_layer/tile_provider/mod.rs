@@ -303,6 +303,7 @@ struct UnpackedVectorTile {
     bundle: RenderBundle,
 }
 
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 enum TileState {
     Loading,
     Loaded(Box<UnpackedVectorTile>),

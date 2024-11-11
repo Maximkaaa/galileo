@@ -24,14 +24,21 @@ fn get_layer_style() -> Option<VectorTileStyle> {
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() {
+    let Some(api_key) = std::env::var_os("VT_API_KEY") else {
+        eprintln!("You must set VT_API_KEY environment variable with a valid MapTiler API key to run this example");
+        eprintln!("You can obtain your free API key at https://maptiler.com");
+
+        return;
+    };
+
     env_logger::Builder::from_env(
         env_logger::Env::default().default_filter_or("warn,galileo=trace"),
     )
     .init();
-    run(MapBuilder::new(), get_layer_style().unwrap()).await;
+    run(MapBuilder::new(), get_layer_style().unwrap(), api_key.into_string().expect("invalid VT API key")).await;
 }
 
-pub async fn run(builder: MapBuilder, style: VectorTileStyle) {
+pub async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: String) {
     FontService::with_mut(|service| {
         let font = include_bytes!("data/NotoSansAdlam-Regular.ttf");
         service
@@ -40,7 +47,6 @@ pub async fn run(builder: MapBuilder, style: VectorTileStyle) {
     });
 
     // You can get your fee API key at https://maptiler.com
-    let api_key = std::env!("VT_API_KEY");
     let tile_provider = MapBuilder::create_vector_tile_provider(
         move |&index: &TileIndex| {
             format!(

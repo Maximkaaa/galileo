@@ -1,3 +1,5 @@
+//! Operations with Web Workers.
+
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::processor::TileProcessingError;
 use crate::render::render_bundle::tessellating::serialization::TessellatingRenderBundleBytes;
@@ -12,13 +14,10 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::future::Future;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::task::{Poll, Waker};
 use tokio::sync::watch::Receiver;
-use tokio::sync::OnceCell;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::JsCast;
 
@@ -29,14 +28,13 @@ struct WorkerState {
     is_ready: AtomicBool,
 }
 
+type WwSender = Sender<Result<WebWorkerResponsePayload, WebWorkerError>>;
+
+/// Service for communicating with Web Workers.
 pub struct WebWorkerService {
     worker_pool: Vec<Rc<WorkerState>>,
     next_worker: AtomicUsize,
-    pending_requests: Rc<
-        RefCell<
-            HashMap<WebWorkerRequestId, Sender<Result<WebWorkerResponsePayload, WebWorkerError>>>,
-        >,
-    >,
+    pending_requests: Rc<RefCell<HashMap<WebWorkerRequestId, WwSender>>>,
     is_ready: RefCell<Receiver<bool>>,
 }
 
@@ -104,7 +102,7 @@ impl TryFrom<Result<WebWorkerResponsePayload, WebWorkerError>> for RenderBundle 
         match value {
             Ok(WebWorkerResponsePayload::ProcessVtTile { result }) => result.map(|bytes| {
                 let converted: TessellatingRenderBundleBytes =
-                    bincode::deserialize(&bytes).unwrap();
+                    bincode::deserialize(&bytes).expect("Failed to deserialize render bundle bytes");
                 RenderBundle(RenderBundleType::Tessellating(
                     TessellatingRenderBundle::from_bytes_unchecked(converted),
                 ))
@@ -118,6 +116,7 @@ impl TryFrom<Result<WebWorkerResponsePayload, WebWorkerError>> for RenderBundle 
 }
 
 impl WebWorkerService {
+    /// Create new instance of the service.
     pub fn new(worker_count: usize) -> Self {
         let (tx, rx) = tokio::sync::watch::channel(false);
         let mut service = Self {
@@ -133,6 +132,7 @@ impl WebWorkerService {
         service
     }
 
+    /// Pre-render vector tile.
     pub async fn process_vt_tile(
         &self,
         tile: Arc<MvtTile>,
@@ -156,7 +156,7 @@ impl WebWorkerService {
         &self,
         payload: WebWorkerRequestPayload,
     ) -> Result<WebWorkerResponsePayload, WebWorkerError> {
-        self.is_ready.borrow_mut().wait_for(|v| *v).await;
+        self.is_ready.borrow_mut().wait_for(|v| *v).await.expect("failed to read is_ready channel");
 
         let (sender, receiver) = oneshot::channel();
         let request_id = WebWorkerRequestId::next();
@@ -168,7 +168,7 @@ impl WebWorkerService {
 
         log::debug!("Sent request {request_id} to web worker");
 
-        receiver.await.unwrap()
+        receiver.await.expect("failed to read ww result channel")
     }
 
     fn add_request(
@@ -184,8 +184,8 @@ impl WebWorkerService {
     fn send_request(&self, request: &WebWorkerRequest) {
         let worker = self.next_worker();
         worker
-            .post_message(&serde_wasm_bindgen::to_value(request).unwrap())
-            .unwrap();
+            .post_message(&serde_wasm_bindgen::to_value(request).expect("failed to serialize ww request"))
+            .expect("failed to send a message to a web worker");
     }
 
     fn next_worker(&self) -> &web_sys::Worker {
@@ -293,7 +293,7 @@ mod worker {
 
         js_sys::global()
             .dyn_into::<web_sys::DedicatedWorkerGlobalScope>()
-            .unwrap()
+            .expect("failed to get global web worker object")
             .post_message(&js_value)
             .expect("failed to send web worker response");
 

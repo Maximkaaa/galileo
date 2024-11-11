@@ -29,11 +29,15 @@ fn get_layer_style() -> VectorTileStyle {
 #[wasm_bindgen]
 pub async fn init() {
     let (window, event_loop) = common::set_up().await;
+    //
+    // Get your free MapTiler key at https://maptiler.com
+    let api_key = std::env!("VT_API_KEY");
     example::run(
         MapBuilder::new()
             .with_window(window)
             .with_event_loop(event_loop),
         get_layer_style(),
+        api_key,
     )
     .await;
 }
