@@ -130,4 +130,15 @@ impl Map {
     pub fn set_size(&mut self, new_size: Size) {
         self.view = self.view.with_size(new_size);
     }
+
+    /// Sets the new event messenger for the map.
+    pub fn set_messenger(&mut self, messenger: Option<impl Messenger + 'static>) {
+        let messenger: Option<Box<dyn Messenger>> = if let Some(m) = messenger {
+            Some(Box::new(m))
+        } else {
+            None
+        };
+
+        self.messenger = messenger;
+    }
 }

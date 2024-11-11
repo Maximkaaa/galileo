@@ -7,14 +7,16 @@ use crate::render::WgpuRenderer;
 use crate::tile_scheme::{TileIndex, TileSchema};
 use crate::view::MapView;
 use crate::winit::{WinitInputHandler, WinitMessenger};
+use crate::Messenger;
 use galileo_types::cartesian::Size;
 use galileo_types::geo::impls::GeoPoint2d;
 use maybe_sync::{MaybeSend, MaybeSync};
 use std::sync::{Arc, RwLock};
+use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
-use winit::event::{Event, WindowEvent};
+use winit::event::WindowEvent;
 use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::{Window, WindowBuilder};
+use winit::window::Window;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -26,116 +28,126 @@ use wasm_bindgen::prelude::wasm_bindgen;
 /// of how to set up the event loop for Galileo map.
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct GalileoMap {
-    window: Arc<Window>,
+    window: Option<Arc<Window>>,
     map: Arc<RwLock<Map>>,
     backend: Arc<RwLock<Option<WgpuRenderer>>>,
     event_processor: EventProcessor,
     input_handler: WinitInputHandler,
-    event_loop: EventLoop<()>,
+    event_loop: Option<EventLoop<()>>,
+}
+
+impl ApplicationHandler for GalileoMap {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let window = event_loop
+            .create_window(Window::default_attributes().with_inner_size(PhysicalSize {
+                width: 1024,
+                height: 1024,
+            }))
+            .expect("Failed to init a window.");
+
+        let window = Arc::new(window);
+        self.window = Some(window.clone());
+        let messenger = WinitMessenger::new(window.clone());
+
+        self.set_messenger(Some(messenger));
+
+        let backend = self.backend.clone();
+        let map = self.map.clone();
+        crate::async_runtime::spawn(async move {
+            let size = window.inner_size();
+
+            let mut renderer =
+                WgpuRenderer::new_with_window(window.clone(), Size::new(size.width, size.height))
+                    .await
+                    .expect("failed to init renderer");
+
+            let new_size = window.inner_size();
+            if new_size != size {
+                renderer.resize(Size::new(new_size.width, new_size.height));
+            }
+
+            *backend.write().expect("poisoned lock") = Some(renderer);
+            map.write()
+                .expect("poisoned lock")
+                .set_size(Size::new(size.width as f64, size.height as f64));
+            window.request_redraw();
+        });
+    }
+
+    fn suspended(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
+        *self.backend.write().expect("poisoned lock") = None;
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
+        self.map.write().expect("lock is poisoned").animate();
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        match event {
+            WindowEvent::CloseRequested => {
+                event_loop.exit();
+            }
+            WindowEvent::Resized(size) => {
+                log::info!("Window resized to: {size:?}");
+                if let Some(backend) = self.backend.write().expect("lock is poisoned").as_mut() {
+                    backend.resize(Size::new(size.width, size.height));
+
+                    let mut map = self.map.write().expect("lock is poisoned");
+                    map.set_size(Size::new(size.width as f64, size.height as f64));
+                }
+            }
+            WindowEvent::RedrawRequested => {
+                if let Some(backend) = self.backend.read().expect("lock is poisoned").as_ref() {
+                    let map = self.map.read().expect("lock is poisoned");
+                    map.load_layers();
+                    if let Err(err) = backend.render(&map) {
+                        log::error!("Render error: {err:?}");
+                    }
+                }
+            }
+            other => {
+                // Phone emulator in browsers works funny with scaling, using this code fixes it.
+                // But my real phone works fine without it, so it's commented out for now, and probably
+                // should be deleted later, when we know that it's not needed on any devices.
+
+                // #[cfg(target_arch = "wasm32")]
+                // let scale = window.scale_factor();
+                //
+                // #[cfg(not(target_arch = "wasm32"))]
+                let scale = 1.0;
+
+                if let Some(raw_event) = self.input_handler.process_user_input(&other, scale) {
+                    let mut map = self.map.write().expect("lock is poisoned");
+                    self.event_processor.handle(raw_event, &mut map);
+                }
+            }
+        }
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl GalileoMap {
+    fn set_messenger(&mut self, messenger: Option<WinitMessenger>) {
+        let mut map = self.map.write().expect("lock is poisoned");
+        map.set_messenger(messenger.clone());
+
+        if let Some(messenger) = messenger {
+            for layer in map.layers_mut().iter_mut() {
+                let boxed: Box<dyn Messenger> = Box::new(messenger.clone());
+                layer.set_messenger(boxed);
+            }
+        }
+    }
+
     /// Runs the main event loop.
-    pub fn run(self) {
-        let Self {
-            window,
-            map,
-            backend,
-            mut event_processor,
-            mut input_handler,
-            event_loop,
-        } = self;
-
-        event_loop
-            .run(move |event, target| {
-                target.set_control_flow(ControlFlow::Wait);
-
-                match event {
-                    Event::Resumed => {
-                        log::info!("Resume called");
-                        let backend = backend.clone();
-                        let window = window.clone();
-                        let map = map.clone();
-                        crate::async_runtime::spawn(async move {
-                            let size = window.inner_size();
-
-                            let mut renderer = WgpuRenderer::new_with_window(
-                                window.clone(),
-                                Size::new(size.width, size.height),
-                            )
-                            .await
-                            .expect("failed to init renderer");
-
-                            let new_size = window.inner_size();
-                            if new_size != size {
-                                renderer.resize(Size::new(new_size.width, new_size.height));
-                            }
-
-                            *backend.write().expect("poisoned lock") = Some(renderer);
-                            map.write()
-                                .expect("poisoned lock")
-                                .set_size(Size::new(size.width as f64, size.height as f64));
-                            window.request_redraw();
-                        });
-                    }
-                    Event::Suspended => {
-                        *backend.write().expect("poisoned lock") = None;
-                    }
-                    Event::WindowEvent { event, window_id } if window_id == window.id() => {
-                        match event {
-                            WindowEvent::CloseRequested => {
-                                target.exit();
-                            }
-                            WindowEvent::Resized(size) => {
-                                log::info!("Window resized to: {size:?}");
-                                if let Some(backend) =
-                                    backend.write().expect("lock is poisoned").as_mut()
-                                {
-                                    backend.resize(Size::new(size.width, size.height));
-
-                                    let mut map = map.write().expect("lock is poisoned");
-                                    map.set_size(Size::new(size.width as f64, size.height as f64));
-                                }
-                            }
-                            WindowEvent::RedrawRequested => {
-                                if let Some(backend) =
-                                    backend.read().expect("lock is poisoned").as_ref()
-                                {
-                                    let map = map.read().expect("lock is poisoned");
-                                    map.load_layers();
-                                    if let Err(err) = backend.render(&map) {
-                                        log::error!("Render error: {err:?}");
-                                    }
-                                }
-                            }
-                            other => {
-                                // Phone emulator in browsers works funny with scaling, using this code fixes it.
-                                // But my real phone works fine without it, so it's commented out for now, and probably
-                                // should be deleted later, when we know that it's not needed on any devices.
-
-                                // #[cfg(target_arch = "wasm32")]
-                                // let scale = window.scale_factor();
-                                //
-                                // #[cfg(not(target_arch = "wasm32"))]
-                                let scale = 1.0;
-
-                                if let Some(raw_event) =
-                                    input_handler.process_user_input(&other, scale)
-                                {
-                                    let mut map = map.write().expect("lock is poisoned");
-                                    event_processor.handle(raw_event, &mut map);
-                                }
-                            }
-                        }
-                    }
-                    Event::AboutToWait => {
-                        map.write().expect("lock is poisoned").animate();
-                    }
-                    _ => (),
-                }
-            })
-            .expect("error processing event loop");
+    pub fn run(&mut self) {
+        let event_loop = self.event_loop.take().expect("event loop is not created");
+        event_loop.run_app(self).expect("failed to run application");
     }
 }
 
@@ -170,20 +182,10 @@ impl MapBuilder {
             .take()
             .unwrap_or_else(|| EventLoop::new().expect("Failed to create event loop."));
 
+        event_loop.set_control_flow(ControlFlow::Wait);
+
         log::info!("Trying to get window");
 
-        let window = self.window.take().unwrap_or_else(|| {
-            WindowBuilder::new()
-                .with_inner_size(PhysicalSize {
-                    width: 1024,
-                    height: 1024,
-                })
-                .build(&event_loop)
-                .expect("Failed to init a window.")
-        });
-
-        let window = Arc::new(window);
-        let messenger = WinitMessenger::new(window.clone());
         let backend = Arc::new(RwLock::new(None));
 
         let input_handler = WinitInputHandler::default();
@@ -195,12 +197,12 @@ impl MapBuilder {
         event_processor.add_handler(MapController::default());
 
         GalileoMap {
-            window,
-            map: self.build_map(messenger),
+            window: None,
+            map: self.build_map(None),
             backend,
             event_processor,
             input_handler,
-            event_loop,
+            event_loop: Some(event_loop),
         }
     }
 
@@ -262,16 +264,18 @@ impl MapBuilder {
         self
     }
 
-    fn build_map(mut self, messenger: WinitMessenger) -> Arc<RwLock<Map>> {
-        for layer in self.layers.iter_mut() {
-            layer.set_messenger(Box::new(messenger.clone()))
+    fn build_map(mut self, messenger: Option<WinitMessenger>) -> Arc<RwLock<Map>> {
+        if let Some(ref messenger) = messenger {
+            for layer in self.layers.iter_mut() {
+                layer.set_messenger(Box::new(messenger.clone()))
+            }
         }
 
         let view = self
             .view
             .unwrap_or_else(|| MapView::new(&self.position, self.resolution));
 
-        let map = Map::new(view, self.layers, Some(messenger));
+        let map = Map::new(view, self.layers, messenger);
 
         Arc::new(RwLock::new(map))
     }

@@ -66,6 +66,7 @@ impl State {
                     } else {
                         wgpu::Limits::default()
                     },
+                    memory_hints: Default::default(),
                 },
                 None,
             )

@@ -150,11 +150,13 @@ fn default_pipeline_descriptor<'a>(
             module: shader,
             entry_point: "vs_main",
             buffers,
+            compilation_options: Default::default(),
         },
         fragment: Some(wgpu::FragmentState {
             module: shader,
             entry_point: "fs_main",
             targets,
+            compilation_options: Default::default(),
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
@@ -183,5 +185,6 @@ fn default_pipeline_descriptor<'a>(
             alpha_to_coverage_enabled: false,
         },
         multiview: None,
+        cache: Default::default(),
     }
 }
