@@ -56,7 +56,7 @@ impl EguiState {
         response
     }
 
-    pub fn render<'a>(&mut self, wgpu_frame: &'a mut WgpuFrame<'a>, run_ui: impl FnMut(&Context)) {
+    pub fn render(&mut self, wgpu_frame: &mut WgpuFrame, run_ui: impl FnMut(&Context)) {
         let screen_descriptor = ScreenDescriptor {
             size_in_pixels: [wgpu_frame.size.width, wgpu_frame.size.height],
             pixels_per_point: wgpu_frame.window.scale_factor() as f32,
@@ -89,8 +89,8 @@ impl EguiState {
         );
 
         {
-            let encoder = &mut wgpu_frame.encoder;
-            let mut render_pass = encoder
+            let mut render_pass = wgpu_frame
+                .encoder
                 .begin_render_pass(&wgpu::RenderPassDescriptor {
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view: wgpu_frame.texture_view,
