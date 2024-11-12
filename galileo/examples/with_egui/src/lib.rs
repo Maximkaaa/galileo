@@ -14,6 +14,8 @@ pub async fn run(window: Window, event_loop: EventLoop<()>) {
 
     let mut state = state::State::new(Arc::clone(&window)).await;
 
+    // TODO: refactor this to use winit 0.30 approach to handle event loop
+    #[allow(deprecated)]
     let _ = event_loop.run(move |event, ewlt| {
         ewlt.set_control_flow(ControlFlow::Wait);
 

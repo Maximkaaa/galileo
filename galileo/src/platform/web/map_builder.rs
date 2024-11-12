@@ -18,7 +18,7 @@ use std::sync::Arc;
 use wasm_bindgen::prelude::wasm_bindgen;
 use winit::dpi::PhysicalSize;
 use winit::event_loop::EventLoop;
-use winit::window::WindowBuilder;
+use winit::window::Window;
 
 impl MapBuilder {
     /// Creates a raster tile layer.
@@ -86,15 +86,15 @@ impl MapBuilder {
             .event_loop
             .take()
             .unwrap_or_else(|| EventLoop::new().unwrap());
-        let window = self.window.take().unwrap_or_else(|| {
-            WindowBuilder::new()
-                .with_inner_size(PhysicalSize {
-                    width: 1024,
-                    height: 1024,
-                })
-                .build(&event_loop)
-                .unwrap()
-        });
+
+        // TODO: refactor to use winit v0.30 approach to creating window
+        #[allow(deprecated)]
+        let window = event_loop
+            .create_window(Window::default_attributes().with_inner_size(PhysicalSize {
+                width: 1024,
+                height: 1024,
+            }))
+            .expect("failed to create a window");
 
         let canvas = web_sys::Element::from(window.canvas().unwrap());
         container.append_child(&canvas).unwrap();

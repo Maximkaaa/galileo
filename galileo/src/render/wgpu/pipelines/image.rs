@@ -174,7 +174,8 @@ impl ImagePipeline {
             render_pass.set_pipeline(&self.wgpu_pipeline);
         }
 
-        render_pass.set_bind_group(1, &buffers.texture_bind_group, &[]);
+        let bind_group: &BindGroup = &buffers.texture_bind_group;
+        render_pass.set_bind_group(1, bind_group, &[]);
         render_pass.set_vertex_buffer(0, buffers.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         render_pass.draw_indexed(0..INDICES.len() as u32, 0, 0..1);

@@ -351,6 +351,7 @@ impl WgpuRenderer {
                         wgpu::Limits::default()
                     },
                     label: None,
+                    memory_hints: Default::default(),
                 },
                 None,
             )
