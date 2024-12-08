@@ -3,6 +3,7 @@ target
 .tile_cache
 galileo/pkg
 Cargo.lock
+.env
 
 # Ignore large sample files
 **/*.laz
