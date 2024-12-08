@@ -18,7 +18,7 @@ type VectorTileProvider = WebWorkerVectorTileProvider;
 #[cfg(not(target_arch = "wasm32"))]
 fn get_layer_style() -> Option<VectorTileStyle> {
     const STYLE: &str = "galileo/examples/data/vt_style.json";
-    serde_json::from_reader(std::fs::File::open(STYLE).ok()?).ok()
+    Some(serde_json::from_reader(std::fs::File::open(STYLE).ok()?).expect("failed to parse style"))
 }
 
 #[cfg(not(target_arch = "wasm32"))]

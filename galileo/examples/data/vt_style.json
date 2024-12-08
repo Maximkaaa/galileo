@@ -204,6 +204,14 @@
     },
     "polygon": {
       "fill_color": "#00000010"
+    },
+    "point": {
+      "shape": {
+        "type": "Circle",
+        "radius": 1.2,
+        "fill": {"center_color": "#ff0000ff", "side_color": "#ff0000ff"}
+      },
+      "offset": [0.0, 0.0]
     }
   },
   "background": "#fff3e4"
