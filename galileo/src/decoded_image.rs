@@ -121,7 +121,7 @@ impl<'de> Deserialize<'de> for DecodedImage {
 }
 
 struct DecodedImageVisitor {}
-impl<'de> Visitor<'de> for DecodedImageVisitor {
+impl Visitor<'_> for DecodedImageVisitor {
     type Value = DecodedImage;
 
     fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {

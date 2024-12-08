@@ -21,14 +21,14 @@ pub struct FeatureContainer<'a, F> {
     feature_index: usize,
 }
 
-impl<'a, F> FeatureContainer<'a, F> {
+impl<F> FeatureContainer<'_, F> {
     /// Index of the feature in the layer.
     pub fn index(&self) -> usize {
         self.feature_index
     }
 }
 
-impl<'a, F> AsRef<F> for FeatureContainer<'a, F> {
+impl<F> AsRef<F> for FeatureContainer<'_, F> {
     fn as_ref(&self) -> &F {
         self.feature
     }
@@ -117,13 +117,13 @@ impl<'a, F> FeatureContainerMut<'a, F> {
     }
 }
 
-impl<'a, F> AsRef<F> for FeatureContainerMut<'a, F> {
+impl<F> AsRef<F> for FeatureContainerMut<'_, F> {
     fn as_ref(&self) -> &F {
         self.entry.feature()
     }
 }
 
-impl<'a, F> AsMut<F> for FeatureContainerMut<'a, F> {
+impl<F> AsMut<F> for FeatureContainerMut<'_, F> {
     fn as_mut(&mut self) -> &mut F {
         if !self.is_updated {
             self.pending_updates

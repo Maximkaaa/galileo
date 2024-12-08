@@ -1137,7 +1137,7 @@ struct LineVertexConstructor<'a> {
     path: &'a Path,
 }
 
-impl<'a> StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'a> {
+impl StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'_> {
     fn new_vertex(&mut self, mut vertex: StrokeVertex) -> PolyVertex {
         let position = vertex.position_on_path();
         let offset = match vertex.side() {

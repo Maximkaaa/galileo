@@ -5,7 +5,7 @@ use num_traits::{One, Zero};
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Segment<'a, Point>(pub &'a Point, pub &'a Point);
 
-impl<'a, P: CartesianPoint2d> Segment<'a, P> {
+impl<P: CartesianPoint2d> Segment<'_, P> {
     /// Shortest euclidian distance (squared) between a point and the segment:
     ///
     /// * if the normal from the point to the segment ends inside the segment, the returned value is the squared length
