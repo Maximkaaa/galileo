@@ -56,6 +56,11 @@ impl EventProcessor {
         self.handlers.push(Box::new(handler));
     }
 
+    /// Returns true if the processor is currenly tracking dgragging by the pointer.
+    pub fn is_dragging(&self) -> bool {
+        self.drag_target.is_some()
+    }
+
     /// Handles the event.
     pub fn handle(&mut self, event: RawUserEvent, map: &mut Map) {
         if let Some(user_events) = self.process(event) {
@@ -138,10 +143,10 @@ impl EventProcessor {
                     }
 
                     self.last_click_time = now;
+                }
 
-                    if self.drag_target.take().is_some() {
-                        events.push(UserEvent::DragEnded(button, self.get_mouse_event()));
-                    }
+                if self.drag_target.take().is_some() {
+                    events.push(UserEvent::DragEnded(button, self.get_mouse_event()));
                 }
 
                 Some(events)
