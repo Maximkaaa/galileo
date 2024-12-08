@@ -64,7 +64,7 @@ enum RenderTargetTexture<'a> {
     Texture(&'a Texture),
 }
 
-impl<'a> RenderTargetTexture<'a> {
+impl RenderTargetTexture<'_> {
     fn view(&self) -> TextureView {
         match self {
             RenderTargetTexture::Surface(t) => t.texture.create_view(&Default::default()),
@@ -157,7 +157,9 @@ impl WgpuRenderer {
             sample_count: 1,
             dimension: TextureDimension::D2,
             format: TARGET_TEXTURE_FORMAT,
-            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::COPY_SRC,
+            usage: TextureUsages::RENDER_ATTACHMENT
+                | TextureUsages::COPY_SRC
+                | TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         })
     }
@@ -306,6 +308,25 @@ impl WgpuRenderer {
             background: DEFAULT_BACKGROUND,
         };
         renderer.init_render_set(render_target);
+
+        renderer
+    }
+
+    /// Creates a new rendering using the given wgpu device and queue, and rendering to a texture
+    /// with the given size.
+    pub fn new_with_device_and_texture(
+        device: Arc<Device>,
+        queue: Arc<Queue>,
+        size: Size<u32>,
+    ) -> Self {
+        let mut renderer = Self {
+            device,
+            queue,
+            render_set: None,
+            background: DEFAULT_BACKGROUND,
+        };
+
+        renderer.init_target_texture(size);
 
         renderer
     }
@@ -466,7 +487,7 @@ impl WgpuRenderer {
                     surface.configure(&self.device, config);
                 }
                 RenderTarget::Texture(texture, size) => {
-                    *texture = Self::create_target_texture(&self.device, *size);
+                    *texture = Self::create_target_texture(&self.device, new_size);
                     *size = new_size
                 }
             }
@@ -487,6 +508,15 @@ impl WgpuRenderer {
             }) => config.format,
             _ => TARGET_TEXTURE_FORMAT,
         }
+    }
+
+    /// Returns target texture view.
+    ///
+    /// Returns `None` if render target is not initialized.
+    pub fn get_target_texture_view(&self) -> Option<TextureView> {
+        self.render_set
+            .as_ref()
+            .and_then(|rs| rs.render_target.texture().ok().map(|rt| rt.view()))
     }
 
     /// Returns the image of the last render operation.
@@ -695,7 +725,7 @@ impl<'a> WgpuCanvas<'a> {
     }
 }
 
-impl<'a> Canvas for WgpuCanvas<'a> {
+impl Canvas for WgpuCanvas<'_> {
     fn size(&self) -> Size {
         self.renderer.size()
     }
