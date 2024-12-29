@@ -64,8 +64,6 @@ impl Geometry for GeoPoint2d {
 #[macro_export]
 macro_rules! latlon {
     ($lat:expr, $lon:expr) => {
-        <::galileo_types::geo::impls::GeoPoint2d as ::galileo_types::geo::NewGeoPoint<f64>>::latlon(
-            $lat, $lon,
-        )
+        <$crate::geo::impls::GeoPoint2d as $crate::geo::NewGeoPoint<f64>>::latlon($lat, $lon)
     };
 }
