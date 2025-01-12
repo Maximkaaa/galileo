@@ -12,8 +12,8 @@
   },
   "devDependencies": {
     "copy-webpack-plugin": "^5.0.0",
-    "webpack": "^4.29.3",
-    "webpack-cli": "^3.1.0",
-    "webpack-dev-server": "^3.1.5"
+    "webpack": "^5.97",
+    "webpack-cli": "^5.1.0",
+    "webpack-dev-server": "^5.1.0"
   }
 }

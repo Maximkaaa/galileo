@@ -67,6 +67,8 @@ impl ImagePointSymbol {
     /// Loads the image from the file system path.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn from_path(path: &str, offset: Vector2<f32>, scale: f32) -> Result<Self, GalileoError> {
+        use galileo_types::cartesian::Size;
+
         let image = image::io::Reader::open(path)?
             .decode()
             .map_err(|_| GalileoError::ImageDecode)?;
@@ -74,8 +76,7 @@ impl ImagePointSymbol {
         Ok(Self {
             image: Arc::new(DecodedImage::from_raw(
                 Vec::from(image.to_rgba8().deref()),
-                image.width(),
-                image.height(),
+                Size::new(image.width(), image.height()),
             )?),
             offset,
             scale,
@@ -121,6 +122,6 @@ mod tests {
         .unwrap();
         assert_eq!(symbol.image.width(), 62);
         assert_eq!(symbol.image.height(), 99);
-        assert_eq!(symbol.image.bytes().len(), 62 * 99 * 4);
+        assert_eq!(symbol.image.size(), 62 * 99 * 4);
     }
 }

@@ -1,6 +1,6 @@
 //! Platform specific stuff for WASM32 (web) targets.
 
-use crate::decoded_image::DecodedImage;
+use crate::decoded_image::{DecodedImage, DecodedImageType};
 use crate::error::GalileoError;
 use crate::platform::PlatformService;
 use async_trait::async_trait;
@@ -13,10 +13,7 @@ use std::task::{Context, Poll};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{
-    CanvasRenderingContext2d, HtmlCanvasElement, HtmlImageElement, Request, RequestInit,
-    RequestMode, Response, WorkerGlobalScope,
-};
+use web_sys::{HtmlImageElement, Request, RequestInit, RequestMode, Response, WorkerGlobalScope};
 
 pub mod map_builder;
 pub mod vt_processor;
@@ -34,41 +31,11 @@ impl PlatformService for WebPlatformService {
     async fn load_image_url(&self, url: &str) -> Result<DecodedImage, GalileoError> {
         let image = ImageFuture::new(url).await?;
 
-        let canvas: HtmlCanvasElement = web_sys::window()
-            .ok_or(GalileoError::Wasm(Some(
-                "Window element is not available".into(),
-            )))?
-            .document()
-            .ok_or(GalileoError::Wasm(Some(
-                "Document element is not available".into(),
-            )))?
-            .create_element("canvas")?
-            .dyn_into::<HtmlCanvasElement>()?;
+        let window = web_sys::window().expect("no global `window` exists");
+        let image_bitmap_promise = window.create_image_bitmap_with_html_image_element(&image)?;
+        let image_bitmap = JsFuture::from(image_bitmap_promise).await?.dyn_into()?;
 
-        canvas.set_width(image.natural_width());
-        canvas.set_height(image.natural_height());
-
-        let context = canvas
-            .get_context("2d")?
-            .ok_or(GalileoError::Wasm(Some(
-                "Cannot get 2d canvas context".into(),
-            )))?
-            .dyn_into::<CanvasRenderingContext2d>()?;
-
-        context.draw_image_with_html_image_element(&image, 0.0, 0.0)?;
-        let image_data = context.get_image_data(
-            0.0,
-            0.0,
-            image.natural_width() as f64,
-            image.natural_height() as f64,
-        )?;
-
-        let dimensions = (image_data.width(), image_data.height());
-
-        Ok(DecodedImage {
-            bytes: image_data.data().to_vec(),
-            dimensions,
-        })
+        Ok(DecodedImage(DecodedImageType::JsImageBitmap(image_bitmap)))
     }
 
     async fn load_bytes_from_url(&self, url: &str) -> Result<bytes::Bytes, GalileoError> {

@@ -1,4 +1,4 @@
-use crate::decoded_image::DecodedImage;
+use crate::decoded_image::{DecodedImage, DecodedImageType};
 use crate::render::render_bundle::tessellating::ImageVertex;
 use crate::render::wgpu::pipelines;
 use crate::render::wgpu::pipelines::default_targets;
@@ -98,21 +98,59 @@ impl ImagePipeline {
             depth_or_array_layers: 1,
         };
 
-        let texture = device.create_texture_with_data(
-            queue,
-            &wgpu::TextureDescriptor {
-                size: texture_size,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: TextureFormat::Rgba8UnormSrgb,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                label: None,
-                view_formats: &[],
-            },
-            TextureDataOrder::default(),
-            image.bytes(),
-        );
+        let texture = match &image.0 {
+            DecodedImageType::Bitmap { bytes, .. } => device.create_texture_with_data(
+                queue,
+                &wgpu::TextureDescriptor {
+                    size: texture_size,
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: TextureFormat::Rgba8UnormSrgb,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                    label: None,
+                    view_formats: &[],
+                },
+                TextureDataOrder::default(),
+                bytes,
+            ),
+            #[cfg(target_arch = "wasm32")]
+            DecodedImageType::JsImageBitmap(image) => {
+                use wgpu::{ExternalImageSource, ImageCopyExternalImage, Origin2d};
+
+                let texture = device.create_texture(&wgpu::TextureDescriptor {
+                    size: texture_size,
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: TextureFormat::Rgba8UnormSrgb,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING
+                        | wgpu::TextureUsages::COPY_DST
+                        | wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    label: None,
+                    view_formats: &[],
+                });
+                let texture_size = wgpu::Extent3d {
+                    width: image.width(),
+                    height: image.height(),
+                    depth_or_array_layers: 1,
+                };
+                let image = ImageCopyExternalImage {
+                    source: ExternalImageSource::ImageBitmap(image.clone()),
+                    origin: Origin2d::ZERO,
+                    flip_y: false,
+                };
+                queue.copy_external_image_to_texture(
+                    &image,
+                    texture
+                        .as_image_copy()
+                        .to_tagged(wgpu::PredefinedColorSpace::Srgb, false),
+                    texture_size,
+                );
+
+                texture
+            }
+        };
 
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 

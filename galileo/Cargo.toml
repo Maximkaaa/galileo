@@ -18,10 +18,11 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [features]
-default = ["wgpu", "serde", "winit", "cosmic-text", "_tests", "rustybuzz"]
+default = ["wgpu", "serde", "winit", "cosmic-text", "_tests", "rustybuzz", "image"]
 wgpu = ["dep:wgpu", "raw-window-handle"]
 geojson = ["dep:geojson", "galileo-types/geojson"]
 rustybuzz = ["dep:rustybuzz"]
+image = ["dep:image"]
 
 # Used to provide some fixtures for doctests
 _tests = []
@@ -53,6 +54,7 @@ strfmt = "0.2"
 ahash = "0.8"
 rustybuzz = { version = "0.17", optional = true }
 geozero = "0.13.0"
+image = { version = "0.24", default-features = false, features = ["png", "jpeg"], optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 wgpu = { version = "22", optional = true }
@@ -60,7 +62,6 @@ tokio = { version = "1.39", features = ["macros", "rt", "rt-multi-thread"] }
 maybe-sync = { version = "0.1", features = ["sync"] }
 reqwest = "0.11.18"
 rayon = "1.8"
-image = { version = "0.24", default-features = false, features = ["png", "jpeg"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 bytemuck = { version = "1.14", features = ["derive", "extern_crate_alloc"] }
@@ -85,6 +86,7 @@ web-sys = { version = "0.3", features = [
     "HtmlImageElement",
     "HtmlCanvasElement",
     "CanvasRenderingContext2d",
+    "ImageBitmap",
     "ImageData",
     "Request",
     "Headers",

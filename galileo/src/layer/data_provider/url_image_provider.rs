@@ -97,7 +97,7 @@ where
     }
 
     fn decode(&self, bytes: Bytes, _context: ()) -> Result<DecodedImage, GalileoError> {
-        DecodedImage::new(&bytes)
+        DecodedImage::decode(&bytes)
     }
 }
 
