@@ -12,10 +12,13 @@ use galileo_types::cartesian::Size;
 use galileo_types::geo::impls::GeoPoint2d;
 use maybe_sync::{MaybeSend, MaybeSync};
 use std::sync::{Arc, RwLock};
+use wasm_bindgen::JsCast;
+use web_sys::HtmlCanvasElement;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::EventLoop;
+use winit::platform::web::WindowAttributesExtWebSys;
 use winit::window::Window;
 
 #[cfg(target_arch = "wasm32")]
@@ -43,11 +46,36 @@ pub struct GalileoMap {
 
 impl ApplicationHandler for GalileoMap {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let window_size = Size::new(1024, 1024);
+
+        let window_attributes = Window::default_attributes().with_inner_size(PhysicalSize {
+            width: window_size.width(),
+            height: window_size.height(),
+        });
+
+        #[cfg(target_arch = "wasm32")]
+        let window_attributes = {
+            let document = web_sys::window()
+                .expect("failed to get window")
+                .document()
+                .expect("failed to get document");
+            let canvas: HtmlCanvasElement = document
+                .create_element("canvas")
+                .expect("failed to create canvas")
+                .unchecked_into();
+
+            canvas.set_width(window_size.width());
+            canvas.set_height(window_size.height());
+
+            self.dom_container
+                .append_child(&canvas.clone().unchecked_into())
+                .expect("failed to append canvas to the container");
+
+            window_attributes.with_canvas(Some(canvas))
+        };
+
         let window = event_loop
-            .create_window(Window::default_attributes().with_inner_size(PhysicalSize {
-                width: 1024,
-                height: 1024,
-            }))
+            .create_window(window_attributes)
             .expect("Failed to init a window.");
 
         let window = Arc::new(window);
@@ -73,6 +101,10 @@ impl ApplicationHandler for GalileoMap {
 
             let size = window.inner_size();
             log::info!("Window size: {size:?}");
+            log::info!(
+                "Map size: {:?}",
+                map.read().expect("poisoned lock").view().size()
+            );
 
             let mut renderer =
                 WgpuRenderer::new_with_window(window.clone(), Size::new(size.width, size.height))
