@@ -188,7 +188,7 @@ impl TessellatingRenderBundle {
     {
         let opacity = opacity as f32 / 255.0;
 
-        self.buffer_size += image.size()+ size_of::<ImageVertex>() * 4;
+        self.buffer_size += image.size() + size_of::<ImageVertex>() * 4;
 
         let position = [position.x().as_(), position.y().as_()];
         let offset_x = -offset[0] * width;

@@ -122,6 +122,6 @@ mod tests {
         .unwrap();
         assert_eq!(symbol.image.width(), 62);
         assert_eq!(symbol.image.height(), 99);
-        assert_eq!(symbol.image.bytes().len(), 62 * 99 * 4);
+        assert_eq!(symbol.image.size(), 62 * 99 * 4);
     }
 }

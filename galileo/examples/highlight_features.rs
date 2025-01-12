@@ -22,9 +22,9 @@ const GREEN_PIN: &[u8] = include_bytes!("data/pin-green.png");
 
 lazy_static! {
     static ref YELLOW_PIN_IMAGE: Arc<DecodedImage> =
-        Arc::new(DecodedImage::new(YELLOW_PIN).expect("Must have Yellow Pin Image"));
+        Arc::new(DecodedImage::decode(YELLOW_PIN).expect("Must have Yellow Pin Image"));
     static ref GREEN_PIN_IMAGE: Arc<DecodedImage> =
-        Arc::new(DecodedImage::new(GREEN_PIN).expect("Must have Green Pin Image"));
+        Arc::new(DecodedImage::decode(GREEN_PIN).expect("Must have Green Pin Image"));
 }
 
 #[tokio::main]

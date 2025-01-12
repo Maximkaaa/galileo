@@ -12,13 +12,10 @@ use galileo_types::cartesian::Size;
 use galileo_types::geo::impls::GeoPoint2d;
 use maybe_sync::{MaybeSend, MaybeSync};
 use std::sync::{Arc, RwLock};
-use wasm_bindgen::JsCast;
-use web_sys::HtmlCanvasElement;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::EventLoop;
-use winit::platform::web::WindowAttributesExtWebSys;
 use winit::window::Window;
 
 #[cfg(target_arch = "wasm32")]
@@ -55,6 +52,10 @@ impl ApplicationHandler for GalileoMap {
 
         #[cfg(target_arch = "wasm32")]
         let window_attributes = {
+            use wasm_bindgen::JsCast;
+            use web_sys::HtmlCanvasElement;
+            use winit::platform::web::WindowAttributesExtWebSys;
+
             let document = web_sys::window()
                 .expect("failed to get window")
                 .document()
@@ -233,7 +234,7 @@ impl MapBuilder {
             .take()
             .unwrap_or_else(|| EventLoop::new().expect("Failed to create event loop."));
 
-        event_loop.set_control_flow(ControlFlow::Wait);
+        event_loop.set_control_flow(winit::event_loop::ControlFlow::Wait);
 
         log::info!("Trying to get window");
 
@@ -245,7 +246,7 @@ impl MapBuilder {
         for handler in self.event_handlers.drain(..) {
             event_processor.add_handler(handler);
         }
-        event_processor.add_handler(MapController::default());
+        event_processor.add_handler(crate::control::MapController::default());
 
         GalileoMap {
             window: None,

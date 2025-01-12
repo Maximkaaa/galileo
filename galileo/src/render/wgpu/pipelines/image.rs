@@ -6,8 +6,8 @@ use crate::render::RenderOptions;
 use std::sync::Arc;
 use wgpu::util::{DeviceExt, TextureDataOrder};
 use wgpu::{
-    BindGroup, BindGroupLayout, Device, ExternalImageSource, ImageCopyExternalImage, Origin2d,
-    Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, TextureFormat,
+    BindGroup, BindGroupLayout, Device, Queue, RenderPass, RenderPipeline,
+    RenderPipelineDescriptor, TextureFormat,
 };
 
 const INDICES: &[u16] = &[1, 0, 2, 1, 2, 3];
@@ -114,14 +114,19 @@ impl ImagePipeline {
                 TextureDataOrder::default(),
                 bytes,
             ),
+            #[cfg(target_arch = "wasm32")]
             DecodedImageType::JsImageBitmap(image) => {
+                use wgpu::{ExternalImageSource, ImageCopyExternalImage, Origin2d};
+
                 let texture = device.create_texture(&wgpu::TextureDescriptor {
                     size: texture_size,
                     mip_level_count: 1,
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
                     format: TextureFormat::Rgba8UnormSrgb,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING
+                        | wgpu::TextureUsages::COPY_DST
+                        | wgpu::TextureUsages::RENDER_ATTACHMENT,
                     label: None,
                     view_formats: &[],
                 });

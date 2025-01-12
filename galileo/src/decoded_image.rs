@@ -111,7 +111,7 @@ mod serialization {
                     let mut encoded = vec![];
                     let encoder = PngEncoder::new(&mut encoded);
                     if let Err(err) = encoder.write_image(
-                        &bytes,
+                        bytes,
                         dimensions.width(),
                         dimensions.height(),
                         ColorType::Rgba8,
