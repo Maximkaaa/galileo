@@ -135,7 +135,7 @@ impl TessellatingRenderBundle {
     ) -> PrimitiveId {
         let opacity = paint.opacity as f32 / 255.0;
 
-        self.buffer_size += image.bytes().len() + std::mem::size_of::<ImageVertex>() * 4;
+        self.buffer_size += image.size() + std::mem::size_of::<ImageVertex>() * 4;
 
         let index = self.add_image_to_store(Arc::new(image));
         let vertices = [
@@ -188,7 +188,7 @@ impl TessellatingRenderBundle {
     {
         let opacity = opacity as f32 / 255.0;
 
-        self.buffer_size += image.bytes().len() + size_of::<ImageVertex>() * 4;
+        self.buffer_size += image.size()+ size_of::<ImageVertex>() * 4;
 
         let position = [position.x().as_(), position.y().as_()];
         let offset_x = -offset[0] * width;
@@ -373,7 +373,7 @@ impl TessellatingRenderBundle {
                     ImageStoreInfo::Image(image) => {
                         self.vacant_image_store_ids.push(image_id);
 
-                        self.buffer_size -= image.bytes.len() + size_of::<ImageVertex>() * 4;
+                        self.buffer_size -= image.size() + size_of::<ImageVertex>() * 4;
                     }
                 }
             }

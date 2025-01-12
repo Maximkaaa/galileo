@@ -20,7 +20,7 @@ pub enum GalileoError {
     #[error("item not found")]
     NotFound,
     /// Image decoding error.
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(feature = "image")]
     #[error("image decode error")]
     ImageDecode,
     /// Generic error - details are inside.

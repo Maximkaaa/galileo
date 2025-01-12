@@ -1,7 +1,8 @@
-use crate::decoded_image::DecodedImage;
+use crate::decoded_image::{DecodedImage, DecodedImageType};
 use crate::render::render_bundle::tessellating::{
     ImageInfo, ImageStoreInfo, PolyVertex, PrimitiveInfo, ScreenRefVertex, TessellatingRenderBundle,
 };
+use galileo_types::cartesian::Size;
 use lyon::lyon_tessellation::VertexBuffers;
 use serde::{Deserialize, Serialize};
 use std::mem::size_of;
@@ -105,9 +106,13 @@ impl TessellatingRenderBundle {
                 .into_iter()
                 .map(|image_info| match image_info {
                     ImageStoreInfo::Vacant => None,
-                    ImageStoreInfo::Image(image) => {
-                        Some((image.dimensions.0, image.dimensions.1, image.bytes.clone()))
-                    }
+                    ImageStoreInfo::Image(image) => match &image.0 {
+                        DecodedImageType::Bitmap { bytes, dimensions } => {
+                            Some((dimensions.width(), dimensions.height(), bytes.clone()))
+                        }
+                        #[cfg(target_arch = "wasm32")]
+                        _ => panic!("only supported for raw bitmaps"),
+                    },
                 })
                 .collect(),
             vacant_image_ids: self.vacant_image_ids,
@@ -144,10 +149,12 @@ impl TessellatingRenderBundle {
                 .image_store
                 .into_iter()
                 .map(|stored| match stored {
-                    Some((width, height, bytes)) => ImageStoreInfo::Image(Arc::new(DecodedImage {
-                        bytes,
-                        dimensions: (width, height),
-                    })),
+                    Some((width, height, bytes)) => {
+                        ImageStoreInfo::Image(Arc::new(DecodedImage(DecodedImageType::Bitmap {
+                            bytes,
+                            dimensions: Size::new(width, height),
+                        })))
+                    }
                     None => ImageStoreInfo::Vacant,
                 })
                 .collect(),

@@ -29,7 +29,7 @@ impl PlatformService for NativePlatformService {
 
     async fn load_image_url(&self, url: &str) -> Result<DecodedImage, GalileoError> {
         let image_source = self.load_from_web(url).await?;
-        DecodedImage::new(&image_source)
+        DecodedImage::decode(&image_source)
     }
 
     async fn load_bytes_from_url(&self, url: &str) -> Result<Bytes, GalileoError> {

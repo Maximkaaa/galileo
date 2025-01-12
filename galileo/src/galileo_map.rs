@@ -1,4 +1,4 @@
-use crate::control::{EventProcessor, EventPropagation, MapController, UserEvent};
+use crate::control::{EventProcessor, EventPropagation, UserEvent};
 use crate::layer::data_provider::UrlSource;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::Layer;
@@ -15,9 +15,11 @@ use std::sync::{Arc, RwLock};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event_loop::EventLoop;
 use winit::window::Window;
 
+#[cfg(target_arch = "wasm32")]
+use crate::platform::web::map_builder::sleep;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -28,12 +30,15 @@ use wasm_bindgen::prelude::wasm_bindgen;
 /// of how to set up the event loop for Galileo map.
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct GalileoMap {
-    window: Option<Arc<Window>>,
-    map: Arc<RwLock<Map>>,
-    backend: Arc<RwLock<Option<WgpuRenderer>>>,
-    event_processor: EventProcessor,
-    input_handler: WinitInputHandler,
-    event_loop: Option<EventLoop<()>>,
+    pub(crate) window: Option<Arc<Window>>,
+    pub(crate) map: Arc<RwLock<Map>>,
+    pub(crate) backend: Arc<RwLock<Option<WgpuRenderer>>>,
+    pub(crate) event_processor: EventProcessor,
+    pub(crate) input_handler: WinitInputHandler,
+    pub(crate) event_loop: Option<EventLoop<()>>,
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) dom_container: web_sys::Element,
 }
 
 impl ApplicationHandler for GalileoMap {
@@ -46,6 +51,15 @@ impl ApplicationHandler for GalileoMap {
             .expect("Failed to init a window.");
 
         let window = Arc::new(window);
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            use winit::platform::web::WindowExtWebSys;
+
+            let canvas = web_sys::Element::from(window.canvas().unwrap());
+            self.dom_container.append_child(&canvas).unwrap();
+        }
+
         self.window = Some(window.clone());
         let messenger = WinitMessenger::new(window.clone());
 
@@ -54,7 +68,11 @@ impl ApplicationHandler for GalileoMap {
         let backend = self.backend.clone();
         let map = self.map.clone();
         crate::async_runtime::spawn(async move {
+            #[cfg(target_arch = "wasm32")]
+            sleep(1).await;
+
             let size = window.inner_size();
+            log::info!("Window size: {size:?}");
 
             let mut renderer =
                 WgpuRenderer::new_with_window(window.clone(), Size::new(size.width, size.height))
@@ -176,6 +194,7 @@ impl Default for MapBuilder {
 
 impl MapBuilder {
     /// Consturct [`GalileoMap`].
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn build(mut self) -> GalileoMap {
         let event_loop = self
             .event_loop
@@ -264,7 +283,7 @@ impl MapBuilder {
         self
     }
 
-    fn build_map(mut self, messenger: Option<WinitMessenger>) -> Arc<RwLock<Map>> {
+    pub(crate) fn build_map(mut self, messenger: Option<WinitMessenger>) -> Arc<RwLock<Map>> {
         if let Some(ref messenger) = messenger {
             for layer in self.layers.iter_mut() {
                 layer.set_messenger(Box::new(messenger.clone()))

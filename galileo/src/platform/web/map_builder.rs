@@ -1,5 +1,6 @@
 //! Map builder functions specific to Web target.
 
+use crate::control::{EventProcessor, MapController};
 use crate::galileo_map::{GalileoMap, MapBuilder};
 use crate::layer::data_provider::dummy::DummyCacheController;
 use crate::layer::data_provider::UrlImageProvider;
@@ -12,13 +13,12 @@ use crate::platform::web::vt_processor::WebWorkerVtProcessor;
 use crate::platform::web::web_workers::WebWorkerService;
 use crate::platform::{PlatformService, PlatformServiceImpl};
 use crate::tile_scheme::TileIndex;
+use crate::winit::WinitInputHandler;
 use crate::TileSchema;
 use galileo_types::geo::impls::GeoPoint2d;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use wasm_bindgen::prelude::wasm_bindgen;
-use winit::dpi::PhysicalSize;
-use winit::event_loop::EventLoop;
-use winit::window::Window;
+use winit::event_loop::{ControlFlow, EventLoop};
 
 impl MapBuilder {
     /// Creates a raster tile layer.
@@ -80,37 +80,34 @@ impl MapBuilder {
 
     /// Builds the map and adds it to the given parent HTML element.
     pub async fn build_into(mut self, container: web_sys::Element) -> GalileoMap {
-        use winit::platform::web::WindowExtWebSys;
-
         let event_loop = self
             .event_loop
             .take()
-            .unwrap_or_else(|| EventLoop::new().unwrap());
+            .unwrap_or_else(|| EventLoop::new().expect("Failed to create event loop."));
 
-        // TODO: refactor to use winit v0.30 approach to creating window
-        #[allow(deprecated)]
-        let window = event_loop
-            .create_window(Window::default_attributes().with_inner_size(PhysicalSize {
-                width: 1024,
-                height: 1024,
-            }))
-            .expect("failed to create a window");
+        event_loop.set_control_flow(ControlFlow::Wait);
 
-        let canvas = web_sys::Element::from(window.canvas().unwrap());
-        container.append_child(&canvas).unwrap();
+        log::info!("Trying to get window");
 
-        let width = container.client_width() as u32;
-        let height = container.client_height() as u32;
-        log::info!("Requesting canvas size: {width} - {height}");
+        let backend = Arc::new(RwLock::new(None));
 
-        let _ = window.request_inner_size(PhysicalSize { width, height });
+        let input_handler = WinitInputHandler::default();
 
-        sleep(1).await;
+        let mut event_processor = EventProcessor::default();
+        for handler in self.event_handlers.drain(..) {
+            event_processor.add_handler(handler);
+        }
+        event_processor.add_handler(MapController::default());
 
-        self.window = Some(window);
-        self.event_loop = Some(event_loop);
-
-        self.build().await
+        GalileoMap {
+            window: None,
+            map: self.build_map(None),
+            backend,
+            event_processor,
+            input_handler,
+            event_loop: Some(event_loop),
+            dom_container: container,
+        }
     }
 
     /// Adds a new raster tile layer to the layer list.
@@ -136,7 +133,7 @@ impl MapBuilder {
     }
 }
 
-async fn sleep(duration: i32) {
+pub(crate) async fn sleep(duration: i32) {
     let mut cb = |resolve: js_sys::Function, _reject: js_sys::Function| {
         web_sys::window()
             .unwrap()
