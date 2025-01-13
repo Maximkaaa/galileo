@@ -120,3 +120,7 @@ assert_matches = "1.5"
 [[example]]
 name = "render_to_file"
 required-features = ["geojson"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(wasm_bindgen_unstable_test_coverage)'] }
+
