@@ -252,7 +252,7 @@ impl MapBuilder {
             event_processor,
             input_handler,
             event_loop: Some(event_loop),
-            init_size, 
+            init_size,
 
             #[cfg(target_arch = "wasm32")]
             dom_container,
