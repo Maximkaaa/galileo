@@ -9,11 +9,11 @@ mod example;
 
 #[wasm_bindgen]
 pub async fn init() {
-    let (window, event_loop) = common::set_up().await;
+    let (container, size) = common::set_up().await;
     example::run(
         MapBuilder::new()
-            .with_window(window)
-            .with_event_loop(event_loop),
+            .with_size(size.width(), size.height())
+            .with_container(container),
     )
     .await;
 }

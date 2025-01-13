@@ -25,6 +25,7 @@ impl MapBuilder {
             event_handlers: vec![],
             window: None,
             event_loop: None,
+            size: None,
         }
     }
 

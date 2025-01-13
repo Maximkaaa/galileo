@@ -112,11 +112,18 @@ excluded from the workspace (because Cargo does not like cross-platform workspac
 To run those you will need to [install wasm-pack](https://rustwasm.github.io/wasm-pack/installer/):
 
 ```shell
-wasm-pack build wasm_examples/countries --target no-modules --release
+wasm-pack build wasm_examples/feature_layers --target no-modules --release --target-dir target
 ```
 
-After that open `index.html` in your browser (must be served from `localhost`, use your
-favourite developer server).
+After that open `index.html` in your browser. It must be served from `localhost`, use your
+favourite developer server. For example, you can:
+
+```shell
+cd wasm_examples/feature_layers
+python3 -m http.server
+```
+
+Then just open `localhost:8000` in your browser.
 
 ## Android
 

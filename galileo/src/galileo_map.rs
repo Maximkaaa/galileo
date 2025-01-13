@@ -36,14 +36,15 @@ pub struct GalileoMap {
     pub(crate) event_processor: EventProcessor,
     pub(crate) input_handler: WinitInputHandler,
     pub(crate) event_loop: Option<EventLoop<()>>,
+    pub(crate) init_size: Size<u32>,
 
     #[cfg(target_arch = "wasm32")]
-    pub(crate) dom_container: web_sys::Element,
+    pub(crate) dom_container: Option<web_sys::HtmlElement>,
 }
 
 impl ApplicationHandler for GalileoMap {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let window_size = Size::new(1024, 1024);
+        let window_size = self.init_size;
 
         let window_attributes = Window::default_attributes().with_inner_size(PhysicalSize {
             width: window_size.width(),
@@ -68,9 +69,11 @@ impl ApplicationHandler for GalileoMap {
             canvas.set_width(window_size.width());
             canvas.set_height(window_size.height());
 
-            self.dom_container
-                .append_child(&canvas.clone().unchecked_into())
-                .expect("failed to append canvas to the container");
+            if let Some(dom_container) = &self.dom_container {
+                dom_container
+                    .append_child(&canvas.clone().unchecked_into())
+                    .expect("failed to append canvas to the container");
+            }
 
             window_attributes.with_canvas(Some(canvas))
         };
@@ -80,14 +83,6 @@ impl ApplicationHandler for GalileoMap {
             .expect("Failed to init a window.");
 
         let window = Arc::new(window);
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            use winit::platform::web::WindowExtWebSys;
-
-            let canvas = web_sys::Element::from(window.canvas().unwrap());
-            self.dom_container.append_child(&canvas).unwrap();
-        }
 
         self.window = Some(window.clone());
         let messenger = WinitMessenger::new(window.clone());
@@ -101,11 +96,6 @@ impl ApplicationHandler for GalileoMap {
             sleep(1).await;
 
             let size = window.inner_size();
-            log::info!("Window size: {size:?}");
-            log::info!(
-                "Map size: {:?}",
-                map.read().expect("poisoned lock").view().size()
-            );
 
             let mut renderer =
                 WgpuRenderer::new_with_window(window.clone(), Size::new(size.width, size.height))
@@ -217,6 +207,10 @@ pub struct MapBuilder {
     pub(crate) event_handlers: Vec<Box<EventHandler>>,
     pub(crate) window: Option<Window>,
     pub(crate) event_loop: Option<EventLoop<()>>,
+    pub(crate) size: Option<Size<u32>>,
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) dom_container: Option<web_sys::HtmlElement>,
 }
 
 impl Default for MapBuilder {
@@ -227,7 +221,6 @@ impl Default for MapBuilder {
 
 impl MapBuilder {
     /// Consturct [`GalileoMap`].
-    #[cfg(not(target_arch = "wasm32"))]
     pub async fn build(mut self) -> GalileoMap {
         let event_loop = self
             .event_loop
@@ -247,6 +240,10 @@ impl MapBuilder {
             event_processor.add_handler(handler);
         }
         event_processor.add_handler(crate::control::MapController::default());
+        let init_size = self.size.unwrap_or_else(|| Size::new(1024, 1024));
+
+        #[cfg(target_arch = "wasm32")]
+        let dom_container = self.dom_container.clone();
 
         GalileoMap {
             window: None,
@@ -255,6 +252,10 @@ impl MapBuilder {
             event_processor,
             input_handler,
             event_loop: Some(event_loop),
+            init_size,
+
+            #[cfg(target_arch = "wasm32")]
+            dom_container,
         }
     }
 
@@ -285,6 +286,12 @@ impl MapBuilder {
     /// Set the view of the map.
     pub fn with_view(mut self, view: MapView) -> Self {
         self.view = Some(view);
+        self
+    }
+
+    /// Set the initial size of the map in pixels
+    pub fn with_size(mut self, width: u32, height: u32) -> Self {
+        self.size = Some(Size::new(width, height));
         self
     }
 

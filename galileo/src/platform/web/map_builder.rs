@@ -15,6 +15,7 @@ use crate::platform::{PlatformService, PlatformServiceImpl};
 use crate::tile_scheme::TileIndex;
 use crate::winit::WinitInputHandler;
 use crate::TileSchema;
+use galileo_types::cartesian::Size;
 use galileo_types::geo::impls::GeoPoint2d;
 use std::sync::{Arc, RwLock};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -63,7 +64,6 @@ impl MapBuilder {
     /// Creates a new map builder and intializes console logger.
     pub fn new() -> Self {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init_with_level(log::Level::Info).expect("Couldn't init logger");
 
         log::debug!("Logger is initialized");
 
@@ -75,11 +75,13 @@ impl MapBuilder {
             event_handlers: vec![],
             window: None,
             event_loop: None,
+            size: None,
+            dom_container: None,
         }
     }
 
     /// Builds the map and adds it to the given parent HTML element.
-    pub async fn build_into(mut self, container: web_sys::Element) -> GalileoMap {
+    pub async fn build_into(mut self, container: web_sys::HtmlElement) -> GalileoMap {
         let event_loop = self
             .event_loop
             .take()
@@ -99,6 +101,10 @@ impl MapBuilder {
         }
         event_processor.add_handler(MapController::default());
 
+        let width = container.offset_width() as u32;
+        let height = container.offset_height() as u32;
+        let size = Size::new(width, height);
+
         GalileoMap {
             window: None,
             map: self.build_map(None),
@@ -106,7 +112,8 @@ impl MapBuilder {
             event_processor,
             input_handler,
             event_loop: Some(event_loop),
-            dom_container: container,
+            init_size: size,
+            dom_container: Some(container),
         }
     }
 
@@ -129,6 +136,12 @@ impl MapBuilder {
             None,
         )));
 
+        self
+    }
+
+    /// Sets DOM element to add the map canvas into.
+    pub fn with_container(mut self, container: web_sys::HtmlElement) -> Self {
+        self.dom_container = Some(container);
         self
     }
 }
