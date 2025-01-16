@@ -3,22 +3,22 @@ name = "many_points"
 version = "0.1.0"
 edition = "2021"
 
-[lib]
-crate-type = ["cdylib"]
-
 [dependencies]
-winit = { version ="0.30", features = ["rwh_05"] }
-galileo = { path = "../../galileo" }
-galileo-types = { path = "../../galileo-types" }
 console_error_panic_hook = "0.1"
 console_log = "1.0"
-wasm-bindgen = "0.2"
-log = "0.4"
-wasm-bindgen-futures = "0.4"
+galileo = { path = "../../galileo" }
+galileo-types = { path = "../../galileo-types" }
 js-sys = { version = "0.3" }
+log = "0.4"
+num-traits = "0.2.17"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = [
     "Document",
     "Window",
     "Element",
-]}
-num-traits = "0.2.17"
+] }
+winit = { version = "0.30", features = ["rwh_05"] }
+
+[lib]
+crate-type = ["cdylib"]

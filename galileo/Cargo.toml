@@ -9,13 +9,7 @@ keywords.workspace = true
 documentation = "https://docs.rs/galileo"
 description = "Cross-platform general purpose map rendering engine"
 readme = "../README.md"
-exclude = [
-    "examples/data",
-]
-
-[lib]
-crate-type = ["cdylib", "rlib"]
-doctest = false
+exclude = ["examples/data"]
 
 [features]
 default = ["wgpu", "serde", "winit", "cosmic-text", "_tests", "rustybuzz", "image"]
@@ -28,33 +22,52 @@ image = ["dep:image"]
 _tests = []
 
 [dependencies]
-cfg-if = "1"
+ahash = "0.8"
 async-trait = "0.1.68"
+base64 = "0.21"
 bytemuck = { version = "1.14", features = ["derive"] }
 bytes = "1.4.0"
+cfg-if = "1"
+cosmic-text = { version = "0.12", optional = true }
 futures = "0.3.28"
-winit = { version = "0.30", features = ["rwh_06"], optional = true }
+futures-intrusive = "0.5"
+galileo-mvt = { path = "../galileo-mvt", version = "0.1.1" }
+galileo-types = { path = "../galileo-types", version = "0.1.1" }
+geojson = { version = "0.24", optional = true }
+geozero = "0.13.0"
+image = { version = "0.24", default-features = false, features = ["png", "jpeg"], optional = true }
 lazy_static = "1.4"
 log = "0.4"
 lyon = { version = "1" }
-galileo-types = { path = "../galileo-types", version = "0.1.1" }
-galileo-mvt = { path = "../galileo-mvt", version = "0.1.1" }
-num-traits = "0.2.17"
-serde = { version = "1.0", optional = true, features = ["std", "derive", "rc"] }
-web-time = "1.0"
-thiserror = "1.0"
 nalgebra = "0.32"
+num-traits = "0.2.17"
 quick_cache = "0.4"
-futures-intrusive = "0.5"
-geojson = { version = "0.24", optional = true }
 raw-window-handle = { version = "0.6", optional = true }
-cosmic-text = { version = "0.12", optional = true }
-base64 = "0.21"
-strfmt = "0.2"
-ahash = "0.8"
 rustybuzz = { version = "0.17", optional = true }
-geozero = "0.13.0"
-image = { version = "0.24", default-features = false, features = ["png", "jpeg"], optional = true }
+serde = { version = "1.0", optional = true, features = ["std", "derive", "rc"] }
+strfmt = "0.2"
+thiserror = "1.0"
+web-time = "1.0"
+winit = { version = "0.30", features = ["rwh_06"], optional = true }
+
+[dev-dependencies]
+anyhow = "1.0"
+approx = "0.5"
+assert_matches = "1.5"
+bincode = "1.3"
+csv = "1.3"
+env_logger = "0.11"
+geo = "0.27"
+geo-types = "0.7"
+geojson = "0.24"
+las = { version = "0.8", features = ["laz"] }
+notify = "6.1"
+serde_json = "1.0"
+tokio-test = "0.4"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 wgpu = { version = "22", optional = true }
@@ -101,21 +114,6 @@ web-sys = { version = "0.3", features = [
 [target.'cfg(target_os = "android")'.dependencies]
 reqwest = { version = "0.11.18", features = ["native-tls-vendored"] }
 winit = { version = "0.30", features = ["android-native-activity"] }
-
-[dev-dependencies]
-tokio-test = "0.4"
-env_logger = "0.11"
-serde_json = "1.0"
-notify = "6.1"
-bincode = "1.3"
-approx = "0.5"
-geo = "0.27"
-csv = "1.3"
-geo-types = "0.7"
-las = { version = "0.8", features = ["laz"] }
-anyhow = "1.0"
-geojson = "0.24"
-assert_matches = "1.5"
 
 [[example]]
 name = "render_to_file"

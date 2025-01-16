@@ -14,10 +14,10 @@ readme = "../README.md"
 default = ["geo-types", "geodesy"]
 
 [dependencies]
-num-traits = "0.2.17"
-nalgebra = "0.32"
-serde = { version = "1.0", features = ["derive"] }
-geodesy = { version = "0.12", optional = true }
 geo-types = { version = "0.7", optional = true }
+geodesy = { version = "0.12", optional = true }
 geojson = { version = "0.24", optional = true }
+nalgebra = "0.32"
+num-traits = "0.2.17"
+serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
