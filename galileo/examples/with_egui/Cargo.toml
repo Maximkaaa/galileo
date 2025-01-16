@@ -3,9 +3,6 @@ edition = "2021"
 name = "with_egui"
 version = "0.1.0"
 
-[[bin]]
-name = "with_egui"
-
 [dependencies]
 egui = "0.29"
 egui-wgpu = "0.29"
@@ -15,6 +12,9 @@ galileo = { path = "../../../galileo" }
 galileo-types = { path = "../../../galileo-types" }
 wgpu = { version = "22", default-features = false }
 winit = { version = "0.30", default-features = false }
+
+[[bin]]
+name = "with_egui"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.0", default-features = false, features = ["full"] }
