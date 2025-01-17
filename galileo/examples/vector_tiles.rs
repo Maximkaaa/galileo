@@ -55,20 +55,18 @@ async fn main() {
 }
 
 pub async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: String) {
-    let layer =
-        Arc::new(RwLock::new(
-            MapBuilder::create_vector_tile_layer(
-                move |&index: &TileIndex| {
-                    format!(
-                    "https://api.maptiler.com/tiles/v3-openmaptiles/{z}/{x}/{y}.pbf?key={api_key}",
-                    z = index.z, x = index.x, y = index.y
-                )
-                },
-                tile_scheme(),
-                style,
+    let layer = Arc::new(RwLock::new(MapBuilder::create_vector_tile_layer(
+        move |&index: &TileIndex| {
+            format!(
+                "https://api.maptiler.com/tiles/v3-openmaptiles/{z}/{x}/{y}.pbf?key={api_key}",
+                z = index.z,
+                x = index.x,
+                y = index.y
             )
-            .await,
-        ));
+        },
+        tile_scheme(),
+        style,
+    )));
 
     builder
         .with_layer(layer.clone())

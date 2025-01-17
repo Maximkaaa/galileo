@@ -43,11 +43,11 @@ impl VectorTileProcessor for WebWorkerVtProcessor {
         self.styles.borrow().get(&style_id).cloned()
     }
 
-    async fn add_style(&self, style_id: VtStyleId, style: VectorTileStyle) {
+    fn add_style(&self, style_id: VtStyleId, style: VectorTileStyle) {
         self.styles.borrow_mut().insert(style_id, Arc::new(style));
     }
 
-    async fn drop_style(&self, style_id: VtStyleId) {
+    fn drop_style(&self, style_id: VtStyleId) {
         self.styles.borrow_mut().remove(&style_id);
     }
 

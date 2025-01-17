@@ -85,12 +85,12 @@ where
     }
 
     /// Creates a new layer with the given url source.
-    pub async fn from_url(
+    pub fn from_url(
         mut tile_provider: VectorTileProvider<Loader, Processor>,
         style: VectorTileStyle,
         tile_scheme: TileSchema,
     ) -> Self {
-        let style_id = tile_provider.add_style(style).await;
+        let style_id = tile_provider.add_style(style);
         Self {
             tile_provider,
             tile_scheme,
@@ -141,8 +141,8 @@ where
     }
 
     /// Change style of the layer and redraw it.
-    pub async fn update_style(&mut self, style: VectorTileStyle) {
-        let new_style_id = self.tile_provider.add_style(style).await;
+    pub fn update_style(&mut self, style: VectorTileStyle) {
+        let new_style_id = self.tile_provider.add_style(style);
         self.style_id = new_style_id;
     }
 

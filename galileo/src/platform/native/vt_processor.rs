@@ -49,14 +49,14 @@ impl VectorTileProcessor for ThreadVtProcessor {
             .cloned()
     }
 
-    async fn add_style(&self, style_id: VtStyleId, style: VectorTileStyle) {
+    fn add_style(&self, style_id: VtStyleId, style: VectorTileStyle) {
         self.styles
             .write()
             .expect("lock is poisoned")
             .insert(style_id, Arc::new(style));
     }
 
-    async fn drop_style(&self, style_id: VtStyleId) {
+    fn drop_style(&self, style_id: VtStyleId) {
         self.styles
             .write()
             .expect("lock is poisoned")

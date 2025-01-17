@@ -88,16 +88,16 @@ where
     }
 
     /// Register a new style in the provider.
-    pub async fn add_style(&mut self, style: VectorTileStyle) -> VtStyleId {
+    pub fn add_style(&mut self, style: VectorTileStyle) -> VtStyleId {
         let id = VtStyleId::next_id();
-        self.processor.add_style(id, style).await;
+        self.processor.add_style(id, style);
 
         id
     }
 
     /// Removes the style from the list of registerred styles.
-    pub async fn drop_style(&mut self, style_id: VtStyleId) {
-        self.processor.drop_style(style_id).await;
+    pub fn drop_style(&mut self, style_id: VtStyleId) {
+        self.processor.drop_style(style_id);
     }
 
     /// Load and pre-render the tile with given index using given style.
