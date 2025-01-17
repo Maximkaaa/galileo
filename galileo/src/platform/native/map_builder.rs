@@ -59,13 +59,13 @@ impl MapBuilder {
     }
 
     /// Create a new vector tile layer.
-    pub async fn create_vector_tile_layer(
+    pub fn create_vector_tile_layer(
         tile_source: impl UrlSource<TileIndex> + 'static,
         tile_schema: TileSchema,
         style: VectorTileStyle,
     ) -> VectorTileLayer<WebVtLoader<FileCacheController>, ThreadVtProcessor> {
         let tile_provider = Self::create_vector_tile_provider(tile_source, tile_schema.clone());
-        VectorTileLayer::from_url(tile_provider, style, tile_schema).await
+        VectorTileLayer::from_url(tile_provider, style, tile_schema)
     }
 
     /// Returns a vector tile provider.

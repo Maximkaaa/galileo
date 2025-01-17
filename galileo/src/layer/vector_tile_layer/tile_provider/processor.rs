@@ -31,9 +31,9 @@ pub trait VectorTileProcessor {
     /// Returns a style with the given id.
     fn get_style(&self, style_id: VtStyleId) -> Option<Arc<VectorTileStyle>>;
     /// Registers a vector tile style.
-    async fn add_style(&self, style_id: VtStyleId, style: VectorTileStyle);
+    fn add_style(&self, style_id: VtStyleId, style: VectorTileStyle);
     /// Removes the style from the list.
-    async fn drop_style(&self, style_id: VtStyleId);
+    fn drop_style(&self, style_id: VtStyleId);
     /// Convert the tile into render bundle using the given style.
     ///
     /// The style with the given id must first be registerred in the processor using [`add_style`]

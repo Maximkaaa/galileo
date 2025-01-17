@@ -64,8 +64,7 @@ pub async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: String) {
         tile_schema(),
     );
 
-    let graphics_layer =
-        VectorTileLayer::from_url(tile_provider.clone(), style, tile_schema()).await;
+    let graphics_layer = VectorTileLayer::from_url(tile_provider.clone(), style, tile_schema());
 
     let style = VectorTileStyle {
         rules: vec![],
@@ -85,7 +84,7 @@ pub async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: String) {
         },
         background: Default::default(),
     };
-    let label_layer = VectorTileLayer::from_url(tile_provider, style, tile_schema()).await;
+    let label_layer = VectorTileLayer::from_url(tile_provider, style, tile_schema());
 
     builder
         .with_layer(graphics_layer)
