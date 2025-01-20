@@ -119,6 +119,6 @@ winit = { version = "0.30", features = ["android-native-activity"] }
 name = "render_to_file"
 required-features = ["geojson"]
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(wasm_bindgen_unstable_test_coverage)'] }
+[lints]
+workspace = true
 
