@@ -105,7 +105,7 @@ impl<'a> PointPaint<'a> {
     }
 
     /// Creates a paint that draws given text label with the specified style.
-    pub fn label_owed(text: String, style: TextStyle) -> Self {
+    pub fn label_owned(text: String, style: TextStyle) -> Self {
         Self {
             offset: Vector2::new(0.0, 0.0),
             shape: PointShape::Label {

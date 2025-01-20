@@ -2,7 +2,6 @@
   "rules": [
     {
       "layer_name": "park",
-      "symbol": {},
       "properties": {
         "class": "protected_area"
       }
@@ -179,7 +178,6 @@
     },
     {
       "layer_name": "park",
-      "symbol": {},
       "properties": {
         "class": "национальный_парк"
       }
@@ -206,12 +204,8 @@
       "fill_color": "#00000010"
     },
     "point": {
-      "shape": {
-        "type": "Circle",
-        "radius": 1.2,
-        "fill": {"center_color": "#ff0000ff", "side_color": "#ff0000ff"}
-      },
-      "offset": [0.0, 0.0]
+      "size": 2.4,
+      "color": "#ff0000ff"
     }
   },
   "background": "#fff3e4"

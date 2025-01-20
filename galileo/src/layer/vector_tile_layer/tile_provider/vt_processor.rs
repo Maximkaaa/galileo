@@ -1,9 +1,9 @@
 use crate::error::GalileoError;
 use crate::layer::data_provider::DataProcessor;
-use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::render::point_paint::{PointPaint, PointShape};
+use crate::layer::vector_tile_layer::style::{VectorTileLabelSymbol, VectorTileStyle};
+use crate::render::point_paint::PointPaint;
 use crate::render::render_bundle::{RenderBundle, RenderPrimitive};
-use crate::render::{LineCap, LinePaint, PolygonPaint};
+use crate::render::{LinePaint, PolygonPaint};
 use crate::tile_scheme::TileIndex;
 use crate::TileSchema;
 use bytes::Bytes;
@@ -103,32 +103,12 @@ impl VtProcessor {
             for feature in &layer.features {
                 match &feature.geometry {
                     MvtGeometry::Point(points) => {
-                        // let label = if feature.properties.contains_key("name") {
-                        //     feature.properties.get("name").as_ref().unwrap().to_string()
-                        // } else {
-                        //     let Some(value) = feature.properties.values().next() else {
-                        //         continue;
-                        //     };
-                        //
-                        //     value.to_string()
-                        // };
-                        //
-                        // let label: String = label.chars().take(20).collect();
-                        // let style = TextStyle {
-                        //     font_name: "Noto Sans".into(),
-                        //     font_size: 20.0,
-                        //     font_color: Color::RED,
-                        //     horizontal_alignment: HorizontalAlignment::Left,
-                        //     vertical_alignment: VerticalAlignment::Top,
-                        // };
-
                         let Some(paint) = Self::get_point_symbol(style, &layer.name, feature)
                         else {
                             continue;
                         };
 
                         for point in points {
-                            // let paint = PointPaint::label(&label, &style);
                             bundle.add(RenderPrimitive::<_, _, galileo_types::impls::Contour<_>, Polygon<_>>::new_point_ref(&Self::transform_point(point, bbox, tile_resolution), &paint), lod_resolution);
                         }
                     }
@@ -180,25 +160,43 @@ impl VtProcessor {
         layer_name: &str,
         feature: &MvtFeature,
     ) -> Option<PointPaint<'a>> {
-        let mut paint = Self::get_point_paint(style, layer_name, feature)?.clone();
-        if let PointShape::Label { text, .. } = &mut paint.shape {
-            let formatted = strfmt(text, &feature.properties).ok()?;
-            *text.to_mut() = formatted;
-        }
-
-        Some(paint)
+        style
+            .get_style_rule(layer_name, feature)
+            .and_then(|rule| {
+                rule.symbol
+                    .point()
+                    .copied()
+                    .map(|symbol| symbol.into())
+                    .or_else(|| {
+                        rule.symbol
+                            .label()
+                            .and_then(|symbol| Self::format_label(symbol, feature))
+                    })
+            })
+            .or_else(|| {
+                style
+                    .default_symbol
+                    .point
+                    .map(|symbol| symbol.into())
+                    .or_else(|| {
+                        style
+                            .default_symbol
+                            .label
+                            .as_ref()
+                            .and_then(|symbol| Self::format_label(symbol, feature))
+                    })
+            })
     }
 
-    fn get_point_paint<'a>(
-        style: &'a VectorTileStyle,
-        layer_name: &str,
+    fn format_label<'a>(
+        label_symbol: &VectorTileLabelSymbol,
         feature: &MvtFeature,
-    ) -> Option<&'a PointPaint<'a>> {
-        let Some(rule) = style.get_style_rule(layer_name, feature) else {
-            return style.default_symbol.point.as_ref();
-        };
-
-        rule.symbol.point.as_ref()
+    ) -> Option<PointPaint<'a>> {
+        let text = strfmt(&label_symbol.pattern, &feature.properties).ok()?;
+        Some(PointPaint::label_owned(
+            text,
+            label_symbol.text_style.clone(),
+        ))
     }
 
     fn get_line_symbol(
@@ -206,24 +204,11 @@ impl VtProcessor {
         layer_name: &str,
         feature: &MvtFeature,
     ) -> Option<LinePaint> {
-        let Some(rule) = style.get_style_rule(layer_name, feature) else {
-            let symbol = style.default_symbol.line.as_ref()?;
-            return Some(LinePaint {
-                width: symbol.width,
-                color: symbol.stroke_color,
-                offset: 0.0,
-                line_cap: LineCap::Butt,
-            });
-        };
-
-        let symbol = rule.symbol.line.as_ref()?;
-
-        Some(LinePaint {
-            width: symbol.width,
-            color: symbol.stroke_color,
-            offset: 0.0,
-            line_cap: LineCap::Butt,
-        })
+        style
+            .get_style_rule(layer_name, feature)
+            .and_then(|rule| rule.symbol.line().copied())
+            .or(style.default_symbol.line)
+            .map(|symbol| symbol.into())
     }
 
     fn get_polygon_symbol(
@@ -231,15 +216,11 @@ impl VtProcessor {
         layer_name: &str,
         feature: &MvtFeature,
     ) -> Option<PolygonPaint> {
-        let Some(rule) = style.get_style_rule(layer_name, feature) else {
-            return Some(PolygonPaint {
-                color: style.default_symbol.polygon.as_ref()?.fill_color,
-            });
-        };
-
-        Some(PolygonPaint {
-            color: rule.symbol.polygon.as_ref()?.fill_color,
-        })
+        style
+            .get_style_rule(layer_name, feature)
+            .and_then(|rule| rule.symbol.polygon().copied())
+            .or(style.default_symbol.polygon)
+            .map(|symbol| symbol.into())
     }
 
     fn transform_point<Num: num_traits::Float + ToPrimitive>(
