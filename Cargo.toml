@@ -26,3 +26,9 @@ keywords = ["gis", "map", "rendering"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Maximkaaa/galileo"
 version = "0.1.1"
+
+[workspace.lints]
+rust.missing_docs = "warn"
+rust.unexpected_cfgs = { level = "warn", check-cfg = ['cfg(wasm_bindgen_unstable_test_coverage)'] }
+clippy.unwrap_used = "warn"
+

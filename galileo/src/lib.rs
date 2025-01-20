@@ -65,9 +65,6 @@
 //!   some intermediate representation, more convenient to deal with, and some
 //! * [`controls`](control) that actually change state of the map or layers based on the user input.
 
-#![warn(clippy::unwrap_used)]
-#![warn(missing_docs)]
-
 pub(crate) mod async_runtime;
 mod color;
 pub mod control;

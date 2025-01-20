@@ -80,9 +80,6 @@
 //! * `geo-types` - enabled by `geo-types` feature
 //! * `geojson` - enabled by `geojson` feature
 
-#![warn(clippy::unwrap_used)]
-#![warn(missing_docs)]
-
 pub mod cartesian;
 pub mod contour;
 mod disambig;

@@ -1,7 +1,9 @@
 //! See [`VectorTileStyle`].
 
-use crate::render::point_paint::PointPaint;
-use crate::Color;
+use crate::{
+    render::{point_paint::PointPaint, text::TextStyle, LineCap, LinePaint, PolygonPaint},
+    Color,
+};
 use galileo_mvt::MvtFeature;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -16,10 +18,26 @@ pub struct VectorTileStyle {
     pub rules: Vec<StyleRule>,
 
     /// Default symbol that is used for features, for which other rules don't apply.
-    pub default_symbol: VectorTileSymbol,
+    pub default_symbol: VectorTileDefaultSymbol,
 
     /// Background color of tiles.
     pub background: Color,
+}
+
+/// Default symbol of the vector tile.
+///
+/// These symbols are applied to the features in the tile if no of the style rules are selected for
+/// this feature.
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct VectorTileDefaultSymbol {
+    /// Symbol for point objects.
+    pub point: Option<VectorTilePointSymbol>,
+    /// Symbol for line objects.
+    pub line: Option<VectorTileLineSymbol>,
+    /// Symbol for polygon objects.
+    pub polygon: Option<VectorTilePolygonSymbol>,
+    /// Symbol for point objects that should have text labels.
+    pub label: Option<VectorTileLabelSymbol>,
 }
 
 impl VectorTileStyle {
@@ -49,33 +67,73 @@ pub struct StyleRule {
     #[serde(default)]
     pub properties: HashMap<String, String>,
     /// Symbol to draw a feature with.
+    #[serde(default, skip_serializing_if = "VectorTileSymbol::is_none")]
     pub symbol: VectorTileSymbol,
 }
 
-/// Symbol to draw a vector tile feature.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct VectorTileSymbol {
-    /// If set, points will be drawn with this symbol.
-    pub point: Option<PointPaint<'static>>,
-    /// If set, lines will be drawn with this symbol.
-    pub line: Option<VectorTileLineSymbol>,
-    /// If set, polygons will be drawn with this symbol.
-    pub polygon: Option<VectorTilePolygonSymbol>,
+/// Symbol of an object in a vector tile.
+///
+/// An the object has incompatible type with the symbol, the object is not renderred.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum VectorTileSymbol {
+    /// Do not render object.
+    None,
+    /// Symbol for a point object.
+    #[serde(rename = "point")]
+    Point(VectorTilePointSymbol),
+    /// Symbol for a line object.
+    #[serde(rename = "line")]
+    Line(VectorTileLineSymbol),
+    /// Symbol for a polygon object.
+    #[serde(rename = "polygon")]
+    Polygon(VectorTilePolygonSymbol),
+    /// Symbol for a point object that is renderred as a text label.
+    #[serde(rename = "label")]
+    Label(VectorTileLabelSymbol),
+}
+
+impl Default for VectorTileSymbol {
+    fn default() -> Self {
+        Self::None
+    }
 }
 
 impl VectorTileSymbol {
-    /// Creates a new symbol for polygon geometries.
-    pub fn polygon(color: Color) -> Self {
-        Self {
-            point: None,
-            line: None,
-            polygon: Some(VectorTilePolygonSymbol { fill_color: color }),
+    pub(crate) fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+
+    pub(crate) fn line(&self) -> Option<&VectorTileLineSymbol> {
+        match self {
+            Self::Line(symbol) => Some(symbol),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn polygon(&self) -> Option<&VectorTilePolygonSymbol> {
+        match self {
+            Self::Polygon(symbol) => Some(symbol),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn point(&self) -> Option<&VectorTilePointSymbol> {
+        match self {
+            Self::Point(symbol) => Some(symbol),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn label(&self) -> Option<&VectorTileLabelSymbol> {
+        match self {
+            Self::Label(symbol) => Some(symbol),
+            _ => None,
         }
     }
 }
 
 /// Symbol for point geometries.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct VectorTilePointSymbol {
     /// Size of the point.
     pub size: f64,
@@ -83,8 +141,14 @@ pub struct VectorTilePointSymbol {
     pub color: Color,
 }
 
+impl From<VectorTilePointSymbol> for PointPaint<'_> {
+    fn from(value: VectorTilePointSymbol) -> Self {
+        PointPaint::circle(value.color, value.size as f32)
+    }
+}
+
 /// Symbol for line geometries.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct VectorTileLineSymbol {
     /// Width of the line in pixels.
     pub width: f64,
@@ -92,9 +156,57 @@ pub struct VectorTileLineSymbol {
     pub stroke_color: Color,
 }
 
+impl From<VectorTileLineSymbol> for LinePaint {
+    fn from(value: VectorTileLineSymbol) -> Self {
+        Self {
+            color: value.stroke_color,
+            width: value.width,
+            offset: 0.0,
+            line_cap: LineCap::Butt,
+        }
+    }
+}
+
 /// Symbol for polygon geometries.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct VectorTilePolygonSymbol {
     /// Color of the fill of polygon.
     pub fill_color: Color,
+}
+
+impl From<VectorTilePolygonSymbol> for PolygonPaint {
+    fn from(value: VectorTilePolygonSymbol) -> Self {
+        Self {
+            color: value.fill_color,
+        }
+    }
+}
+
+/// Symbol of a point geometry that is renderred as text label on the map.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VectorTileLabelSymbol {
+    /// Text of the label with substitutes for feature attributes.
+    pub pattern: String,
+    /// Style of the text.
+    pub text_style: TextStyle,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn symbol_serialization_point() {
+        let symbol = VectorTileSymbol::Point(VectorTilePointSymbol {
+            size: 10.0,
+            color: Color::BLACK,
+        });
+
+        let json = serde_json::to_string_pretty(&symbol).unwrap();
+        eprintln!("{json}");
+
+        let value = serde_json::to_value(&symbol).unwrap();
+        assert!(value.as_object().unwrap().get("point").is_some());
+        assert!(value.as_object().unwrap().get("polygon").is_none());
+    }
 }

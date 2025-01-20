@@ -1,5 +1,7 @@
 use bytes::Bytes;
-use galileo::layer::vector_tile_layer::style::{VectorTileStyle, VectorTileSymbol};
+use galileo::layer::vector_tile_layer::style::{
+    VectorTileDefaultSymbol, VectorTileLabelSymbol, VectorTileStyle, VectorTileSymbol,
+};
 #[cfg(target_arch = "wasm32")]
 use galileo::layer::vector_tile_layer::tile_provider::WebWorkerVectorTileProvider;
 use galileo::layer::vector_tile_layer::VectorTileLayer;
@@ -68,19 +70,18 @@ pub async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: String) {
 
     let style = VectorTileStyle {
         rules: vec![],
-        default_symbol: VectorTileSymbol {
-            point: Some(PointPaint::label_owed(
-                "{name_en}".into(),
-                TextStyle {
+        default_symbol: VectorTileDefaultSymbol {
+            label: Some(VectorTileLabelSymbol {
+                pattern: "{name_en}".into(),
+                text_style: TextStyle {
                     font_name: "Noto Sans".to_string(),
                     font_size: 12.0,
                     font_color: Color::BLACK,
                     horizontal_alignment: Default::default(),
                     vertical_alignment: Default::default(),
                 },
-            )),
-            line: None,
-            polygon: None,
+            }),
+            ..Default::default()
         },
         background: Default::default(),
     };
