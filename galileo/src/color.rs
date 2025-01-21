@@ -113,6 +113,26 @@ impl Color {
     pub fn is_transparent(&self) -> bool {
         self.a == 0
     }
+
+    /// Red component of the color in RGBA space.
+    pub fn r(&self) -> u8 {
+        self.r
+    }
+
+    /// Green component of the color in RGBA space.
+    pub fn g(&self) -> u8 {
+        self.g
+    }
+
+    /// Blue component of the color in RGBA space.
+    pub fn b(&self) -> u8 {
+        self.b
+    }
+
+    /// Opacity component of the color.
+    pub fn a(&self) -> u8 {
+        self.a
+    }
 }
 
 const fn decode_byte(chars: &[u8]) -> u8 {
@@ -142,6 +162,6 @@ mod tests {
         let color = Color::try_from_hex(hex).unwrap();
         assert_eq!(&color.to_hex(), hex);
 
-        assert_eq!(Color::from_hex(&hex), color);
+        assert_eq!(Color::from_hex(hex), color);
     }
 }
