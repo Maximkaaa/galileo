@@ -41,20 +41,18 @@ impl VtStyleId {
 }
 
 /// Provider of vector tiles for a vector tile layer.
-pub struct VectorTileProvider<Loader, Processor>
+pub struct VectorTileProvider<Processor>
 where
-    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
     Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
 {
     tiles: Arc<RwLock<TileStore>>,
-    loader: Arc<Loader>,
+    loader: Arc<dyn VectorTileLoader>,
     processor: Arc<Processor>,
     messenger: Option<Arc<dyn Messenger>>,
 }
 
-impl<Loader, Processor> Clone for VectorTileProvider<Loader, Processor>
+impl<Processor> Clone for VectorTileProvider<Processor>
 where
-    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
     Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
 {
     fn clone(&self) -> Self {
@@ -67,13 +65,12 @@ where
     }
 }
 
-impl<Loader, Processor> VectorTileProvider<Loader, Processor>
+impl<Processor> VectorTileProvider<Processor>
 where
-    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
     Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
 {
     /// Create a new instance of the provider.
-    pub fn new(loader: Arc<Loader>, processor: Arc<Processor>) -> Self {
+    pub fn new(loader: Arc<dyn VectorTileLoader>, processor: Arc<Processor>) -> Self {
         Self {
             tiles: Arc::default(),
             loader,
@@ -197,7 +194,7 @@ where
         self.messenger = Some(messenger.into());
     }
 
-    async fn download(tile_index: TileIndex, loader: Arc<Loader>) -> MvtTileState {
+    async fn download(tile_index: TileIndex, loader: Arc<dyn VectorTileLoader>) -> MvtTileState {
         match loader.load(tile_index).await {
             Ok(mvt_tile) => MvtTileState::Loaded(Arc::new(mvt_tile)),
             Err(_) => MvtTileState::Error(),

@@ -14,7 +14,6 @@ use galileo_types::geometry::CartesianGeometry2d;
 pub use vector_tile::VectorTile;
 
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::layer::vector_tile_layer::tile_provider::loader::VectorTileLoader;
 use crate::layer::vector_tile_layer::tile_provider::processor::VectorTileProcessor;
 use crate::layer::vector_tile_layer::tile_provider::{VectorTileProvider, VtStyleId};
 use crate::layer::Layer;
@@ -29,19 +28,17 @@ mod vector_tile;
 
 /// Vector tile layers use [`Providers`](VectorTileProviderT) to load prepared vector tiles, and then render them using
 /// specified [styles](VectorTileStyle).
-pub struct VectorTileLayer<Loader, Processor>
+pub struct VectorTileLayer<Processor>
 where
-    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
     Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
 {
-    tile_provider: VectorTileProvider<Loader, Processor>,
+    tile_provider: VectorTileProvider<Processor>,
     tile_scheme: TileSchema,
     style_id: VtStyleId,
 }
 
-impl<Loader, Processor> Layer for VectorTileLayer<Loader, Processor>
+impl<Processor> Layer for VectorTileLayer<Processor>
 where
-    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
     Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
@@ -72,9 +69,8 @@ where
     }
 }
 
-impl<Loader, Processor> VectorTileLayer<Loader, Processor>
+impl<Processor> VectorTileLayer<Processor>
 where
-    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
     Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
 {
     /// Style of the layer.
@@ -86,7 +82,7 @@ where
 
     /// Creates a new layer with the given url source.
     pub fn from_url(
-        mut tile_provider: VectorTileProvider<Loader, Processor>,
+        mut tile_provider: VectorTileProvider<Processor>,
         style: VectorTileStyle,
         tile_scheme: TileSchema,
     ) -> Self {
@@ -216,7 +212,7 @@ mod tests {
 
     use super::*;
 
-    fn test_layer() -> VectorTileLayer<TestTileLoader, ThreadVtProcessor> {
+    fn test_layer() -> VectorTileLayer<ThreadVtProcessor> {
         let tile_schema = TileSchema::web(18);
         let empty_bundle = RenderBundle(RenderBundleType::Tessellating(
             TessellatingRenderBundle::new(),
