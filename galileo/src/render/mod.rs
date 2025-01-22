@@ -45,6 +45,12 @@ pub trait Canvas {
     fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle>;
     /// Render the bundles.
     fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle], options: RenderOptions);
+    /// Render bundles applying the specified opacity to each of them.
+    fn draw_bundles_with_opacity(
+        &mut self,
+        bundles: &[(&dyn PackedBundle, f32)],
+        options: RenderOptions,
+    );
 }
 
 /// Packed render bundle ready to be drawn.

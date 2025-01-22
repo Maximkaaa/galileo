@@ -743,6 +743,15 @@ impl Canvas for WgpuCanvas<'_> {
     }
 
     fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle], options: RenderOptions) {
+        let with_opacity: Vec<_> = bundles.iter().map(|bundle| (*bundle, 1.0)).collect();
+        self.draw_bundles_with_opacity(&with_opacity, options);
+    }
+
+    fn draw_bundles_with_opacity(
+        &mut self,
+        bundles: &[(&dyn PackedBundle, f32)],
+        options: RenderOptions,
+    ) {
         let mut encoder =
             self.renderer
                 .device
@@ -786,11 +795,22 @@ impl Canvas for WgpuCanvas<'_> {
                 occlusion_query_set: None,
             });
 
-            for bundle in bundles {
+            let opacities: Vec<f32> = bundles.iter().map(|(_, opacity)| *opacity).collect();
+            let display_buffer =
+                self.renderer
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: None,
+                        usage: wgpu::BufferUsages::VERTEX,
+                        contents: bytemuck::cast_slice(&opacities),
+                    });
+            render_pass.set_vertex_buffer(1, display_buffer.slice(..));
+
+            for (index, (bundle, _)) in bundles.iter().enumerate() {
                 if let Some(cast) = bundle.as_any().downcast_ref::<WgpuPackedBundle>() {
                     self.render_set
                         .pipelines
-                        .render(&mut render_pass, cast, options);
+                        .render(&mut render_pass, cast, options, index as u32);
                 }
             }
         }
@@ -1030,6 +1050,26 @@ impl PolyVertex {
                     format: wgpu::VertexFormat::Float32,
                 },
             ],
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct DisplayInstance {
+    pub opacity: f32,
+}
+
+impl DisplayInstance {
+    fn wgpu_desc() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: size_of::<DisplayInstance>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[wgpu::VertexAttribute {
+                offset: 0,
+                shader_location: 10,
+                format: wgpu::VertexFormat::Float32,
+            }],
         }
     }
 }
