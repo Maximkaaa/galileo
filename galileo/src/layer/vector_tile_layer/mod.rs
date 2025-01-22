@@ -143,6 +143,7 @@ where
     /// Change style of the layer and redraw it.
     pub fn update_style(&mut self, style: VectorTileStyle) {
         let new_style_id = self.tile_provider.add_style(style);
+        self.tile_provider.drop_style(self.style_id);
         self.style_id = new_style_id;
     }
 
@@ -200,5 +201,48 @@ where
         }
 
         features
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        platform::native::vt_processor::ThreadVtProcessor,
+        render::render_bundle::{
+            tessellating::TessellatingRenderBundle, RenderBundle, RenderBundleType,
+        },
+        tests::TestTileLoader,
+    };
+
+    use super::*;
+
+    fn test_layer() -> VectorTileLayer<TestTileLoader, ThreadVtProcessor> {
+        let tile_schema = TileSchema::web(18);
+        let empty_bundle = RenderBundle(RenderBundleType::Tessellating(
+            TessellatingRenderBundle::new(),
+        ));
+        let mut provider = VectorTileProvider::new(
+            Arc::new(TestTileLoader {}),
+            Arc::new(ThreadVtProcessor::new(tile_schema.clone(), empty_bundle)),
+        );
+
+        let style_id = provider.add_style(VectorTileStyle::default());
+        VectorTileLayer {
+            tile_provider: provider,
+            tile_scheme: TileSchema::web(18),
+            style_id,
+        }
+    }
+
+    #[test]
+    fn update_style_drops_previous_style() {
+        let mut layer = test_layer();
+        let style_id = layer.style_id;
+        assert!(layer.tile_provider.get_style(style_id).is_some());
+
+        layer.update_style(VectorTileStyle::default());
+        let new_style_id = layer.style_id;
+        assert!(layer.tile_provider.get_style(new_style_id).is_some());
+        assert!(layer.tile_provider.get_style(style_id).is_none());
     }
 }
