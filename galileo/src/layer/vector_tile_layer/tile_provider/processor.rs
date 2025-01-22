@@ -1,5 +1,6 @@
 //! Vector tile processor.
 
+use maybe_sync::{MaybeSend, MaybeSync};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -25,7 +26,7 @@ pub enum TileProcessingError {
 /// the map.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait VectorTileProcessor {
+pub trait VectorTileProcessor: MaybeSend + MaybeSync {
     /// Returns try if a style with the given id was registerred.
     fn has_style(&self, style_id: VtStyleId) -> bool;
     /// Returns a style with the given id.

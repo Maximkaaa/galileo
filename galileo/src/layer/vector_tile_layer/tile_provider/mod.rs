@@ -41,20 +41,14 @@ impl VtStyleId {
 }
 
 /// Provider of vector tiles for a vector tile layer.
-pub struct VectorTileProvider<Processor>
-where
-    Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
-{
+pub struct VectorTileProvider {
     tiles: Arc<RwLock<TileStore>>,
     loader: Arc<dyn VectorTileLoader>,
-    processor: Arc<Processor>,
+    processor: Arc<dyn VectorTileProcessor>,
     messenger: Option<Arc<dyn Messenger>>,
 }
 
-impl<Processor> Clone for VectorTileProvider<Processor>
-where
-    Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
-{
+impl Clone for VectorTileProvider {
     fn clone(&self) -> Self {
         Self {
             tiles: self.tiles.clone(),
@@ -65,12 +59,9 @@ where
     }
 }
 
-impl<Processor> VectorTileProvider<Processor>
-where
-    Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
-{
+impl VectorTileProvider {
     /// Create a new instance of the provider.
-    pub fn new(loader: Arc<dyn VectorTileLoader>, processor: Arc<Processor>) -> Self {
+    pub fn new(loader: Arc<dyn VectorTileLoader>, processor: Arc<dyn VectorTileProcessor>) -> Self {
         Self {
             tiles: Arc::default(),
             loader,
@@ -205,7 +196,7 @@ where
         mvt_tile_state: &MvtTileState,
         index: TileIndex,
         style_id: VtStyleId,
-        processor: Arc<Processor>,
+        processor: Arc<dyn VectorTileProcessor>,
     ) -> PreparedTileState {
         match mvt_tile_state {
             MvtTileState::Loaded(mvt_tile) => {
