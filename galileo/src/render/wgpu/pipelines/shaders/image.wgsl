@@ -15,6 +15,7 @@ struct VertexInput {
     @location(1) opacity: f32,
     @location(2) tex_coord: vec2<f32>,
     @location(3) offset: vec2<f32>,
+    @location(10) bundle_opacity: f32,
 }
 
 struct VertexOutput {
@@ -34,7 +35,7 @@ fn vs_main(
     var vertex_delta = vec4<f32>(model.offset * transform.inv_screen_size * point_position[3] * 2.0, 0.0, 0.0);
 
     out.clip_position = point_position + vertex_delta;
-    out.opacity = model.opacity;
+    out.opacity = model.opacity * model.bundle_opacity;
 
     return out;
 }

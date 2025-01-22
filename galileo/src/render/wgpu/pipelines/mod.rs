@@ -78,6 +78,7 @@ impl Pipelines {
         render_pass: &mut RenderPass<'a>,
         bundle: &'a WgpuPackedBundle,
         render_options: RenderOptions,
+        bundle_index: u32,
     ) {
         self.set_bindings(render_pass);
 
@@ -86,7 +87,8 @@ impl Pipelines {
         }
 
         for image in &bundle.image_buffers {
-            self.image.render(image, render_pass, render_options);
+            self.image
+                .render(image, render_pass, render_options, bundle_index);
         }
 
         if bundle.map_ref_buffers.index_count > 0 {

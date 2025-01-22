@@ -79,6 +79,9 @@ pub mod render;
 pub mod tile_scheme;
 mod view;
 
+#[cfg(test)]
+pub(crate) mod tests;
+
 #[cfg(feature = "winit")]
 pub mod winit;
 

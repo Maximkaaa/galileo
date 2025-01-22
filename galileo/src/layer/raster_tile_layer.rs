@@ -1,8 +1,7 @@
 use crate::decoded_image::DecodedImage;
 use crate::layer::data_provider::DataProvider;
 use crate::messenger::Messenger;
-use crate::render::render_bundle::RenderBundle;
-use crate::render::{Canvas, ImagePaint, PackedBundle, PrimitiveId, RenderOptions};
+use crate::render::{Canvas, ImagePaint, PackedBundle, RenderOptions};
 use crate::tile_scheme::{TileIndex, TileSchema};
 use crate::view::MapView;
 use galileo_types::cartesian::Size;
@@ -36,11 +35,15 @@ enum TileState {
 }
 
 struct RenderedTile {
-    render_bundle: RenderBundle,
     packed_bundle: Box<dyn PackedBundle>,
     first_drawn: SystemTime,
-    is_opaque: bool,
-    primitive_id: PrimitiveId,
+    opacity: f32,
+}
+
+impl RenderedTile {
+    fn is_opaque(&self) -> bool {
+        self.opacity > 0.999
+    }
 }
 
 impl<Provider> RasterTileLayer<Provider>
@@ -82,7 +85,7 @@ where
                 None => to_substitute.push(index),
                 Some(tile_state) => match &*tile_state.clone() {
                     TileState::Rendered(tile) => {
-                        if !tile.lock().is_opaque {
+                        if !tile.lock().is_opaque() {
                             to_substitute.push(index);
                         }
 
@@ -124,7 +127,7 @@ where
                             .as_ref()
                             .map(|v| v.as_ref())
                         {
-                            if !rendered.lock().is_opaque {
+                            if !rendered.lock().is_opaque() {
                                 need_more = true;
                             }
                         }
@@ -172,38 +175,26 @@ where
             match &**tile {
                 TileState::Rendered(rendered) => {
                     let mut rendered = rendered.lock();
-                    if rendered.is_opaque {
+                    if rendered.is_opaque() {
                         continue;
                     }
 
                     let first_drawn = rendered.first_drawn;
-                    let primitive_id = rendered.primitive_id;
 
                     let since_drawn = now
                         .duration_since(first_drawn)
                         .unwrap_or(Duration::from_millis(0));
                     let opacity = if self.fade_in_duration.is_zero() {
-                        255
+                        0.0
                     } else {
-                        ((since_drawn.as_secs_f64() / self.fade_in_duration.as_secs_f64()).min(1.0)
-                            * 255.0) as u8
+                        (since_drawn.as_secs_f64() / self.fade_in_duration.as_secs_f64()).min(1.0)
+                            as f32
                     };
 
-                    let is_opaque = opacity == 255;
-                    if !is_opaque {
+                    rendered.opacity = opacity;
+                    if !rendered.is_opaque() {
                         requires_redraw = true;
                     }
-
-                    if let Err(err) = rendered
-                        .render_bundle
-                        .modify_image(primitive_id, ImagePaint { opacity })
-                    {
-                        log::warn!("Failed to update image style: {err}");
-                    }
-
-                    let packed = canvas.pack_bundle(&rendered.render_bundle);
-                    rendered.packed_bundle = packed;
-                    rendered.is_opaque = is_opaque;
                 }
                 TileState::Loaded(decoded_image) => {
                     let mut bundle = canvas.create_bundle();
@@ -216,9 +207,9 @@ where
                     );
 
                     let opacity = if self.fade_in_duration.is_zero() {
-                        255
+                        1.0
                     } else {
-                        0
+                        0.0
                     };
 
                     let Some(tile_bbox) = self.tile_scheme.tile_bbox(*index) else {
@@ -226,20 +217,18 @@ where
                         continue;
                     };
 
-                    let id = bundle.add_image(
+                    bundle.add_image(
                         owned,
                         tile_bbox.into_quadrangle(),
-                        ImagePaint { opacity },
+                        ImagePaint { opacity: 255 },
                     );
                     let packed = canvas.pack_bundle(&bundle);
                     self.tiles.insert(
                         *index,
                         Arc::new(TileState::Rendered(Box::new(Mutex::new(RenderedTile {
-                            render_bundle: bundle,
                             packed_bundle: packed,
                             first_drawn: now,
-                            is_opaque: false,
-                            primitive_id: id,
+                            opacity,
                         })))),
                     );
 
@@ -323,10 +312,10 @@ where
             }
         }
 
-        canvas.draw_bundles(
+        canvas.draw_bundles_with_opacity(
             &to_draw
                 .iter()
-                .map(|guard| &*guard.packed_bundle)
+                .map(|guard| (&*guard.packed_bundle, guard.opacity))
                 .collect::<Vec<_>>(),
             RenderOptions::default(),
         );

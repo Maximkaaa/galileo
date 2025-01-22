@@ -63,7 +63,7 @@ impl MapBuilder {
         tile_source: impl UrlSource<TileIndex> + 'static,
         tile_schema: TileSchema,
         style: VectorTileStyle,
-    ) -> VectorTileLayer<WebVtLoader<FileCacheController>, ThreadVtProcessor> {
+    ) -> VectorTileLayer {
         let tile_provider = Self::create_vector_tile_provider(tile_source, tile_schema.clone());
         VectorTileLayer::from_url(tile_provider, style, tile_schema)
     }
@@ -72,7 +72,7 @@ impl MapBuilder {
     pub fn create_vector_tile_provider(
         tile_source: impl UrlSource<TileIndex> + 'static,
         tile_schema: TileSchema,
-    ) -> VectorTileProvider<WebVtLoader<FileCacheController>, ThreadVtProcessor> {
+    ) -> VectorTileProvider {
         let loader = WebVtLoader::new(
             PlatformServiceImpl::new(),
             FileCacheController::new(".tile_cache"),

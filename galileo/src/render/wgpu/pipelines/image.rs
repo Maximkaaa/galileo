@@ -1,7 +1,7 @@
 use crate::decoded_image::{DecodedImage, DecodedImageType};
 use crate::render::render_bundle::tessellating::ImageVertex;
-use crate::render::wgpu::pipelines;
 use crate::render::wgpu::pipelines::default_targets;
+use crate::render::wgpu::{pipelines, DisplayInstance};
 use crate::render::RenderOptions;
 use std::sync::Arc;
 use wgpu::util::{DeviceExt, TextureDataOrder};
@@ -54,7 +54,7 @@ impl ImagePipeline {
                 ],
                 label: Some("texture_bind_group_label"),
             });
-        let buffers = [ImageVertex::wgpu_desc()];
+        let buffers = [ImageVertex::wgpu_desc(), DisplayInstance::wgpu_desc()];
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
@@ -205,6 +205,7 @@ impl ImagePipeline {
         buffers: &'a WgpuImage,
         render_pass: &mut RenderPass<'a>,
         render_options: RenderOptions,
+        bundle_index: u32,
     ) {
         if render_options.antialias {
             render_pass.set_pipeline(&self.wgpu_pipeline_antialias);
@@ -216,7 +217,7 @@ impl ImagePipeline {
         render_pass.set_bind_group(1, bind_group, &[]);
         render_pass.set_vertex_buffer(0, buffers.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.draw_indexed(0..INDICES.len() as u32, 0, 0..1);
+        render_pass.draw_indexed(0..INDICES.len() as u32, 0, bundle_index..(bundle_index + 1));
     }
 }
 

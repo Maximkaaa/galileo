@@ -1,7 +1,6 @@
 //! [Vector tile layers](VectorTileLayer) load prepared vector tiles using a [data provider](VectorTileProviderT)
 //! and draw them to the map with the given [`VectorTileStyle`].
 
-use maybe_sync::{MaybeSend, MaybeSync};
 use std::any::Any;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -14,8 +13,6 @@ use galileo_types::geometry::CartesianGeometry2d;
 pub use vector_tile::VectorTile;
 
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::layer::vector_tile_layer::tile_provider::loader::VectorTileLoader;
-use crate::layer::vector_tile_layer::tile_provider::processor::VectorTileProcessor;
 use crate::layer::vector_tile_layer::tile_provider::{VectorTileProvider, VtStyleId};
 use crate::layer::Layer;
 use crate::messenger::Messenger;
@@ -29,21 +26,13 @@ mod vector_tile;
 
 /// Vector tile layers use [`Providers`](VectorTileProviderT) to load prepared vector tiles, and then render them using
 /// specified [styles](VectorTileStyle).
-pub struct VectorTileLayer<Loader, Processor>
-where
-    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
-    Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
-{
-    tile_provider: VectorTileProvider<Loader, Processor>,
+pub struct VectorTileLayer {
+    tile_provider: VectorTileProvider,
     tile_scheme: TileSchema,
     style_id: VtStyleId,
 }
 
-impl<Loader, Processor> Layer for VectorTileLayer<Loader, Processor>
-where
-    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
-    Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
-{
+impl Layer for VectorTileLayer {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         let tiles = self.get_tiles_to_draw(view, canvas);
         let to_render: Vec<&dyn PackedBundle> = tiles.iter().map(|v| &**v).collect();
@@ -72,11 +61,7 @@ where
     }
 }
 
-impl<Loader, Processor> VectorTileLayer<Loader, Processor>
-where
-    Loader: VectorTileLoader + MaybeSend + MaybeSync + 'static,
-    Processor: VectorTileProcessor + MaybeSend + MaybeSync + 'static,
-{
+impl VectorTileLayer {
     /// Style of the layer.
     pub fn style(&self) -> Arc<VectorTileStyle> {
         self.tile_provider
@@ -86,7 +71,7 @@ where
 
     /// Creates a new layer with the given url source.
     pub fn from_url(
-        mut tile_provider: VectorTileProvider<Loader, Processor>,
+        mut tile_provider: VectorTileProvider,
         style: VectorTileStyle,
         tile_scheme: TileSchema,
     ) -> Self {
@@ -143,6 +128,7 @@ where
     /// Change style of the layer and redraw it.
     pub fn update_style(&mut self, style: VectorTileStyle) {
         let new_style_id = self.tile_provider.add_style(style);
+        self.tile_provider.drop_style(self.style_id);
         self.style_id = new_style_id;
     }
 
@@ -200,5 +186,48 @@ where
         }
 
         features
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        platform::native::vt_processor::ThreadVtProcessor,
+        render::render_bundle::{
+            tessellating::TessellatingRenderBundle, RenderBundle, RenderBundleType,
+        },
+        tests::TestTileLoader,
+    };
+
+    use super::*;
+
+    fn test_layer() -> VectorTileLayer {
+        let tile_schema = TileSchema::web(18);
+        let empty_bundle = RenderBundle(RenderBundleType::Tessellating(
+            TessellatingRenderBundle::new(),
+        ));
+        let mut provider = VectorTileProvider::new(
+            Arc::new(TestTileLoader {}),
+            Arc::new(ThreadVtProcessor::new(tile_schema.clone(), empty_bundle)),
+        );
+
+        let style_id = provider.add_style(VectorTileStyle::default());
+        VectorTileLayer {
+            tile_provider: provider,
+            tile_scheme: TileSchema::web(18),
+            style_id,
+        }
+    }
+
+    #[test]
+    fn update_style_drops_previous_style() {
+        let mut layer = test_layer();
+        let style_id = layer.style_id;
+        assert!(layer.tile_provider.get_style(style_id).is_some());
+
+        layer.update_style(VectorTileStyle::default());
+        let new_style_id = layer.style_id;
+        assert!(layer.tile_provider.get_style(new_style_id).is_some());
+        assert!(layer.tile_provider.get_style(style_id).is_none());
     }
 }

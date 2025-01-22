@@ -21,7 +21,7 @@ pub enum TileLoadError {
 /// Loader for vector tiles.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait VectorTileLoader {
+pub trait VectorTileLoader: MaybeSend + MaybeSync {
     /// Load tile with the given index.
     async fn load(&self, index: TileIndex) -> Result<MvtTile, TileLoadError>;
 }
