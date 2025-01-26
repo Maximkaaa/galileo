@@ -2,13 +2,14 @@
 //! and draw them to the map with the given [`VectorTileStyle`].
 
 use std::any::Any;
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
+use galileo_types::impls::{ClosedContour, Polygon};
 use nalgebra::Point2;
 
 use galileo_mvt::{MvtFeature, MvtGeometry};
-use galileo_types::cartesian::CartesianPoint2d;
+use galileo_types::cartesian::{CartesianPoint2d, Point3d};
 use galileo_types::geometry::CartesianGeometry2d;
 pub use vector_tile::VectorTile;
 
@@ -16,9 +17,11 @@ use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::{VectorTileProvider, VtStyleId};
 use crate::layer::Layer;
 use crate::messenger::Messenger;
-use crate::render::{Canvas, PackedBundle, RenderOptions};
-use crate::tile_scheme::TileSchema;
+use crate::render::render_bundle::RenderPrimitive;
+use crate::render::{Canvas, PackedBundle, PolygonPaint, RenderOptions};
+use crate::tile_scheme::{TileIndex, TileSchema};
 use crate::view::MapView;
+use crate::Color;
 
 pub mod style;
 pub mod tile_provider;
@@ -30,14 +33,46 @@ pub struct VectorTileLayer {
     tile_provider: VectorTileProvider,
     tile_scheme: TileSchema,
     style_id: VtStyleId,
+    displayed_tiles: Mutex<Vec<DisplayedTile>>,
+    prev_background: Mutex<Option<PreviousBackground>>,
+}
+
+#[derive(Debug, Copy, Clone)]
+struct PreviousBackground {
+    color: Color,
+    replaced_at: web_time::Instant,
+}
+
+#[derive(Clone)]
+struct DisplayedTile {
+    index: TileIndex,
+    bundle: Arc<dyn PackedBundle>,
+    style_id: VtStyleId,
+    opacity: f32,
+    displayed_at: web_time::Instant,
+}
+
+impl DisplayedTile {
+    fn is_opaque(&self) -> bool {
+        self.opacity >= 0.999
+    }
 }
 
 impl Layer for VectorTileLayer {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
-        let tiles = self.get_tiles_to_draw(view, canvas);
-        let to_render: Vec<&dyn PackedBundle> = tiles.iter().map(|v| &**v).collect();
+        self.update_displayed_tiles(view, canvas);
 
-        canvas.draw_bundles(&to_render, RenderOptions::default());
+        let Some(background_bundle) = self.create_background_bundle(view, canvas) else {
+            // View is impossible to render
+            return;
+        };
+
+        let displayed_tiles = self.displayed_tiles.lock().expect("mutex is poisoned");
+        let to_render: Vec<(&dyn PackedBundle, f32)> = std::iter::once((&*background_bundle, 1.0))
+            .chain(displayed_tiles.iter().map(|v| (&*v.bundle, v.opacity)))
+            .collect();
+
+        canvas.draw_bundles_with_opacity(&to_render, RenderOptions::default());
     }
 
     fn prepare(&self, view: &MapView) {
@@ -80,54 +115,107 @@ impl VectorTileLayer {
             tile_provider,
             tile_scheme,
             style_id,
+            displayed_tiles: Default::default(),
+            prev_background: Default::default(),
         }
     }
 
-    fn get_tiles_to_draw(&self, view: &MapView, canvas: &dyn Canvas) -> Vec<Arc<dyn PackedBundle>> {
-        let mut tiles = vec![];
+    fn update_displayed_tiles(&self, view: &MapView, canvas: &dyn Canvas) {
         let Some(tile_iter) = self.tile_scheme.iter_tiles(view) else {
-            return vec![];
+            return;
         };
 
-        let indices: Vec<_> = tile_iter.collect();
+        let needed_indices: Vec<_> = tile_iter.collect();
         self.tile_provider
-            .pack_tiles(&indices, self.style_id, canvas);
+            .pack_tiles(&needed_indices, self.style_id, canvas);
 
+        let mut displayed_tiles = self.displayed_tiles.lock().expect("mutex is poisoned");
+
+        let mut needed_tiles = Vec::with_capacity(needed_indices.len());
         let mut to_substitute = vec![];
-        for index in &indices {
-            match self.tile_provider.get_tile(*index, self.style_id) {
-                None => to_substitute.push(*index),
-                Some(v) => tiles.push((*index, v)),
+
+        let now = web_time::Instant::now();
+        let fade_in_time = self.fade_in_time();
+        let mut requires_redraw = false;
+
+        for index in &needed_indices {
+            if let Some(displayed) = displayed_tiles
+                .iter_mut()
+                .find(|displayed| displayed.index == *index && displayed.style_id == self.style_id)
+            {
+                if !displayed.is_opaque() {
+                    to_substitute.push(*index);
+                    displayed.opacity = ((now.duration_since(displayed.displayed_at)).as_secs_f64()
+                        / fade_in_time.as_secs_f64())
+                    .min(1.0) as f32;
+                    requires_redraw = true;
+                }
+
+                needed_tiles.push(displayed.clone());
+            } else {
+                match self.tile_provider.get_tile(*index, self.style_id) {
+                    None => to_substitute.push(*index),
+                    Some(bundle) => {
+                        needed_tiles.push(DisplayedTile {
+                            index: *index,
+                            bundle,
+                            style_id: self.style_id,
+                            opacity: 0.0,
+                            displayed_at: now,
+                        });
+                        to_substitute.push(*index);
+                        requires_redraw = true;
+                    }
+                }
             }
         }
 
-        let mut substitute_indices = HashSet::new();
-        for index in to_substitute {
-            let mut substitute_index = index;
-            while let Some(mut subst) = self.tile_scheme.get_substitutes(substitute_index) {
-                substitute_index = match subst.next() {
-                    Some(v) => v,
-                    None => break,
+        let mut new_displayed = vec![];
+        for displayed in displayed_tiles.iter() {
+            if needed_tiles
+                .iter()
+                .any(|new| new.index == displayed.index && new.style_id == displayed.style_id)
+            {
+                continue;
+            }
+
+            let Some(displayed_bbox) = self.tile_scheme.tile_bbox(displayed.index) else {
+                continue;
+            };
+
+            for subst in &to_substitute {
+                let Some(subst_bbox) = self.tile_scheme.tile_bbox(*subst) else {
+                    continue;
                 };
 
-                if let Some(tile) = self.tile_provider.get_tile(substitute_index, self.style_id) {
-                    if !substitute_indices.contains(&substitute_index) {
-                        tiles.push((substitute_index, tile));
-                        substitute_indices.insert(substitute_index);
-                    }
-
+                if displayed_bbox.intersects(subst_bbox) {
+                    new_displayed.push(displayed.clone());
                     break;
                 }
             }
         }
 
-        tiles.sort_unstable_by(|(index_a, _), (index_b, _)| index_a.z.cmp(&index_b.z));
-        tiles.into_iter().map(|(_, tile)| tile).collect()
+        new_displayed.append(&mut needed_tiles);
+        *displayed_tiles = new_displayed;
+
+        if requires_redraw {
+            self.tile_provider.request_redraw();
+        }
+    }
+
+    fn fade_in_time(&self) -> Duration {
+        Duration::from_millis(300)
     }
 
     /// Change style of the layer and redraw it.
     pub fn update_style(&mut self, style: VectorTileStyle) {
         let new_style_id = self.tile_provider.add_style(style);
+        if let Some(curr_style) = self.tile_provider.get_style(self.style_id) {
+            *self.prev_background.lock().expect("mutex is poisoned") = Some(PreviousBackground {
+                color: curr_style.background,
+                replaced_at: web_time::Instant::now(),
+            });
+        }
         self.tile_provider.drop_style(self.style_id);
         self.style_id = new_style_id;
     }
@@ -187,6 +275,60 @@ impl VectorTileLayer {
 
         features
     }
+
+    fn create_background_bundle(
+        &self,
+        view: &MapView,
+        canvas: &mut dyn Canvas,
+    ) -> Option<Box<dyn PackedBundle>> {
+        let mut bundle = canvas.create_bundle();
+        let bbox = view.get_bbox()?;
+        let bounds = Polygon::new(
+            ClosedContour::new(vec![
+                Point3d::new(bbox.x_min(), bbox.y_min(), 0.0),
+                Point3d::new(bbox.x_min(), bbox.y_max(), 0.0),
+                Point3d::new(bbox.x_max(), bbox.y_max(), 0.0),
+                Point3d::new(bbox.x_max(), bbox.y_min(), 0.0),
+            ]),
+            vec![],
+        );
+        let style = self.tile_provider.get_style(self.style_id)?;
+
+        let mut prev_background = self.prev_background.lock().expect("mutex is poisoned");
+        let color = match *prev_background {
+            Some(prev) => {
+                let k = web_time::Instant::now()
+                    .duration_since(prev.replaced_at)
+                    .as_secs_f32()
+                    / self.fade_in_time().as_secs_f32();
+
+                if k >= 1.0 {
+                    *prev_background = None;
+                    style.background
+                } else {
+                    eprintln!("Interpolating");
+                    prev.color.blend(
+                        style
+                            .background
+                            .with_alpha((style.background.a() as f32 * k) as u8),
+                    )
+                }
+            }
+            None => style.background,
+        };
+
+        eprintln!("Using background: {color:?}");
+
+        bundle.add(
+            RenderPrimitive::<_, _, galileo_types::impls::Contour<_>, _>::new_polygon_ref(
+                &bounds,
+                PolygonPaint { color },
+            ),
+            view.resolution(),
+        );
+
+        Some(canvas.pack_bundle(&bundle))
+    }
 }
 
 #[cfg(test)]
@@ -216,6 +358,8 @@ mod tests {
             tile_provider: provider,
             tile_scheme: TileSchema::web(18),
             style_id,
+            displayed_tiles: Default::default(),
+            prev_background: Default::default(),
         }
     }
 

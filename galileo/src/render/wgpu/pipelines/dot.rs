@@ -1,6 +1,6 @@
 use crate::render::render_bundle::tessellating::PointInstance;
 use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
-use crate::render::wgpu::{WgpuDotBuffers, DEPTH_FORMAT};
+use crate::render::wgpu::{DisplayInstance, WgpuDotBuffers, DEPTH_FORMAT};
 use crate::render::RenderOptions;
 use wgpu::{
     BindGroupLayout, CompareFunction, DepthStencilState, Device, RenderPass, RenderPipeline,
@@ -22,7 +22,7 @@ impl DotPipeline {
         let mut desc = PointInstance::wgpu_desc();
         desc.step_mode = VertexStepMode::Vertex;
 
-        let buffers = [desc];
+        let buffers = [desc, DisplayInstance::wgpu_desc()];
         let shader = device.create_shader_module(wgpu::include_wgsl!("./shaders/dot.wgsl"));
 
         let targets = default_targets(format);
@@ -80,6 +80,7 @@ impl DotPipeline {
         buffers: &'a WgpuDotBuffers,
         render_pass: &mut RenderPass<'a>,
         render_options: RenderOptions,
+        bundle_index: u32,
     ) {
         if render_options.antialias {
             render_pass.set_pipeline(&self.wgpu_pipeline_antialias);
@@ -88,6 +89,6 @@ impl DotPipeline {
         }
 
         render_pass.set_vertex_buffer(0, buffers.buffer.slice(..));
-        render_pass.draw(0..buffers.point_count, 0..1);
+        render_pass.draw(0..buffers.point_count, bundle_index..(bundle_index + 1));
     }
 }

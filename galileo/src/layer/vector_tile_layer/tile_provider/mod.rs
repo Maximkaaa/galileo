@@ -176,6 +176,14 @@ impl VectorTileProvider {
         self.messenger = Some(messenger.into());
     }
 
+    /// Notifies the messenger about a change to be processed by the map.
+    // TODO: This method should not be here. This requires some refactoring.
+    pub fn request_redraw(&self) {
+        if let Some(messenger) = &self.messenger {
+            messenger.request_redraw();
+        }
+    }
+
     async fn download(tile_index: TileIndex, loader: Arc<dyn VectorTileLoader>) -> MvtTileState {
         match loader.load(tile_index).await {
             Ok(mvt_tile) => MvtTileState::Loaded(Arc::new(mvt_tile)),

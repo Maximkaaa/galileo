@@ -24,9 +24,14 @@ struct VertexOutput {
 @vertex
 fn vs_main(
     model: VertexInput,
+    @location(10) bundle_opacity: f32,
 ) -> VertexOutput {
     var out: VertexOutput;
-    out.color = vec4<f32>(model.color) / 255.0;
+
+    var color = vec4<f32>(model.color) / 255.0;
+    color[3] = color[3] * bundle_opacity;
+    out.color = color;
+
     var point_position = transform.view_proj * vec4<f32>(model.position, 1.0);
     var vertex_delta = vec4<f32>(model.normal * transform.inv_screen_size * point_position[3] * 2.0, 0.0, 0.0);
 

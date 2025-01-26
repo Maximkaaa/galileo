@@ -44,7 +44,7 @@
       "layer_name": "landcover",
       "symbol": {
         "polygon": {
-          "fill_color": "#b3b3b356"
+          "fill_color": "#3c3c3c00"
         }
       },
       "properties": {
@@ -197,11 +197,11 @@
   ],
   "default_symbol": {
     "line": {
-      "stroke_color": "#00000010",
+      "stroke_color": "#e0e0e0ff",
       "width": 1.0
     },
     "polygon": {
-      "fill_color": "#00000010"
+      "fill_color": "#e0e0e0ff"
     },
     "point": {
       "size": 2.4,

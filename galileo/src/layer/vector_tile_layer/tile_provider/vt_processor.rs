@@ -89,17 +89,7 @@ impl VtProcessor {
         );
         bundle.clip_area(&bounds);
 
-        bundle.add(
-            RenderPrimitive::<_, _, galileo_types::impls::Contour<_>, _>::new_polygon_ref(
-                &bounds,
-                PolygonPaint {
-                    color: style.background,
-                },
-            ),
-            lod_resolution,
-        );
-
-        for layer in &mvt_tile.layers {
+        for layer in mvt_tile.layers.iter().rev() {
             for feature in &layer.features {
                 match &feature.geometry {
                     MvtGeometry::Point(points) => {
