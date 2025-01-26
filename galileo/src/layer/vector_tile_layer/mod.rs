@@ -3,7 +3,8 @@
 
 use std::any::Any;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use nalgebra::Point2;
 
@@ -17,7 +18,7 @@ use crate::layer::vector_tile_layer::tile_provider::{VectorTileProvider, VtStyle
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, PackedBundle, RenderOptions};
-use crate::tile_scheme::TileSchema;
+use crate::tile_scheme::{TileIndex, TileSchema};
 use crate::view::MapView;
 
 pub mod style;
@@ -30,14 +31,33 @@ pub struct VectorTileLayer {
     tile_provider: VectorTileProvider,
     tile_scheme: TileSchema,
     style_id: VtStyleId,
+    displayed_tiles: Mutex<Vec<DisplayedTile>>,
+}
+
+struct DisplayedTile {
+    index: TileIndex,
+    bundle: Arc<dyn PackedBundle>,
+    style_id: VtStyleId,
+    opacity: f32,
+    displayed_at: web_time::Instant,
+}
+
+impl DisplayedTile {
+    fn is_opaque(&self) -> bool {
+        self.opacity >= 0.999
+    }
 }
 
 impl Layer for VectorTileLayer {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
-        let tiles = self.get_tiles_to_draw(view, canvas);
-        let to_render: Vec<&dyn PackedBundle> = tiles.iter().map(|v| &**v).collect();
+        self.update_displayed_tiles(view, canvas);
+        let displayed_tiles = self.displayed_tiles.lock().expect("mutex is poisoned");
+        let to_render: Vec<(&dyn PackedBundle, f32)> = displayed_tiles
+            .iter()
+            .map(|v| (&*v.bundle, v.opacity))
+            .collect();
 
-        canvas.draw_bundles(&to_render, RenderOptions::default());
+        canvas.draw_bundles_with_opacity(&to_render, RenderOptions::default());
     }
 
     fn prepare(&self, view: &MapView) {
@@ -80,30 +100,55 @@ impl VectorTileLayer {
             tile_provider,
             tile_scheme,
             style_id,
+            displayed_tiles: Default::default(),
         }
     }
 
-    fn get_tiles_to_draw(&self, view: &MapView, canvas: &dyn Canvas) -> Vec<Arc<dyn PackedBundle>> {
+    fn update_displayed_tiles(&self, view: &MapView, canvas: &dyn Canvas) {
         let mut tiles = vec![];
         let Some(tile_iter) = self.tile_scheme.iter_tiles(view) else {
-            return vec![];
+            return;
         };
 
         let indices: Vec<_> = tile_iter.collect();
         self.tile_provider
             .pack_tiles(&indices, self.style_id, canvas);
 
+        let mut displayed_tiles = self.displayed_tiles.lock().expect("mutex is poisoned");
+
         let mut to_substitute = vec![];
         for index in &indices {
             match self.tile_provider.get_tile(*index, self.style_id) {
                 None => to_substitute.push(*index),
-                Some(v) => tiles.push((*index, v)),
+                Some(v) => {
+                    tiles.push((*index, v));
+
+                    if let Some(displayed) = displayed_tiles
+                        .iter()
+                        .find(|displayed| displayed.index == *index)
+                    {
+                        if !displayed.is_opaque() {
+                            to_substitute.push(*index);
+                        }
+                    } else {
+                        to_substitute.push(*index);
+                    }
+                }
             }
         }
 
         let mut substitute_indices = HashSet::new();
         for index in to_substitute {
             let mut substitute_index = index;
+            if let Some(displayed) = displayed_tiles
+                .iter()
+                .find(|entry| entry.index == index && entry.style_id != self.style_id)
+            {
+                tiles.push((index, displayed.bundle.clone()));
+                substitute_indices.insert(index);
+                break;
+            }
+
             while let Some(mut subst) = self.tile_scheme.get_substitutes(substitute_index) {
                 substitute_index = match subst.next() {
                     Some(v) => v,
@@ -122,7 +167,51 @@ impl VectorTileLayer {
         }
 
         tiles.sort_unstable_by(|(index_a, _), (index_b, _)| index_a.z.cmp(&index_b.z));
-        tiles.into_iter().map(|(_, tile)| tile).collect()
+
+        let mut requires_redraw = false;
+        let mut new_displayed = Vec::with_capacity(tiles.len());
+        let now = web_time::Instant::now();
+        let fade_in_time = self.fade_in_time();
+        while let Some(mut displayed) = displayed_tiles.pop() {
+            if tiles.iter().any(|(index, _)| *index == displayed.index) {
+                if !displayed.is_opaque() {
+                    requires_redraw = true;
+                    displayed.opacity = ((now.duration_since(displayed.displayed_at)).as_secs_f64()
+                        / fade_in_time.as_secs_f64())
+                    .min(1.0) as f32;
+                }
+
+                new_displayed.push(displayed);
+            }
+        }
+
+        for (index, bundle) in tiles {
+            if !new_displayed
+                .iter()
+                .any(|v| v.index == index && v.style_id == self.style_id)
+            {
+                // Adding new tiles to the displayed list
+                new_displayed.push(DisplayedTile {
+                    index,
+                    bundle,
+                    style_id: self.style_id,
+                    opacity: 0.0,
+                    displayed_at: web_time::Instant::now(),
+                });
+                requires_redraw = true;
+            }
+        }
+
+        new_displayed.sort_unstable_by(|a, b| a.index.z.cmp(&b.index.z));
+        *displayed_tiles = new_displayed;
+
+        if requires_redraw {
+            self.tile_provider.request_redraw();
+        }
+    }
+
+    fn fade_in_time(&self) -> Duration {
+        Duration::from_millis(300)
     }
 
     /// Change style of the layer and redraw it.

@@ -25,9 +25,12 @@ struct VertexOutput {
 @vertex
 fn vs_main(
     model: VertexInput,
+    @location(10) bundle_opacity: f32,
 ) -> VertexOutput {
     var out: VertexOutput;
-    out.color = model.color;
+    var color = model.color;
+    color[3] = model.color[3] * bundle_opacity;
+    out.color = color;
 
     var vertex_position = transform.view_proj * vec4<f32>(model.position, 1.0);
     var norm_length = sqrt(model.norm[0] * model.norm[0] + model.norm[1] * model.norm[1]) * transform.resolution;
