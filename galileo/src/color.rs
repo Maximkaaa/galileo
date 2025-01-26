@@ -133,6 +133,26 @@ impl Color {
     pub fn a(&self) -> u8 {
         self.a
     }
+
+    /// Alpha blends `self` color with the given foreground one using foregraound color alpha.
+    pub fn blend(&self, fore: Color) -> Color {
+        let back_r = self.r as f32 / 255.0;
+        let back_g = self.g as f32 / 255.0;
+        let back_b = self.b as f32 / 255.0;
+
+        let fore_r = fore.r as f32 / 255.0;
+        let fore_g = fore.g as f32 / 255.0;
+        let fore_b = fore.b as f32 / 255.0;
+
+        let a = fore.a as f32 / 255.0;
+
+        Color {
+            r: ((back_r * (1.0 - a) + fore_r * a) * 255.0) as u8,
+            g: ((back_g * (1.0 - a) + fore_g * a) * 255.0) as u8,
+            b: ((back_b * (1.0 - a) + fore_b * a) * 255.0) as u8,
+            a: self.a,
+        }
+    }
 }
 
 const fn decode_byte(chars: &[u8]) -> u8 {
