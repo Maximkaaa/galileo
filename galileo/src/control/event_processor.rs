@@ -57,7 +57,7 @@ impl EventProcessor {
         self.handlers.push(Box::new(handler));
     }
 
-    /// Returns true if the processor is currenly tracking dgragging by the pointer.
+    /// Returns true if the processor is currently tracking dgragging by the pointer.
     pub fn is_dragging(&self) -> bool {
         self.drag_target.is_some()
     }

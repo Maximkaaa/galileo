@@ -302,7 +302,7 @@ impl MapView {
         self.translate(delta.xy())
     }
 
-    /// Move the vew by the given projected coorinates delta.
+    /// Move the view by the given projected coordinates delta.
     pub fn translate(&self, delta: Vector2<f64>) -> Self {
         match self.projected_position {
             Some(v) => {

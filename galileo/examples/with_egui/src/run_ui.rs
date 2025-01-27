@@ -23,7 +23,7 @@ pub fn run_ui(state: &mut UiState, ui: &Context) {
                 pointer_position.lon()
             ));
         } else {
-            ui.label("<unavaliable>");
+            ui.label("<unavailable>");
         }
 
         ui.separator();
@@ -36,7 +36,7 @@ pub fn run_ui(state: &mut UiState, ui: &Context) {
                 map_center_position.lon()
             ));
         } else {
-            ui.label("<unavaliable>");
+            ui.label("<unavailable>");
         }
     });
 }

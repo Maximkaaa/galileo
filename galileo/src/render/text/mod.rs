@@ -59,7 +59,7 @@ pub enum VerticalAlignment {
     Top,
     /// Align to middle.
     Middle,
-    /// Align to botton.
+    /// Align to bottom.
     #[default]
     Bottom,
 }

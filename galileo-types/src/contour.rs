@@ -146,7 +146,7 @@ where
     }
 }
 
-/// Iterator of contour segements.
+/// Iterator of contour segments.
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct ContourSegmentIterator<'a, P: 'a, Iter>
 where

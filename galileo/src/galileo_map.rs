@@ -221,7 +221,7 @@ impl Default for MapBuilder {
 }
 
 impl MapBuilder {
-    /// Consturct [`GalileoMap`].
+    /// Construct [`GalileoMap`].
     pub async fn build(mut self) -> GalileoMap {
         let event_loop = self
             .event_loop

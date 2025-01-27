@@ -225,7 +225,7 @@ impl WebWorkerService {
                 };
 
                 log::info!(
-                    "Recieved response for request {} from a web worker",
+                    "Received response for request {} from a web worker",
                     response.request_id
                 );
 
