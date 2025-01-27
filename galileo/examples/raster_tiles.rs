@@ -1,3 +1,5 @@
+//! This exmpales shows how to set a simple map with a single raster tile layer.
+
 use galileo::tile_scheme::TileSchema;
 use galileo::MapBuilder;
 use galileo_types::latlon;
@@ -9,10 +11,14 @@ async fn main() {
     run(MapBuilder::new()).await;
 }
 
-pub async fn run(builder: MapBuilder) {
+pub(crate) async fn run(builder: MapBuilder) {
     builder
         .center(latlon!(37.566, 126.9784))
-        .resolution(TileSchema::web(18).lod_resolution(8).unwrap())
+        .resolution(
+            TileSchema::web(18)
+                .lod_resolution(8)
+                .expect("invalid tile scheme"),
+        )
         .with_raster_tiles(
             |index| {
                 format!(

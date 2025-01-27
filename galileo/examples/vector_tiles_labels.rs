@@ -1,11 +1,12 @@
+//! This examples shows how to render labels for vector tile points.
+
 use bytes::Bytes;
 use galileo::layer::vector_tile_layer::style::{
-    VectorTileDefaultSymbol, VectorTileLabelSymbol, VectorTileStyle, VectorTileSymbol,
+    VectorTileDefaultSymbol, VectorTileLabelSymbol, VectorTileStyle,
 };
 #[cfg(target_arch = "wasm32")]
 use galileo::layer::vector_tile_layer::tile_provider::WebWorkerVectorTileProvider;
 use galileo::layer::vector_tile_layer::VectorTileLayer;
-use galileo::render::point_paint::PointPaint;
 use galileo::render::text::font_service::FontService;
 use galileo::render::text::TextStyle;
 use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
@@ -39,13 +40,13 @@ async fn main() {
     .init();
     run(
         MapBuilder::new(),
-        get_layer_style().unwrap(),
+        get_layer_style().expect("failed to load style"),
         api_key.into_string().expect("invalid VT API key"),
     )
     .await;
 }
 
-pub async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: String) {
+pub(crate) async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: String) {
     FontService::with_mut(|service| {
         let font = include_bytes!("data/NotoSansAdlam-Regular.ttf");
         service
@@ -95,13 +96,15 @@ pub async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: String) {
         .run();
 }
 
-pub fn tile_schema() -> TileSchema {
+fn tile_schema() -> TileSchema {
     const ORIGIN: Point2d = Point2d::new(-20037508.342787, 20037508.342787);
     const TOP_RESOLUTION: f64 = 156543.03392800014 / 4.0;
 
-    let mut lods = vec![Lod::new(TOP_RESOLUTION, 0).unwrap()];
+    let mut lods = vec![Lod::new(TOP_RESOLUTION, 0).expect("invalid config")];
     for i in 1..16 {
-        lods.push(Lod::new(lods[(i - 1) as usize].resolution() / 2.0, i).unwrap());
+        lods.push(
+            Lod::new(lods[(i - 1) as usize].resolution() / 2.0, i).expect("invalid tile schema"),
+        );
     }
 
     TileSchema {

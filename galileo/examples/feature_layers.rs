@@ -1,3 +1,6 @@
+//! This example shows how to create custom symbols for feature layers and set the appearance of
+//! features based on their attributes.
+
 use data::{City, Country};
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
 use galileo::layer::feature_layer::symbol::{SimplePolygonSymbol, Symbol};
@@ -22,11 +25,11 @@ async fn main() {
     run(MapBuilder::new()).await;
 }
 
-pub fn load_countries() -> Vec<Country> {
-    bincode::deserialize(include_bytes!("data/countries.data")).unwrap()
+fn load_countries() -> Vec<Country> {
+    bincode::deserialize(include_bytes!("data/countries.data")).expect("invalid countries data")
 }
 
-pub fn load_cities() -> Vec<City> {
+fn load_cities() -> Vec<City> {
     let mut reader = csv::Reader::from_reader(&include_bytes!("data/worldcities.csv")[..]);
     let mut cities: Vec<City> = reader.deserialize().filter_map(|res| res.ok()).collect();
     cities.sort_by(|a, b| {
@@ -46,14 +49,14 @@ pub fn load_cities() -> Vec<City> {
     cities
 }
 
-pub async fn run(builder: MapBuilder) {
+pub(crate) async fn run(builder: MapBuilder) {
     let countries = load_countries();
 
     let feature_layer = FeatureLayer::with_lods(
         countries,
         CountrySymbol {},
         Crs::EPSG3857,
-        &vec![8000.0, 1000.0, 1.0],
+        &[8000.0, 1000.0, 1.0],
     );
     let feature_layer = Arc::new(RwLock::new(feature_layer));
 
@@ -66,7 +69,7 @@ pub async fn run(builder: MapBuilder) {
         .with_event_handler(move |ev, map| {
             if let UserEvent::Click(button, event) = ev {
                 if *button == MouseButton::Left {
-                    let mut layer = feature_layer.write().unwrap();
+                    let mut layer = feature_layer.write().expect("lock is poisoned");
 
                     let Some(position) = map.view().screen_to_map(event.screen_pointer_position)
                     else {
@@ -96,7 +99,7 @@ pub async fn run(builder: MapBuilder) {
             }
 
             if let UserEvent::PointerMoved(event) = ev {
-                let mut layer = feature_layer.write().unwrap();
+                let mut layer = feature_layer.write().expect("lock is poisoned");
 
                 let mut new_selected = usize::MAX;
                 let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {
@@ -117,8 +120,9 @@ pub async fn run(builder: MapBuilder) {
 
                 let selected = selected_index.swap(new_selected, Ordering::Relaxed);
                 if selected != usize::MAX {
-                    let feature = layer.features_mut().get_mut(selected).unwrap();
-                    feature.edit_style().is_selected = false;
+                    if let Some(feature) = layer.features_mut().get_mut(selected) {
+                        feature.edit_style().is_selected = false;
+                    }
                 }
 
                 map.redraw();
@@ -181,7 +185,7 @@ impl Symbol<City> for CitySymbol {
             return primitives;
         };
 
-        let _ = match &feature.capital[..] {
+        match &feature.capital[..] {
             "primary" => {
                 primitives.push(RenderPrimitive::new_point(
                     point.clone(),

@@ -1,3 +1,6 @@
+//! This example shows how to change a feature appearance based on use input - pointing with a
+//! mouse in this case.
+
 use std::sync::{Arc, RwLock};
 
 use galileo::control::{EventPropagation, UserEvent};
@@ -84,7 +87,7 @@ impl CartesianGeometry2d<Point2d> for PointMarker {
 
 struct ColoredPointSymbol {}
 
-pub async fn run(builder: MapBuilder) {
+pub(crate) async fn run(builder: MapBuilder) {
     #[cfg(not(target_arch = "wasm32"))]
     let builder = builder.with_raster_tiles(
         |index| {
@@ -108,7 +111,9 @@ pub async fn run(builder: MapBuilder) {
         ]
         .iter()
         .map(|point| PointMarker {
-            point: projection.project(point).unwrap(),
+            point: projection
+                .project(point)
+                .expect("point cannot be projected"),
             ..Default::default()
         })
         .collect(),
@@ -124,7 +129,7 @@ pub async fn run(builder: MapBuilder) {
         .with_layer(feature_layer.clone())
         .with_event_handler(move |ev, map| {
             if let UserEvent::PointerMoved(event) = ev {
-                let mut layer = feature_layer.write().unwrap();
+                let mut layer = feature_layer.write().expect("lock is poisoned");
 
                 let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {
                     return EventPropagation::Stop;

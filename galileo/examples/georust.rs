@@ -1,3 +1,5 @@
+//! This exmample shows how to use geometries from `geo` crate as inputs for feature layers.
+
 use galileo::layer::feature_layer::{FeatureLayer, FeatureLayerOptions};
 use galileo::symbol::ImagePointSymbol;
 use galileo::tile_scheme::TileSchema;
@@ -19,7 +21,7 @@ async fn main() {
 fn load_points() -> Vec<Disambig<geo_types::Point, GeoSpace2d>> {
     let json = include_str!("./data/Museums 2021.geojson");
     let geojson = GeoJson(json);
-    match geojson.to_geo().unwrap() {
+    match geojson.to_geo().expect("invalid geojson") {
         geo_types::Geometry::GeometryCollection(points) => points
             .iter()
             .map(|p| match p {
@@ -31,7 +33,7 @@ fn load_points() -> Vec<Disambig<geo_types::Point, GeoSpace2d>> {
     }
 }
 
-pub async fn run(builder: MapBuilder) {
+pub(crate) async fn run(builder: MapBuilder) {
     let point_layer = FeatureLayer::new(
         load_points(),
         ImagePointSymbol::from_path(
@@ -39,7 +41,7 @@ pub async fn run(builder: MapBuilder) {
             Vector2::new(0.5, 1.0),
             0.5,
         )
-        .unwrap(),
+        .expect("invalid image file"),
         Crs::WGS84,
     )
     .with_options(FeatureLayerOptions {
