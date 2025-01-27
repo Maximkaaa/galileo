@@ -35,7 +35,7 @@ pub struct WebWorkerService {
     worker_pool: Vec<Rc<WorkerState>>,
     next_worker: AtomicUsize,
     pending_requests: Rc<RefCell<HashMap<WebWorkerRequestId, WwSender>>>,
-    is_ready: RefCell<Receiver<bool>>,
+    is_ready: Receiver<bool>,
 }
 
 const INVALID_ID: u64 = 0;
@@ -123,7 +123,7 @@ impl WebWorkerService {
             worker_pool: vec![],
             next_worker: Default::default(),
             pending_requests: Rc::new(RefCell::new(Default::default())),
-            is_ready: RefCell::new(rx),
+            is_ready: rx,
         };
         for _ in 0..worker_count {
             service.spawn_worker(tx.clone());
@@ -157,7 +157,7 @@ impl WebWorkerService {
         payload: WebWorkerRequestPayload,
     ) -> Result<WebWorkerResponsePayload, WebWorkerError> {
         self.is_ready
-            .borrow_mut()
+            .clone()
             .wait_for(|v| *v)
             .await
             .expect("failed to read is_ready channel");
