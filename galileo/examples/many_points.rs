@@ -1,3 +1,5 @@
+//! This examples shows the map performance when rendering millions of points over it.
+
 use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::{Feature, FeatureLayer};
 use galileo::render::point_paint::PointPaint;
@@ -83,7 +85,7 @@ fn generate_points() -> Vec<ColoredPoint> {
     points
 }
 
-pub async fn run(builder: MapBuilder) {
+pub(crate) async fn run(builder: MapBuilder) {
     #[cfg(not(target_arch = "wasm32"))]
     let builder = builder.with_raster_tiles(
         |index| {

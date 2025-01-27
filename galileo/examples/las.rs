@@ -1,3 +1,12 @@
+//! This example demonstrates rendering of 19_000_000 points from lidar scanning on the map. To be run it requires
+//! a file `Clifton_Suspension_Bridge.laz` to be added to the `./data` directory. This file is too large to be added
+//! to git repository, but it can be downloaded from https://geoslam.com/sample-data/
+//!
+//! Running this example requires powerful GPU. It doesn't do any optimizations and simplifications on purpose,
+//! to demonstrate the capability of Galileo engine to render large amounts of data. In real applications the input
+//! data should probably be preprocessed, as many of those 19M points have virtually the same coordinate. These
+//! optimizations may be done by Galileo in future, but at this point it's up to the application.
+
 use galileo::layer::feature_layer::{Feature, FeatureLayerOptions};
 use galileo::layer::FeatureLayer;
 use galileo::render::point_paint::PointPaint;
@@ -5,14 +14,6 @@ use galileo::render::render_bundle::RenderPrimitive;
 use galileo::symbol::Symbol;
 use galileo::tile_scheme::TileSchema;
 use galileo::Color;
-/// This example demonstrates rendering of 19_000_000 points from lidar scanning on the map. To be run it requires
-/// a file `Clifton_Suspension_Bridge.laz` to be added to the `./data` directory. This file is too large to be added
-/// to git repository, but it can be downloaded from https://geoslam.com/sample-data/
-///
-/// Running this example requires powerful GPU. It doesn't do any optimizations and simplifications on purpose,
-/// to demonstrate the capability of Galileo engine to render large amounts of data. In real applications the input
-/// data should probably be preprocessed, as many of those 19M points have virtually the same coordinate. These
-/// optimizations may be done by Galileo in future, but at this point it's up to the application.
 use galileo::MapBuilder;
 use galileo_types::cartesian::{CartesianPoint3d, Point3d};
 use galileo_types::geo::Crs;
@@ -32,12 +33,17 @@ async fn main() {
 
 fn load_points() -> Vec<ColoredPoint> {
     let mut reader =
-        las::Reader::from_path("./galileo/examples/data/Clifton_Suspension_Bridge.laz").unwrap();
+        las::Reader::from_path("./galileo/examples/data/Clifton_Suspension_Bridge.laz")
+            .expect("invalid laz file");
     log::info!("Header: {:?}", reader.header());
 
     log::info!(
         "{}",
-        u16::from_be_bytes(reader.header().vlrs()[0].data[0..2].try_into().unwrap())
+        u16::from_be_bytes(
+            reader.header().vlrs()[0].data[0..2]
+                .try_into()
+                .expect("invalid laz file")
+        )
     );
     let x = -292613.7773218893 - 249.0;
     let y = 6702106.413514771 - 142.0;
@@ -53,8 +59,8 @@ fn load_points() -> Vec<ColoredPoint> {
     reader
         .points()
         .map(|p| {
-            let p = p.unwrap();
-            let color = p.color.unwrap();
+            let p = p.expect("invalid laz file");
+            let color = p.color.expect("invalid laz file");
             let point = Point3d::new(p.x * scale_lat, p.y * scale_lat, p.z * scale_lat);
             let point: Point3d = transform * point;
             ColoredPoint {
@@ -107,11 +113,15 @@ impl Symbol<ColoredPoint> for ColoredPointSymbol {
     }
 }
 
-pub async fn run(builder: MapBuilder) {
+async fn run(builder: MapBuilder) {
     let points = load_points();
     builder
         .center(latlon!(51.4549, -2.6279))
-        .resolution(TileSchema::web(18).lod_resolution(14).unwrap())
+        .resolution(
+            TileSchema::web(18)
+                .lod_resolution(14)
+                .expect("invalid tile scheme"),
+        )
         .with_raster_tiles(
             |index| {
                 format!(

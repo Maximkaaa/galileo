@@ -32,7 +32,7 @@ async fn main() -> Result<()> {
         ));
     }
 
-    let file_name = std::env::args().skip(1).next().unwrap();
+    let file_name = std::env::args().nth(1).expect("no geojson arg is provided");
     let json = &std::fs::read_to_string(file_name)?;
     let geojson = json.parse::<GeoJson>()?;
     let collection = FeatureCollection::try_from(geojson)?;
@@ -50,15 +50,20 @@ async fn main() -> Result<()> {
 
     // To calculate the area of the map which we want to draw, we use map's CRS instead of
     // layer CRS.
-    let extent = layer.extent_projected(&Crs::EPSG3857).unwrap();
+    let extent = layer
+        .extent_projected(&Crs::EPSG3857)
+        .expect("cannot project extent");
     let center = extent.center();
 
     let image_size = Size::new(512, 512);
 
     let width_resolution = extent.width() / image_size.width() as f64;
     let height_resolution = extent.height() / image_size.height() as f64;
-    let resolution = (width_resolution.max(height_resolution) * 1.1)
-        .max(TileSchema::web(18).lod_resolution(17).unwrap());
+    let resolution = (width_resolution.max(height_resolution) * 1.1).max(
+        TileSchema::web(18)
+            .lod_resolution(17)
+            .expect("invalid tile schema"),
+    );
 
     // Create OSM layer for background
     let cache_controller = FileCacheController::new(".tile_cache");
@@ -95,14 +100,21 @@ async fn main() -> Result<()> {
     // We create a renderer without window, so it will use internal texture to render to.
     // Every time the `render` method is callled, the image is updated and can be retrieved
     // by the `get_image` method.
-    let renderer = WgpuRenderer::new_with_texture_rt(image_size).await.unwrap();
-    renderer.render(&map).unwrap();
+    let renderer = WgpuRenderer::new_with_texture_rt(image_size)
+        .await
+        .expect("failed to create renderer");
+    renderer.render(&map).expect("failed to render the map");
 
-    let bitmap = renderer.get_image().await.unwrap();
+    let bitmap = renderer
+        .get_image()
+        .await
+        .expect("failed to get image bitmap from texture");
     let buffer =
         ImageBuffer::<Rgba<u8>, _>::from_raw(image_size.width(), image_size.height(), bitmap)
-            .unwrap();
-    buffer.save("output_map.png").unwrap();
+            .expect("failed to read bitmap");
+    buffer
+        .save("output_map.png")
+        .expect("failed to encode or write image");
 
     Ok(())
 }

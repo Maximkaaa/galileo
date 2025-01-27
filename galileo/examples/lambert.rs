@@ -1,3 +1,6 @@
+//! This examples demonstrates working with the map in a projection different from usual Web
+//! Mercator projection.
+
 use data::Country;
 use galileo::control::{EventPropagation, UserEvent};
 use galileo::layer::feature_layer::symbol::{SimplePolygonSymbol, Symbol};
@@ -24,11 +27,12 @@ async fn main() {
     run(MapBuilder::new()).await;
 }
 
-pub fn load_countries() -> Vec<Country> {
-    bincode::deserialize(include_bytes!("data/countries_simpl.data")).unwrap()
+fn load_countries() -> Vec<Country> {
+    bincode::deserialize(include_bytes!("data/countries_simpl.data"))
+        .expect("invalid countries data")
 }
 
-pub async fn run(builder: MapBuilder) {
+pub(crate) async fn run(builder: MapBuilder) {
     let countries = load_countries();
 
     let feature_layer = FeatureLayer::new(countries, CountrySymbol {}, Crs::EPSG3857);
@@ -47,7 +51,7 @@ pub async fn run(builder: MapBuilder) {
         .with_layer(feature_layer.clone())
         .with_event_handler(move |ev, map| {
             if let UserEvent::PointerMoved(event) = ev {
-                let mut layer = feature_layer.write().unwrap();
+                let mut layer = feature_layer.write().expect("lock is poisoned");
 
                 let mut new_selected = usize::MAX;
                 let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {
@@ -56,9 +60,15 @@ pub async fn run(builder: MapBuilder) {
 
                 let projection = ChainProjection::new(
                     Box::new(InvertedProjection::new(
-                        map.view().crs().get_projection::<GeoPoint2d, _>().unwrap(),
+                        map.view()
+                            .crs()
+                            .get_projection::<GeoPoint2d, _>()
+                            .expect("cannot project point"),
                     )),
-                    layer.crs().get_projection::<_, Point2d>().unwrap(),
+                    layer
+                        .crs()
+                        .get_projection::<_, Point2d>()
+                        .expect("cannot find projection"),
                 );
 
                 let Some(projected) = projection.project(&position) else {
@@ -80,8 +90,9 @@ pub async fn run(builder: MapBuilder) {
 
                 let selected = selected_index.swap(new_selected, Ordering::Relaxed);
                 if selected != usize::MAX {
-                    let feature = layer.features_mut().get_mut(selected).unwrap();
-                    feature.edit_style().is_selected = false;
+                    if let Some(feature) = layer.features_mut().get_mut(selected) {
+                        feature.edit_style().is_selected = false;
+                    }
                 }
 
                 map.redraw();
