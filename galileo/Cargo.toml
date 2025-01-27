@@ -12,7 +12,7 @@ readme = "../README.md"
 exclude = ["examples/data"]
 
 [features]
-default = ["wgpu", "serde", "winit", "cosmic-text", "_tests", "rustybuzz", "image"]
+default = ["wgpu", "serde", "winit", "_tests", "rustybuzz", "image"]
 wgpu = ["dep:wgpu", "raw-window-handle"]
 geojson = ["dep:geojson", "galileo-types/geojson"]
 rustybuzz = ["dep:rustybuzz"]
@@ -28,8 +28,6 @@ base64 = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 bytes = { workspace = true }
 cfg-if = { workspace = true }
-cosmic-text = { workspace = true, optional = true }
-futures = { workspace = true }
 futures-intrusive = { workspace = true }
 galileo-mvt = { workspace = true }
 galileo-types = { workspace = true }
@@ -61,7 +59,6 @@ geo = { workspace = true }
 geo-types = { workspace = true }
 geojson = { workspace = true }
 las = { workspace = true, features = ["laz"] }
-notify = { workspace = true }
 serde_json = { workspace = true }
 tokio-test = { workspace = true }
 
@@ -74,12 +71,12 @@ wgpu = { workspace = true, default-features = true, optional = true }
 tokio = { workspace = true, default-features = true, features = ["macros", "rt", "rt-multi-thread"] }
 maybe-sync = { workspace = true, features = ["sync"] }
 reqwest = { workspace = true }
-rayon = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 bytemuck = { workspace = true, features = ["derive", "extern_crate_alloc"] }
 console_error_panic_hook = { workspace = true }
 console_log = { workspace = true }
+futures = { workspace = true }
 wgpu = { workspace = true, default-features = false, features = ["webgl", "wgsl"] }
 wasm-bindgen-futures = { workspace = true }
 wasm-bindgen = { workspace = true }
