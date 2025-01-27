@@ -67,7 +67,7 @@ pub(crate) async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: St
         tile_schema(),
     );
 
-    let graphics_layer = VectorTileLayer::from_url(tile_provider.clone(), style, tile_schema());
+    let graphics_layer = VectorTileLayer::new(tile_provider.clone(), style, tile_schema());
 
     let style = VectorTileStyle {
         rules: vec![],
@@ -86,7 +86,7 @@ pub(crate) async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: St
         },
         background: Default::default(),
     };
-    let label_layer = VectorTileLayer::from_url(tile_provider, style, tile_schema());
+    let label_layer = VectorTileLayer::new(tile_provider, style, tile_schema());
 
     builder
         .with_layer(graphics_layer)
