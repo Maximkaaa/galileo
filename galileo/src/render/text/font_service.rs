@@ -1,14 +1,16 @@
 //! Service for text rendering.
 
-use crate::render::text::rustybuzz::RustybuzzFontServiceProvider;
-use crate::render::text::{FontServiceProvider, TextShaping, TextStyle};
+use std::sync::Arc;
+
 use bytes::Bytes;
 use lazy_static::lazy_static;
 use nalgebra::Vector2;
 use parking_lot::RwLock;
 use rustybuzz::ttf_parser::FaceParsingError;
-use std::sync::Arc;
 use thiserror::Error;
+
+use crate::render::text::rustybuzz::RustybuzzFontServiceProvider;
+use crate::render::text::{FontServiceProvider, TextShaping, TextStyle};
 
 lazy_static! {
     static ref INSTANCE: Arc<RwLock<FontService>> = Arc::new(RwLock::new(FontService::default()));

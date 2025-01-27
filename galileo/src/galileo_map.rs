@@ -1,28 +1,29 @@
-use crate::control::{EventProcessor, EventPropagation, UserEvent};
-use crate::layer::data_provider::UrlSource;
-use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::layer::Layer;
-use crate::map::Map;
-use crate::render::WgpuRenderer;
-use crate::tile_scheme::{TileIndex, TileSchema};
-use crate::view::MapView;
-use crate::winit::{WinitInputHandler, WinitMessenger};
-use crate::Messenger;
+use std::sync::Arc;
+
 use galileo_types::cartesian::Size;
 use galileo_types::geo::impls::GeoPoint2d;
 use maybe_sync::{MaybeSend, MaybeSync};
 use parking_lot::RwLock;
-use std::sync::Arc;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::wasm_bindgen;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::EventLoop;
 use winit::window::Window;
 
+use crate::control::{EventProcessor, EventPropagation, UserEvent};
+use crate::layer::data_provider::UrlSource;
+use crate::layer::vector_tile_layer::style::VectorTileStyle;
+use crate::layer::Layer;
+use crate::map::Map;
 #[cfg(target_arch = "wasm32")]
 use crate::platform::web::map_builder::sleep;
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::wasm_bindgen;
+use crate::render::WgpuRenderer;
+use crate::tile_scheme::{TileIndex, TileSchema};
+use crate::view::MapView;
+use crate::winit::{WinitInputHandler, WinitMessenger};
+use crate::Messenger;
 
 /// Convenience struct holding all necessary parts of a interactive map, including window handle and an event loop.
 ///

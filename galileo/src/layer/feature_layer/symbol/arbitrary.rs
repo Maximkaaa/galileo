@@ -1,10 +1,11 @@
-use crate::render::render_bundle::RenderPrimitive;
-use crate::symbol::{CirclePointSymbol, SimpleContourSymbol, SimplePolygonSymbol, Symbol};
-use crate::Color;
 use galileo_types::cartesian::CartesianPoint3d;
 use galileo_types::geometry::Geom;
 use galileo_types::impls::{Contour, Polygon};
 use num_traits::AsPrimitive;
+
+use crate::render::render_bundle::RenderPrimitive;
+use crate::symbol::{CirclePointSymbol, SimpleContourSymbol, SimplePolygonSymbol, Symbol};
+use crate::Color;
 
 /// Renders any type of the geometry with the set inner symbols.
 #[derive(Debug, Clone)]

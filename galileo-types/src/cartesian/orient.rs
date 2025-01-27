@@ -1,5 +1,6 @@
-use crate::cartesian::CartesianPoint2d;
 use serde::{Deserialize, Serialize};
+
+use crate::cartesian::CartesianPoint2d;
 
 /// Orientation of a triplet of points.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

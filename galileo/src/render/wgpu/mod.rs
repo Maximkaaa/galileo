@@ -1,10 +1,11 @@
+use std::any::Any;
+use std::mem::size_of;
+use std::sync::Arc;
+
 use cfg_if::cfg_if;
 use galileo_types::cartesian::Size;
 use lyon::tessellation::VertexBuffers;
 use nalgebra::{Rotation3, Vector3};
-use std::any::Any;
-use std::mem::size_of;
-use std::sync::Arc;
 use wgpu::util::DeviceExt;
 use wgpu::{
     Adapter, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Extent3d,
@@ -14,6 +15,8 @@ use wgpu::{
     TextureUsages, TextureView, TextureViewDescriptor, WasmNotSendSync,
 };
 
+use super::render_bundle::tessellating::{ImageInfo, ImageStoreInfo};
+use super::{Canvas, PackedBundle, RenderOptions};
 use crate::error::GalileoError;
 use crate::layer::Layer;
 use crate::map::Map;
@@ -25,9 +28,6 @@ use crate::render::wgpu::pipelines::image::WgpuImage;
 use crate::render::wgpu::pipelines::Pipelines;
 use crate::view::MapView;
 use crate::Color;
-
-use super::render_bundle::tessellating::{ImageInfo, ImageStoreInfo};
-use super::{Canvas, PackedBundle, RenderOptions};
 
 mod pipelines;
 

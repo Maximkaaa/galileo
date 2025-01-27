@@ -1,21 +1,19 @@
 use std::sync::Arc;
 
-use crate::run_ui::Positions;
-use crate::state::WgpuFrame;
-use galileo::control::{EventPropagation, MouseEvent, UserEvent};
-use galileo::{
-    control::{EventProcessor, MapController},
-    render::WgpuRenderer,
-    tile_scheme::TileIndex,
-    winit::WinitInputHandler,
-    Map, MapBuilder, MapView, TileSchema,
-};
-use galileo_types::cartesian::Point2d;
-use galileo_types::{cartesian::Size, latlon};
+use galileo::control::{EventProcessor, EventPropagation, MapController, MouseEvent, UserEvent};
+use galileo::render::WgpuRenderer;
+use galileo::tile_scheme::TileIndex;
+use galileo::winit::WinitInputHandler;
+use galileo::{Map, MapBuilder, MapView, TileSchema};
+use galileo_types::cartesian::{Point2d, Size};
+use galileo_types::latlon;
 use parking_lot::RwLock;
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
+
+use crate::run_ui::Positions;
+use crate::state::WgpuFrame;
 
 pub struct GalileoState {
     input_handler: WinitInputHandler,

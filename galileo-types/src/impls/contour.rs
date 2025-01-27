@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 use crate::geo::Projection;
 use crate::geometry_type::{ContourGeometryType, GeometryType};
-use serde::{Deserialize, Serialize};
 
 /// Simple [`crate::Contour`] implementation.
 #[derive(Debug, Default, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]

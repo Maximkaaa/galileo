@@ -1,6 +1,9 @@
 //! This example shows how to create custom symbols for feature layers and set the appearance of
 //! features based on their attributes.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+
 use data::{City, Country};
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
 use galileo::layer::feature_layer::symbol::{SimplePolygonSymbol, Symbol};
@@ -14,8 +17,6 @@ use galileo_types::geometry::Geom;
 use galileo_types::impls::{Contour, Polygon};
 use num_traits::AsPrimitive;
 use parking_lot::RwLock;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 
 mod data;
 

@@ -1,12 +1,13 @@
-use crate::render::render_bundle::tessellating::PointInstance;
-use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
-use crate::render::wgpu::{DisplayInstance, WgpuDotBuffers, DEPTH_FORMAT};
-use crate::render::RenderOptions;
 use wgpu::{
     BindGroupLayout, CompareFunction, DepthStencilState, Device, RenderPass, RenderPipeline,
     RenderPipelineDescriptor, StencilFaceState, StencilOperation, StencilState, TextureFormat,
     VertexStepMode,
 };
+
+use crate::render::render_bundle::tessellating::PointInstance;
+use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
+use crate::render::wgpu::{DisplayInstance, WgpuDotBuffers, DEPTH_FORMAT};
+use crate::render::RenderOptions;
 
 pub struct DotPipeline {
     wgpu_pipeline: RenderPipeline,

@@ -1,12 +1,14 @@
+use std::mem::size_of;
+use std::sync::Arc;
+
+use galileo_types::cartesian::Size;
+use lyon::lyon_tessellation::VertexBuffers;
+use serde::{Deserialize, Serialize};
+
 use crate::decoded_image::{DecodedImage, DecodedImageType};
 use crate::render::render_bundle::tessellating::{
     ImageInfo, ImageStoreInfo, PolyVertex, PrimitiveInfo, ScreenRefVertex, TessellatingRenderBundle,
 };
-use galileo_types::cartesian::Size;
-use lyon::lyon_tessellation::VertexBuffers;
-use serde::{Deserialize, Serialize};
-use std::mem::size_of;
-use std::sync::Arc;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct TessellatingRenderBundleBytes {

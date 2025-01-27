@@ -1,14 +1,16 @@
-use crate::decoded_image::{DecodedImage, DecodedImageType};
-use crate::render::render_bundle::tessellating::ImageVertex;
-use crate::render::wgpu::pipelines::default_targets;
-use crate::render::wgpu::{pipelines, DisplayInstance};
-use crate::render::RenderOptions;
 use std::sync::Arc;
+
 use wgpu::util::{DeviceExt, TextureDataOrder};
 use wgpu::{
     BindGroup, BindGroupLayout, Device, Queue, RenderPass, RenderPipeline,
     RenderPipelineDescriptor, TextureFormat,
 };
+
+use crate::decoded_image::{DecodedImage, DecodedImageType};
+use crate::render::render_bundle::tessellating::ImageVertex;
+use crate::render::wgpu::pipelines::default_targets;
+use crate::render::wgpu::{pipelines, DisplayInstance};
+use crate::render::RenderOptions;
 
 const INDICES: &[u16] = &[1, 0, 2, 1, 2, 3];
 

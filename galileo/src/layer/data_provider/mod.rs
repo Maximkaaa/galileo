@@ -9,13 +9,14 @@ pub use url_image_provider::UrlImageProvider;
 #[cfg(not(target_arch = "wasm32"))]
 mod file_cache;
 
+use std::future::Future;
+
+use bytes::Bytes;
 #[cfg(not(target_arch = "wasm32"))]
 pub use file_cache::FileCacheController;
+use maybe_sync::{MaybeSend, MaybeSync};
 
 use crate::error::GalileoError;
-use bytes::Bytes;
-use maybe_sync::{MaybeSend, MaybeSync};
-use std::future::Future;
 
 /// Data provider is a generic way to load and decode data for a layer.
 ///
@@ -80,9 +81,10 @@ pub trait UrlSource<Key: ?Sized>: (Fn(&Key) -> String) + MaybeSend + MaybeSync {
 impl<Key: ?Sized, T: Fn(&Key) -> String> UrlSource<Key> for T where T: MaybeSend + MaybeSync {}
 
 pub(crate) mod dummy {
+    use bytes::Bytes;
+
     use crate::error::GalileoError;
     use crate::layer::data_provider::PersistentCacheController;
-    use bytes::Bytes;
 
     /// Cache controller that always misses.
     pub struct DummyCacheController {}

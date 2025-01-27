@@ -1,12 +1,14 @@
-use crate::render::render_bundle::tessellating::ScreenRefVertex;
-use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
-use crate::render::wgpu::{DisplayInstance, ScreenRefBuffers, DEPTH_FORMAT};
-use crate::render::RenderOptions;
 use std::mem::size_of;
+
 use wgpu::{
     BindGroupLayout, CompareFunction, DepthStencilState, Device, RenderPass, RenderPipeline,
     RenderPipelineDescriptor, StencilFaceState, StencilOperation, StencilState, TextureFormat,
 };
+
+use crate::render::render_bundle::tessellating::ScreenRefVertex;
+use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
+use crate::render::wgpu::{DisplayInstance, ScreenRefBuffers, DEPTH_FORMAT};
+use crate::render::RenderOptions;
 
 pub struct ScreenRefPipeline {
     wgpu_pipeline: RenderPipeline,

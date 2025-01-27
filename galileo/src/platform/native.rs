@@ -1,11 +1,12 @@
 //! Types for native applications.
 
-use crate::decoded_image::DecodedImage;
-use crate::error::GalileoError;
-use crate::platform::PlatformService;
 use async_trait::async_trait;
 use bytes::Bytes;
 use log::info;
+
+use crate::decoded_image::DecodedImage;
+use crate::error::GalileoError;
+use crate::platform::PlatformService;
 
 pub mod map_builder;
 pub mod vt_processor;

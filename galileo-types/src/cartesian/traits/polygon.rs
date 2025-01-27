@@ -1,8 +1,9 @@
+use nalgebra::Point2;
+
 use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
 use crate::contour::ClosedContour;
 use crate::polygon::Polygon;
 use crate::segment::Segment;
-use nalgebra::Point2;
 
 /// Polygon in 2d cartesian coordinates. This trait is auto-implemented for all illegible types.
 pub trait CartesianPolygon {

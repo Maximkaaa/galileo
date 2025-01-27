@@ -1,6 +1,9 @@
 //! This examples demonstrates working with the map in a projection different from usual Web
 //! Mercator projection.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+
 use data::Country;
 use galileo::control::{EventPropagation, UserEvent};
 use galileo::layer::feature_layer::symbol::{SimplePolygonSymbol, Symbol};
@@ -16,8 +19,6 @@ use galileo_types::geometry::Geom;
 use galileo_types::impls::{Contour, Polygon};
 use num_traits::AsPrimitive;
 use parking_lot::RwLock;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 
 mod data;
 

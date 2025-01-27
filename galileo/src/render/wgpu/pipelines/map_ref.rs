@@ -1,8 +1,9 @@
+use wgpu::{BindGroupLayout, Device, RenderPass, RenderPipeline, TextureFormat};
+
 use crate::render::render_bundle::tessellating::PolyVertex;
 use crate::render::wgpu::pipelines::default_targets;
 use crate::render::wgpu::{pipelines, DisplayInstance, WgpuPolygonBuffers};
 use crate::render::RenderOptions;
-use wgpu::{BindGroupLayout, Device, RenderPass, RenderPipeline, TextureFormat};
 
 pub struct MapRefPipeline {
     wgpu_pipeline: RenderPipeline,

@@ -1,11 +1,8 @@
-use crate::decoded_image::DecodedImage;
-use crate::error::GalileoError;
-use crate::render::point_paint::{CircleFill, PointPaint, PointShape, SectorParameters};
-use crate::render::render_bundle::RenderPrimitive;
-use crate::render::text::{FontService, TextShaping, TextStyle};
-use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
-use crate::view::MapView;
-use crate::Color;
+use std::borrow::Borrow;
+use std::mem::size_of;
+use std::ops::Range;
+use std::sync::Arc;
+
 use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d, Point2d, Point3d};
 use galileo_types::contour::Contour;
 use galileo_types::impls::ClosedContour;
@@ -22,10 +19,15 @@ use lyon::tessellation::VertexSource;
 use nalgebra::{Point2, Vector2};
 use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
-use std::mem::size_of;
-use std::ops::Range;
-use std::sync::Arc;
+
+use crate::decoded_image::DecodedImage;
+use crate::error::GalileoError;
+use crate::render::point_paint::{CircleFill, PointPaint, PointShape, SectorParameters};
+use crate::render::render_bundle::RenderPrimitive;
+use crate::render::text::{FontService, TextShaping, TextStyle};
+use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
+use crate::view::MapView;
+use crate::Color;
 
 #[derive(Debug, Clone)]
 pub(crate) struct TessellatingRenderBundle {

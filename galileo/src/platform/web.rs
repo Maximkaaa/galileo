@@ -1,19 +1,21 @@
 //! Platform specific stuff for WASM32 (web) targets.
 
-use crate::decoded_image::{DecodedImage, DecodedImageType};
-use crate::error::GalileoError;
-use crate::platform::PlatformService;
-use async_trait::async_trait;
-use js_sys::Uint8Array;
 use std::cell::Cell;
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
+
+use async_trait::async_trait;
+use js_sys::Uint8Array;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{HtmlImageElement, Request, RequestInit, RequestMode, Response, WorkerGlobalScope};
+
+use crate::decoded_image::{DecodedImage, DecodedImageType};
+use crate::error::GalileoError;
+use crate::platform::PlatformService;
 
 pub mod map_builder;
 pub mod vt_processor;

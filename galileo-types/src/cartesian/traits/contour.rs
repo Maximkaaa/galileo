@@ -1,9 +1,11 @@
-use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
-use crate::contour::{ClosedContour, Contour};
-use num_traits::{One, Zero};
-use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::Debug;
+
+use num_traits::{One, Zero};
+use serde::{Deserialize, Serialize};
+
+use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
+use crate::contour::{ClosedContour, Contour};
 
 /// Methods specific to closed contours in 2d cartesian space. This trait is auto-implemented for all types implementing
 /// [`ClosedContour`] trait and consist of [`CartesianPoint2d`].

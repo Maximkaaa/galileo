@@ -1,15 +1,16 @@
-use crate::error::GalileoMvtError;
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+
 use bytes::Buf;
 use galileo_types::cartesian::{CartesianClosedContour, CartesianPoint2d, Winding};
 use galileo_types::impls::{ClosedContour, Contour, Polygon};
 use geozero::mvt::tile::GeomType;
-use geozero::mvt::Message as GeozeroMessage;
-use geozero::mvt::Tile;
+use geozero::mvt::{Message as GeozeroMessage, Tile};
 use nalgebra::Point2;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
 use strfmt::DisplayStr;
+
+use crate::error::GalileoMvtError;
 
 pub mod error;
 
@@ -608,8 +609,9 @@ enum MvtGeomCommand {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::io::Cursor;
+
+    use super::*;
 
     #[test]
     fn sint_to_int_test() {

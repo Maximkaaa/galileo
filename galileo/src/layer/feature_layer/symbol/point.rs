@@ -1,20 +1,21 @@
+#[cfg(not(target_arch = "wasm32"))]
+use std::ops::Deref;
+use std::sync::Arc;
+
+use galileo_types::cartesian::CartesianPoint3d;
+use galileo_types::geometry::Geom;
+use galileo_types::impls::{Contour, Polygon};
+use galileo_types::MultiPoint;
+use nalgebra::Vector2;
+use num_traits::AsPrimitive;
+
 use crate::decoded_image::DecodedImage;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::error::GalileoError;
 use crate::layer::feature_layer::symbol::Symbol;
 use crate::render::point_paint::PointPaint;
 use crate::render::render_bundle::RenderPrimitive;
 use crate::Color;
-use galileo_types::cartesian::CartesianPoint3d;
-use galileo_types::geometry::Geom;
-use galileo_types::MultiPoint;
-use nalgebra::Vector2;
-use num_traits::AsPrimitive;
-use std::sync::Arc;
-
-#[cfg(not(target_arch = "wasm32"))]
-use crate::error::GalileoError;
-use galileo_types::impls::{Contour, Polygon};
-#[cfg(not(target_arch = "wasm32"))]
-use std::ops::Deref;
 
 /// Renders a point as a circle of fixes size.
 #[derive(Debug, Copy, Clone)]

@@ -1,14 +1,15 @@
+#[cfg(target_arch = "wasm32")]
+use std::future::Future;
+use std::marker::PhantomData;
+
+use bytes::Bytes;
+use maybe_sync::{MaybeSend, MaybeSync};
+
 use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::layer::data_provider::dummy::DummyCacheController;
 use crate::layer::data_provider::{DataProvider, PersistentCacheController, UrlSource};
 use crate::platform::{PlatformService, PlatformServiceImpl};
-use bytes::Bytes;
-use maybe_sync::{MaybeSend, MaybeSync};
-use std::marker::PhantomData;
-
-#[cfg(target_arch = "wasm32")]
-use std::future::Future;
 
 /// Loads an image from Internet and uses `Cache` persistent cache controller to save it locally.
 #[cfg_attr(target_arch = "wasm32", allow(dead_code))]

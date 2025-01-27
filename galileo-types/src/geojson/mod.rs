@@ -1,12 +1,9 @@
+use geojson::{LineStringType, PolygonType, Position, Value};
+
 use crate::geo::Projection;
 use crate::geojson::point::GeoJsonPoint;
 use crate::geometry::{Geom, Geometry};
-use crate::impls::Contour;
-use crate::impls::MultiContour;
-use crate::impls::MultiPoint;
-use crate::impls::MultiPolygon;
-use crate::impls::Polygon;
-use geojson::{LineStringType, PolygonType, Position, Value};
+use crate::impls::{Contour, MultiContour, MultiPoint, MultiPolygon, Polygon};
 
 mod point;
 

@@ -1,5 +1,6 @@
-use parking_lot::Mutex;
 use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 /// Feature storage of a [FeatureLayer](super::FeatureLayer).
 ///
@@ -281,8 +282,9 @@ impl<F> FeatureEntry<F> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use assert_matches::assert_matches;
+
+    use super::*;
 
     #[test]
     fn feature_editing() {

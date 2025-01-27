@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::cartesian::{CartesianPoint2d, NewCartesianPoint2d};
 use crate::contour::Contour;
 use crate::geo::{GeoPoint, NewGeoPoint};
@@ -6,7 +8,6 @@ use crate::multi_contour::MultiContour;
 use crate::multi_point::MultiPoint;
 use crate::multi_polygon::MultiPolygon;
 use crate::polygon::Polygon;
-use std::marker::PhantomData;
 
 /// Wrapper type that disambiguates coordinate space for generic geometries.
 ///

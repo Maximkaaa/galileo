@@ -1,7 +1,8 @@
 //! Error types used by the crate.
 
-use galileo_mvt::error::GalileoMvtError;
 use std::io::Error;
+
+use galileo_mvt::error::GalileoMvtError;
 use thiserror::Error;
 
 /// Galileo error type.

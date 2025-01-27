@@ -1,10 +1,11 @@
+use galileo_types::cartesian::{CartesianPoint2d, Point2d};
+use web_time::SystemTime;
+
 use crate::control::{
     EventPropagation, MouseButton, MouseButtonsState, MouseEvent, RawUserEvent, TouchId, UserEvent,
     UserEventHandler,
 };
 use crate::map::Map;
-use galileo_types::cartesian::{CartesianPoint2d, Point2d};
-use web_time::SystemTime;
 
 const DRAG_THRESHOLD: f64 = 3.0;
 const CLICK_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(200);

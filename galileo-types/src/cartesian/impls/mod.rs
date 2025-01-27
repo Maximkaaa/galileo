@@ -1,13 +1,13 @@
+use nalgebra::Scalar;
+pub use nalgebra::{Point2, Point3};
+use num_traits::{Bounded, FromPrimitive};
+
 use crate::cartesian::traits::{
     CartesianPoint2d, CartesianPoint3d, NewCartesianPoint2d, NewCartesianPoint3d,
 };
 use crate::geo::Projection;
 use crate::geometry::{Geom, Geometry};
 use crate::geometry_type::{CartesianSpace2d, GeometryType, PointGeometryType};
-use nalgebra::Scalar;
-use num_traits::{Bounded, FromPrimitive};
-
-pub use nalgebra::{Point2, Point3};
 
 /// Cartesian point in *XY* coordinate space.
 pub type Point2d = Point2<f64>;

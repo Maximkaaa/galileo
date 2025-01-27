@@ -1,8 +1,9 @@
 //! Provides platform specific logic and [`PlatformService`] to access it.
 
+use async_trait::async_trait;
+
 use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
-use async_trait::async_trait;
 
 /// Service providing some platform specific functions in a generic way.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]

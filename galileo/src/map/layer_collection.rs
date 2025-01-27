@@ -1,5 +1,6 @@
-use crate::layer::Layer;
 use std::ops::{Index, IndexMut, RangeBounds};
+
+use crate::layer::Layer;
 
 /// Collection of layers with some meta-information.
 ///

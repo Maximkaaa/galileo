@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 use crate::geometry_type::{GeometryType, MultiContourGeometryType};
 use crate::impls::contour::Contour;
-use serde::{Deserialize, Serialize};
 
 /// A set of contours.
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]

@@ -1,8 +1,10 @@
-use crate::error::GalileoError;
-use crate::layer::data_provider::PersistentCacheController;
+use std::path::{Path, PathBuf};
+
 use bytes::Bytes;
 use log::debug;
-use std::path::{Path, PathBuf};
+
+use crate::error::GalileoError;
+use crate::layer::data_provider::PersistentCacheController;
 
 const CACHE_FOLDER: &str = ".tile_cache";
 

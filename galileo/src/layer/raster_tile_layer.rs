@@ -1,19 +1,20 @@
+use std::any::Any;
+use std::collections::HashSet;
+use std::sync::Arc;
+
+use galileo_types::cartesian::Size;
+use maybe_sync::{MaybeSend, MaybeSync};
+use parking_lot::Mutex;
+use quick_cache::sync::Cache;
+use web_time::{Duration, SystemTime};
+
+use super::Layer;
 use crate::decoded_image::DecodedImage;
 use crate::layer::data_provider::DataProvider;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, ImagePaint, PackedBundle, RenderOptions};
 use crate::tile_scheme::{TileIndex, TileSchema};
 use crate::view::MapView;
-use galileo_types::cartesian::Size;
-use maybe_sync::{MaybeSend, MaybeSync};
-use parking_lot::Mutex;
-use quick_cache::sync::Cache;
-use std::any::Any;
-use std::collections::HashSet;
-use std::sync::Arc;
-use web_time::{Duration, SystemTime};
-
-use super::Layer;
 
 /// Raster tile layers load prerender tile sets using [`Provider`](DataProvider) and render them to the map.
 pub struct RasterTileLayer<Provider>

@@ -1,12 +1,14 @@
 //! See [`VectorTileStyle`].
 
-use crate::{
-    render::{point_paint::PointPaint, text::TextStyle, LineCap, LinePaint, PolygonPaint},
-    Color,
-};
+use std::collections::HashMap;
+
 use galileo_mvt::MvtFeature;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
+use crate::render::point_paint::PointPaint;
+use crate::render::text::TextStyle;
+use crate::render::{LineCap, LinePaint, PolygonPaint};
+use crate::Color;
 
 /// Style of a vector tile layer. This specifies how each feature in a tile should be rendered.
 ///

@@ -1,12 +1,13 @@
-use crate::layer::feature_layer::symbol::Symbol;
-use crate::render::render_bundle::RenderPrimitive;
-use crate::render::{LineCap, LinePaint};
-use crate::Color;
 use galileo_types::cartesian::CartesianPoint3d;
 use galileo_types::geometry::Geom;
 use galileo_types::impls::{Contour, Polygon};
 use galileo_types::MultiContour;
 use num_traits::AsPrimitive;
+
+use crate::layer::feature_layer::symbol::Symbol;
+use crate::render::render_bundle::RenderPrimitive;
+use crate::render::{LineCap, LinePaint};
+use crate::Color;
 
 /// Renders a contour as a line of fixed width.
 #[derive(Debug, Copy, Clone)]

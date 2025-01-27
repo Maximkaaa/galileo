@@ -1,14 +1,14 @@
 //! This exmpale shows how to create and work with vector tile layers.
 
+use std::sync::Arc;
+
 use galileo::control::{EventPropagation, MouseButton, UserEvent};
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
 use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Lod, MapBuilder};
-use galileo_types::cartesian::Point2d;
-use galileo_types::cartesian::Rect;
+use galileo_types::cartesian::{Point2d, Rect};
 use galileo_types::geo::Crs;
 use parking_lot::RwLock;
-use std::sync::Arc;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn get_layer_style() -> Option<VectorTileStyle> {

@@ -1,9 +1,10 @@
+use nalgebra::{Point2, Scalar, Vector2};
+use num_traits::{Bounded, Float, FromPrimitive, Num};
+
 use crate::cartesian::Rect;
 use crate::geo::Projection;
 use crate::geometry::{CartesianGeometry2dSpecialization, Geom, GeometrySpecialization};
 use crate::geometry_type::{CartesianSpace2d, GeometryType, PointGeometryType};
-use nalgebra::{Point2, Scalar, Vector2};
-use num_traits::{Bounded, Float, FromPrimitive, Num};
 
 /// Point in a 2d cartesian space.
 ///

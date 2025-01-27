@@ -1,10 +1,10 @@
 //! Vector tile processor.
 
-use maybe_sync::{MaybeSend, MaybeSync};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use galileo_mvt::MvtTile;
+use maybe_sync::{MaybeSend, MaybeSync};
+use serde::{Deserialize, Serialize};
 
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::VtStyleId;

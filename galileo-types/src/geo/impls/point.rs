@@ -1,7 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use crate::geo::traits::point::{GeoPoint, NewGeoPoint};
 use crate::geo::traits::projection::Projection;
 use crate::geometry::{Geom, Geometry};
-use serde::{Deserialize, Serialize};
 
 /// 2d point on the surface of a celestial body.
 #[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Deserialize, Serialize)]

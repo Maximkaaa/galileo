@@ -1,14 +1,16 @@
+use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
+use std::sync::{Arc, Weak};
+
+use galileo_mvt::MvtTile;
+use quick_cache::unsync::Cache;
+use quick_cache::{DefaultHashBuilder, Lifecycle, Weighter};
+use tokio::sync::OnceCell;
+
 use crate::layer::vector_tile_layer::tile_provider::VtStyleId;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::PackedBundle;
 use crate::tile_scheme::TileIndex;
-use galileo_mvt::MvtTile;
-use quick_cache::unsync::Cache;
-use quick_cache::{DefaultHashBuilder, Lifecycle, Weighter};
-use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
-use std::sync::{Arc, Weak};
-use tokio::sync::OnceCell;
 
 const DEFAULT_CACHE_CAPACITY: usize = 100_000_000;
 const AVG_TILE_SIZE: usize = 100_000;

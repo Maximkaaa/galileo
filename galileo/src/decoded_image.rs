@@ -1,12 +1,12 @@
 //! This module contains utilities for loading images to be rendered on the map.
 
-use crate::error::GalileoError;
+use std::fmt::Formatter;
 
 use galileo_types::cartesian::Size;
-
 use serde::de::{Error, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::Formatter;
+
+use crate::error::GalileoError;
 
 /// An image that has been loaded into memory.
 #[derive(Debug, Clone)]
@@ -93,7 +93,8 @@ impl DecodedImageType {
 
 #[cfg(feature = "image")]
 mod serialization {
-    use base64::{prelude::BASE64_STANDARD, Engine};
+    use base64::prelude::BASE64_STANDARD;
+    use base64::Engine;
     use image::ImageEncoder;
 
     use super::*;
