@@ -4,8 +4,9 @@ use crate::messenger::Messenger;
 use crate::render::Canvas;
 use crate::view::MapView;
 use maybe_sync::{MaybeSend, MaybeSync};
+use parking_lot::RwLock;
 use std::any::Any;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 pub mod data_provider;
 pub mod feature_layer;
@@ -40,19 +41,15 @@ pub trait Layer: MaybeSend + MaybeSync {
 
 impl<T: Layer + 'static> Layer for Arc<RwLock<T>> {
     fn render(&self, position: &MapView, canvas: &mut dyn Canvas) {
-        self.read()
-            .expect("lock is poisoned")
-            .render(position, canvas)
+        self.read().render(position, canvas)
     }
 
     fn prepare(&self, view: &MapView) {
-        self.read().expect("lock is poisoned").prepare(view)
+        self.read().prepare(view)
     }
 
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
-        self.write()
-            .expect("lock is poisoned")
-            .set_messenger(messenger)
+        self.write().set_messenger(messenger)
     }
 
     fn as_any(&self) -> &dyn Any {

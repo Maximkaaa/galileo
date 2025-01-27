@@ -6,9 +6,10 @@ use crate::render::{Canvas, PackedBundle};
 use crate::tile_scheme::TileIndex;
 use galileo_mvt::MvtTile;
 use loader::VectorTileLoader;
+use parking_lot::RwLock;
 use processor::VectorTileProcessor;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 pub mod loader;
 pub mod processor;
@@ -89,11 +90,7 @@ impl VectorTileProvider {
         }
 
         let tile_store = self.tiles.clone();
-        if tile_store
-            .read()
-            .expect("lock is poisoned")
-            .contains(index, style_id)
-        {
+        if tile_store.read().contains(index, style_id) {
             return;
         }
 
@@ -105,7 +102,7 @@ impl VectorTileProvider {
 
         crate::async_runtime::spawn(async move {
             let cell = {
-                let mut store = tile_store.write().expect("lock is poisoned");
+                let mut store = tile_store.write();
                 if store.contains(index, style_id) {
                     return;
                 }
@@ -125,7 +122,6 @@ impl VectorTileProvider {
 
             tile_store
                 .write()
-                .expect("lock is poisoned")
                 .store_tile(index, style_id, cell, tile_state);
 
             if let Some(messenger) = messenger {
@@ -139,7 +135,7 @@ impl VectorTileProvider {
     /// If any of the tiles with the given indices was not pre-renderred with the given style id,
     /// it is just skipped.
     pub fn pack_tiles(&self, indices: &[TileIndex], style_id: VtStyleId, canvas: &dyn Canvas) {
-        let mut store = self.tiles.write().expect("lock is poisoned");
+        let mut store = self.tiles.write();
         for index in indices {
             if let Some((tile, mvt_tile)) = store.get_prepared(*index, style_id) {
                 let packed = canvas.pack_bundle(&tile);
@@ -157,18 +153,12 @@ impl VectorTileProvider {
     ///
     /// The tile must be packed before calling this method.
     pub fn get_tile(&self, index: TileIndex, style_id: VtStyleId) -> Option<Arc<dyn PackedBundle>> {
-        self.tiles
-            .read()
-            .expect("lock is poisoned")
-            .get_packed(index, style_id)
+        self.tiles.read().get_packed(index, style_id)
     }
 
     /// Returns raw tile data for the given index.
     pub fn get_mvt_tile(&self, index: TileIndex) -> Option<Arc<MvtTile>> {
-        self.tiles
-            .read()
-            .expect("lock is poisoned")
-            .get_mvt_tile(index)
+        self.tiles.read().get_mvt_tile(index)
     }
 
     /// Set messenger to use to notify about tile updates.

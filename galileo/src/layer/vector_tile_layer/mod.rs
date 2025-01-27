@@ -2,11 +2,12 @@
 //! and draw them to the map with the given [`VectorTileStyle`].
 
 use std::any::Any;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use galileo_types::impls::{ClosedContour, Polygon};
 use nalgebra::Point2;
+use parking_lot::Mutex;
 
 use galileo_mvt::{MvtFeature, MvtGeometry};
 use galileo_types::cartesian::{CartesianPoint2d, Point3d};
@@ -67,7 +68,7 @@ impl Layer for VectorTileLayer {
             return;
         };
 
-        let displayed_tiles = self.displayed_tiles.lock().expect("mutex is poisoned");
+        let displayed_tiles = self.displayed_tiles.lock();
         let to_render: Vec<(&dyn PackedBundle, f32)> = std::iter::once((&*background_bundle, 1.0))
             .chain(displayed_tiles.iter().map(|v| (&*v.bundle, v.opacity)))
             .collect();
@@ -129,7 +130,7 @@ impl VectorTileLayer {
         self.tile_provider
             .pack_tiles(&needed_indices, self.style_id, canvas);
 
-        let mut displayed_tiles = self.displayed_tiles.lock().expect("mutex is poisoned");
+        let mut displayed_tiles = self.displayed_tiles.lock();
 
         let mut needed_tiles = Vec::with_capacity(needed_indices.len());
         let mut to_substitute = vec![];
@@ -211,7 +212,7 @@ impl VectorTileLayer {
     pub fn update_style(&mut self, style: VectorTileStyle) {
         let new_style_id = self.tile_provider.add_style(style);
         if let Some(curr_style) = self.tile_provider.get_style(self.style_id) {
-            *self.prev_background.lock().expect("mutex is poisoned") = Some(PreviousBackground {
+            *self.prev_background.lock() = Some(PreviousBackground {
                 color: curr_style.background,
                 replaced_at: web_time::Instant::now(),
             });
@@ -294,7 +295,7 @@ impl VectorTileLayer {
         );
         let style = self.tile_provider.get_style(self.style_id)?;
 
-        let mut prev_background = self.prev_background.lock().expect("mutex is poisoned");
+        let mut prev_background = self.prev_background.lock();
         let color = match *prev_background {
             Some(prev) => {
                 let k = web_time::Instant::now()

@@ -66,6 +66,7 @@ lyon = "1"
 maybe-sync = "0.1"
 nalgebra = "0.32"
 num-traits = "0.2"
+parking_lot = "0.12"
 prost = "0.12"
 prost-build = "0.12"
 quick_cache = "0.4"
@@ -86,4 +87,4 @@ wasm-bindgen-futures = "0.4"
 web-time = "1"
 web-sys = "0.3"
 wgpu = { version = "22", default-features = false }
-winit = "0.30"
+winit = { version = "0.30", default-features = false }

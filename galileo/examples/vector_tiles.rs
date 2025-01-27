@@ -7,7 +7,8 @@ use galileo::{Lod, MapBuilder};
 use galileo_types::cartesian::Point2d;
 use galileo_types::cartesian::Rect;
 use galileo_types::geo::Crs;
-use std::sync::{Arc, RwLock};
+use parking_lot::RwLock;
+use std::sync::Arc;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn get_layer_style() -> Option<VectorTileStyle> {
@@ -61,10 +62,7 @@ pub(crate) async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: St
                     .view()
                     .screen_to_map(mouse_event.screen_pointer_position)
                 {
-                    let features = layer
-                        .read()
-                        .expect("lock is poisoned")
-                        .get_features_at(&position, &view);
+                    let features = layer.read().get_features_at(&position, &view);
 
                     for (layer, feature) in features {
                         println!("{layer}, {:?}", feature.properties);

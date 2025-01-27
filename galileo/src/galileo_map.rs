@@ -11,7 +11,8 @@ use crate::Messenger;
 use galileo_types::cartesian::Size;
 use galileo_types::geo::impls::GeoPoint2d;
 use maybe_sync::{MaybeSend, MaybeSync};
-use std::sync::{Arc, RwLock};
+use parking_lot::RwLock;
+use std::sync::Arc;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -107,20 +108,19 @@ impl ApplicationHandler for GalileoMap {
                 renderer.resize(Size::new(new_size.width, new_size.height));
             }
 
-            *backend.write().expect("poisoned lock") = Some(renderer);
+            *backend.write() = Some(renderer);
             map.write()
-                .expect("poisoned lock")
                 .set_size(Size::new(size.width as f64, size.height as f64));
             window.request_redraw();
         });
     }
 
     fn suspended(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
-        *self.backend.write().expect("poisoned lock") = None;
+        *self.backend.write() = None;
     }
 
     fn about_to_wait(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
-        self.map.write().expect("lock is poisoned").animate();
+        self.map.write().animate();
     }
 
     fn window_event(
@@ -135,16 +135,16 @@ impl ApplicationHandler for GalileoMap {
             }
             WindowEvent::Resized(size) => {
                 log::info!("Window resized to: {size:?}");
-                if let Some(backend) = self.backend.write().expect("lock is poisoned").as_mut() {
+                if let Some(backend) = self.backend.write().as_mut() {
                     backend.resize(Size::new(size.width, size.height));
 
-                    let mut map = self.map.write().expect("lock is poisoned");
+                    let mut map = self.map.write();
                     map.set_size(Size::new(size.width as f64, size.height as f64));
                 }
             }
             WindowEvent::RedrawRequested => {
-                if let Some(backend) = self.backend.read().expect("lock is poisoned").as_ref() {
-                    let map = self.map.read().expect("lock is poisoned");
+                if let Some(backend) = self.backend.read().as_ref() {
+                    let map = self.map.read();
                     map.load_layers();
                     if let Err(err) = backend.render(&map) {
                         log::error!("Render error: {err:?}");
@@ -163,7 +163,7 @@ impl ApplicationHandler for GalileoMap {
                 let scale = 1.0;
 
                 if let Some(raw_event) = self.input_handler.process_user_input(&other, scale) {
-                    let mut map = self.map.write().expect("lock is poisoned");
+                    let mut map = self.map.write();
                     self.event_processor.handle(raw_event, &mut map);
                 }
             }
@@ -174,7 +174,7 @@ impl ApplicationHandler for GalileoMap {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl GalileoMap {
     fn set_messenger(&mut self, messenger: Option<WinitMessenger>) {
-        let mut map = self.map.write().expect("lock is poisoned");
+        let mut map = self.map.write();
         map.set_messenger(messenger.clone());
 
         if let Some(messenger) = messenger {

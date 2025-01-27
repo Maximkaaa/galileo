@@ -15,8 +15,9 @@ use galileo_types::geo::{
 use galileo_types::geometry::Geom;
 use galileo_types::impls::{Contour, Polygon};
 use num_traits::AsPrimitive;
+use parking_lot::RwLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 mod data;
 
@@ -51,7 +52,7 @@ pub(crate) async fn run(builder: MapBuilder) {
         .with_layer(feature_layer.clone())
         .with_event_handler(move |ev, map| {
             if let UserEvent::PointerMoved(event) = ev {
-                let mut layer = feature_layer.write().expect("lock is poisoned");
+                let mut layer = feature_layer.write();
 
                 let mut new_selected = usize::MAX;
                 let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {

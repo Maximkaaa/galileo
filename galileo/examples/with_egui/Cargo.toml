@@ -10,8 +10,9 @@ egui-winit = { version = "0.29", default-features = false }
 env_logger = { version = "0.11", default-features = false }
 galileo = { path = "../../../galileo" }
 galileo-types = { path = "../../../galileo-types" }
-wgpu = { version = "22", default-features = false }
-winit = { version = "0.30", default-features = false }
+parking_lot = { workspace = true }
+wgpu = { workspace = true, default-features = false }
+winit = { workspace = true, default-features = false }
 
 [[bin]]
 name = "with_egui"

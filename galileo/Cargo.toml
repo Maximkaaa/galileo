@@ -40,13 +40,14 @@ lyon = { workspace = true }
 nalgebra = { workspace = true }
 num-traits = { workspace = true }
 quick_cache = { workspace = true }
+parking_lot = { workspace = true }
 raw-window-handle = { workspace = true, optional = true }
 rustybuzz = { workspace = true, optional = true }
 serde = { workspace = true, optional = true, features = ["std", "derive", "rc"] }
 strfmt = { workspace = true }
 thiserror = { workspace = true }
 web-time = { workspace = true }
-winit = { workspace = true, features = ["rwh_06"], optional = true }
+winit = { workspace = true, default-features = true, features = ["rwh_06"], optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
