@@ -306,7 +306,6 @@ impl VectorTileLayer {
                     *prev_background = None;
                     style.background
                 } else {
-                    eprintln!("Interpolating");
                     prev.color.blend(
                         style
                             .background
@@ -316,8 +315,6 @@ impl VectorTileLayer {
             }
             None => style.background,
         };
-
-        eprintln!("Using background: {color:?}");
 
         bundle.add(
             RenderPrimitive::<_, _, galileo_types::impls::Contour<_>, _>::new_polygon_ref(
