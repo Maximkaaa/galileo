@@ -1,6 +1,7 @@
+use std::future::Future;
+
 #[cfg(not(target_arch = "wasm32"))]
 use maybe_sync::MaybeSend;
-use std::future::Future;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn spawn<T>(future: T)

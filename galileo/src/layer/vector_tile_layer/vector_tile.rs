@@ -1,5 +1,6 @@
-use crate::render::PackedBundle;
 use galileo_mvt::MvtTile;
+
+use crate::render::PackedBundle;
 
 /// Decoded and packed vector tile.
 pub struct VectorTile {

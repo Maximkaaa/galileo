@@ -5,13 +5,12 @@ use std::any::Any;
 use std::sync::Arc;
 use std::time::Duration;
 
-use galileo_types::impls::{ClosedContour, Polygon};
-use nalgebra::Point2;
-use parking_lot::Mutex;
-
 use galileo_mvt::{MvtFeature, MvtGeometry};
 use galileo_types::cartesian::{CartesianPoint2d, Point3d};
 use galileo_types::geometry::CartesianGeometry2d;
+use galileo_types::impls::{ClosedContour, Polygon};
+use nalgebra::Point2;
+use parking_lot::Mutex;
 pub use vector_tile::VectorTile;
 
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
@@ -334,15 +333,11 @@ impl VectorTileLayer {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        platform::native::vt_processor::ThreadVtProcessor,
-        render::render_bundle::{
-            tessellating::TessellatingRenderBundle, RenderBundle, RenderBundleType,
-        },
-        tests::TestTileLoader,
-    };
-
     use super::*;
+    use crate::platform::native::vt_processor::ThreadVtProcessor;
+    use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
+    use crate::render::render_bundle::{RenderBundle, RenderBundleType};
+    use crate::tests::TestTileLoader;
 
     fn test_layer() -> VectorTileLayer {
         let tile_schema = TileSchema::web(18);

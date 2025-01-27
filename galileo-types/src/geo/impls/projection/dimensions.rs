@@ -1,7 +1,9 @@
+use std::marker::PhantomData;
+
+use serde::{Deserialize, Serialize};
+
 use crate::cartesian::{NewCartesianPoint2d, NewCartesianPoint3d};
 use crate::geo::traits::projection::Projection;
-use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
 
 /// Projection that adds a default z-value to a 2d point. Reversed projecting drops the z-value.
 #[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Hash, Deserialize, Serialize)]

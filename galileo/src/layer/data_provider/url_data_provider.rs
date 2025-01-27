@@ -1,12 +1,14 @@
+use std::marker::PhantomData;
+
+use bytes::Bytes;
+use maybe_sync::{MaybeSend, MaybeSync};
+
 use crate::error::GalileoError;
 use crate::layer::data_provider::dummy::DummyCacheController;
 use crate::layer::data_provider::{
     DataProcessor, DataProvider, PersistentCacheController, UrlSource,
 };
 use crate::platform::{PlatformService, PlatformServiceImpl};
-use bytes::Bytes;
-use maybe_sync::{MaybeSend, MaybeSync};
-use std::marker::PhantomData;
 
 /// Loads data from Internet and uses `Cache` persistent cache to save data locally.
 pub struct UrlDataProvider<Key, Decoder, Cache = DummyCacheController>

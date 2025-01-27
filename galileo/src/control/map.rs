@@ -1,8 +1,10 @@
+use std::time::Duration;
+
+use nalgebra::Vector2;
+
 use crate::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
 use crate::map::Map;
 use crate::view::MapView;
-use nalgebra::Vector2;
-use std::time::Duration;
 
 const DEFAULT_ZOOM_DURATION: Duration = Duration::from_millis(50);
 

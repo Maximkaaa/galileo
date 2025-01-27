@@ -1,5 +1,12 @@
 //! Vector tile processor implementation for Web
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use galileo_mvt::MvtTile;
+
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::processor::{
     TileProcessingError, VectorTileProcessor,
@@ -9,11 +16,6 @@ use crate::platform::web::web_workers::WebWorkerService;
 use crate::render::render_bundle::RenderBundle;
 use crate::tile_scheme::TileIndex;
 use crate::TileSchema;
-use async_trait::async_trait;
-use galileo_mvt::MvtTile;
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::sync::Arc;
 
 /// Vector tile processor that uses Web Workers to prepare tiles for rendering.
 pub struct WebWorkerVtProcessor {

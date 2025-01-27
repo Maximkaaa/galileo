@@ -1,12 +1,14 @@
 //! [Layers](Layer) specify a data source and the way the data should be rendered to the map.
 
+use std::any::Any;
+use std::sync::Arc;
+
+use maybe_sync::{MaybeSend, MaybeSync};
+use parking_lot::RwLock;
+
 use crate::messenger::Messenger;
 use crate::render::Canvas;
 use crate::view::MapView;
-use maybe_sync::{MaybeSend, MaybeSync};
-use parking_lot::RwLock;
-use std::any::Any;
-use std::sync::Arc;
 
 pub mod data_provider;
 pub mod feature_layer;

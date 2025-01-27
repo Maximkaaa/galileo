@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 use crate::geometry_type::{GeometryType, PolygonGeometryType};
 use crate::impls::contour::ClosedContour;
-use serde::{Deserialize, Serialize};
 
 /// Simple implementation of the [`Polygon`](crate::Polygon) trait.
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]

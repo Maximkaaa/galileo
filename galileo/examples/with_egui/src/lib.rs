@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
-use winit::{
-    event::{Event, KeyEvent, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    window::Window,
-};
+use winit::event::{Event, KeyEvent, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::Window;
 
 mod run_ui;
 mod state;

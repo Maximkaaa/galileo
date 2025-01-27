@@ -11,8 +11,7 @@ use galileo::render::text::font_service::FontService;
 use galileo::render::text::TextStyle;
 use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Color, Lod, MapBuilder};
-use galileo_types::cartesian::Point2d;
-use galileo_types::cartesian::Rect;
+use galileo_types::cartesian::{Point2d, Rect};
 use galileo_types::geo::Crs;
 
 #[cfg(target_arch = "wasm32")]

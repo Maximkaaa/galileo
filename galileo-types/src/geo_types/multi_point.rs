@@ -1,5 +1,6 @@
-use crate::geometry_type::{AmbiguousSpace, GeometryType, MultiPointGeometryType};
 use geo_types::{CoordNum, MultiPoint, Point};
+
+use crate::geometry_type::{AmbiguousSpace, GeometryType, MultiPointGeometryType};
 
 impl<T: CoordNum> crate::multi_point::MultiPoint for MultiPoint<T> {
     type Point = Point<T>;

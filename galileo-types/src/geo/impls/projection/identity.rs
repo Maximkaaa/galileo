@@ -1,8 +1,9 @@
+use std::marker::PhantomData;
+
 use crate::cartesian::{NewCartesianPoint2d, NewCartesianPoint3d};
 use crate::geo::traits::point::NewGeoPoint;
 use crate::geo::traits::projection::Projection;
 use crate::geometry_type::{CartesianSpace2d, CartesianSpace3d, GeoSpace2d};
-use std::marker::PhantomData;
 
 /// Projection that doesn't change the input geometry (but may change the type of geometry).
 #[derive(Default)]

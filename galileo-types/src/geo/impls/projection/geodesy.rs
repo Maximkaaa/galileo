@@ -1,8 +1,10 @@
+use std::marker::PhantomData;
+
+use geodesy::prelude::*;
+
 use crate::cartesian::NewCartesianPoint2d;
 use crate::geo::traits::point::NewGeoPoint;
 use crate::geo::traits::projection::Projection;
-use geodesy::prelude::*;
-use std::marker::PhantomData;
 
 /// A projection constructed by `geodesy` crate.
 #[derive(Debug, Default)]

@@ -1,6 +1,7 @@
+use geo_types::{CoordNum, LineString};
+
 use crate::geometry_type::{AmbiguousSpace, GeometryType, PolygonGeometryType};
 use crate::polygon::Polygon;
-use geo_types::{CoordNum, LineString};
 
 impl<T: CoordNum> Polygon for geo_types::Polygon<T> {
     type Contour = LineString<T>;

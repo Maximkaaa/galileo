@@ -1,3 +1,11 @@
+use std::mem::size_of;
+
+use wgpu::{
+    BindGroup, Buffer, CompareFunction, DepthStencilState, Device, PipelineLayout, RenderPass,
+    RenderPipelineDescriptor, ShaderModule, StencilFaceState, StencilOperation, StencilState,
+    TextureFormat, VertexBufferLayout,
+};
+
 use crate::render::wgpu::pipelines::clip::ClipPipeline;
 use crate::render::wgpu::pipelines::dot::DotPipeline;
 use crate::render::wgpu::pipelines::image::ImagePipeline;
@@ -5,12 +13,6 @@ use crate::render::wgpu::pipelines::map_ref::MapRefPipeline;
 use crate::render::wgpu::pipelines::screen_ref::ScreenRefPipeline;
 use crate::render::wgpu::{ViewUniform, WgpuPackedBundle, DEPTH_FORMAT};
 use crate::render::RenderOptions;
-use std::mem::size_of;
-use wgpu::{
-    BindGroup, Buffer, CompareFunction, DepthStencilState, Device, PipelineLayout, RenderPass,
-    RenderPipelineDescriptor, ShaderModule, StencilFaceState, StencilOperation, StencilState,
-    TextureFormat, VertexBufferLayout,
-};
 
 mod clip;
 mod dot;

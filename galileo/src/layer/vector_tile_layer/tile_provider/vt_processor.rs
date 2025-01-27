@@ -1,3 +1,11 @@
+use bytes::Bytes;
+use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
+use galileo_types::cartesian::{CartesianPoint2d, Point3d, Rect};
+use galileo_types::impls::{ClosedContour, Polygon};
+use galileo_types::Contour;
+use num_traits::ToPrimitive;
+use strfmt::strfmt;
+
 use crate::error::GalileoError;
 use crate::layer::data_provider::DataProcessor;
 use crate::layer::vector_tile_layer::style::{VectorTileLabelSymbol, VectorTileStyle};
@@ -6,13 +14,6 @@ use crate::render::render_bundle::{RenderBundle, RenderPrimitive};
 use crate::render::{LinePaint, PolygonPaint};
 use crate::tile_scheme::TileIndex;
 use crate::TileSchema;
-use bytes::Bytes;
-use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
-use galileo_types::cartesian::{CartesianPoint2d, Point3d, Rect};
-use galileo_types::impls::{ClosedContour, Polygon};
-use galileo_types::Contour;
-use num_traits::ToPrimitive;
-use strfmt::strfmt;
 
 /// Data processor that decodes vector tiles.
 pub struct VtProcessor {}

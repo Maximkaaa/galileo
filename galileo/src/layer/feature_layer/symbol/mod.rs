@@ -11,13 +11,13 @@ mod polygon;
 
 pub use arbitrary::ArbitraryGeometrySymbol;
 pub use contour::SimpleContourSymbol;
+use galileo_types::cartesian::CartesianPoint3d;
+use galileo_types::geometry::Geom;
+use galileo_types::impls::{Contour, Polygon};
 pub use point::{CirclePointSymbol, ImagePointSymbol};
 pub use polygon::SimplePolygonSymbol;
 
 use crate::render::render_bundle::RenderPrimitive;
-use galileo_types::cartesian::CartesianPoint3d;
-use galileo_types::geometry::Geom;
-use galileo_types::impls::{Contour, Polygon};
 
 /// Symbol is used to draw a feature `F` to the map.
 pub trait Symbol<F> {

@@ -1,14 +1,16 @@
 //! [`PointPaint`] specifies the way a point should be drawn to the map.
 
+use std::borrow::Cow;
+use std::sync::Arc;
+
+use galileo_types::impls::ClosedContour;
+use nalgebra::{Point2, Vector2};
+use serde::{Deserialize, Serialize};
+
 use crate::decoded_image::DecodedImage;
 use crate::render::text::TextStyle;
 use crate::render::{LineCap, LinePaint};
 use crate::Color;
-use galileo_types::impls::ClosedContour;
-use nalgebra::{Point2, Vector2};
-use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
-use std::sync::Arc;
 
 /// Specifies the way a point should be drawn to the map.
 #[derive(Debug, Clone, Serialize, Deserialize)]

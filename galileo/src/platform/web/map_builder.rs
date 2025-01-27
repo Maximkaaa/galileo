@@ -1,10 +1,17 @@
 //! Map builder functions specific to Web target.
 
+use std::sync::Arc;
+
+use galileo_types::cartesian::Size;
+use galileo_types::geo::impls::GeoPoint2d;
+use parking_lot::RwLock;
+use wasm_bindgen::prelude::wasm_bindgen;
+use winit::event_loop::{ControlFlow, EventLoop};
+
 use crate::control::{EventProcessor, MapController};
 use crate::galileo_map::{GalileoMap, MapBuilder};
 use crate::layer::data_provider::dummy::DummyCacheController;
-use crate::layer::data_provider::UrlImageProvider;
-use crate::layer::data_provider::UrlSource;
+use crate::layer::data_provider::{UrlImageProvider, UrlSource};
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::loader::WebVtLoader;
 use crate::layer::vector_tile_layer::tile_provider::VectorTileProvider;
@@ -15,12 +22,6 @@ use crate::platform::{PlatformService, PlatformServiceImpl};
 use crate::tile_scheme::TileIndex;
 use crate::winit::WinitInputHandler;
 use crate::TileSchema;
-use galileo_types::cartesian::Size;
-use galileo_types::geo::impls::GeoPoint2d;
-use parking_lot::RwLock;
-use std::sync::Arc;
-use wasm_bindgen::prelude::wasm_bindgen;
-use winit::event_loop::{ControlFlow, EventLoop};
 
 impl MapBuilder {
     /// Creates a raster tile layer.

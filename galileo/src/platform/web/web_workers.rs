@@ -1,5 +1,20 @@
 //! Operations with Web Workers.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
+
+use futures::channel::oneshot;
+use futures::channel::oneshot::Sender;
+use galileo_mvt::MvtTile;
+use serde::{Deserialize, Serialize};
+use tokio::sync::watch::Receiver;
+use wasm_bindgen::closure::Closure;
+use wasm_bindgen::JsCast;
+
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::processor::TileProcessingError;
 use crate::render::render_bundle::tessellating::serialization::TessellatingRenderBundleBytes;
@@ -7,19 +22,6 @@ use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
 use crate::render::render_bundle::{RenderBundle, RenderBundleType};
 use crate::tile_scheme::TileIndex;
 use crate::TileSchema;
-use futures::channel::oneshot;
-use futures::channel::oneshot::Sender;
-use galileo_mvt::MvtTile;
-use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::fmt::Display;
-use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::Arc;
-use tokio::sync::watch::Receiver;
-use wasm_bindgen::closure::Closure;
-use wasm_bindgen::JsCast;
 
 const WORKER_URL: &str = "./vt_worker.js";
 
@@ -262,23 +264,20 @@ impl WebWorkerService {
 
 mod worker {
     use galileo_mvt::MvtTile;
-    use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
-
-    use crate::{
-        layer::vector_tile_layer::{
-            style::VectorTileStyle,
-            tile_provider::{processor::TileProcessingError, VtProcessor},
-        },
-        platform::web::web_workers::WebWorkerResponsePayload,
-        render::render_bundle::RenderBundle,
-        tile_scheme::TileIndex,
-        TileSchema,
-    };
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use wasm_bindgen::{JsCast, JsValue};
 
     use super::{
         RenderBundleType, TessellatingRenderBundle, WebWorkerRequest, WebWorkerRequestId,
         WebWorkerRequestPayload, WebWorkerResponse,
     };
+    use crate::layer::vector_tile_layer::style::VectorTileStyle;
+    use crate::layer::vector_tile_layer::tile_provider::processor::TileProcessingError;
+    use crate::layer::vector_tile_layer::tile_provider::VtProcessor;
+    use crate::platform::web::web_workers::WebWorkerResponsePayload;
+    use crate::render::render_bundle::RenderBundle;
+    use crate::tile_scheme::TileIndex;
+    use crate::TileSchema;
 
     #[wasm_bindgen]
     pub fn init_vt_worker() {

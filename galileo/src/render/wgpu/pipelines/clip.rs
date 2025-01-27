@@ -1,11 +1,12 @@
-use crate::render::render_bundle::tessellating::PolyVertex;
-use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
-use crate::render::wgpu::{DisplayInstance, WgpuPolygonBuffers, DEPTH_FORMAT};
-use crate::render::RenderOptions;
 use wgpu::{
     BindGroupLayout, CompareFunction, DepthStencilState, Device, RenderPass, RenderPipeline,
     RenderPipelineDescriptor, StencilFaceState, StencilOperation, StencilState, TextureFormat,
 };
+
+use crate::render::render_bundle::tessellating::PolyVertex;
+use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
+use crate::render::wgpu::{DisplayInstance, WgpuPolygonBuffers, DEPTH_FORMAT};
+use crate::render::RenderOptions;
 
 pub struct ClipPipeline {
     wgpu_pipeline: RenderPipeline,

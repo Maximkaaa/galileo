@@ -1,11 +1,13 @@
 //! Types that help using `Galileo` with `winit`.
 
-use crate::control::{MouseButton, RawUserEvent, TouchEvent};
-use crate::messenger::Messenger;
-use galileo_types::cartesian::Point2d;
 use std::sync::Arc;
+
+use galileo_types::cartesian::Point2d;
 use winit::event::{ElementState, MouseScrollDelta, Touch, TouchPhase, WindowEvent};
 use winit::window::Window;
+
+use crate::control::{MouseButton, RawUserEvent, TouchEvent};
+use crate::messenger::Messenger;
 
 /// Converts `winit` events into `Galileo` [`RawUserEvent`]s.
 #[derive(Debug, Default)]

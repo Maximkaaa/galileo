@@ -1,16 +1,18 @@
 //! [`RenderBundle`] is used to store primitives and prepare them for rendering with the rendering backend.
 
+use std::borrow::Cow;
+
+use galileo_types::cartesian::{CartesianPoint3d, Point2d};
+use galileo_types::contour::Contour;
+use galileo_types::Polygon;
+use num_traits::AsPrimitive;
+
 use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::render::point_paint::PointPaint;
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
 use crate::render::{ImagePaint, LinePaint, PolygonPaint, PrimitiveId};
 use crate::view::MapView;
-use galileo_types::cartesian::{CartesianPoint3d, Point2d};
-use galileo_types::contour::Contour;
-use galileo_types::Polygon;
-use num_traits::AsPrimitive;
-use std::borrow::Cow;
 
 pub(crate) mod tessellating;
 

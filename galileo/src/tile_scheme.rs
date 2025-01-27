@@ -1,12 +1,12 @@
 //! [`TileSchema`] is used by tile layers to calculate [tile indices](TileIndex) needed for a given ['MapView'].
 
-use galileo_types::cartesian::{CartesianPoint2d, Point2d, Rect};
-use galileo_types::geo::Crs;
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+use galileo_types::cartesian::{CartesianPoint2d, Point2d, Rect};
+use galileo_types::geo::Crs;
 #[cfg(target_arch = "wasm32")]
 use js_sys::wasm_bindgen::prelude::wasm_bindgen;
+use serde::{Deserialize, Serialize};
 
 use crate::lod::Lod;
 use crate::view::MapView;
@@ -295,8 +295,9 @@ impl TileSchema {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use galileo_types::cartesian::Size;
+
+    use super::*;
 
     fn simple_schema() -> TileSchema {
         TileSchema {

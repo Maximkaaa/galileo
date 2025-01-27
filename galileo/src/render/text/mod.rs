@@ -1,14 +1,16 @@
 //! Types for text rendering.
 
-use crate::Color;
 use bytes::Bytes;
 use nalgebra::Vector2;
 use serde::{Deserialize, Serialize};
 
+use crate::Color;
+
 pub mod font_service;
 
-use crate::render::text::font_service::FontServiceError;
 pub(crate) use font_service::FontService;
+
+use crate::render::text::font_service::FontServiceError;
 
 // #[cfg(feature = "cosmic-text")]
 // mod cosmic_text;

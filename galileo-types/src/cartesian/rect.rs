@@ -1,9 +1,11 @@
-use crate::cartesian::CartesianPoint2d;
-use crate::impls::ClosedContour;
+use std::ops::Deref;
+
 use nalgebra::{Point2, Scalar};
 use num_traits::{FromPrimitive, Num};
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
+
+use crate::cartesian::CartesianPoint2d;
+use crate::impls::ClosedContour;
 
 /// Rectangle in 2d cartesian coordinate space.
 #[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Hash, Deserialize, Serialize)]

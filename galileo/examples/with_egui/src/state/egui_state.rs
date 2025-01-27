@@ -1,7 +1,5 @@
 use egui::Context;
-use egui_wgpu::Renderer;
-use egui_wgpu::ScreenDescriptor;
-
+use egui_wgpu::{Renderer, ScreenDescriptor};
 use egui_winit::{EventResponse, State};
 use wgpu::{Device, TextureFormat};
 use winit::event::WindowEvent;

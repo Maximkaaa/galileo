@@ -1,9 +1,11 @@
+use std::time::Duration;
+
+use galileo_types::cartesian::Size;
+use web_time::SystemTime;
+
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::view::MapView;
-use galileo_types::cartesian::Size;
-use std::time::Duration;
-use web_time::SystemTime;
 
 mod layer_collection;
 pub use layer_collection::LayerCollection;

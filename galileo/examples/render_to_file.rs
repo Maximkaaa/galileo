@@ -7,6 +7,9 @@
 //! cargo run --example render_to_file --features geojson -- "./galileo/examples/data/Museums 2021.geojson"
 //! ```
 
+use std::sync::Arc;
+use std::time::Duration;
+
 use anyhow::{anyhow, Result};
 use galileo::layer::data_provider::{FileCacheController, UrlImageProvider};
 use galileo::layer::{FeatureLayer, RasterTileLayer};
@@ -18,8 +21,6 @@ use galileo_types::cartesian::Size;
 use galileo_types::geo::Crs;
 use geojson::{FeatureCollection, GeoJson};
 use image::{ImageBuffer, Rgba};
-use std::sync::Arc;
-use std::time::Duration;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]

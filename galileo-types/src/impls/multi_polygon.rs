@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 use crate::geometry_type::{GeometryType, MultiPolygonGeometryType};
 use crate::impls::polygon::Polygon;
-use serde::{Deserialize, Serialize};
 
 /// A set of polygons.
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]

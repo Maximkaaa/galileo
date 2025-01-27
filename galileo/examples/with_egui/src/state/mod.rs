@@ -1,11 +1,13 @@
-use std::{iter, sync::Arc};
-
-use crate::run_ui::{run_ui, UiState};
+use std::iter;
+use std::sync::Arc;
 
 use wgpu::TextureView;
-use winit::{event::*, window::Window};
+use winit::event::*;
+use winit::window::Window;
 
-use self::{egui_state::EguiState, galileo_state::GalileoState};
+use self::egui_state::EguiState;
+use self::galileo_state::GalileoState;
+use crate::run_ui::{run_ui, UiState};
 
 mod egui_state;
 mod galileo_state;

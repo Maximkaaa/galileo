@@ -11,10 +11,11 @@
 //! To write a user interaction logic, the app must provide an implementation of [`UserEventHandler`] trait and add it
 //! to the `EventProcessor` handler list.
 
-use crate::map::Map;
 use galileo_types::cartesian::Point2d;
 use maybe_sync::{MaybeSend, MaybeSync};
 use nalgebra::Vector2;
+
+use crate::map::Map;
 
 mod event_processor;
 mod map;

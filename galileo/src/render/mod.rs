@@ -4,12 +4,14 @@
 //!
 //! At this point only [`WgpuRenderer`] is implemented.
 
-use crate::Color;
+use std::any::Any;
+
 use galileo_types::cartesian::Size;
 use maybe_sync::{MaybeSend, MaybeSync};
 use render_bundle::RenderBundle;
 use serde::{Deserialize, Serialize};
-use std::any::Any;
+
+use crate::Color;
 
 #[cfg(feature = "wgpu")]
 mod wgpu;

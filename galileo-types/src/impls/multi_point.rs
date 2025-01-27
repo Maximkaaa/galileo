@@ -1,5 +1,6 @@
-use crate::geometry_type::{GeometryType, MultiPointGeometryType};
 use serde::{Deserialize, Serialize};
+
+use crate::geometry_type::{GeometryType, MultiPointGeometryType};
 
 /// A set of points.
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]

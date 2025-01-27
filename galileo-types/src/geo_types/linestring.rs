@@ -1,6 +1,7 @@
+use geo_types::{Coord, CoordNum, LineString};
+
 use crate::contour::Contour;
 use crate::geometry_type::{AmbiguousSpace, ContourGeometryType, GeometryType};
-use geo_types::{Coord, CoordNum, LineString};
 
 impl<T: CoordNum> Contour for LineString<T> {
     type Point = Coord<T>;

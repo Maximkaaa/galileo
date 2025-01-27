@@ -360,8 +360,9 @@ impl MapView {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use approx::assert_abs_diff_eq;
+
+    use super::*;
 
     fn test_view() -> MapView {
         MapView::new_projected(&Point2d::new(0.0, 0.0), 1.0)

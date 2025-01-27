@@ -1,9 +1,9 @@
 //! [`FeatureLayer`] stores features in a [`FeatureStore`] and renders them with a [`Symbol`].
 
-use crate::layer::Layer;
-use crate::messenger::Messenger;
-use crate::render::{Canvas, RenderOptions};
-use crate::view::MapView;
+use std::any::Any;
+use std::marker::PhantomData;
+use std::ops::Deref;
+
 use feature_render_store::FeatureRenderStore;
 use galileo_types::cartesian::{
     CartesianPoint2d, NewCartesianPoint2d, NewCartesianPoint3d, Point2d, Point3d, Rect,
@@ -16,9 +16,11 @@ use galileo_types::geometry_type::{CartesianSpace2d, CartesianSpace3d, GeoSpace2
 use maybe_sync::{MaybeSend, MaybeSync};
 use num_traits::AsPrimitive;
 use parking_lot::{Mutex, RwLock};
-use std::any::Any;
-use std::marker::PhantomData;
-use std::ops::Deref;
+
+use crate::layer::Layer;
+use crate::messenger::Messenger;
+use crate::render::{Canvas, RenderOptions};
+use crate::view::MapView;
 
 mod feature;
 mod feature_render_store;

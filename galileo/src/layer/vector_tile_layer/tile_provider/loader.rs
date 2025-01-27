@@ -1,12 +1,13 @@
 //! Vector tile loader stuff.
 
+use bytes::Bytes;
+use galileo_mvt::MvtTile;
+use maybe_sync::{MaybeSend, MaybeSync};
+
 use crate::error::GalileoError;
 use crate::layer::data_provider::{PersistentCacheController, UrlSource};
 use crate::platform::{PlatformService, PlatformServiceImpl};
 use crate::tile_scheme::TileIndex;
-use bytes::Bytes;
-use galileo_mvt::MvtTile;
-use maybe_sync::{MaybeSend, MaybeSync};
 
 /// Error that can occur when trying to load a vector tile.
 pub enum TileLoadError {

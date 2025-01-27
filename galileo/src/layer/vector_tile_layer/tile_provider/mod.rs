@@ -1,25 +1,28 @@
 //! Vector tile layer tile providers
 
-use crate::layer::vector_tile_layer::style::VectorTileStyle;
-use crate::messenger::Messenger;
-use crate::render::{Canvas, PackedBundle};
-use crate::tile_scheme::TileIndex;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
+
 use galileo_mvt::MvtTile;
 use loader::VectorTileLoader;
 use parking_lot::RwLock;
 use processor::VectorTileProcessor;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
+
+use crate::layer::vector_tile_layer::style::VectorTileStyle;
+use crate::messenger::Messenger;
+use crate::render::{Canvas, PackedBundle};
+use crate::tile_scheme::TileIndex;
 
 pub mod loader;
 pub mod processor;
 mod tile_store;
 mod vt_processor;
 
+pub use vt_processor::{VectorTileDecodeContext, VtProcessor};
+
 use crate::layer::vector_tile_layer::tile_provider::tile_store::{
     MvtTileState, PreparedTileState, TileStore,
 };
-pub use vt_processor::{VectorTileDecodeContext, VtProcessor};
 
 /// Identifier of a vector tile style.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

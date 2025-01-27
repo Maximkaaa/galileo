@@ -1,5 +1,9 @@
 //! Map builder functions that are present only on native platform.
 
+use std::sync::Arc;
+
+use galileo_types::geo::impls::GeoPoint2d;
+
 use crate::layer::data_provider::{FileCacheController, UrlImageProvider, UrlSource};
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::loader::WebVtLoader;
@@ -11,8 +15,6 @@ use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
 use crate::render::render_bundle::{RenderBundle, RenderBundleType};
 use crate::tile_scheme::TileIndex;
 use crate::{MapBuilder, TileSchema};
-use galileo_types::geo::impls::GeoPoint2d;
-use std::sync::Arc;
 
 impl MapBuilder {
     /// Creates a new instance.

@@ -1,7 +1,8 @@
+use num_traits::Float;
+
 use crate::geo::traits::projection::Projection;
 use crate::geometry::{Geom, GeometrySpecialization};
 use crate::geometry_type::{GeoSpace2d, GeometryType, PointGeometryType};
-use num_traits::Float;
 
 /// 2d point on the surface of a celestial body.
 pub trait GeoPoint {
