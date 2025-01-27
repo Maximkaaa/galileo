@@ -210,7 +210,7 @@ where
     F: Feature,
     F::Geom: Geometry<Point = P>,
 {
-    /// Returns an iterator of features that are withing `tolerance` units from the `point`. Note that the `point` is
+    /// Returns an iterator of features that are within `tolerance` units from the `point`. Note that the `point` is
     /// expected to be set in the layer's CRS.
     ///
     /// At this moment this method just iterates over all features checking for each one if it is at the point. But
@@ -229,7 +229,7 @@ where
             .filter(move |f| f.as_ref().geometry().is_point_inside(point, tolerance))
     }
 
-    /// Returns a mutable iterator of features that are withing `tolerance` units from the `point`. Note that the `point` is
+    /// Returns a mutable iterator of features that are within `tolerance` units from the `point`. Note that the `point` is
     /// expected to be set in the layer's CRS.
     ///
     /// At this moment this method just iterates over all features checking for each one if it is at the point. But
@@ -518,7 +518,7 @@ where
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         if view.crs() != &self.crs {
-            // not supported at the moment for 3d coordiantes
+            // not supported at the moment for 3d coordinates
             return;
         }
 

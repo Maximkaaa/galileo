@@ -99,7 +99,7 @@ async fn main() -> Result<()> {
     );
 
     // We create a renderer without window, so it will use internal texture to render to.
-    // Every time the `render` method is callled, the image is updated and can be retrieved
+    // Every time the `render` method is called, the image is updated and can be retrieved
     // by the `get_image` method.
     let renderer = WgpuRenderer::new_with_texture_rt(image_size)
         .await

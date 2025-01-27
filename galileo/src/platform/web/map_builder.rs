@@ -63,7 +63,7 @@ impl MapBuilder {
 
 #[wasm_bindgen]
 impl MapBuilder {
-    /// Creates a new map builder and intializes console logger.
+    /// Creates a new map builder and initializes console logger.
     pub fn new() -> Self {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 

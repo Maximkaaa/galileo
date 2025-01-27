@@ -65,7 +65,7 @@ impl VectorTileStyle {
 pub struct StyleRule {
     /// If set, a feature must belong to the set layer. If not set, layer is not checked.
     pub layer_name: Option<String>,
-    /// Specifies a set of attibutes of a feature that must have the given values for this rule to be applied.
+    /// Specifies a set of attributes of a feature that must have the given values for this rule to be applied.
     #[serde(default)]
     pub properties: HashMap<String, String>,
     /// Symbol to draw a feature with.

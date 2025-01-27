@@ -78,14 +78,14 @@ impl VectorTileProvider {
         id
     }
 
-    /// Removes the style from the list of registerred styles.
+    /// Removes the style from the list of registered styles.
     pub fn drop_style(&mut self, style_id: VtStyleId) {
         self.processor.drop_style(style_id);
     }
 
     /// Load and pre-render the tile with given index using given style.
     ///
-    /// A style with given id must first be registerred in the provider.
+    /// A style with given id must first be registered in the provider.
     pub fn load_tile(&self, index: TileIndex, style_id: VtStyleId) {
         if !self.processor.has_style(style_id) {
             log::warn!("Requested tile loading with non-existing style");

@@ -7,7 +7,7 @@ To run this example, first build Galileo as wasm package:
 wasm-pack build --release galileo
 ```
 
-Make sure that you use `wasm-opt` of version heigher than 119.
+Make sure that you use `wasm-opt` of version higher than 119.
 
 After the package is created, use `npm` and `webpack` to build and run the example:
 

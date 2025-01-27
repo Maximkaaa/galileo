@@ -14,7 +14,7 @@ use crate::tile_scheme::TileIndex;
 /// Error while processing vector tile.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TileProcessingError {
-    /// Style with the given style id is not registerred.
+    /// Style with the given style id is not registered.
     InvalidStyle,
     /// Failed to render the tile.
     Rendering,
@@ -27,7 +27,7 @@ pub enum TileProcessingError {
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait VectorTileProcessor: MaybeSend + MaybeSync {
-    /// Returns try if a style with the given id was registerred.
+    /// Returns try if a style with the given id was registered.
     fn has_style(&self, style_id: VtStyleId) -> bool;
     /// Returns a style with the given id.
     fn get_style(&self, style_id: VtStyleId) -> Option<Arc<VectorTileStyle>>;
@@ -37,7 +37,7 @@ pub trait VectorTileProcessor: MaybeSend + MaybeSync {
     fn drop_style(&self, style_id: VtStyleId);
     /// Convert the tile into render bundle using the given style.
     ///
-    /// The style with the given id must first be registerred in the processor using [`add_style`]
+    /// The style with the given id must first be registered in the processor using [`add_style`]
     /// method.
     async fn process_tile(
         &self,
