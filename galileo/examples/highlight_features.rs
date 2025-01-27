@@ -1,7 +1,7 @@
 //! This example shows how to change a feature appearance based on use input - pointing with a
 //! mouse in this case.
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use galileo::control::{EventPropagation, UserEvent};
 use galileo::decoded_image::DecodedImage;
@@ -19,6 +19,7 @@ use galileo_types::{latlon, CartesianGeometry2d, Geometry};
 use lazy_static::lazy_static;
 use nalgebra::Vector2;
 use num_traits::AsPrimitive;
+use parking_lot::RwLock;
 
 const YELLOW_PIN: &[u8] = include_bytes!("data/pin-yellow.png");
 const GREEN_PIN: &[u8] = include_bytes!("data/pin-green.png");
@@ -129,7 +130,7 @@ pub(crate) async fn run(builder: MapBuilder) {
         .with_layer(feature_layer.clone())
         .with_event_handler(move |ev, map| {
             if let UserEvent::PointerMoved(event) = ev {
-                let mut layer = feature_layer.write().expect("lock is poisoned");
+                let mut layer = feature_layer.write();
 
                 let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {
                     return EventPropagation::Stop;

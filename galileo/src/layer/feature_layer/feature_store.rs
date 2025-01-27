@@ -1,4 +1,5 @@
-use std::sync::{Arc, Mutex};
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 /// Feature storage of a [FeatureLayer](super::FeatureLayer).
 ///
@@ -63,7 +64,6 @@ impl<'a, F> FeatureContainerMut<'a, F> {
         if !self.is_updated {
             self.pending_updates
                 .lock()
-                .expect("poisoned mutex")
                 .push(FeatureUpdate::UpdateStyle {
                     feature_index: self.feature_index,
                 });
@@ -79,19 +79,16 @@ impl<'a, F> FeatureContainerMut<'a, F> {
         }
 
         self.entry.is_hidden = true;
-        let mut render_indices = self.entry.render_indices.lock().expect("mutex is poisoned");
+        let mut render_indices = self.entry.render_indices.lock();
         let to_store = (*render_indices).clone();
 
         for entry in &mut *render_indices {
             *entry = None;
         }
 
-        self.pending_updates
-            .lock()
-            .expect("mutex is poisoned")
-            .push(FeatureUpdate::Delete {
-                render_indices: to_store,
-            });
+        self.pending_updates.lock().push(FeatureUpdate::Delete {
+            render_indices: to_store,
+        });
 
         self.is_updated = true;
     }
@@ -105,12 +102,9 @@ impl<'a, F> FeatureContainerMut<'a, F> {
         self.entry.is_hidden = false;
 
         if !self.is_updated {
-            self.pending_updates
-                .lock()
-                .expect("poisoned mutex")
-                .push(FeatureUpdate::Update {
-                    feature_index: self.feature_index,
-                });
+            self.pending_updates.lock().push(FeatureUpdate::Update {
+                feature_index: self.feature_index,
+            });
         }
 
         self.is_updated = true;
@@ -126,12 +120,9 @@ impl<F> AsRef<F> for FeatureContainerMut<'_, F> {
 impl<F> AsMut<F> for FeatureContainerMut<'_, F> {
     fn as_mut(&mut self) -> &mut F {
         if !self.is_updated {
-            self.pending_updates
-                .lock()
-                .expect("poisoned mutex")
-                .push(FeatureUpdate::Update {
-                    feature_index: self.feature_index,
-                });
+            self.pending_updates.lock().push(FeatureUpdate::Update {
+                feature_index: self.feature_index,
+            });
         }
 
         self.is_updated = true;
@@ -167,7 +158,6 @@ impl<F> FeatureStore<F> {
         self.features.push(FeatureEntry::new(feature));
         self.pending_updates
             .lock()
-            .expect("poisoned mutex")
             .push(FeatureUpdate::Update { feature_index })
     }
 
@@ -202,12 +192,9 @@ impl<F> FeatureStore<F> {
             is_hidden: _is_hidden,
             render_indices,
         } = self.features.remove(index);
-        self.pending_updates
-            .lock()
-            .expect("mutex is poisoned")
-            .push(FeatureUpdate::Delete {
-                render_indices: render_indices.into_inner().expect("mutex is poisoned"),
-            });
+        self.pending_updates.lock().push(FeatureUpdate::Delete {
+            render_indices: render_indices.into_inner(),
+        });
 
         feature
     }
@@ -217,7 +204,7 @@ impl<F> FeatureStore<F> {
     }
 
     pub(super) fn drain_updates(&self) -> Vec<FeatureUpdate> {
-        let mut updates = self.pending_updates.lock().expect("poisoned mutex");
+        let mut updates = self.pending_updates.lock();
         std::mem::take(&mut *updates)
     }
 
@@ -276,14 +263,13 @@ impl<F> FeatureEntry<F> {
     pub fn render_index(&self, render_store_id: usize) -> Option<usize> {
         self.render_indices
             .lock()
-            .expect("mutex is poisoned")
             .get(render_store_id)
             .copied()
             .flatten()
     }
 
     pub fn set_render_index(&self, render_index: usize, render_store_id: usize) {
-        let mut render_indices = self.render_indices.lock().expect("mutex is poisoned");
+        let mut render_indices = self.render_indices.lock();
 
         for _ in render_indices.len()..(render_store_id + 1) {
             render_indices.push(None)

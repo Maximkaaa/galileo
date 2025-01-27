@@ -1,4 +1,4 @@
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use crate::run_ui::Positions;
 use crate::state::WgpuFrame;
@@ -12,6 +12,7 @@ use galileo::{
 };
 use galileo_types::cartesian::Point2d;
 use galileo_types::{cartesian::Size, latlon};
+use parking_lot::RwLock;
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration};
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
@@ -49,7 +50,7 @@ impl GalileoState {
                 ..
             }) = ev
             {
-                *pointer_position_clone.write().expect("poisoned lock") = *screen_pointer_position;
+                *pointer_position_clone.write() = *screen_pointer_position;
             }
 
             EventPropagation::Propagate
@@ -89,27 +90,24 @@ impl GalileoState {
     }
 
     pub fn about_to_wait(&self) {
-        self.map.write().unwrap().animate();
+        self.map.write().animate();
     }
 
     pub fn resize(&self, size: PhysicalSize<u32>) {
         self.renderer
             .write()
-            .expect("poisoned lock")
             .resize(Size::new(size.width, size.height));
         self.map
             .write()
-            .expect("poisoned lock")
             .set_size(Size::new(size.width as f64, size.height as f64));
     }
 
     pub fn render(&self, wgpu_frame: &WgpuFrame<'_>) {
-        let galileo_map = self.map.read().unwrap();
+        let galileo_map = self.map.read();
         galileo_map.load_layers();
 
         self.renderer
             .write()
-            .expect("poisoned lock")
             .render_to_texture_view(&galileo_map, wgpu_frame.texture_view);
     }
 
@@ -125,14 +123,14 @@ impl GalileoState {
         let scale = 1.0;
 
         if let Some(raw_event) = self.input_handler.process_user_input(event, scale) {
-            let mut map = self.map.write().expect("poisoned lock");
+            let mut map = self.map.write();
             self.event_processor.handle(raw_event, &mut map);
         }
     }
 
     pub fn positions(&self) -> Positions {
-        let pointer_position = *self.pointer_position.read().expect("poisoned lock");
-        let view = self.map.read().expect("poisoned lock").view().clone();
+        let pointer_position = *self.pointer_position.read();
+        let view = self.map.read().view().clone();
         Positions {
             pointer_position: view.screen_to_map_geo(pointer_position),
             map_center_position: view.position(),

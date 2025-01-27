@@ -17,7 +17,8 @@ use crate::winit::WinitInputHandler;
 use crate::TileSchema;
 use galileo_types::cartesian::Size;
 use galileo_types::geo::impls::GeoPoint2d;
-use std::sync::{Arc, RwLock};
+use parking_lot::RwLock;
+use std::sync::Arc;
 use wasm_bindgen::prelude::wasm_bindgen;
 use winit::event_loop::{ControlFlow, EventLoop};
 

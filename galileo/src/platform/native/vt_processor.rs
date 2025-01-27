@@ -9,9 +9,10 @@ use crate::render::render_bundle::RenderBundle;
 use crate::tile_scheme::TileIndex;
 use crate::TileSchema;
 use galileo_mvt::MvtTile;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 /// Vector tile processor that uses a thread pool to run vector tile tessellation in parallel.
 pub struct ThreadVtProcessor {
@@ -34,32 +35,19 @@ impl ThreadVtProcessor {
 #[async_trait::async_trait]
 impl VectorTileProcessor for ThreadVtProcessor {
     fn has_style(&self, style_id: VtStyleId) -> bool {
-        self.styles
-            .read()
-            .expect("lock is poisoned")
-            .contains_key(&style_id)
+        self.styles.read().contains_key(&style_id)
     }
 
     fn get_style(&self, style_id: VtStyleId) -> Option<Arc<VectorTileStyle>> {
-        self.styles
-            .read()
-            .expect("lock is poisoned")
-            .get(&style_id)
-            .cloned()
+        self.styles.read().get(&style_id).cloned()
     }
 
     fn add_style(&self, style_id: VtStyleId, style: VectorTileStyle) {
-        self.styles
-            .write()
-            .expect("lock is poisoned")
-            .insert(style_id, Arc::new(style));
+        self.styles.write().insert(style_id, Arc::new(style));
     }
 
     fn drop_style(&self, style_id: VtStyleId) {
-        self.styles
-            .write()
-            .expect("lock is poisoned")
-            .remove(&style_id);
+        self.styles.write().remove(&style_id);
     }
 
     async fn process_tile(
@@ -69,13 +57,7 @@ impl VectorTileProcessor for ThreadVtProcessor {
         style_id: VtStyleId,
     ) -> Result<RenderBundle, TileProcessingError> {
         // todo: remove clone here
-        let Some(style) = self
-            .styles
-            .read()
-            .expect("lock is poisoned")
-            .get(&style_id)
-            .cloned()
-        else {
+        let Some(style) = self.styles.read().get(&style_id).cloned() else {
             return Err(TileProcessingError::InvalidStyle);
         };
 

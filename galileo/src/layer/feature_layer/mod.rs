@@ -15,10 +15,10 @@ use galileo_types::geometry::{CartesianGeometry2d, Geom, Geometry};
 use galileo_types::geometry_type::{CartesianSpace2d, CartesianSpace3d, GeoSpace2d};
 use maybe_sync::{MaybeSend, MaybeSync};
 use num_traits::AsPrimitive;
+use parking_lot::{Mutex, RwLock};
 use std::any::Any;
 use std::marker::PhantomData;
 use std::ops::Deref;
-use std::sync::{Mutex, RwLock};
 
 mod feature;
 mod feature_render_store;
@@ -159,7 +159,7 @@ where
         self.options = options;
 
         for lod in &mut self.lods {
-            let lock = lod.contents.get_mut().expect("mutex is poisoned");
+            let lock = lod.contents.get_mut();
             lock.set_buffer_size_limit(options.buffer_size_limit);
         }
 
@@ -276,10 +276,7 @@ where
             self.update_feature_renders(canvas, projection, &updates);
         }
 
-        let lod = self
-            .select_lod(view.resolution())
-            .lock()
-            .expect("mutex is poisoned");
+        let lod = self.select_lod(view.resolution()).lock();
 
         canvas.draw_bundles(
             &lod.bundles(),
@@ -305,14 +302,13 @@ where
                     self.lods[lod_index]
                         .contents
                         .lock()
-                        .expect("mutex is poisoned")
                         .remove_render(render_index);
                 }
             }
         }
 
         for lod in &self.lods {
-            let mut lod = lod.contents.lock().expect("mutex is poisoned");
+            let mut lod = lod.contents.lock();
 
             for update in updates {
                 lod.init_bundle(|| canvas.create_bundle());
@@ -426,7 +422,7 @@ where
     }
 
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
-        *self.messenger.write().expect("lock is poisoned") = Some(messenger);
+        *self.messenger.write() = Some(messenger);
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -485,7 +481,7 @@ where
     }
 
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
-        *self.messenger.write().expect("lock is poisoned") = Some(messenger);
+        *self.messenger.write() = Some(messenger);
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -533,7 +529,7 @@ where
     }
 
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
-        *self.messenger.write().expect("lock is poisoned") = Some(messenger);
+        *self.messenger.write() = Some(messenger);
     }
 
     fn as_any(&self) -> &dyn Any {

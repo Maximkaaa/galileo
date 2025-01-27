@@ -5,8 +5,9 @@ use crate::render::text::{FontServiceProvider, TextShaping, TextStyle};
 use bytes::Bytes;
 use lazy_static::lazy_static;
 use nalgebra::Vector2;
+use parking_lot::RwLock;
 use rustybuzz::ttf_parser::FaceParsingError;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use thiserror::Error;
 
 lazy_static! {
@@ -46,12 +47,12 @@ impl FontService {
 
     /// Execute the closure with the font service instance as an argument.
     pub fn with<T>(f: impl FnOnce(&Self) -> T) -> T {
-        f(&INSTANCE.read().expect("lock is poisoned"))
+        f(&INSTANCE.read())
     }
 
     /// Execute the closure with mutable reference to the font service instance as an argument.
     pub fn with_mut<T>(f: impl FnOnce(&mut Self) -> T) -> T {
-        f(&mut INSTANCE.write().expect("lock is poisoned"))
+        f(&mut INSTANCE.write())
     }
 
     /// Shape the given text input with the given style.
