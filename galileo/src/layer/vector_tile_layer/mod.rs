@@ -106,7 +106,7 @@ impl VectorTileLayer {
     }
 
     /// Creates a new layer with the given url source.
-    pub fn from_url(
+    pub fn new(
         mut tile_provider: VectorTileProvider,
         style: VectorTileStyle,
         tile_scheme: TileSchema,
