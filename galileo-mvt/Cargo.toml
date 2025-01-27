@@ -15,15 +15,15 @@ exclude = ["test-data/*"]
 default = []
 
 [dependencies]
-bytes = "1.5.0"
-galileo-types = { path = "../galileo-types", version = "0.1.1" }
-geozero = { version = "0.13.0", features = ["with-mvt"] }
-log = "0.4.20"
-nalgebra = { version = "0.32", features = ["serde-serialize"] }
-prost = "0.12.2"
-serde = { version = "1.0", features = ["derive"] }
-strfmt = "0.2"
-thiserror = "1.0"
+bytes = { workspace = true }
+galileo-types = { workspace = true }
+geozero = { workspace = true, features = ["with-mvt"] }
+log = { workspace = true }
+nalgebra = { workspace = true, features = ["serde-serialize"] }
+prost = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+strfmt = { workspace = true }
+thiserror = { workspace = true }
 
 [build-dependencies]
-prost-build = "0.12.2"
+prost-build = { workspace = true }
