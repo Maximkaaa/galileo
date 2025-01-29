@@ -57,6 +57,11 @@ impl EventProcessor {
         self.handlers.push(Box::new(handler));
     }
 
+    /// Adds a new handler to the end of the handler list.
+    pub fn add_handler_boxed(&mut self, handler: Box<dyn UserEventHandler>) {
+        self.handlers.push(handler);
+    }
+
     /// Returns true if the processor is currently tracking dgragging by the pointer.
     pub fn is_dragging(&self) -> bool {
         self.drag_target.is_some()

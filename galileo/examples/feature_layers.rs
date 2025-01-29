@@ -5,26 +5,47 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use data::{City, Country};
-use galileo::control::{EventPropagation, MouseButton, UserEvent};
+use galileo::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
 use galileo::layer::feature_layer::symbol::{SimplePolygonSymbol, Symbol};
 use galileo::layer::feature_layer::FeatureLayer;
+use galileo::layer::Layer;
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
-use galileo::{Color, MapBuilder};
-use galileo_types::cartesian::CartesianPoint3d;
+use galileo::{Color, Map, MapView};
+use galileo_types::cartesian::{CartesianPoint3d, Point2d};
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
+use galileo_types::geometry_type::CartesianSpace2d;
 use galileo_types::impls::{Contour, Polygon};
+use galileo_types::latlon;
 use num_traits::AsPrimitive;
 use parking_lot::RwLock;
 
 mod data;
 
 #[cfg(not(target_arch = "wasm32"))]
-#[tokio::main]
-async fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    run(MapBuilder::new()).await;
+fn main() {
+    run()
+}
+
+pub(crate) fn run() {
+    let countries_layer = Arc::new(RwLock::new(create_countries_layer()));
+    let map = create_map(countries_layer.clone());
+    let selected_index = AtomicUsize::new(usize::MAX);
+    let handler = create_mouse_handler(countries_layer, selected_index);
+
+    galileo_egui::init(map, [Box::new(handler) as Box<dyn UserEventHandler>])
+        .expect("failed to initialize");
+}
+
+fn create_map(countries_layer: impl Layer + 'static) -> Map {
+    let point_layer = FeatureLayer::new(load_cities(), CitySymbol {}, Crs::WGS84);
+
+    Map::new(
+        MapView::new(&latlon!(0.0, 0.0), 9783.939620500008),
+        vec![Box::new(countries_layer), Box::new(point_layer)],
+        None,
+    )
 }
 
 fn load_countries() -> Vec<Country> {
@@ -51,79 +72,32 @@ fn load_cities() -> Vec<City> {
     cities
 }
 
-pub(crate) async fn run(builder: MapBuilder) {
-    let countries = load_countries();
-
-    let feature_layer = FeatureLayer::with_lods(
-        countries,
-        CountrySymbol {},
-        Crs::EPSG3857,
-        &[8000.0, 1000.0, 1.0],
-    );
-    let feature_layer = Arc::new(RwLock::new(feature_layer));
-
-    let point_layer = FeatureLayer::new(load_cities(), CitySymbol {}, Crs::WGS84);
-
-    let selected_index = Arc::new(AtomicUsize::new(usize::MAX));
-    builder
-        .with_layer(feature_layer.clone())
-        .with_layer(point_layer)
-        .with_event_handler(move |ev, map| {
-            if let UserEvent::Click(button, event) = ev {
-                if *button == MouseButton::Left {
-                    let mut layer = feature_layer.write();
-
-                    let Some(position) = map.view().screen_to_map(event.screen_pointer_position)
-                    else {
-                        return EventPropagation::Stop;
-                    };
-
-                    for mut feature_container in
-                        layer.get_features_at_mut(&position, map.view().resolution() * 2.0)
-                    {
-                        log::info!(
-                            "Found {} with bbox {:?}",
-                            feature_container.as_ref().name,
-                            feature_container.as_ref().bbox
-                        );
-
-                        if feature_container.is_hidden() {
-                            feature_container.show();
-                        } else {
-                            feature_container.hide();
-                        }
-                    }
-
-                    map.redraw();
-
-                    return EventPropagation::Stop;
-                }
-            }
-
-            if let UserEvent::PointerMoved(event) = ev {
+fn create_mouse_handler(
+    feature_layer: Arc<RwLock<FeatureLayer<Point2d, Country, CountrySymbol, CartesianSpace2d>>>,
+    selected_index: AtomicUsize,
+) -> impl UserEventHandler {
+    move |ev: &UserEvent, map: &mut Map| {
+        if let UserEvent::Click(button, event) = ev {
+            if *button == MouseButton::Left {
                 let mut layer = feature_layer.write();
 
-                let mut new_selected = usize::MAX;
                 let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {
                     return EventPropagation::Stop;
                 };
-                if let Some(feature_container) = layer
-                    .get_features_at_mut(&position, map.view().resolution() * 2.0)
-                    .next()
+
+                for mut feature_container in
+                    layer.get_features_at_mut(&position, map.view().resolution() * 2.0)
                 {
-                    let index = feature_container.index();
-                    if index == selected_index.load(Ordering::Relaxed) {
-                        return EventPropagation::Stop;
-                    }
+                    log::info!(
+                        "Found {} with bbox {:?}",
+                        feature_container.as_ref().name,
+                        feature_container.as_ref().bbox
+                    );
 
-                    feature_container.edit_style().is_selected = true;
-                    new_selected = index;
-                }
-
-                let selected = selected_index.swap(new_selected, Ordering::Relaxed);
-                if selected != usize::MAX {
-                    if let Some(feature) = layer.features_mut().get_mut(selected) {
-                        feature.edit_style().is_selected = false;
+                    if feature_container.is_hidden() {
+                        feature_container.show();
+                    } else {
+                        feature_container.hide();
                     }
                 }
 
@@ -131,12 +105,53 @@ pub(crate) async fn run(builder: MapBuilder) {
 
                 return EventPropagation::Stop;
             }
+        }
 
-            EventPropagation::Propagate
-        })
-        .build()
-        .await
-        .run();
+        if let UserEvent::PointerMoved(event) = ev {
+            let mut layer = feature_layer.write();
+
+            let mut new_selected = usize::MAX;
+            let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {
+                return EventPropagation::Stop;
+            };
+            if let Some(feature_container) = layer
+                .get_features_at_mut(&position, map.view().resolution() * 2.0)
+                .next()
+            {
+                let index = feature_container.index();
+                if index == selected_index.load(Ordering::Relaxed) {
+                    return EventPropagation::Stop;
+                }
+
+                feature_container.edit_style().is_selected = true;
+                new_selected = index;
+            }
+
+            let selected = selected_index.swap(new_selected, Ordering::Relaxed);
+            if selected != usize::MAX {
+                if let Some(feature) = layer.features_mut().get_mut(selected) {
+                    feature.edit_style().is_selected = false;
+                }
+            }
+
+            map.redraw();
+
+            return EventPropagation::Stop;
+        }
+
+        EventPropagation::Propagate
+    }
+}
+
+fn create_countries_layer() -> FeatureLayer<Point2d, Country, CountrySymbol, CartesianSpace2d> {
+    let countries = load_countries();
+
+    FeatureLayer::with_lods(
+        countries,
+        CountrySymbol {},
+        Crs::EPSG3857,
+        &[8000.0, 1000.0, 1.0],
+    )
 }
 
 struct CountrySymbol {}

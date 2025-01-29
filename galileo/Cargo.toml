@@ -55,6 +55,8 @@ approx = { workspace = true }
 assert_matches = { workspace = true }
 bincode = { workspace = true }
 csv = { workspace = true }
+eframe = { workspace = true }
+egui = { workspace = true }
 env_logger = { workspace = true }
 galileo-egui = { workspace = true, features = ["init"] }
 geo = { workspace = true }

@@ -10,8 +10,18 @@ keywords.workspace = true
 [features]
 default = []
 raster_tiles = []
+feature_layers = []
+egui_app = ["eframe", "egui"]
 
 [dependencies]
+bincode = { workspace = true }
+csv = { workspace = true }
+eframe = { workspace = true, optional = true }
+egui = { workspace = true, optional = true }
 galileo = { workspace = true }
 galileo-egui = { workspace = true }
 galileo-types = { workspace = true }
+log = { workspace = true }
+num-traits = { workspace = true }
+parking_lot = { workspace = true }
+serde = { workspace = true }

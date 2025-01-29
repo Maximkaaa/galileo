@@ -2,15 +2,63 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use egui::load::SizedTexture;
-use egui::{Event, Image, ImageSource, Sense, TextureId, Vec2};
+use egui::{Event, Image, ImageSource, Sense, TextureId, Ui, Vec2};
 use egui_wgpu::wgpu::{FilterMode, TextureView};
 use egui_wgpu::RenderState;
-use galileo::control::{EventProcessor, MapController, MouseButton, RawUserEvent};
+use galileo::control::{EventProcessor, MapController, MouseButton, RawUserEvent, UserEventHandler};
 use galileo::galileo_types::cartesian::{Point2d, Size};
+use galileo::galileo_types::geo::impls::GeoPoint2d;
 use galileo::render::WgpuRenderer;
 use galileo::{Map, Messenger};
 
-pub struct EguiMap {
+pub struct EguiMap<'a> {
+    state: &'a mut EguiMapState,
+    position: Option<&'a mut GeoPoint2d>,
+    resolution: Option<&'a mut f64>,
+}
+
+impl<'a> EguiMap<'a> {
+    pub fn new(state: &'a mut EguiMapState) -> Self {
+        Self { state, position: None, resolution: None }
+    }
+
+    pub fn with_position(&'a mut self, position: &'a mut GeoPoint2d) -> &'a mut Self {
+        let curr_view = self.state.map.view();
+        if curr_view.position() != Some(*position) {
+            self.state.map.set_view(curr_view.with_position(position));
+        }
+
+        self.position = Some(position);
+        self
+    }
+
+    pub fn with_resolution(&'a mut self, resolution: &'a mut f64) -> &'a mut Self {
+        let curr_view = self.state.map.view();
+        if curr_view.resolution() != *resolution {
+            self.state.map.set_view(curr_view.with_resolution(*resolution));
+        }
+
+        self.resolution = Some(resolution);
+        self
+    }
+
+    pub fn show_ui(&mut self, ui: &mut Ui) {
+        self.state.render(ui);
+
+        let updated_view = self.state.map.view();
+        if let Some(resolution) = &mut self.resolution {
+            **resolution = updated_view.resolution();
+        }
+
+        if let Some(position) = &mut self.position {
+            if let Some(view_position) = updated_view.position() {
+                **position = view_position;
+            }
+        }
+    }
+}
+
+pub struct EguiMapState {
     map: Map,
     egui_render_state: RenderState,
     renderer: WgpuRenderer,
@@ -20,8 +68,13 @@ pub struct EguiMap {
     event_processor: EventProcessor,
 }
 
-impl EguiMap {
-    pub fn new(mut map: Map, ctx: egui::Context, render_state: RenderState) -> Self {
+impl EguiMapState {
+    pub fn new(
+        mut map: Map,
+        ctx: egui::Context,
+        render_state: RenderState,
+        handlers: impl IntoIterator<Item = Box<dyn UserEventHandler>>,
+    ) -> Self {
         let requires_redraw = Arc::new(AtomicBool::new(true));
         let messenger = MapStateMessenger {
             context: ctx.clone(),
@@ -53,6 +106,9 @@ impl EguiMap {
         );
 
         let mut event_processor = EventProcessor::default();
+        for handler in handlers {
+            event_processor.add_handler_boxed(handler);
+        }
         event_processor.add_handler(MapController::default());
 
         Self {
