@@ -56,6 +56,7 @@ assert_matches = { workspace = true }
 bincode = { workspace = true }
 csv = { workspace = true }
 env_logger = { workspace = true }
+galileo-egui = { workspace = true, features = ["init"] }
 geo = { workspace = true }
 geo-types = { workspace = true }
 geojson = { workspace = true }

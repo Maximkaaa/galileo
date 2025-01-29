@@ -752,6 +752,11 @@ impl Canvas for WgpuCanvas<'_> {
         bundles: &[(&dyn PackedBundle, f32)],
         options: RenderOptions,
     ) {
+        if bundles.is_empty() {
+            log::debug!("Requested drawing of 0 bundles");
+            return;
+        }
+
         let mut encoder =
             self.renderer
                 .device

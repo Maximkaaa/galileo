@@ -337,7 +337,7 @@ impl MapBuilder {
             .view
             .unwrap_or_else(|| MapView::new(&self.position, self.resolution));
 
-        let map = Map::new(view, self.layers, messenger);
+        let map = Map::new(view, self.layers, messenger.map(|m| Box::new(m) as Box<dyn Messenger>));
 
         Arc::new(RwLock::new(map))
     }

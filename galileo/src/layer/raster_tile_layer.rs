@@ -293,6 +293,11 @@ where
             }
         }
     }
+
+    /// Returns tile schema of the layer.
+    pub fn tile_schema(&self) -> &TileSchema {
+        &self.tile_scheme
+    }
 }
 
 impl<Provider> Layer for RasterTileLayer<Provider>

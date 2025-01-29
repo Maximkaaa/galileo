@@ -1,0 +1,17 @@
+[package]
+name = "galileo-web-example"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+
+[features]
+default = []
+raster_tiles = []
+
+[dependencies]
+galileo = { workspace = true }
+galileo-egui = { workspace = true }
+galileo-types = { workspace = true }
