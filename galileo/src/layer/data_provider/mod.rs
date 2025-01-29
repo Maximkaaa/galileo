@@ -1,9 +1,7 @@
 //! Data sources for layers.
 
-mod url_data_provider;
 mod url_image_provider;
 
-pub use url_data_provider::UrlDataProvider;
 pub use url_image_provider::UrlImageProvider;
 
 #[cfg(not(target_arch = "wasm32"))]
