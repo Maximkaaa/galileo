@@ -32,13 +32,8 @@ impl Map {
     pub fn new(
         view: MapView,
         layers: Vec<Box<dyn Layer>>,
-        messenger: Option<impl Messenger + 'static>,
+        messenger: Option<Box<dyn Messenger + 'static>>,
     ) -> Self {
-        let messenger: Option<Box<dyn Messenger>> = if let Some(m) = messenger {
-            Some(Box::new(m))
-        } else {
-            None
-        };
         Self {
             view,
             layers: layers.into(),
