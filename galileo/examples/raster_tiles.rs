@@ -4,6 +4,15 @@ use galileo::tile_scheme::TileSchema;
 use galileo::{Map, MapBuilder, MapView};
 use galileo_types::latlon;
 
+#[cfg(not(target_arch = "wasm32"))]
+fn main() {
+    run()
+}
+
+pub(crate) fn run() {
+    galileo_egui::init(create_map(), []).expect("failed to initialize");
+}
+
 fn create_map() -> Map {
     let layer = MapBuilder::create_raster_tile_layer(
         |index| {
@@ -28,11 +37,3 @@ fn create_map() -> Map {
     )
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn main() {
-    run()
-}
-
-pub(crate) fn run() {
-    galileo_egui::init(create_map()).expect("failed to initialize");
-}

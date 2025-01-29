@@ -1,21 +1,26 @@
-use eframe::CreationContext;
+use eframe::{AppCreator, CreationContext};
+use galileo::control::UserEventHandler;
 use galileo::Map;
 
-use crate::EguiMap;
+use crate::EguiMapState;
 
 struct MapApp {
-    map: EguiMap,
+    map: EguiMapState,
 }
 
 impl MapApp {
-    fn new(map: Map, cc: &CreationContext<'_>) -> Self {
+    fn new(
+        map: Map,
+        cc: &CreationContext<'_>,
+        handlers: impl IntoIterator<Item = Box<dyn UserEventHandler>>,
+    ) -> Self {
         let ctx = cc.egui_ctx.clone();
         let render_state = cc
             .wgpu_render_state
             .clone()
             .expect("failed to get wgpu context");
         Self {
-            map: EguiMap::new(map, ctx, render_state),
+            map: EguiMapState::new(map, ctx, render_state, handlers),
         }
     }
 }
@@ -29,7 +34,15 @@ impl eframe::App for MapApp {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn init(map: Map) -> eframe::Result {
+pub fn init(
+    map: Map,
+    handlers: impl IntoIterator<Item = Box<dyn UserEventHandler>>,
+) -> eframe::Result {
+    init_with_app(Box::new(|cc| Ok(Box::new(MapApp::new(map, cc, handlers)))))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn init_with_app(app_creator: AppCreator<'_>) -> eframe::Result {
     use std::time::Duration;
 
     use tokio::runtime::Runtime;
@@ -54,15 +67,19 @@ pub fn init(map: Map) -> eframe::Result {
         ..Default::default()
     };
 
-    eframe::run_native(
-        "eframe template",
-        native_options,
-        Box::new(|cc| Ok(Box::new(MapApp::new(map, cc)))),
-    )
+    eframe::run_native("Galileo Dev Map", native_options, app_creator)
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn init(map: Map) -> eframe::Result {
+pub fn init(
+    map: Map,
+    handlers: impl IntoIterator<Item = Box<dyn UserEventHandler>> + 'static,
+) -> eframe::Result {
+    init_with_app(Box::new(|cc| Ok(Box::new(MapApp::new(map, cc, handlers)))))
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn init_with_app(app_creator: AppCreator<'static>) -> eframe::Result {
     use eframe::wasm_bindgen::JsCast as _;
 
     // Redirect `log` message to `console.log` and friends:
@@ -83,11 +100,7 @@ pub fn init(map: Map) -> eframe::Result {
             .expect("the_canvas_id was not a HtmlCanvasElement");
 
         let start_result = eframe::WebRunner::new()
-            .start(
-                canvas,
-                web_options,
-                Box::new(|cc| Ok(Box::new(MapApp::new(map, cc)))),
-            )
+            .start(canvas, web_options, app_creator)
             .await;
 
         // Remove the loading text and spinner:

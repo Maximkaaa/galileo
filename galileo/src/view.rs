@@ -87,6 +87,20 @@ impl MapView {
         })
     }
 
+    /// Creates a new view same as the current one but with the given position.
+    pub fn with_position(&self, position: &impl GeoPoint<Num = f64>) -> Self {
+        let projected_position = self.crs
+            .get_projection()
+            .and_then(|projection| projection.project(&GeoPoint2d::from(position)))
+            .map(|p: Point2d| Point3::new(p.x, p.y, 0.0));
+        Self {
+            projected_position,
+            crs: self.crs.clone(),
+            ..*self
+        }
+
+    }
+
     /// Resolution at the center of the map.
     pub fn resolution(&self) -> f64 {
         self.resolution
