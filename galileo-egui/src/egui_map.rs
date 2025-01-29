@@ -195,4 +195,3 @@ impl Messenger for MapStateMessenger {
         }
     }
 }
-
