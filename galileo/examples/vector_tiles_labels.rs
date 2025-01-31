@@ -4,48 +4,25 @@ use bytes::Bytes;
 use galileo::layer::vector_tile_layer::style::{
     VectorTileDefaultSymbol, VectorTileLabelSymbol, VectorTileStyle,
 };
-#[cfg(target_arch = "wasm32")]
-use galileo::layer::vector_tile_layer::tile_provider::WebWorkerVectorTileProvider;
 use galileo::layer::vector_tile_layer::VectorTileLayer;
 use galileo::render::text::font_service::FontService;
 use galileo::render::text::TextStyle;
 use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
-use galileo::{Color, Lod, MapBuilder};
+use galileo::{Color, Lod, Map, MapBuilder, MapView};
 use galileo_types::cartesian::{Point2d, Rect};
 use galileo_types::geo::Crs;
-
-#[cfg(target_arch = "wasm32")]
-type VectorTileProvider = WebWorkerVectorTileProvider;
+use galileo_types::latlon;
 
 #[cfg(not(target_arch = "wasm32"))]
-fn get_layer_style() -> Option<VectorTileStyle> {
-    const STYLE: &str = "galileo/examples/data/vt_style.json";
-    Some(serde_json::from_reader(std::fs::File::open(STYLE).ok()?).expect("failed to parse style"))
+fn main() {
+    run()
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-#[tokio::main]
-async fn main() {
-    let Some(api_key) = std::env::var_os("VT_API_KEY") else {
-        eprintln!("You must set VT_API_KEY environment variable with a valid MapTiler API key to run this example");
-        eprintln!("You can obtain your free API key at https://maptiler.com");
-
-        return;
+pub(crate) fn run() {
+    let Some(api_key) = std::option_env!("VT_API_KEY") else {
+        panic!("Set the MapTiler API key into VT_API_KEY library when building this example");
     };
 
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("warn,galileo=trace"),
-    )
-    .init();
-    run(
-        MapBuilder::new(),
-        get_layer_style().expect("failed to load style"),
-        api_key.into_string().expect("invalid VT API key"),
-    )
-    .await;
-}
-
-pub(crate) async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: String) {
     FontService::with_mut(|service| {
         let font = include_bytes!("data/NotoSansAdlam-Regular.ttf");
         service
@@ -53,7 +30,6 @@ pub(crate) async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: St
             .expect("failed to load font");
     });
 
-    // You can get your fee API key at https://maptiler.com
     let tile_provider = MapBuilder::create_vector_tile_provider(
         move |&index: &TileIndex| {
             format!(
@@ -65,10 +41,10 @@ pub(crate) async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: St
         },
         tile_schema(),
     );
+    let graphics_layer =
+        VectorTileLayer::new(tile_provider.clone(), default_style(), tile_schema());
 
-    let graphics_layer = VectorTileLayer::new(tile_provider.clone(), style, tile_schema());
-
-    let style = VectorTileStyle {
+    let labels_style = VectorTileStyle {
         rules: vec![],
         default_symbol: VectorTileDefaultSymbol {
             label: Some(VectorTileLabelSymbol {
@@ -85,14 +61,26 @@ pub(crate) async fn run(builder: MapBuilder, style: VectorTileStyle, api_key: St
         },
         background: Default::default(),
     };
-    let label_layer = VectorTileLayer::new(tile_provider, style, tile_schema());
 
-    builder
-        .with_layer(graphics_layer)
-        .with_layer(label_layer)
-        .build()
-        .await
-        .run();
+    let label_layer = VectorTileLayer::new(tile_provider, labels_style, tile_schema());
+
+    let view = MapView::new(
+        &latlon!(0.0, 0.0),
+        tile_schema()
+            .lod_resolution(3)
+            .expect("invalid tile schema"),
+    );
+    let map = Map::new(
+        view,
+        vec![Box::new(graphics_layer), Box::new(label_layer)],
+        None,
+    );
+
+    galileo_egui::init(map, []).expect("failed to initialize");
+}
+
+fn default_style() -> VectorTileStyle {
+    serde_json::from_str(include_str!("data/vt_style.json")).expect("invalid style json")
 }
 
 fn tile_schema() -> TileSchema {

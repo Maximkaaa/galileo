@@ -13,7 +13,7 @@ use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
 use galileo::symbol::Symbol;
 use galileo::tile_scheme::TileSchema;
-use galileo::{Color, MapBuilder};
+use galileo::{Color, Map, MapBuilder, MapView};
 use galileo_types::cartesian::{CartesianPoint3d, Point3d};
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
@@ -24,10 +24,12 @@ use nalgebra::{Rotation3, Translation3, Vector3};
 use num_traits::AsPrimitive;
 
 #[cfg(not(target_arch = "wasm32"))]
-#[tokio::main]
-async fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    run(MapBuilder::new()).await;
+fn main() {
+    run()
+}
+
+pub(crate) fn run() {
+    galileo_egui::init(create_map(), []).expect("failed to initialize");
 }
 
 fn load_points() -> Vec<ColoredPoint> {
@@ -112,33 +114,34 @@ impl Symbol<ColoredPoint> for ColoredPointSymbol {
     }
 }
 
-async fn run(builder: MapBuilder) {
+fn create_map() -> Map {
+    let tile_layer = MapBuilder::create_raster_tile_layer(
+        |index| {
+            format!(
+                "https://tile.openstreetmap.org/{}/{}/{}.png",
+                index.z, index.x, index.y
+            )
+        },
+        TileSchema::web(18),
+    );
+
     let points = load_points();
-    builder
-        .center(latlon!(51.4549, -2.6279))
-        .resolution(
-            TileSchema::web(18)
-                .lod_resolution(14)
-                .expect("invalid tile scheme"),
+    let feature_layer = FeatureLayer::new(points, ColoredPointSymbol {}, Crs::EPSG3857)
+        .with_options(FeatureLayerOptions {
+            use_antialiasing: true,
+            ..Default::default()
+        });
+
+    Map::new(
+        MapView::new(
+            &latlon!(51.4549, -2.6279),
+            tile_layer
+                .tile_schema()
+                .lod_resolution(17)
+                .expect("invalid tile schema"),
         )
-        .with_raster_tiles(
-            |index| {
-                format!(
-                    "https://tile.openstreetmap.org/{}/{}/{}.png",
-                    index.z, index.x, index.y
-                )
-            },
-            TileSchema::web(18),
-        )
-        .with_layer(
-            FeatureLayer::new(points, ColoredPointSymbol {}, Crs::EPSG3857).with_options(
-                FeatureLayerOptions {
-                    use_antialiasing: true,
-                    ..Default::default()
-                },
-            ),
-        )
-        .build()
-        .await
-        .run();
+        .with_rotation_x(std::f64::consts::FRAC_PI_4),
+        vec![Box::new(tile_layer), Box::new(feature_layer)],
+        None,
+    )
 }

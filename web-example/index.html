@@ -1,23 +1,10 @@
 <!DOCTYPE html>
-<html>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-
+<html lang="en">
 <head>
-    <title>Galileo Web Example</title>
-    <link data-trunk rel="rust" data-wasm-opt="2" />
-    <base data-trunk-public-url />
-
-    <link data-trunk rel="icon" href="assets/favicon.ico">
-
-    <link data-trunk rel="copy-file" href="assets/sw.js"/>
-    <link data-trunk rel="copy-file" href="assets/manifest.json" data-target-path="assets"/>
-
-    <link rel="manifest" href="assets/manifest.json">
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="white">
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#404040">
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simple map</title>
+</head>
     <style>
         html {
             /* Remove touch delay: */
@@ -104,33 +91,28 @@
             }
         }
     </style>
-</head>
+<body id="map">
+<canvas id="the_canvas_id"></canvas>
+<script src="./pkg/galileo_web_example.js"></script>
 
-<body>
-    <!-- The WASM code will resize the canvas dynamically -->
-    <!-- the id is hardcoded in main.rs . so, make sure both match. -->
-    <canvas id="the_canvas_id"></canvas>
+<script>
+    const {main} = wasm_bindgen;
 
-    <!-- the loading spinner will be removed in main.rs -->
-    <div class="centered" id="loading_text">
-        <p style="font-size:16px">
-            Loading…
-        </p>
-        <div class="lds-dual-ring"></div>
-    </div>
+    async function run_wasm() {
+        console.log("Starting bindgen");
+        await wasm_bindgen();
 
-    <!--Register Service Worker. this will cache the wasm / js scripts for offline use (for PWA functionality). -->
-    <!-- Force refresh (Ctrl + F5) to load the latest files instead of cached files  -->
-    <script>
-        // We disable caching during development so that we always view the latest version.
-        if ('serviceWorker' in navigator && window.location.hash !== "#dev") {
-            window.addEventListener('load', function () {
-                navigator.serviceWorker.register('sw.js');
-            });
-        }
-    </script>
+        main();
+        console.log("WASM loaded");
+        // init().then(() => {
+        //     console.log("WASM loaded");
+        // })
+    }
+
+    console.log("Running wasm");
+    run_wasm();
+    document.addEventListener('contextmenu', event => event.preventDefault());
+</script>
+
 </body>
-
 </html>
-
-<!-- Powered by egui: https://github.com/emilk/egui/ -->

@@ -7,21 +7,35 @@ repository.workspace = true
 license.workspace = true
 keywords.workspace = true
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [features]
 default = []
 raster_tiles = []
 feature_layers = []
 egui_app = ["eframe", "egui"]
+georust = ["nalgebra", "geo-types", "geozero"]
+highlight_features = ["nalgebra"]
+lambert = ["nalgebra"]
+many_points = []
+vector_tiles = ["serde_json"]
 
 [dependencies]
 bincode = { workspace = true }
+console_error_panic_hook = { workspace = true }
 csv = { workspace = true }
 eframe = { workspace = true, optional = true }
 egui = { workspace = true, optional = true }
 galileo = { workspace = true }
 galileo-egui = { workspace = true }
 galileo-types = { workspace = true }
+geozero = { workspace = true, optional = true }
+geo-types = { workspace = true, optional = true }
 log = { workspace = true }
+nalgebra = { workspace = true, optional = true }
 num-traits = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true }
