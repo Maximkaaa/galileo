@@ -282,7 +282,7 @@ mod worker {
     #[wasm_bindgen]
     pub fn init_vt_worker() {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init_with_level(log::Level::Info).expect("Couldn't init logger");
+        console_log::init_with_level(log::Level::Trace).expect("Couldn't init logger");
 
         log::debug!("Vt worker is initialized");
 

@@ -16,13 +16,12 @@ use galileo::layer::{FeatureLayer, RasterTileLayer};
 use galileo::render::WgpuRenderer;
 use galileo::symbol::ArbitraryGeometrySymbol;
 use galileo::tile_scheme::TileIndex;
-use galileo::{DummyMessenger, Map, MapView, Messenger, TileSchema};
+use galileo::{Map, MapView, Messenger, TileSchema};
 use galileo_types::cartesian::Size;
 use galileo_types::geo::Crs;
 use geojson::{FeatureCollection, GeoJson};
 use image::{ImageBuffer, Rgba};
 
-#[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -95,7 +94,7 @@ async fn main() -> Result<()> {
     let map = Map::new(
         map_view,
         vec![Box::new(osm), Box::new(layer)],
-        None::<DummyMessenger>,
+        None::<Box<dyn Messenger>>,
     );
 
     // We create a renderer without window, so it will use internal texture to render to.

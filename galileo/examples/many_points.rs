@@ -4,20 +4,22 @@ use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::{Feature, FeatureLayer};
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
-#[cfg(not(target_arch = "wasm32"))]
 use galileo::tile_scheme::TileSchema;
-use galileo::{Color, MapBuilder};
+use galileo::{Color, Map, MapBuilder, MapView};
 use galileo_types::cartesian::{CartesianPoint3d, Point3d};
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
 use galileo_types::impls::{Contour, Polygon};
+use galileo_types::latlon;
 use num_traits::AsPrimitive;
 
 #[cfg(not(target_arch = "wasm32"))]
-#[tokio::main]
-async fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    run(MapBuilder::new()).await;
+fn main() {
+    run()
+}
+
+pub(crate) fn run() {
+    galileo_egui::init(create_map(), []).expect("failed to initialize");
 }
 
 struct ColoredPoint {
@@ -85,9 +87,8 @@ fn generate_points() -> Vec<ColoredPoint> {
     points
 }
 
-pub(crate) async fn run(builder: MapBuilder) {
-    #[cfg(not(target_arch = "wasm32"))]
-    let builder = builder.with_raster_tiles(
+fn create_map() -> Map {
+    let tile_layer = MapBuilder::create_raster_tile_layer(
         |index| {
             format!(
                 "https://tile.openstreetmap.org/{}/{}/{}.png",
@@ -96,19 +97,17 @@ pub(crate) async fn run(builder: MapBuilder) {
         },
         TileSchema::web(18),
     );
-    #[cfg(target_arch = "wasm32")]
-    let builder = builder.with_raster_tiles(js_sys::Function::new_with_args(
-        "index",
-        "return `https://tile.openstreetmap.org/${index.z}/${index.x}/${index.y}.png`",
-    ));
+    let feature_layer = FeatureLayer::new(generate_points(), ColoredPointSymbol {}, Crs::EPSG3857);
 
-    builder
-        .with_layer(FeatureLayer::new(
-            generate_points(),
-            ColoredPointSymbol {},
-            Crs::EPSG3857,
-        ))
-        .build()
-        .await
-        .run();
+    Map::new(
+        MapView::new(
+            &latlon!(0.0, 0.0),
+            tile_layer
+                .tile_schema()
+                .lod_resolution(2)
+                .expect("invalid tile schema"),
+        ),
+        vec![Box::new(tile_layer), Box::new(feature_layer)],
+        None,
+    )
 }

@@ -3,7 +3,7 @@
 use galileo::layer::feature_layer::{FeatureLayer, FeatureLayerOptions};
 use galileo::symbol::ImagePointSymbol;
 use galileo::tile_scheme::TileSchema;
-use galileo::MapBuilder;
+use galileo::{Map, MapBuilder, MapView};
 use galileo_types::geo::Crs;
 use galileo_types::geometry_type::GeoSpace2d;
 use galileo_types::{latlon, Disambig, Disambiguate};
@@ -12,10 +12,12 @@ use geozero::ToGeo;
 use nalgebra::Vector2;
 
 #[cfg(not(target_arch = "wasm32"))]
-#[tokio::main]
-async fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    run(MapBuilder::new()).await;
+fn main() {
+    run()
+}
+
+pub(crate) fn run() {
+    galileo_egui::init(create_map(), []).expect("failed to initialize");
 }
 
 fn load_points() -> Vec<Disambig<geo_types::Point, GeoSpace2d>> {
@@ -33,15 +35,12 @@ fn load_points() -> Vec<Disambig<geo_types::Point, GeoSpace2d>> {
     }
 }
 
-pub(crate) async fn run(builder: MapBuilder) {
+fn create_map() -> Map {
+    let symbol_image = include_bytes!("data/pin-yellow.png");
     let point_layer = FeatureLayer::new(
         load_points(),
-        ImagePointSymbol::from_path(
-            "galileo/examples/data/pin-yellow.png",
-            Vector2::new(0.5, 1.0),
-            0.5,
-        )
-        .expect("invalid image file"),
+        ImagePointSymbol::from_bytes(symbol_image, Vector2::new(0.5, 1.0), 0.5)
+            .expect("invalid image file"),
         Crs::WGS84,
     )
     .with_options(FeatureLayerOptions {
@@ -49,20 +48,19 @@ pub(crate) async fn run(builder: MapBuilder) {
         ..Default::default()
     });
 
-    builder
-        .center(latlon!(53.732562, -1.863383))
-        .resolution(50.0)
-        .with_raster_tiles(
-            |index| {
-                format!(
-                    "https://tile.openstreetmap.org/{}/{}/{}.png",
-                    index.z, index.x, index.y
-                )
-            },
-            TileSchema::web(18),
-        )
-        .with_layer(point_layer)
-        .build()
-        .await
-        .run();
+    let raster_layer = MapBuilder::create_raster_tile_layer(
+        |index| {
+            format!(
+                "https://tile.openstreetmap.org/{}/{}/{}.png",
+                index.z, index.x, index.y
+            )
+        },
+        TileSchema::web(18),
+    );
+
+    Map::new(
+        MapView::new(&latlon!(53.732562, -1.863383), 50.0),
+        vec![Box::new(raster_layer), Box::new(point_layer)],
+        None,
+    )
 }

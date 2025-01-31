@@ -5,7 +5,9 @@ use egui::load::SizedTexture;
 use egui::{Event, Image, ImageSource, Sense, TextureId, Ui, Vec2};
 use egui_wgpu::wgpu::{FilterMode, TextureView};
 use egui_wgpu::RenderState;
-use galileo::control::{EventProcessor, MapController, MouseButton, RawUserEvent, UserEventHandler};
+use galileo::control::{
+    EventProcessor, MapController, MouseButton, RawUserEvent, UserEventHandler,
+};
 use galileo::galileo_types::cartesian::{Point2d, Size};
 use galileo::galileo_types::geo::impls::GeoPoint2d;
 use galileo::render::WgpuRenderer;
@@ -19,7 +21,11 @@ pub struct EguiMap<'a> {
 
 impl<'a> EguiMap<'a> {
     pub fn new(state: &'a mut EguiMapState) -> Self {
-        Self { state, position: None, resolution: None }
+        Self {
+            state,
+            position: None,
+            resolution: None,
+        }
     }
 
     pub fn with_position(&'a mut self, position: &'a mut GeoPoint2d) -> &'a mut Self {
@@ -35,7 +41,9 @@ impl<'a> EguiMap<'a> {
     pub fn with_resolution(&'a mut self, resolution: &'a mut f64) -> &'a mut Self {
         let curr_view = self.state.map.view();
         if curr_view.resolution() != *resolution {
-            self.state.map.set_view(curr_view.with_resolution(*resolution));
+            self.state
+                .map
+                .set_view(curr_view.with_resolution(*resolution));
         }
 
         self.resolution = Some(resolution);

@@ -107,20 +107,11 @@ for the list, description and run instructions.
 
 ## Web
 
-There are also examples of running Galileo in a web-browser located at [`wasm_examples`](wasm_examples) folder. These are
-excluded from the workspace (because Cargo does not like cross-platform workspaces).
-To run those you will need to [install wasm-pack](https://rustwasm.github.io/wasm-pack/installer/):
+Most of the Galileo examples can be run in browser. You will need to have `wasm_pack`, `just` and `python3` installed
+on your system:
 
 ```shell
-wasm-pack build wasm_examples/feature_layers --target no-modules --release --target-dir target
-```
-
-After that open `index.html` in your browser. It must be served from `localhost`, use your
-favourite developer server. For example, you can:
-
-```shell
-cd wasm_examples/feature_layers
-python3 -m http.server
+just web_example <example_name>
 ```
 
 Then just open `localhost:8000` in your browser.

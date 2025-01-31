@@ -36,4 +36,3 @@ fn create_map() -> Map {
         None,
     )
 }
-
