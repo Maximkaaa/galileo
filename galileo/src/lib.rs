@@ -3,46 +3,7 @@
 //!
 //! # Quick start
 //!
-//! You can create a simple interactive map with two layers by this code:
-//!
-//! ```no_run
-//! use galileo::{MapBuilder, TileSchema };
-//! use galileo::layer::FeatureLayer;
-//! use galileo::symbol::CirclePointSymbol;
-//! use galileo::galileo_types::latlon;
-//! use galileo_types::geo::Crs;
-//! use galileo::Color;
-//!
-//! # tokio_test::block_on(async {
-//! MapBuilder::new()
-//!     .center(latlon!(37.566, 126.9784))
-//!     .resolution(TileSchema::web(18).lod_resolution(8).unwrap())
-//!     .with_raster_tiles(|index| {
-//!         format!(
-//!             "https://tile.openstreetmap.org/{}/{}/{}.png",
-//!             index.z, index.x, index.y
-//!         )},
-//!         TileSchema::web(18))
-//!     .with_layer(FeatureLayer::new(
-//!         vec![latlon!(37.566, 126.9784)],
-//!         CirclePointSymbol::new(Color::BLUE, 5.0),
-//!         Crs::WGS84,
-//!     ))
-//!     .build()
-//!     .await
-//!     .run();
-//! # });
-//! ```
-//!
-//! This will show a map with Open Street Maps base and one blue circle in the center of the map. Map builder takes
-//! care of creating a window, setting up GPU context and configuring user interactions to control the map position
-//! with mouse or touch.
-//!
-//! Calling [`.run()`](GalileoMap) starts `winit` event loop, which will run until the user
-//! closes the window.
-//!
-//! Running the map in a dedicated window is quite straightforward, but to integrate Galileo map into your application
-//! and interact with it you will need some understanding of what happens under the hood of the [`MapBuilder`].
+//! TODO
 //!
 //! # Main components of Galileo
 //!
