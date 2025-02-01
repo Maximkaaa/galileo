@@ -53,7 +53,7 @@ winit = { workspace = true, default-features = true, features = ["rwh_06"], opti
 anyhow = { workspace = true }
 approx = { workspace = true }
 assert_matches = { workspace = true }
-bincode = { workspace = true }
+bincode = { workspace = true, features = ["serde"] }
 csv = { workspace = true }
 eframe = { workspace = true }
 egui = { workspace = true }
@@ -88,7 +88,7 @@ wasm-bindgen-derive = { workspace = true }
 js-sys = { workspace = true }
 serde = { workspace = true, features = ["std", "derive"] }
 serde_bytes = { workspace = true }
-bincode = { workspace = true }
+bincode = { workspace = true, features = ["serde"] }
 serde-wasm-bindgen = { workspace = true }
 maybe-sync = { workspace = true, features = [] }
 getrandom = { workspace = true, features = ["js"] }

@@ -69,7 +69,7 @@ pub struct StyleRule {
     #[serde(default)]
     pub properties: HashMap<String, String>,
     /// Symbol to draw a feature with.
-    #[serde(default, skip_serializing_if = "VectorTileSymbol::is_none")]
+    #[serde(default)]
     pub symbol: VectorTileSymbol,
 }
 
@@ -101,10 +101,6 @@ impl Default for VectorTileSymbol {
 }
 
 impl VectorTileSymbol {
-    pub(crate) fn is_none(&self) -> bool {
-        matches!(self, Self::None)
-    }
-
     pub(crate) fn line(&self) -> Option<&VectorTileLineSymbol> {
         match self {
             Self::Line(symbol) => Some(symbol),
@@ -210,5 +206,18 @@ mod tests {
         let value = serde_json::to_value(&symbol).unwrap();
         assert!(value.as_object().unwrap().get("point").is_some());
         assert!(value.as_object().unwrap().get("polygon").is_none());
+    }
+
+    #[test]
+    fn serialize_with_bincode() {
+        let rule = StyleRule {
+            layer_name: None,
+            properties: HashMap::new(),
+            symbol: VectorTileSymbol::None,
+        };
+
+        let serialized = bincode::serde::encode_to_vec(&rule, bincode::config::standard()).unwrap();
+        let _: (StyleRule, _) =
+            bincode::serde::decode_from_slice(&serialized, bincode::config::standard()).unwrap();
     }
 }

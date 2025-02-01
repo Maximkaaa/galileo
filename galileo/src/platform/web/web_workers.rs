@@ -103,8 +103,9 @@ impl TryFrom<Result<WebWorkerResponsePayload, WebWorkerError>> for RenderBundle 
     ) -> Result<Self, Self::Error> {
         match value {
             Ok(WebWorkerResponsePayload::ProcessVtTile { result }) => result.map(|bytes| {
-                let converted: TessellatingRenderBundleBytes = bincode::deserialize(&bytes)
-                    .expect("Failed to deserialize render bundle bytes");
+                let (converted, _): (TessellatingRenderBundleBytes, _) =
+                    bincode::serde::decode_from_slice(&bytes, bincode::config::standard())
+                        .expect("Failed to deserialize render bundle bytes");
                 RenderBundle(RenderBundleType::Tessellating(
                     TessellatingRenderBundle::from_bytes_unchecked(converted),
                 ))
@@ -167,12 +168,17 @@ impl WebWorkerService {
         let (sender, receiver) = oneshot::channel();
         let request_id = WebWorkerRequestId::next();
         self.add_request(request_id, sender);
+
+        let start = web_time::Instant::now();
         self.send_request(&WebWorkerRequest {
             request_id,
             payload,
         });
 
-        log::debug!("Sent request {request_id} to web worker");
+        log::debug!(
+            "Sent request {request_id} to web worker in {} ms",
+            start.elapsed().as_millis()
+        );
 
         receiver.await.expect("failed to read ww result channel")
     }
@@ -189,9 +195,12 @@ impl WebWorkerService {
 
     fn send_request(&self, request: &WebWorkerRequest) {
         let worker = self.next_worker();
+        let bytes = bincode::serde::encode_to_vec(request, bincode::config::standard())
+            .expect("failed to serialize ww request");
+        let buf = serde_bytes::ByteBuf::from(bytes);
         worker
             .post_message(
-                &serde_wasm_bindgen::to_value(request).expect("failed to serialize ww request"),
+                &serde_wasm_bindgen::to_value(&buf).expect("failed to serialize ww request"),
             )
             .expect("failed to send a message to a web worker");
     }
@@ -212,7 +221,8 @@ impl WebWorkerService {
         let worker_state_clone = worker_state.clone();
         let callback: Closure<dyn FnMut(web_sys::MessageEvent)> = Closure::new(
             move |event: web_sys::MessageEvent| {
-                let response: WebWorkerResponse = match serde_wasm_bindgen::from_value(event.data())
+                let start = web_time::Instant::now();
+                let bytes: serde_bytes::ByteBuf = match serde_wasm_bindgen::from_value(event.data())
                 {
                     Ok(v) => v,
                     Err(err) => {
@@ -224,9 +234,22 @@ impl WebWorkerService {
                     }
                 };
 
+                let response: WebWorkerResponse =
+                    match bincode::serde::decode_from_slice(&bytes, bincode::config::standard()) {
+                        Ok(v) => v.0,
+                        Err(err) => {
+                            log::error!(
+                                "Failed to deserialize message ({:?}) from web worker: {err:?}",
+                                event.data()
+                            );
+                            return;
+                        }
+                    };
+
                 log::info!(
-                    "Received response for request {} from a web worker",
-                    response.request_id
+                    "Received response for request {} from a web worker in {} ms",
+                    response.request_id,
+                    start.elapsed().as_millis(),
                 );
 
                 match response.payload {
@@ -264,6 +287,7 @@ impl WebWorkerService {
 
 mod worker {
     use galileo_mvt::MvtTile;
+    use serde_bytes::ByteBuf;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::{JsCast, JsValue};
 
@@ -293,8 +317,11 @@ mod worker {
     }
 
     fn send_response(response: WebWorkerResponse) {
+        let bytes = bincode::serde::encode_to_vec(&response, bincode::config::standard())
+            .expect("failed to serialize ww response");
+        let buf = serde_bytes::ByteBuf::from(bytes);
         let js_value =
-            serde_wasm_bindgen::to_value(&response).expect("failed to convert response to JsValue");
+            serde_wasm_bindgen::to_value(&buf).expect("failed to convert response to JsValue");
 
         js_sys::global()
             .dyn_into::<web_sys::DedicatedWorkerGlobalScope>()
@@ -312,24 +339,48 @@ mod worker {
     pub fn process_message(msg: JsValue) -> JsValue {
         log::debug!("Web worker received a message");
 
-        let request: WebWorkerRequest = serde_wasm_bindgen::from_value(msg)
+        let start = web_time::Instant::now();
+        let buf: ByteBuf = serde_wasm_bindgen::from_value(msg)
             .expect("failed to decode JsValue into web worker request");
+        let bytes = buf.into_vec();
+        let (request, _): (WebWorkerRequest, _) =
+            bincode::serde::decode_from_slice(&bytes, bincode::config::standard())
+                .expect("failed to decode bytes into request");
+
         let WebWorkerRequest {
             request_id,
             payload: request_payload,
         } = request;
 
-        log::debug!("Web worker processing request {request_id}");
+        log::debug!(
+            "Web worker processing request {request_id}. Decoded in {} ms",
+            start.elapsed().as_millis()
+        );
 
+        let start = web_time::Instant::now();
         let payload = process_request(request_payload);
         let response = WebWorkerResponse {
             request_id,
             payload,
         };
+        log::debug!(
+            "Processed request {request_id} in {} ms",
+            start.elapsed().as_millis()
+        );
 
-        log::debug!("Web worker processed request {request_id}");
+        let start = web_time::Instant::now();
+        let bytes = bincode::serde::encode_to_vec(&response, bincode::config::standard())
+            .expect("failed to serialize ww response");
+        let buf = serde_bytes::ByteBuf::from(bytes);
+        let result =
+            serde_wasm_bindgen::to_value(&buf).expect("failed to convert response to JsValue");
 
-        serde_wasm_bindgen::to_value(&response).expect("failed to convert response to JsValue")
+        log::debug!(
+            "Web worker encoded request {request_id} in {} ms",
+            start.elapsed().as_millis()
+        );
+
+        result
     }
 
     fn process_request(request: WebWorkerRequestPayload) -> WebWorkerResponsePayload {
@@ -357,8 +408,8 @@ mod worker {
                 let RenderBundle(RenderBundleType::Tessellating(tessellating)) = bundle;
 
                 let bytes = tessellating.into_bytes();
-                let serialized =
-                    bincode::serialize(&bytes).expect("failed to serialize render bundle");
+                let serialized = bincode::serde::encode_to_vec(&bytes, bincode::config::standard())
+                    .expect("failed to serialize render bundle");
                 Ok(serialized)
             }
             Err(_) => Err(TileProcessingError::Rendering),

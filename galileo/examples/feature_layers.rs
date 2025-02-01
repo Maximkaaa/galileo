@@ -49,7 +49,12 @@ fn create_map(countries_layer: impl Layer + 'static) -> Map {
 }
 
 fn load_countries() -> Vec<Country> {
-    bincode::deserialize(include_bytes!("data/countries.data")).expect("invalid countries data")
+    bincode::serde::decode_from_slice(
+        include_bytes!("data/countries.data"),
+        bincode::config::legacy(),
+    )
+    .expect("invalid countries data")
+    .0
 }
 
 fn load_cities() -> Vec<City> {
