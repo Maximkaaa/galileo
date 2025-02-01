@@ -40,8 +40,12 @@ pub(crate) fn run() {
 }
 
 fn load_countries() -> Vec<Country> {
-    bincode::deserialize(include_bytes!("data/countries_simpl.data"))
-        .expect("invalid countries data")
+    bincode::serde::decode_from_slice(
+        include_bytes!("data/countries_simpl.data"),
+        bincode::config::legacy(),
+    )
+    .expect("invalid countries data")
+    .0
 }
 
 fn create_mouse_handler(

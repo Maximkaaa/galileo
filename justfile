@@ -6,4 +6,3 @@ default:
 web_example NAME:
   wasm-pack build web-example --release --target no-modules --target-dir target --features {{NAME}}
   cd web-example && python3 -m http.server
-  # cd web-example && trunk serve --features {{NAME}} --release
