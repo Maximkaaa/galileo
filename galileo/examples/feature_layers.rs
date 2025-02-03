@@ -11,13 +11,12 @@ use galileo::layer::feature_layer::FeatureLayer;
 use galileo::layer::Layer;
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
-use galileo::{Color, Map, MapView};
+use galileo::{Color, Map, MapBuilder};
 use galileo_types::cartesian::{CartesianPoint3d, Point2d};
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
 use galileo_types::geometry_type::CartesianSpace2d;
 use galileo_types::impls::{Contour, Polygon};
-use galileo_types::latlon;
 use num_traits::AsPrimitive;
 use parking_lot::RwLock;
 
@@ -41,11 +40,10 @@ pub(crate) fn run() {
 fn create_map(countries_layer: impl Layer + 'static) -> Map {
     let point_layer = FeatureLayer::new(load_cities(), CitySymbol {}, Crs::WGS84);
 
-    Map::new(
-        MapView::new(&latlon!(0.0, 0.0), 9783.939620500008),
-        vec![Box::new(countries_layer), Box::new(point_layer)],
-        None,
-    )
+    MapBuilder::default()
+        .with_layer(countries_layer)
+        .with_layer(point_layer)
+        .build()
 }
 
 fn load_countries() -> Vec<Country> {

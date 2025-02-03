@@ -15,22 +15,18 @@ use crate::layer::Layer;
 ///
 /// ```no_run
 /// use galileo::layer::{RasterTileLayer, VectorTileLayer};
-/// use galileo::layer::data_provider::FileCacheController;
-/// use galileo::layer::data_provider::UrlDataProvider;
-/// use galileo::layer::vector_tile_layer::tile_provider::ThreadedProvider;
-/// use galileo::layer::vector_tile_layer::tile_provider::VtProcessor;
 /// use galileo::LayerCollection;
-/// use galileo::MapBuilder;
+/// use galileo::MapBuilderOld;
 /// use galileo::tile_scheme::TileIndex;
 ///
-/// let raster_tiles = MapBuilder::create_raster_tile_layer(|index| format!("url from {index:?}"), todo!());
-/// let vector_tiles = MapBuilder::create_vector_tile_layer(|index| format!("url from {index:?}"), todo!(), todo!());
+/// let raster_tiles = MapBuilderOld::create_raster_tile_layer(|index| format!("url from {index:?}"), todo!());
+/// let vector_tiles = MapBuilderOld::create_vector_tile_layer(|index| format!("url from {index:?}"), todo!(), todo!());
 ///
 /// let mut collection = LayerCollection::default();
 /// collection.push(raster_tiles);
 /// collection.push(vector_tiles);
 ///
-/// assert!(collection[1].as_any().downcast_ref::<VectorTileLayer<ThreadedProvider<UrlDataProvider<TileIndex, VtProcessor, FileCacheController>>>>().is_some());
+/// assert!(collection.get_typed::<VectorTileLayer>(1).is_some());
 /// ```
 #[derive(Default)]
 pub struct LayerCollection(Vec<LayerEntry>);
@@ -556,6 +552,13 @@ impl LayerCollection {
             .iter()
             .filter(|entry| !entry.is_hidden)
             .map(|entry| &*entry.layer)
+    }
+
+    /// Returns the layer converted to its original type if it was `T`.
+    pub fn get_typed<T: Layer + 'static>(&self, index: usize) -> Option<&T> {
+        self.0
+            .get(index)
+            .and_then(|layer| layer.layer.as_any().downcast_ref::<T>())
     }
 }
 

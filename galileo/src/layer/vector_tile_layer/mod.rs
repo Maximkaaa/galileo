@@ -31,7 +31,7 @@ mod vector_tile;
 /// specified [styles](VectorTileStyle).
 pub struct VectorTileLayer {
     tile_provider: VectorTileProvider,
-    tile_scheme: TileSchema,
+    tile_schema: TileSchema,
     style_id: VtStyleId,
     displayed_tiles: Mutex<Vec<DisplayedTile>>,
     prev_background: Mutex<Option<PreviousBackground>>,
@@ -76,7 +76,7 @@ impl Layer for VectorTileLayer {
     }
 
     fn prepare(&self, view: &MapView) {
-        if let Some(iter) = self.tile_scheme.iter_tiles(view) {
+        if let Some(iter) = self.tile_schema.iter_tiles(view) {
             for index in iter {
                 self.tile_provider.load_tile(index, self.style_id);
             }
@@ -94,6 +94,10 @@ impl Layer for VectorTileLayer {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+
+    fn tile_schema(&self) -> Option<TileSchema> {
+        Some(self.tile_schema.clone())
+    }
 }
 
 impl VectorTileLayer {
@@ -108,12 +112,12 @@ impl VectorTileLayer {
     pub fn new(
         mut tile_provider: VectorTileProvider,
         style: VectorTileStyle,
-        tile_scheme: TileSchema,
+        tile_schema: TileSchema,
     ) -> Self {
         let style_id = tile_provider.add_style(style);
         Self {
             tile_provider,
-            tile_scheme,
+            tile_schema,
             style_id,
             displayed_tiles: Default::default(),
             prev_background: Default::default(),
@@ -121,7 +125,7 @@ impl VectorTileLayer {
     }
 
     fn update_displayed_tiles(&self, view: &MapView, canvas: &dyn Canvas) {
-        let Some(tile_iter) = self.tile_scheme.iter_tiles(view) else {
+        let Some(tile_iter) = self.tile_schema.iter_tiles(view) else {
             return;
         };
 
@@ -179,12 +183,12 @@ impl VectorTileLayer {
                 continue;
             }
 
-            let Some(displayed_bbox) = self.tile_scheme.tile_bbox(displayed.index) else {
+            let Some(displayed_bbox) = self.tile_schema.tile_bbox(displayed.index) else {
                 continue;
             };
 
             for subst in &to_substitute {
-                let Some(subst_bbox) = self.tile_scheme.tile_bbox(*subst) else {
+                let Some(subst_bbox) = self.tile_schema.tile_bbox(*subst) else {
                     continue;
                 };
 
@@ -227,16 +231,16 @@ impl VectorTileLayer {
         view: &MapView,
     ) -> Vec<(String, MvtFeature)> {
         let mut features = vec![];
-        if let Some(iter) = self.tile_scheme.iter_tiles(view) {
+        if let Some(iter) = self.tile_schema.iter_tiles(view) {
             for index in iter {
-                let Some(tile_bbox) = self.tile_scheme.tile_bbox(index) else {
+                let Some(tile_bbox) = self.tile_schema.tile_bbox(index) else {
                     continue;
                 };
-                let Some(lod_resolution) = self.tile_scheme.lod_resolution(index.z) else {
+                let Some(lod_resolution) = self.tile_schema.lod_resolution(index.z) else {
                     continue;
                 };
 
-                let tile_resolution = lod_resolution * self.tile_scheme.tile_width() as f64;
+                let tile_resolution = lod_resolution * self.tile_schema.tile_width() as f64;
 
                 let tile_point = Point2::new(
                     ((point.x() - tile_bbox.x_min()) / tile_resolution) as f32,
@@ -349,7 +353,7 @@ mod tests {
         let style_id = provider.add_style(VectorTileStyle::default());
         VectorTileLayer {
             tile_provider: provider,
-            tile_scheme: TileSchema::web(18),
+            tile_schema: TileSchema::web(18),
             style_id,
             displayed_tiles: Default::default(),
             prev_background: Default::default(),

@@ -14,9 +14,9 @@ use crate::platform::{PlatformService, PlatformServiceImpl};
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
 use crate::render::render_bundle::{RenderBundle, RenderBundleType};
 use crate::tile_scheme::TileIndex;
-use crate::{MapBuilder, TileSchema};
+use crate::{MapBuilderOld, TileSchema};
 
-impl MapBuilder {
+impl MapBuilderOld {
     /// Creates a new instance.
     pub fn new() -> Self {
         Self {

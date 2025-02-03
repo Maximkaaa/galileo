@@ -13,12 +13,11 @@ use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
 use galileo::symbol::Symbol;
 use galileo::tile_scheme::TileSchema;
-use galileo::{Color, Map, MapBuilder, MapView};
+use galileo::{Color, Map, MapBuilder, MapBuilderOld};
 use galileo_types::cartesian::{CartesianPoint3d, Point3d};
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
 use galileo_types::impls::{Contour, Polygon};
-use galileo_types::latlon;
 use las::Read;
 use nalgebra::{Rotation3, Translation3, Vector3};
 use num_traits::AsPrimitive;
@@ -115,7 +114,7 @@ impl Symbol<ColoredPoint> for ColoredPointSymbol {
 }
 
 fn create_map() -> Map {
-    let tile_layer = MapBuilder::create_raster_tile_layer(
+    let tile_layer = MapBuilderOld::create_raster_tile_layer(
         |index| {
             format!(
                 "https://tile.openstreetmap.org/{}/{}/{}.png",
@@ -132,16 +131,10 @@ fn create_map() -> Map {
             ..Default::default()
         });
 
-    Map::new(
-        MapView::new(
-            &latlon!(51.4549, -2.6279),
-            tile_layer
-                .tile_schema()
-                .lod_resolution(17)
-                .expect("invalid tile schema"),
-        )
-        .with_rotation_x(std::f64::consts::FRAC_PI_4),
-        vec![Box::new(tile_layer), Box::new(feature_layer)],
-        None,
-    )
+    MapBuilder::default()
+        .with_latlon(51.4549, -2.6279)
+        .with_z_level(17)
+        .with_layer(tile_layer)
+        .with_layer(feature_layer)
+        .build()
 }

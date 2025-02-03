@@ -10,11 +10,11 @@ use galileo::layer::feature_layer::symbol::{SimplePolygonSymbol, Symbol};
 use galileo::layer::feature_layer::FeatureLayer;
 use galileo::layer::Layer;
 use galileo::render::render_bundle::RenderPrimitive;
-use galileo::{Map, MapView};
+use galileo::{Map, MapBuilder};
 use galileo_types::cartesian::{CartesianPoint3d, Point2d};
 use galileo_types::geo::impls::GeoPoint2d;
 use galileo_types::geo::{
-    ChainProjection, Crs, Datum, InvertedProjection, NewGeoPoint, Projection, ProjectionType,
+    ChainProjection, Crs, Datum, InvertedProjection, Projection, ProjectionType,
 };
 use galileo_types::geometry::Geom;
 use galileo_types::geometry_type::CartesianSpace2d;
@@ -119,15 +119,15 @@ fn create_countries_layer() -> FeatureLayer<Point2d, Country, CountrySymbol, Car
 }
 
 fn create_map(feature_layer: impl Layer + 'static) -> Map {
-    let view = MapView::new_with_crs(
-        &GeoPoint2d::latlon(52.0, 10.0),
-        10_000.0,
-        Crs::new(
+    MapBuilder::default()
+        .with_latlon(52.0, 10.0)
+        .with_resolution(10_000.0)
+        .with_crs(Crs::new(
             Datum::WGS84,
             ProjectionType::Other("laea lon_0=10 lat_0=52 x_0=4321000 y_0=3210000".into()),
-        ),
-    );
-    Map::new(view, vec![Box::new(feature_layer)], None)
+        ))
+        .with_layer(feature_layer)
+        .build()
 }
 
 struct CountrySymbol {}

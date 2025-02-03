@@ -3,10 +3,10 @@
 use galileo::layer::feature_layer::{FeatureLayer, FeatureLayerOptions};
 use galileo::symbol::ImagePointSymbol;
 use galileo::tile_scheme::TileSchema;
-use galileo::{Map, MapBuilder, MapView};
+use galileo::{Map, MapBuilder, MapBuilderOld};
 use galileo_types::geo::Crs;
 use galileo_types::geometry_type::GeoSpace2d;
-use galileo_types::{latlon, Disambig, Disambiguate};
+use galileo_types::{Disambig, Disambiguate};
 use geozero::geojson::GeoJson;
 use geozero::ToGeo;
 use nalgebra::Vector2;
@@ -48,7 +48,7 @@ fn create_map() -> Map {
         ..Default::default()
     });
 
-    let raster_layer = MapBuilder::create_raster_tile_layer(
+    let raster_layer = MapBuilderOld::create_raster_tile_layer(
         |index| {
             format!(
                 "https://tile.openstreetmap.org/{}/{}/{}.png",
@@ -58,9 +58,10 @@ fn create_map() -> Map {
         TileSchema::web(18),
     );
 
-    Map::new(
-        MapView::new(&latlon!(53.732562, -1.863383), 50.0),
-        vec![Box::new(raster_layer), Box::new(point_layer)],
-        None,
-    )
+    MapBuilder::default()
+        .with_latlon(53.732562, -1.863383)
+        .with_resolution(50.0)
+        .with_layer(raster_layer)
+        .with_layer(point_layer)
+        .build()
 }

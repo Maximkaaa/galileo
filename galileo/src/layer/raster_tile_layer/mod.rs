@@ -22,7 +22,7 @@ where
     Provider: DataProvider<TileIndex, DecodedImage, ()> + MaybeSync + MaybeSend,
 {
     tile_provider: Arc<Provider>,
-    tile_scheme: TileSchema,
+    tile_schema: TileSchema,
     fade_in_duration: Duration,
     tiles: Arc<Cache<TileIndex, Arc<TileState>>>,
     prev_drawn_tiles: Mutex<Vec<TileIndex>>,
@@ -54,13 +54,13 @@ where
 {
     /// Creates anew layer.
     pub fn new(
-        tile_scheme: TileSchema,
+        tile_schema: TileSchema,
         tile_provider: Provider,
         messenger: Option<Arc<dyn Messenger>>,
     ) -> Self {
         Self {
             tile_provider: Arc::new(tile_provider),
-            tile_scheme,
+            tile_schema,
             prev_drawn_tiles: Mutex::new(vec![]),
             fade_in_duration: Duration::from_millis(300),
             tiles: Arc::new(Cache::new(5000)),
@@ -75,7 +75,7 @@ where
 
     fn get_tiles_to_draw(&self, view: &MapView) -> Vec<(TileIndex, Arc<TileState>)> {
         let mut tiles = vec![];
-        let Some(tile_iter) = self.tile_scheme.iter_tiles(view) else {
+        let Some(tile_iter) = self.tile_schema.iter_tiles(view) else {
             return vec![];
         };
 
@@ -109,7 +109,7 @@ where
             let mut next_level = index;
             let mut substituted = false;
 
-            while let Some(subst) = self.tile_scheme.get_substitutes(next_level) {
+            while let Some(subst) = self.tile_schema.get_substitutes(next_level) {
                 let mut need_more = false;
                 for substitute_index in subst {
                     // todo: this will not work correctly if a tile is substituted by more then 1 tile
@@ -145,11 +145,11 @@ where
             }
 
             if !substituted {
-                let Some(required_bbox) = self.tile_scheme.tile_bbox(index) else {
+                let Some(required_bbox) = self.tile_schema.tile_bbox(index) else {
                     continue;
                 };
                 for prev in prev_drawn.iter() {
-                    let Some(prev_bbox) = self.tile_scheme.tile_bbox(*prev) else {
+                    let Some(prev_bbox) = self.tile_schema.tile_bbox(*prev) else {
                         continue;
                     };
                     if !substitute_indices.contains(prev) && prev_bbox.intersects(required_bbox) {
@@ -214,7 +214,7 @@ where
                         0.0
                     };
 
-                    let Some(tile_bbox) = self.tile_scheme.tile_bbox(*index) else {
+                    let Some(tile_bbox) = self.tile_schema.tile_bbox(*index) else {
                         log::warn!("Failed to get bbox for tile {index:?}");
                         continue;
                     };
@@ -284,7 +284,7 @@ where
 
     /// Preload tiles for the given `view`.
     pub async fn load_tiles(&self, view: &MapView) {
-        if let Some(iter) = self.tile_scheme.iter_tiles(view) {
+        if let Some(iter) = self.tile_schema.iter_tiles(view) {
             for index in iter {
                 let tile_provider = self.tile_provider.clone();
                 let tiles = self.tiles.clone();
@@ -296,7 +296,7 @@ where
 
     /// Returns tile schema of the layer.
     pub fn tile_schema(&self) -> &TileSchema {
-        &self.tile_scheme
+        &self.tile_schema
     }
 }
 
@@ -330,7 +330,7 @@ where
     }
 
     fn prepare(&self, view: &MapView) {
-        if let Some(iter) = self.tile_scheme.iter_tiles(view) {
+        if let Some(iter) = self.tile_schema.iter_tiles(view) {
             for index in iter {
                 let tile_provider = self.tile_provider.clone();
                 let tiles = self.tiles.clone();
@@ -352,5 +352,9 @@ where
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn tile_schema(&self) -> Option<TileSchema> {
+        Some(self.tile_schema.clone())
     }
 }

@@ -8,10 +8,9 @@ use galileo::layer::vector_tile_layer::VectorTileLayer;
 use galileo::render::text::font_service::FontService;
 use galileo::render::text::TextStyle;
 use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
-use galileo::{Color, Lod, Map, MapBuilder, MapView};
+use galileo::{Color, Lod, MapBuilder, MapBuilderOld};
 use galileo_types::cartesian::{Point2d, Rect};
 use galileo_types::geo::Crs;
-use galileo_types::latlon;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
@@ -30,7 +29,7 @@ pub(crate) fn run() {
             .expect("failed to load font");
     });
 
-    let tile_provider = MapBuilder::create_vector_tile_provider(
+    let tile_provider = MapBuilderOld::create_vector_tile_provider(
         move |&index: &TileIndex| {
             format!(
                 "https://api.maptiler.com/tiles/v3-openmaptiles/{z}/{x}/{y}.pbf?key={api_key}",
@@ -64,17 +63,10 @@ pub(crate) fn run() {
 
     let label_layer = VectorTileLayer::new(tile_provider, labels_style, tile_schema());
 
-    let view = MapView::new(
-        &latlon!(0.0, 0.0),
-        tile_schema()
-            .lod_resolution(3)
-            .expect("invalid tile schema"),
-    );
-    let map = Map::new(
-        view,
-        vec![Box::new(graphics_layer), Box::new(label_layer)],
-        None,
-    );
+    let map = MapBuilder::default()
+        .with_layer(graphics_layer)
+        .with_layer(label_layer)
+        .build();
 
     galileo_egui::init(map, []).expect("failed to initialize");
 }

@@ -9,6 +9,7 @@ use parking_lot::RwLock;
 use crate::messenger::Messenger;
 use crate::render::Canvas;
 use crate::view::MapView;
+use crate::TileSchema;
 
 pub mod data_provider;
 pub mod feature_layer;
@@ -39,6 +40,10 @@ pub trait Layer: MaybeSend + MaybeSync {
     fn as_any(&self) -> &dyn Any;
     /// A map stores layers as trait objects. This method can be used to convert the trait object into the concrete type.
     fn as_any_mut(&mut self) -> &mut dyn Any;
+    /// Tile schema of the layer if any.
+    fn tile_schema(&self) -> Option<TileSchema> {
+        None
+    }
 }
 
 impl<T: Layer + 'static> Layer for Arc<RwLock<T>> {
@@ -60,6 +65,10 @@ impl<T: Layer + 'static> Layer for Arc<RwLock<T>> {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn tile_schema(&self) -> Option<TileSchema> {
+        self.read().tile_schema()
     }
 }
 
