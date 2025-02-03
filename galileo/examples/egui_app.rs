@@ -1,11 +1,10 @@
 //! Example showing how to integrate Galileo map into your egui application.
 
 use eframe::CreationContext;
-use galileo::{Map, MapBuilder, MapView, TileSchema};
+use galileo::{Map, MapBuilder, MapBuilderOld, TileSchema};
 use galileo_egui::{EguiMap, EguiMapState};
 use galileo_types::geo::impls::GeoPoint2d;
 use galileo_types::geo::GeoPoint;
-use galileo_types::latlon;
 
 struct EguiMapApp {
     map: EguiMapState,
@@ -15,6 +14,9 @@ struct EguiMapApp {
 
 impl EguiMapApp {
     fn new(map: Map, cc: &CreationContext) -> Self {
+        let position = map.view().position().expect("invalid map position");
+        let resolution = map.view().resolution();
+
         Self {
             map: EguiMapState::new(
                 map,
@@ -22,8 +24,8 @@ impl EguiMapApp {
                 cc.wgpu_render_state.clone().expect("no render state"),
                 [],
             ),
-            position: latlon!(0.0, 0.0),
-            resolution: 9783.939620500008,
+            position,
+            resolution,
         }
     }
 }
@@ -64,7 +66,7 @@ pub(crate) fn run() {
 }
 
 fn create_map() -> Map {
-    let layer = MapBuilder::create_raster_tile_layer(
+    let layer = MapBuilderOld::create_raster_tile_layer(
         |index| {
             format!(
                 "https://tile.openstreetmap.org/{}/{}/{}.png",
@@ -74,15 +76,9 @@ fn create_map() -> Map {
         TileSchema::web(18),
     );
 
-    Map::new(
-        MapView::new(
-            &latlon!(37.566, 128.9784),
-            layer
-                .tile_schema()
-                .lod_resolution(8)
-                .expect("invalid tile schema"),
-        ),
-        vec![Box::new(layer)],
-        None,
-    )
+    MapBuilder::default()
+        .with_latlon(37.566, 128.9784)
+        .with_z_level(8)
+        .with_layer(layer)
+        .build()
 }

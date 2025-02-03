@@ -50,12 +50,12 @@ pub mod winit;
 mod galileo_map;
 pub use color::Color;
 #[cfg(all(feature = "winit", feature = "wgpu"))]
-pub use galileo_map::{GalileoMap, MapBuilder};
+pub use galileo_map::{GalileoMap, MapBuilder as MapBuilderOld};
 // Reexport galileo_types
 pub use galileo_types;
 pub use layer::feature_layer::symbol;
 pub use lod::Lod;
-pub use map::{LayerCollection, Map};
+pub use map::{LayerCollection, Map, MapBuilder};
 pub use messenger::{DummyMessenger, Messenger};
 pub use tile_scheme::TileSchema;
 pub use view::MapView;

@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::control::{EventProcessor, MapController};
-use crate::galileo_map::{GalileoMap, MapBuilder};
+use crate::galileo_map::{GalileoMap, MapBuilderOld};
 use crate::layer::data_provider::dummy::DummyCacheController;
 use crate::layer::data_provider::{UrlImageProvider, UrlSource};
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
@@ -23,7 +23,7 @@ use crate::tile_scheme::TileIndex;
 use crate::winit::WinitInputHandler;
 use crate::TileSchema;
 
-impl MapBuilder {
+impl MapBuilderOld {
     /// Creates a raster tile layer.
     pub fn create_raster_tile_layer(
         tile_source: impl UrlSource<TileIndex> + 'static,

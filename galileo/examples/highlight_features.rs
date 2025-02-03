@@ -10,7 +10,7 @@ use galileo::layer::feature_layer::{Feature, FeatureLayer};
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
 use galileo::tile_scheme::TileSchema;
-use galileo::{Map, MapBuilder, MapView};
+use galileo::{Map, MapBuilder, MapBuilderOld};
 use galileo_types::cartesian::{CartesianPoint3d, Point2d};
 use galileo_types::geo::{Crs, Projection};
 use galileo_types::geometry::Geom;
@@ -149,7 +149,7 @@ fn create_mouse_handler(
 }
 
 fn create_map() -> Map {
-    let raster_layer = MapBuilder::create_raster_tile_layer(
+    let raster_layer = MapBuilderOld::create_raster_tile_layer(
         |index| {
             format!(
                 "https://tile.openstreetmap.org/{}/{}/{}.png",
@@ -159,11 +159,11 @@ fn create_map() -> Map {
         TileSchema::web(18),
     );
 
-    Map::new(
-        MapView::new(&latlon!(53.732562, -1.863383), 30.0),
-        vec![Box::new(raster_layer)],
-        None,
-    )
+    MapBuilder::default()
+        .with_latlon(53.732562, -1.863383)
+        .with_resolution(30.0)
+        .with_layer(raster_layer)
+        .build()
 }
 
 struct ColoredPointSymbol {
