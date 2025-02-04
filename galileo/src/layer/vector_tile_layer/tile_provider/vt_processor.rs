@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
 use galileo_types::cartesian::{CartesianPoint2d, Point3d, Rect};
 use galileo_types::impls::{ClosedContour, Polygon};
@@ -7,7 +6,6 @@ use num_traits::ToPrimitive;
 use strfmt::strfmt;
 
 use crate::error::GalileoError;
-use crate::layer::data_provider::DataProcessor;
 use crate::layer::vector_tile_layer::style::{VectorTileLabelSymbol, VectorTileStyle};
 use crate::render::point_paint::PointPaint;
 use crate::render::render_bundle::{RenderBundle, RenderPrimitive};
@@ -28,38 +26,6 @@ pub struct VectorTileDecodeContext {
     pub tile_schema: TileSchema,
     /// Render bundle to add render primitives to.
     pub bundle: RenderBundle,
-}
-
-impl DataProcessor for VtProcessor {
-    type Input = Bytes;
-    type Output = (RenderBundle, MvtTile);
-    type Context = VectorTileDecodeContext;
-
-    fn process(
-        &self,
-        input: Self::Input,
-        context: Self::Context,
-    ) -> Result<Self::Output, GalileoError> {
-        let start = std::time::Instant::now();
-        let mvt_tile = MvtTile::decode(input, false)?;
-        let mvt_decoded_in = start.elapsed();
-        let VectorTileDecodeContext {
-            mut bundle,
-            index,
-            style,
-            tile_schema: tile_scheme,
-        } = context;
-        Self::prepare(&mvt_tile, &mut bundle, index, &style, &tile_scheme)?;
-        let prerendered_in = start.elapsed() - mvt_decoded_in;
-
-        log::info!(
-            "Decoded tile in {} ms, prerendered in {} ms",
-            mvt_decoded_in.as_millis(),
-            prerendered_in.as_millis()
-        );
-
-        Ok((bundle, mvt_tile))
-    }
 }
 
 impl VtProcessor {

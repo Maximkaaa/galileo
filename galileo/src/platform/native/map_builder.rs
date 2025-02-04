@@ -2,9 +2,8 @@
 
 use std::sync::Arc;
 
-use galileo_types::geo::impls::GeoPoint2d;
-
-use crate::layer::data_provider::{FileCacheController, UrlImageProvider, UrlSource};
+use crate::layer::data_provider::{FileCacheController, UrlSource};
+use crate::layer::raster_tile_layer::RestTileProvider;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::loader::WebVtLoader;
 use crate::layer::vector_tile_layer::tile_provider::VectorTileProvider;
@@ -17,25 +16,11 @@ use crate::tile_scheme::TileIndex;
 use crate::{MapBuilderOld, TileSchema};
 
 impl MapBuilderOld {
-    /// Creates a new instance.
-    pub fn new() -> Self {
-        Self {
-            position: GeoPoint2d::default(),
-            resolution: 156543.03392800014 / 16.0,
-            view: None,
-            layers: vec![],
-            event_handlers: vec![],
-            window: None,
-            event_loop: None,
-            size: None,
-        }
-    }
-
     /// Create a new raster tile layer.
     pub fn create_raster_tile_layer(
         tile_source: impl UrlSource<TileIndex> + 'static,
         tile_scheme: TileSchema,
-    ) -> RasterTileLayer<UrlImageProvider<TileIndex, FileCacheController>> {
+    ) -> RasterTileLayer {
         #[cfg(not(target_os = "android"))]
         let cache_controller = FileCacheController::new(".tile_cache");
 
@@ -43,7 +28,7 @@ impl MapBuilderOld {
         let cache_controller =
             FileCacheController::new("/data/data/com.example.rastertilesandroid/.tile_cache");
 
-        let tile_provider = UrlImageProvider::new_cached(tile_source, cache_controller);
+        let tile_provider = RestTileProvider::new(tile_source, Some(Box::new(cache_controller)), false);
         RasterTileLayer::new(tile_scheme, tile_provider, None)
     }
 

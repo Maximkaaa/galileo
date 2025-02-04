@@ -214,12 +214,6 @@ pub struct MapBuilder {
     pub(crate) dom_container: Option<web_sys::HtmlElement>,
 }
 
-impl Default for MapBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl MapBuilder {
     /// Construct [`GalileoMap`].
     pub async fn build(mut self) -> GalileoMap {

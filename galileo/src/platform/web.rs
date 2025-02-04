@@ -7,11 +7,14 @@ use std::rc::Rc;
 use std::task::{Context, Poll};
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use js_sys::Uint8Array;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{HtmlImageElement, Request, RequestInit, RequestMode, Response, WorkerGlobalScope};
+use web_sys::{
+    Blob, HtmlImageElement, Request, RequestInit, RequestMode, Response, WorkerGlobalScope,
+};
 
 use crate::decoded_image::{DecodedImage, DecodedImageType};
 use crate::error::GalileoError;
@@ -35,6 +38,19 @@ impl PlatformService for WebPlatformService {
 
         let window = web_sys::window().expect("no global `window` exists");
         let image_bitmap_promise = window.create_image_bitmap_with_html_image_element(&image)?;
+        let image_bitmap = JsFuture::from(image_bitmap_promise).await?.dyn_into()?;
+
+        Ok(DecodedImage(DecodedImageType::JsImageBitmap(image_bitmap)))
+    }
+
+    async fn decode_image(&self, image_data: Bytes) -> Result<DecodedImage, GalileoError> {
+        let js_array = js_sys::Uint8Array::from(&image_data[..]);
+        let bytes = js_sys::Array::new();
+        bytes.push(&js_array);
+        let blob = Blob::new_with_u8_array_sequence(&bytes)?;
+
+        let window = web_sys::window().expect("no global `window` exists");
+        let image_bitmap_promise = window.create_image_bitmap_with_blob(&blob)?;
         let image_bitmap = JsFuture::from(image_bitmap_promise).await?.dyn_into()?;
 
         Ok(DecodedImage(DecodedImageType::JsImageBitmap(image_bitmap)))
