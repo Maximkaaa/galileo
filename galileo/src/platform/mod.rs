@@ -1,6 +1,8 @@
 //! Provides platform specific logic and [`PlatformService`] to access it.
 
 use async_trait::async_trait;
+use bytes::Bytes;
+use lazy_static::lazy_static;
 
 use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
@@ -16,6 +18,12 @@ pub trait PlatformService {
     async fn load_image_url(&self, url: &str) -> Result<DecodedImage, GalileoError>;
     /// Loads a byte array from the given url.
     async fn load_bytes_from_url(&self, url: &str) -> Result<bytes::Bytes, GalileoError>;
+
+    /// Decodes an image from raw byte data
+    ///
+    /// Raw bytes may contain in any supported format. The list of formats depends on the platform.
+    // TODO: LIST the supported formats
+    async fn decode_image(&self, imaage_data: Bytes) -> Result<DecodedImage, GalileoError>;
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -33,3 +41,12 @@ pub mod web;
 #[cfg(target_arch = "wasm32")]
 /// Default implementation of the [`PlatformService`] for the current platform.
 pub type PlatformServiceImpl = web::WebPlatformService;
+
+lazy_static!(
+    static ref SERVICE: PlatformServiceImpl = PlatformServiceImpl::new();
+);
+
+/// Returns the singleton instance of the platform service
+pub fn instance() -> &'static PlatformServiceImpl {
+    &SERVICE
+}

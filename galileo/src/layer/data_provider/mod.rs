@@ -1,73 +1,16 @@
 //! Data sources for layers.
 
-mod url_image_provider;
-
-pub use url_image_provider::UrlImageProvider;
-
 #[cfg(not(target_arch = "wasm32"))]
 mod file_cache;
 
-use std::future::Future;
-
-use bytes::Bytes;
 #[cfg(not(target_arch = "wasm32"))]
 pub use file_cache::FileCacheController;
 use maybe_sync::{MaybeSend, MaybeSync};
 
 use crate::error::GalileoError;
 
-/// Data provider is a generic way to load and decode data for a layer.
-///
-/// The purpose of data providers is to encapsulate the details of where the data for a layer comes from. Data providers
-/// can choose to implement in-memory or persistent caching, use background threads to decode data etc.
-///
-/// # Generic parameters
-/// * `Key` - identification of a data item.
-/// * `Data` - decoded data used by a layer.
-/// * `Context` - context used to decode the raw data.
-pub trait DataProvider<Key, Data, Context>: MaybeSend + MaybeSync
-where
-    Key: MaybeSend + MaybeSync + ?Sized,
-    Context: MaybeSend + MaybeSync,
-{
-    /// Load the raw data for the source.
-    fn load_raw(&self, key: &Key) -> impl Future<Output = Result<Bytes, GalileoError>> + MaybeSend;
-
-    /// Decode the loaded raw data.
-    fn decode(&self, bytes: Bytes, context: Context) -> Result<Data, GalileoError>;
-
-    /// Load and decode the data.
-    fn load(
-        &self,
-        key: &Key,
-        context: Context,
-    ) -> impl Future<Output = Result<Data, GalileoError>> + MaybeSend {
-        async {
-            let raw = self.load_raw(key).await?;
-            self.decode(raw, context)
-        }
-    }
-}
-
-/// Data processors are used to decode raw loaded data into something useful by a layer.
-pub trait DataProcessor {
-    /// Raw data type.
-    type Input;
-    /// Decoded data type.
-    type Output;
-    /// Context needed to decode the data.
-    type Context;
-
-    /// Decodes the data.
-    fn process(
-        &self,
-        input: Self::Input,
-        context: Self::Context,
-    ) -> Result<Self::Output, GalileoError>;
-}
-
 /// Persistent cache for a data of type `Data` with a key `Key`.
-pub trait PersistentCacheController<Key: ?Sized, Data> {
+pub trait PersistentCacheController<Key: ?Sized, Data>: MaybeSend + MaybeSync {
     /// Loads data item from the cache.
     fn get(&self, key: &Key) -> Option<Data>;
     /// Puts data item from the cache, replacing existing value if any.

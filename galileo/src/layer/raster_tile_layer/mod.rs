@@ -1,27 +1,28 @@
+//! Raster tile layer and its providers
+
 use std::any::Any;
 use std::collections::HashSet;
 use std::sync::Arc;
 
 use galileo_types::cartesian::Size;
-use maybe_sync::{MaybeSend, MaybeSync};
 use parking_lot::Mutex;
 use quick_cache::sync::Cache;
 use web_time::{Duration, SystemTime};
 
 use super::Layer;
 use crate::decoded_image::DecodedImage;
-use crate::layer::data_provider::DataProvider;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, ImagePaint, PackedBundle, RenderOptions};
 use crate::tile_scheme::{TileIndex, TileSchema};
 use crate::view::MapView;
 
+mod provider;
+pub use provider::*;
+
 /// Raster tile layers load prerender tile sets using [`Provider`](DataProvider) and render them to the map.
-pub struct RasterTileLayer<Provider>
-where
-    Provider: DataProvider<TileIndex, DecodedImage, ()> + MaybeSync + MaybeSend,
+pub struct RasterTileLayer
 {
-    tile_provider: Arc<Provider>,
+    tile_provider: Arc<dyn RasterTileProvider>,
     tile_schema: TileSchema,
     fade_in_duration: Duration,
     tiles: Arc<Cache<TileIndex, Arc<TileState>>>,
@@ -48,14 +49,12 @@ impl RenderedTile {
     }
 }
 
-impl<Provider> RasterTileLayer<Provider>
-where
-    Provider: DataProvider<TileIndex, DecodedImage, ()> + MaybeSync + MaybeSend,
+impl RasterTileLayer
 {
     /// Creates anew layer.
     pub fn new(
         tile_schema: TileSchema,
-        tile_provider: Provider,
+        tile_provider: impl RasterTileProvider + 'static,
         messenger: Option<Arc<dyn Messenger>>,
     ) -> Self {
         Self {
@@ -249,7 +248,7 @@ where
 
     async fn load_tile(
         index: TileIndex,
-        tile_provider: Arc<Provider>,
+        tile_provider: Arc<dyn RasterTileProvider>,
         tiles: &Cache<TileIndex, Arc<TileState>>,
         messenger: Option<Arc<dyn Messenger>>,
     ) {
@@ -257,7 +256,7 @@ where
             Ok(_) => {}
             Err(guard) => {
                 let _ = guard.insert(Arc::new(TileState::Loading));
-                let load_result = tile_provider.load(&index, ()).await;
+                let load_result = tile_provider.load(index).await;
 
                 match load_result {
                     Ok(decoded_image) => {
@@ -276,7 +275,10 @@ where
                             messenger.request_redraw();
                         }
                     }
-                    Err(_) => tiles.insert(index, Arc::new(TileState::Error)),
+                    Err(err) => {
+                        log::debug!("Failed to load tile: {err}");
+                        tiles.insert(index, Arc::new(TileState::Error))
+                    },
                 }
             }
         }
@@ -300,9 +302,7 @@ where
     }
 }
 
-impl<Provider> Layer for RasterTileLayer<Provider>
-where
-    Provider: DataProvider<TileIndex, DecodedImage, ()> + MaybeSync + MaybeSend + 'static,
+impl Layer for RasterTileLayer
 {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         let tiles = self.get_tiles_to_draw(view);

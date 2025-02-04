@@ -13,7 +13,7 @@ use crate::TileSchema;
 
 pub mod data_provider;
 pub mod feature_layer;
-mod raster_tile_layer;
+pub mod raster_tile_layer;
 pub mod vector_tile_layer;
 
 pub use feature_layer::FeatureLayer;
