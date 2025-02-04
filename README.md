@@ -153,6 +153,17 @@ comes with additional advantages:
 * Increase development speed.
 * Make your needs our priority.
 * See your logo on the project's page.
+* 
+
+## Current sponsors
+
+<img src="https://github.com/user-attachments/assets/6909ab5b-e5e3-461c-8d1e-e7abe32c0505" alt="Tzevet 5" width="200"/>
+
+Thank you [Ragarnoy](https://github.com/Ragarnoy) and Tzevet 5 for sponsoring Galileo!
+
+## Former sponsors
+
+Thanks @spencer741, @quietlychris, @alexkirsz for your support!
 
 # License
 
