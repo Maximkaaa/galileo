@@ -3,48 +3,18 @@
 use std::sync::Arc;
 
 use crate::layer::data_provider::{FileCacheController, UrlSource};
-use crate::layer::raster_tile_layer::RestTileProvider;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::loader::WebVtLoader;
 use crate::layer::vector_tile_layer::tile_provider::VectorTileProvider;
-use crate::layer::{RasterTileLayer, VectorTileLayer};
+use crate::layer::VectorTileLayer;
 use crate::platform::native::vt_processor::ThreadVtProcessor;
 use crate::platform::{PlatformService, PlatformServiceImpl};
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
 use crate::render::render_bundle::{RenderBundle, RenderBundleType};
-use crate::tile_scheme::TileIndex;
+use crate::tile_schema::TileIndex;
 use crate::{MapBuilderOld, TileSchema};
 
 impl MapBuilderOld {
-    /// Create a new raster tile layer.
-    pub fn create_raster_tile_layer(
-        tile_source: impl UrlSource<TileIndex> + 'static,
-        tile_scheme: TileSchema,
-    ) -> RasterTileLayer {
-        #[cfg(not(target_os = "android"))]
-        let cache_controller = FileCacheController::new(".tile_cache");
-
-        #[cfg(target_os = "android")]
-        let cache_controller =
-            FileCacheController::new("/data/data/com.example.rastertilesandroid/.tile_cache");
-
-        let tile_provider = RestTileProvider::new(tile_source, Some(Box::new(cache_controller)), false);
-        RasterTileLayer::new(tile_scheme, tile_provider, None)
-    }
-
-    /// Add a new raster layer to the layer list.
-    pub fn with_raster_tiles(
-        mut self,
-        tile_source: impl UrlSource<TileIndex> + 'static,
-        tile_scheme: TileSchema,
-    ) -> Self {
-        self.layers.push(Box::new(Self::create_raster_tile_layer(
-            tile_source,
-            tile_scheme,
-        )));
-        self
-    }
-
     /// Create a new vector tile layer.
     pub fn create_vector_tile_layer(
         tile_source: impl UrlSource<TileIndex> + 'static,
@@ -62,7 +32,7 @@ impl MapBuilderOld {
     ) -> VectorTileProvider {
         let loader = WebVtLoader::new(
             PlatformServiceImpl::new(),
-            FileCacheController::new(".tile_cache"),
+            FileCacheController::new(".tile_cache").expect("failed to create cache controller"),
             tile_source,
         );
         let processor = ThreadVtProcessor::new(

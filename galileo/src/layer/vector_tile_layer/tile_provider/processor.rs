@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::VtStyleId;
 use crate::render::render_bundle::RenderBundle;
-use crate::tile_scheme::TileIndex;
+use crate::tile_schema::TileIndex;
 
 /// Error while processing vector tile.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]

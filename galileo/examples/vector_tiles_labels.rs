@@ -7,7 +7,7 @@ use galileo::layer::vector_tile_layer::style::{
 use galileo::layer::vector_tile_layer::VectorTileLayer;
 use galileo::render::text::font_service::FontService;
 use galileo::render::text::TextStyle;
-use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
+use galileo::tile_schema::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Color, Lod, MapBuilder, MapBuilderOld};
 use galileo_types::cartesian::{Point2d, Rect};
 use galileo_types::geo::Crs;

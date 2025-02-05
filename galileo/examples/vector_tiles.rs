@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use galileo::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
-use galileo::tile_scheme::{TileIndex, TileSchema, VerticalDirection};
+use galileo::tile_schema::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Lod, Map, MapBuilder, MapBuilderOld};
 use galileo_types::cartesian::{Point2d, Rect};
 use galileo_types::geo::Crs;

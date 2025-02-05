@@ -37,7 +37,7 @@ mod map;
 mod messenger;
 pub mod platform;
 pub mod render;
-pub mod tile_scheme;
+pub mod tile_schema;
 mod view;
 
 #[cfg(test)]
@@ -57,5 +57,5 @@ pub use layer::feature_layer::symbol;
 pub use lod::Lod;
 pub use map::{LayerCollection, Map, MapBuilder};
 pub use messenger::{DummyMessenger, Messenger};
-pub use tile_scheme::TileSchema;
+pub use tile_schema::TileSchema;
 pub use view::MapView;

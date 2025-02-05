@@ -5,7 +5,7 @@ use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::layer::data_provider::{PersistentCacheController, UrlSource};
 use crate::platform::PlatformService;
-use crate::tile_scheme::TileIndex;
+use crate::tile_schema::TileIndex;
 
 /// Provider of tlies for a [`RusterTileLayer`](super::RasterTileLayer).
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -24,8 +24,8 @@ pub trait RasterTileProvider: MaybeSend + MaybeSync {
 /// * ArcGis TileService
 /// * etc.
 ///
-/// If constructed with a [`PersistentCacheControlller`] it will cache the loaded tiles and only
-/// reqeust new tiles from the source url if they are not in the cache.
+/// If constructed with a [`PersistentCacheController`] it will cache the loaded tiles and only
+/// request new tiles from the source url if they are not in the cache.
 ///
 /// If configured to use offline mode, it will only use tiles from the cache without attempting to
 /// load them from the source. Nevertheless, even in this case url source must be correct to
@@ -33,7 +33,10 @@ pub trait RasterTileProvider: MaybeSend + MaybeSync {
 ///
 /// # Example
 ///
-/// ```
+/// ```no_run
+/// use galileo::layer::raster_tile_layer::{RasterTileProvider, RestTileProvider};
+/// use galileo::tile_schema::TileIndex;
+///
 /// let provider = RestTileProvider::new(
 ///     |index| {
 ///         format!(
@@ -45,7 +48,9 @@ pub trait RasterTileProvider: MaybeSend + MaybeSync {
 ///     false
 ///     );
 ///
+/// # tokio_test::block_on(async {
 /// let tile = provider.load(TileIndex::new(3, 5, 3)).await.expect("failed to load tile");
+/// # });
 /// ```
 pub struct RestTileProvider {
     url_source: Box<dyn UrlSource<TileIndex>>,

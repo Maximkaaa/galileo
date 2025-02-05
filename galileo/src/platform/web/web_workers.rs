@@ -20,7 +20,7 @@ use crate::layer::vector_tile_layer::tile_provider::processor::TileProcessingErr
 use crate::render::render_bundle::tessellating::serialization::TessellatingRenderBundleBytes;
 use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
 use crate::render::render_bundle::{RenderBundle, RenderBundleType};
-use crate::tile_scheme::TileIndex;
+use crate::tile_schema::TileIndex;
 use crate::TileSchema;
 
 const WORKER_URL: &str = "./vt_worker.js";
@@ -300,7 +300,7 @@ mod worker {
     use crate::layer::vector_tile_layer::tile_provider::VtProcessor;
     use crate::platform::web::web_workers::WebWorkerResponsePayload;
     use crate::render::render_bundle::RenderBundle;
-    use crate::tile_scheme::TileIndex;
+    use crate::tile_schema::TileIndex;
     use crate::TileSchema;
 
     #[wasm_bindgen]

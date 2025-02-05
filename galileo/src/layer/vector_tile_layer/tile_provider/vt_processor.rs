@@ -10,7 +10,7 @@ use crate::layer::vector_tile_layer::style::{VectorTileLabelSymbol, VectorTileSt
 use crate::render::point_paint::PointPaint;
 use crate::render::render_bundle::{RenderBundle, RenderPrimitive};
 use crate::render::{LinePaint, PolygonPaint};
-use crate::tile_scheme::TileIndex;
+use crate::tile_schema::TileIndex;
 use crate::TileSchema;
 
 /// Data processor that decodes vector tiles.
@@ -35,15 +35,15 @@ impl VtProcessor {
         bundle: &mut RenderBundle,
         index: TileIndex,
         style: &VectorTileStyle,
-        tile_scheme: &TileSchema,
+        tile_schema: &TileSchema,
     ) -> Result<(), GalileoError> {
-        let bbox = tile_scheme
+        let bbox = tile_schema
             .tile_bbox(index)
             .ok_or_else(|| GalileoError::Generic("cannot get tile bbox".into()))?;
-        let lod_resolution = tile_scheme.lod_resolution(index.z).ok_or_else(|| {
+        let lod_resolution = tile_schema.lod_resolution(index.z).ok_or_else(|| {
             GalileoError::Generic(format!("cannot get lod resolution for lod {}", index.z))
         })?;
-        let tile_resolution = lod_resolution * tile_scheme.tile_width() as f64;
+        let tile_resolution = lod_resolution * tile_schema.tile_width() as f64;
 
         let bounds = Polygon::new(
             ClosedContour::new(vec![

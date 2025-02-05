@@ -2,10 +2,10 @@
 
 use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::{Feature, FeatureLayer};
+use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
-use galileo::tile_scheme::TileSchema;
-use galileo::{Color, Map, MapBuilder, MapBuilderOld};
+use galileo::{Color, Map, MapBuilder};
 use galileo_types::cartesian::{CartesianPoint3d, Point3d};
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
@@ -87,19 +87,15 @@ fn generate_points() -> Vec<ColoredPoint> {
 }
 
 fn create_map() -> Map {
-    let tile_layer = MapBuilderOld::create_raster_tile_layer(
-        |index| {
-            format!(
-                "https://tile.openstreetmap.org/{}/{}/{}.png",
-                index.z, index.x, index.y
-            )
-        },
-        TileSchema::web(18),
-    );
+    let raster_layer = RasterTileLayerBuilder::new_osm()
+        .with_file_cache_checked(".tile_cache")
+        .build()
+        .expect("failed to create layer");
+
     let feature_layer = FeatureLayer::new(generate_points(), ColoredPointSymbol {}, Crs::EPSG3857);
 
     MapBuilder::default()
-        .with_layer(tile_layer)
+        .with_layer(raster_layer)
         .with_layer(feature_layer)
         .build()
 }

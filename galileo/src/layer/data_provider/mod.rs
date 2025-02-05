@@ -1,9 +1,6 @@
 //! Data sources for layers.
 
-#[cfg(not(target_arch = "wasm32"))]
 mod file_cache;
-
-#[cfg(not(target_arch = "wasm32"))]
 pub use file_cache::FileCacheController;
 use maybe_sync::{MaybeSend, MaybeSync};
 

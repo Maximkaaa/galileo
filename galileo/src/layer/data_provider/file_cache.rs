@@ -6,20 +6,12 @@ use log::debug;
 use crate::error::GalileoError;
 use crate::layer::data_provider::PersistentCacheController;
 
-const CACHE_FOLDER: &str = ".tile_cache";
-
 /// Stores the cached data as a set of files in the specified folder. It generates file names from the given urls.
 ///
 /// Currently, there is no eviction mechanism.
 #[derive(Debug, Clone)]
 pub struct FileCacheController {
     folder_path: PathBuf,
-}
-
-impl Default for FileCacheController {
-    fn default() -> Self {
-        Self::new(CACHE_FOLDER)
-    }
 }
 
 impl PersistentCacheController<str, Bytes> for FileCacheController {
@@ -60,11 +52,16 @@ impl PersistentCacheController<str, Bytes> for FileCacheController {
 impl FileCacheController {
     /// Creates a new instance. The cache will be located in the given directory. If the directory doesn't exist,
     /// it will be created on startup.
-    pub fn new(path: impl AsRef<Path>) -> Self {
-        ensure_folder_exists(path.as_ref()).expect("Failed to initialize file cache controller.");
-        Self {
+    pub fn new(path: impl AsRef<Path>) -> Result<Self, GalileoError> {
+        ensure_folder_exists(path.as_ref()).map_err(|err| {
+            GalileoError::FsIo(format!(
+                "failed to initialize file cache folder {:?}: {err}",
+                path.as_ref()
+            ))
+        })?;
+        Ok(Self {
             folder_path: path.as_ref().into(),
-        }
+        })
     }
 
     fn get_file_path(&self, url: &str) -> PathBuf {

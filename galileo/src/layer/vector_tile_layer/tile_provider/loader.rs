@@ -7,7 +7,7 @@ use maybe_sync::{MaybeSend, MaybeSync};
 use crate::error::GalileoError;
 use crate::layer::data_provider::{PersistentCacheController, UrlSource};
 use crate::platform::{PlatformService, PlatformServiceImpl};
-use crate::tile_scheme::TileIndex;
+use crate::tile_schema::TileIndex;
 
 /// Error that can occur when trying to load a vector tile.
 pub enum TileLoadError {

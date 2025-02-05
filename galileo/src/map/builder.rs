@@ -10,18 +10,15 @@ use crate::{MapView, Messenger};
 // z-level 4 on the standard web tile scheme
 const DEFAULT_RESOLUTION: f64 = 156543.03392800014 / 16.0;
 
-/// Convinience type to initialize a [Map].
+/// Convenience type to initialize a [Map].
 ///
 /// ```
 /// use galileo::MapBuilder;
 /// use galileo::galileo_types::latlon;
 /// # use approx::assert_relative_eq;
 /// #
-/// # use galileo::layer::data_provider::{DummyCacheController, UrlImageProvider};
-/// # use galileo::layer::RasterTileLayer;
-/// # use galileo::TileSchema;
-/// # let tile_provider = UrlImageProvider::new_cached(|_| unimplemented!(), DummyCacheController {});
-/// # let tile_layer = RasterTileLayer::new(TileSchema::web(18), tile_provider, None);
+/// # use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+/// # let tile_layer = RasterTileLayerBuilder::new_rest(|_| unimplemented!()).build().unwrap();
 ///
 /// let map = MapBuilder::default()
 ///     .with_position(latlon!(55.0, 37.0))
@@ -153,12 +150,8 @@ impl MapBuilder {
     /// use galileo::MapBuilder;
     /// # use approx::assert_relative_eq;
     ///
-    /// # use galileo::layer::data_provider::{DummyCacheController, UrlImageProvider};
-    /// # use galileo::layer::RasterTileLayer;
-    /// # use galileo::TileSchema;
-    /// # let tile_provider =
-    /// #     UrlImageProvider::new_cached(|_| unimplemented!(), DummyCacheController {});
-    /// # let tile_layer = RasterTileLayer::new(TileSchema::web(18), tile_provider, None);
+    /// # use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+    /// # let tile_layer = RasterTileLayerBuilder::new_rest(|_| unimplemented!()).build().unwrap();
     ///
     /// let map = MapBuilder::default().with_layer(tile_layer).with_z_level(5).build();
     ///
@@ -192,12 +185,8 @@ impl MapBuilder {
     /// ```
     /// use galileo::MapBuilder;
     ///
-    /// # use galileo::layer::data_provider::{DummyCacheController, UrlImageProvider};
-    /// # use galileo::layer::RasterTileLayer;
-    /// # use galileo::TileSchema;
-    /// # let tile_provider =
-    /// #     UrlImageProvider::new_cached(|_| unimplemented!(), DummyCacheController {});
-    /// # let tile_layer = RasterTileLayer::new(TileSchema::web(18), tile_provider, None);
+    /// # use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+    /// # let tile_layer = RasterTileLayerBuilder::new_rest(|_| unimplemented!()).build().unwrap();
     ///
     /// let map = MapBuilder::default().with_layer(tile_layer).build();
     ///
@@ -257,20 +246,18 @@ mod tests {
     use galileo_types::latlon;
 
     use super::*;
-    use crate::layer::data_provider::{DummyCacheController, UrlImageProvider};
+    use crate::layer::raster_tile_layer::RestTileProvider;
     use crate::layer::RasterTileLayer;
-    use crate::tile_scheme::TileIndex;
     use crate::TileSchema;
 
     fn test_tile_schema() -> TileSchema {
         TileSchema::web(18)
     }
 
-    fn test_tile_layer() -> RasterTileLayer<UrlImageProvider<TileIndex, DummyCacheController>> {
-        let tile_scheme = test_tile_schema();
-        let tile_provider =
-            UrlImageProvider::new_cached(|_| unimplemented!(), DummyCacheController {});
-        RasterTileLayer::new(tile_scheme, tile_provider, None)
+    fn test_tile_layer() -> RasterTileLayer {
+        let tile_schema = test_tile_schema();
+        let tile_provider = RestTileProvider::new(|_| unimplemented!(), None, false);
+        RasterTileLayer::new(tile_schema, tile_provider, None)
     }
 
     struct TestMessenger;
@@ -425,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    fn with_z_level_sets_default_resolution_if_no_tile_scheme() {
+    fn with_z_level_sets_default_resolution_if_no_tile_schema() {
         let map = MapBuilder::default().with_z_level(3).build();
 
         assert_relative_eq!(map.view().resolution(), DEFAULT_RESOLUTION,);

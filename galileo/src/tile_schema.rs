@@ -48,7 +48,7 @@ impl TileIndex {
 }
 
 /// Tile schema specifies how tile indices are calculated based on the map position and resolution.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TileSchema {
     /// Position where all tiles have `X == 0, Y == 0` indices.
     pub origin: Point2d,

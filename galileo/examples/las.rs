@@ -8,12 +8,12 @@
 //! optimizations may be done by Galileo in future, but at this point it's up to the application.
 
 use galileo::layer::feature_layer::{Feature, FeatureLayerOptions};
+use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::layer::FeatureLayer;
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
 use galileo::symbol::Symbol;
-use galileo::tile_scheme::TileSchema;
-use galileo::{Color, Map, MapBuilder, MapBuilderOld};
+use galileo::{Color, Map, MapBuilder};
 use galileo_types::cartesian::{CartesianPoint3d, Point3d};
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
@@ -114,15 +114,10 @@ impl Symbol<ColoredPoint> for ColoredPointSymbol {
 }
 
 fn create_map() -> Map {
-    let tile_layer = MapBuilderOld::create_raster_tile_layer(
-        |index| {
-            format!(
-                "https://tile.openstreetmap.org/{}/{}/{}.png",
-                index.z, index.x, index.y
-            )
-        },
-        TileSchema::web(18),
-    );
+    let raster_layer = RasterTileLayerBuilder::new_osm()
+        .with_file_cache_checked(".tile_cache")
+        .build()
+        .expect("failed to create layer");
 
     let points = load_points();
     let feature_layer = FeatureLayer::new(points, ColoredPointSymbol {}, Crs::EPSG3857)
@@ -134,7 +129,7 @@ fn create_map() -> Map {
     MapBuilder::default()
         .with_latlon(51.4549, -2.6279)
         .with_z_level(17)
-        .with_layer(tile_layer)
+        .with_layer(raster_layer)
         .with_layer(feature_layer)
         .build()
 }
