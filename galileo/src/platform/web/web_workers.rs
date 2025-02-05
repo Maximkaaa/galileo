@@ -1,6 +1,6 @@
 //! Operations with Web Workers.
 
-use std::cell::RefCell;
+use std::cell::{LazyCell, RefCell};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::rc::Rc;
@@ -24,6 +24,13 @@ use crate::tile_schema::TileIndex;
 use crate::TileSchema;
 
 const WORKER_URL: &str = "./vt_worker.js";
+const WORKER_COUNT: usize = 4;
+
+thread_local! {
+    static INSTANCE: LazyCell<Rc<WebWorkerService>> = LazyCell::new(|| {
+        Rc::new(WebWorkerService::new(WORKER_COUNT))
+    });
+}
 
 struct WorkerState {
     worker: web_sys::Worker,
@@ -133,6 +140,11 @@ impl WebWorkerService {
         }
 
         service
+    }
+
+    /// Returns a static instance of the service.
+    pub fn instance() -> Rc<Self> {
+        INSTANCE.with(|v| (*v).clone())
     }
 
     /// Pre-render vector tile.

@@ -2,6 +2,7 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -21,12 +22,12 @@ use crate::TileSchema;
 pub struct WebWorkerVtProcessor {
     tile_schema: TileSchema,
     styles: RefCell<HashMap<VtStyleId, Arc<VectorTileStyle>>>,
-    ww_service: WebWorkerService,
+    ww_service: Rc<WebWorkerService>,
 }
 
 impl WebWorkerVtProcessor {
     /// Create new instance.
-    pub fn new(tile_schema: TileSchema, ww_service: WebWorkerService) -> Self {
+    pub fn new(tile_schema: TileSchema, ww_service: Rc<WebWorkerService>) -> Self {
         Self {
             tile_schema,
             styles: RefCell::new(HashMap::new()),

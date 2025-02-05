@@ -1,5 +1,6 @@
-//! [Vector tile layers](VectorTileLayer) load prepared vector tiles using a [data provider](VectorTileProviderT)
-//! and draw them to the map with the given [`VectorTileStyle`].
+//! [Vector tile layers](VectorTileLayer) load prepared vector tiles using a
+//! [data provider](crate::layer::vector_tile_layer::tile_provider::VectorTileProvider) and draw them to the map with
+//! the given [`VectorTileStyle`].
 
 use std::any::Any;
 use std::sync::Arc;
@@ -23,11 +24,13 @@ use crate::tile_schema::{TileIndex, TileSchema};
 use crate::view::MapView;
 use crate::Color;
 
+mod builder;
 pub mod style;
 pub mod tile_provider;
 mod vector_tile;
+pub use builder::VectorTileLayerBuilder;
 
-/// Vector tile layers use [`Providers`](VectorTileProviderT) to load prepared vector tiles, and then render them using
+/// Vector tile layers use [tile providers](VectorTileProvider) to load prepared vector tiles, and then render them using
 /// specified [styles](VectorTileStyle).
 pub struct VectorTileLayer {
     tile_provider: VectorTileProvider,
@@ -35,6 +38,15 @@ pub struct VectorTileLayer {
     style_id: VtStyleId,
     displayed_tiles: Mutex<Vec<DisplayedTile>>,
     prev_background: Mutex<Option<PreviousBackground>>,
+}
+
+impl std::fmt::Debug for VectorTileLayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RasterTileLayer")
+            .field("tile_schema", &self.tile_schema)
+            .field("style_id", &self.style_id)
+            .finish()
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -329,6 +341,11 @@ impl VectorTileLayer {
         );
 
         Some(canvas.pack_bundle(&bundle))
+    }
+
+    /// Returns the reference to the layer's tile provider.
+    pub fn provider(&self) -> &VectorTileProvider {
+        &self.tile_provider
     }
 }
 

@@ -139,7 +139,7 @@ impl MapBuilder {
 
     /// Sets the [resolution](MapView::resolution()) of the map to the resolution corresponding to the given z-level.
     ///
-    /// Z-level is the index of level of detail in a [`TileSchema`]. The map itself does not have a
+    /// Z-level is the index of level of detail in a [`TileSchema`](crate::TileSchema). The map itself does not have a
     /// tile schema, so the builder will look through the layers added by
     /// [`MapBuilder::with_layer()`] method. It will then use the tile schema of the first layer
     /// that uses it.

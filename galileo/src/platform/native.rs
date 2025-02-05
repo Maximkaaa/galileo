@@ -8,7 +8,6 @@ use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::platform::PlatformService;
 
-pub mod map_builder;
 pub mod vt_processor;
 
 /// Platform service for native applications.

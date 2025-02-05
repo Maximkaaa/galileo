@@ -4,11 +4,11 @@ use bytes::Bytes;
 use galileo::layer::vector_tile_layer::style::{
     VectorTileDefaultSymbol, VectorTileLabelSymbol, VectorTileStyle,
 };
-use galileo::layer::vector_tile_layer::VectorTileLayer;
+use galileo::layer::vector_tile_layer::{VectorTileLayer, VectorTileLayerBuilder};
 use galileo::render::text::font_service::FontService;
 use galileo::render::text::TextStyle;
 use galileo::tile_schema::{TileIndex, TileSchema, VerticalDirection};
-use galileo::{Color, Lod, MapBuilder, MapBuilderOld};
+use galileo::{Color, Lod, MapBuilder};
 use galileo_types::cartesian::{Point2d, Rect};
 use galileo_types::geo::Crs;
 
@@ -29,19 +29,19 @@ pub(crate) fn run() {
             .expect("failed to load font");
     });
 
-    let tile_provider = MapBuilderOld::create_vector_tile_provider(
-        move |&index: &TileIndex| {
-            format!(
-                "https://api.maptiler.com/tiles/v3-openmaptiles/{z}/{x}/{y}.pbf?key={api_key}",
-                z = index.z,
-                x = index.x,
-                y = index.y
-            )
-        },
-        tile_schema(),
-    );
-    let graphics_layer =
-        VectorTileLayer::new(tile_provider.clone(), default_style(), tile_schema());
+    let graphics_layer = VectorTileLayerBuilder::new_rest(move |&index: &TileIndex| {
+        format!(
+            "https://api.maptiler.com/tiles/v3-openmaptiles/{z}/{x}/{y}.pbf?key={api_key}",
+            z = index.z,
+            x = index.x,
+            y = index.y
+        )
+    })
+    .with_file_cache_checked(".tile_cache")
+    .with_style(default_style())
+    .with_tile_schema(tile_schema())
+    .build()
+    .expect("failed to create layer");
 
     let labels_style = VectorTileStyle {
         rules: vec![],
@@ -61,7 +61,11 @@ pub(crate) fn run() {
         background: Default::default(),
     };
 
-    let label_layer = VectorTileLayer::new(tile_provider, labels_style, tile_schema());
+    let label_layer = VectorTileLayer::new(
+        graphics_layer.provider().clone(),
+        labels_style,
+        tile_schema(),
+    );
 
     let map = MapBuilder::default()
         .with_layer(graphics_layer)
