@@ -16,12 +16,12 @@ use crate::layer::Layer;
 /// ```no_run
 /// use galileo::layer::{RasterTileLayer, VectorTileLayer};
 /// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+/// use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
 /// use galileo::LayerCollection;
-/// use galileo::MapBuilderOld;
 /// use galileo::tile_schema::TileIndex;
 ///
 /// let raster_tiles = RasterTileLayerBuilder::new_osm().build()?;
-/// let vector_tiles = MapBuilderOld::create_vector_tile_layer(|index| format!("url from {index:?}"), todo!(), todo!());
+/// let vector_tiles = VectorTileLayerBuilder::new_rest(|_| unimplemented!()).build()?;
 ///
 /// let mut collection = LayerCollection::default();
 /// collection.push(raster_tiles);

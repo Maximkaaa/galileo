@@ -6,7 +6,7 @@ use maybe_sync::{MaybeSend, MaybeSync};
 
 use crate::error::GalileoError;
 use crate::layer::data_provider::{PersistentCacheController, UrlSource};
-use crate::platform::{PlatformService, PlatformServiceImpl};
+use crate::platform::PlatformService;
 use crate::tile_schema::TileIndex;
 
 /// Error that can occur when trying to load a vector tile.
@@ -28,40 +28,37 @@ pub trait VectorTileLoader: MaybeSend + MaybeSync {
 }
 
 /// Load the tile from the Web.
-pub struct WebVtLoader<Cache>
-where
-    Cache: PersistentCacheController<str, Bytes> + MaybeSend + MaybeSync,
-{
-    platform_service: PlatformServiceImpl,
-    cache: Cache,
+pub struct WebVtLoader {
+    cache: Option<Box<dyn PersistentCacheController<str, Bytes>>>,
     url_source: Box<dyn UrlSource<TileIndex>>,
+    offline_mode: bool,
 }
 
-impl<Cache> WebVtLoader<Cache>
-where
-    Cache: PersistentCacheController<str, Bytes> + MaybeSend + MaybeSync,
-{
+impl WebVtLoader {
     /// Create a new instance.
     pub fn new(
-        platform_service: PlatformServiceImpl,
-        cache: Cache,
+        cache: Option<Box<dyn PersistentCacheController<str, Bytes>>>,
         url_source: impl UrlSource<TileIndex> + 'static,
+        offline_mode: bool,
     ) -> Self {
         Self {
-            platform_service,
             cache,
             url_source: Box::new(url_source),
+            offline_mode,
         }
     }
 
     async fn load_raw(&self, url: &str) -> Result<Bytes, TileLoadError> {
-        if let Some(data) = self.cache.get(url) {
+        if let Some(data) = self.cache.as_ref().and_then(|cache| cache.get(url)) {
             log::trace!("Cache hit for url {url}");
             return Ok(data);
         }
 
-        let bytes = self
-            .platform_service
+        if self.offline_mode {
+            return Err(TileLoadError::DoesNotExist);
+        }
+
+        let bytes = crate::platform::instance()
             .load_bytes_from_url(url)
             .await
             .map_err(|err| match err {
@@ -71,8 +68,10 @@ where
 
         log::info!("Loaded tile from url: {url}");
 
-        if let Err(error) = self.cache.insert(url, &bytes) {
-            log::warn!("Failed to write persistent cache entry: {:?}", error);
+        if let Some(cache) = &self.cache {
+            if let Err(error) = cache.insert(url, &bytes) {
+                log::warn!("Failed to write persistent cache entry: {:?}", error);
+            }
         }
 
         Ok(bytes)
@@ -81,10 +80,7 @@ where
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<Cache> VectorTileLoader for WebVtLoader<Cache>
-where
-    Cache: PersistentCacheController<str, Bytes> + MaybeSend + MaybeSync,
-{
+impl VectorTileLoader for WebVtLoader {
     async fn load(&self, index: TileIndex) -> Result<MvtTile, TileLoadError> {
         let url = (self.url_source)(&index);
 

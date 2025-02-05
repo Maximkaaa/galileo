@@ -20,7 +20,6 @@ use crate::decoded_image::{DecodedImage, DecodedImageType};
 use crate::error::GalileoError;
 use crate::platform::PlatformService;
 
-pub mod map_builder;
 pub mod vt_processor;
 pub mod web_workers;
 

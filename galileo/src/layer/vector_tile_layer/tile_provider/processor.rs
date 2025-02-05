@@ -37,8 +37,8 @@ pub trait VectorTileProcessor: MaybeSend + MaybeSync {
     fn drop_style(&self, style_id: VtStyleId);
     /// Convert the tile into render bundle using the given style.
     ///
-    /// The style with the given id must first be registered in the processor using [`add_style`]
-    /// method.
+    /// The style with the given id must first be registered in the processor using
+    /// [`VectorTileProcessor::add_style()`] method.
     async fn process_tile(
         &self,
         tile: Arc<MvtTile>,

@@ -1,31 +1,49 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use bytes::Bytes;
 
-use super::{RasterTileLayer, RasterTileProvider, RestTileProvider};
+use super::style::{
+    VectorTileDefaultSymbol, VectorTileLineSymbol, VectorTilePolygonSymbol, VectorTileStyle,
+};
+use super::tile_provider::loader::WebVtLoader;
+use super::tile_provider::processor::VectorTileProcessor;
+use super::tile_provider::VectorTileProvider;
+use super::VectorTileLayer;
 use crate::error::GalileoError;
 use crate::layer::data_provider::{FileCacheController, PersistentCacheController, UrlSource};
+use crate::layer::Layer;
 use crate::tile_schema::TileIndex;
-use crate::{Messenger, TileSchema};
+use crate::{Color, Messenger, TileSchema};
 
-/// Constructor for a [`RasterTileLayer`].
+/// Constructor for a [`VectorTileLayer`].
 ///
 /// ```
-/// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+/// use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
 ///
-/// let layer = RasterTileLayerBuilder::new_rest(
+/// # fn load_tile_schema() -> galileo::TileSchema { galileo::TileSchema::web(10) }
+/// # fn load_style() -> galileo::layer::vector_tile_layer::style::VectorTileStyle {
+/// #     galileo::layer::vector_tile_layer::style::VectorTileStyle::default() }
+///
+/// let tile_schema = load_tile_schema();
+/// let style = load_style();
+///
+/// let layer = VectorTileLayerBuilder::new_rest(
 ///     |index| {
 ///         format!(
-///             "https://tile.openstreetmap.org/{}/{}/{}.png",
+///             "https://vector_tiles.example.com/{}/{}/{}.png",
 ///             index.z, index.x, index.y
 ///         )
 ///     })
 ///     .with_file_cache("target")
+///     .with_tile_schema(tile_schema)
+///     .with_style(style)
 ///     .build()?;
 /// # Ok::<(), galileo::error::GalileoError>(())
 /// ```
-pub struct RasterTileLayerBuilder {
+pub struct VectorTileLayerBuilder {
     provider_type: ProviderType,
+    style: Option<VectorTileStyle>,
     tile_schema: Option<TileSchema>,
     messenger: Option<Box<dyn Messenger>>,
     cache: CacheType,
@@ -34,7 +52,7 @@ pub struct RasterTileLayerBuilder {
 
 enum ProviderType {
     Rest(Box<dyn UrlSource<TileIndex>>),
-    Custom(Box<dyn RasterTileProvider>),
+    Custom(VectorTileProvider),
 }
 
 enum CacheType {
@@ -43,16 +61,16 @@ enum CacheType {
     Custom(Box<dyn PersistentCacheController<str, Bytes>>),
 }
 
-impl RasterTileLayerBuilder {
+impl VectorTileLayerBuilder {
     /// Initializes a builder for a layer that requests tiles from the given url source.
     ///
     /// ```
-    /// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+    /// use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
     ///
-    /// let layer = RasterTileLayerBuilder::new_rest(
+    /// let layer = VectorTileLayerBuilder::new_rest(
     ///     |index| {
     ///         format!(
-    ///             "https://tile.openstreetmap.org/{}/{}/{}.png",
+    ///             "https://vector_tiles.example.com/{}/{}/{}.png",
     ///             index.z, index.x, index.y
     ///         )
     ///     }).build()?;
@@ -61,33 +79,7 @@ impl RasterTileLayerBuilder {
     pub fn new_rest(tile_source: impl UrlSource<TileIndex> + 'static) -> Self {
         Self {
             provider_type: ProviderType::Rest(Box::new(tile_source)),
-            tile_schema: None,
-            messenger: None,
-            cache: CacheType::None,
-            offline_mode: false,
-        }
-    }
-
-    #[allow(rustdoc::bare_urls)]
-    /// Initializes a builder for a raster tile layer with the Open Streets Map source.
-    ///
-    /// It uses the standard "https://tile.openstreetmap.org/z/x/y.png" URL pattern to retrieve the
-    /// tiles.
-    ///
-    /// ```
-    /// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
-    ///
-    /// let layer = RasterTileLayerBuilder::new_osm().with_file_cache("target").build()?;
-    /// # Ok::<(), galileo::error::GalileoError>(())
-    /// ```
-    pub fn new_osm() -> Self {
-        Self {
-            provider_type: ProviderType::Rest(Box::new(|index| {
-                format!(
-                    "https://tile.openstreetmap.org/{}/{}/{}.png",
-                    index.z, index.x, index.y
-                )
-            })),
+            style: None,
             tile_schema: None,
             messenger: None,
             cache: CacheType::None,
@@ -98,25 +90,23 @@ impl RasterTileLayerBuilder {
     /// Initializes a builder for a lyer with the given tile provider.
     ///
     /// ```
-    /// use galileo::layer::raster_tile_layer::{RestTileProvider, RasterTileLayerBuilder};
+    /// use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
+    /// use galileo::layer::vector_tile_layer::tile_provider::VectorTileProvider;
     ///
-    /// let provider = RestTileProvider::new(
-    ///     |index| {
-    ///         format!(
-    ///             "https://tile.openstreetmap.org/{}/{}/{}.png",
-    ///             index.z, index.x, index.y
-    ///         )
-    ///     },
-    ///     None,
-    ///     false,
-    /// );
-    /// let layer = RasterTileLayerBuilder::new_with_provider(provider)
-    ///     .build()?;
+    /// # fn get_tile_provider() -> VectorTileProvider {
+    /// #     VectorTileLayerBuilder::new_rest(|_|
+    /// #         unimplemented!()).build().unwrap().provider().clone()
+    /// # }
+    ///
+    /// let provider = get_tile_provider();
+    ///
+    /// let layer = VectorTileLayerBuilder::new_with_provider(provider).build()?;
     /// # Ok::<(), galileo::error::GalileoError>(())
     /// ```
-    pub fn new_with_provider(provider: impl RasterTileProvider + 'static) -> Self {
+    pub fn new_with_provider(provider: VectorTileProvider) -> Self {
         Self {
-            provider_type: ProviderType::Custom(Box::new(provider)),
+            provider_type: ProviderType::Custom(provider),
+            style: None,
             tile_schema: None,
             messenger: None,
             cache: CacheType::None,
@@ -133,25 +123,25 @@ impl RasterTileLayerBuilder {
     /// fails, building the tile layer will return an error.
     ///
     /// Cannot be used with custom tile provider given by
-    /// [`RasterTileLayerBuilder::new_with_provider()`] method as the provider must have already be
+    /// [`VectorTileLayerBuilder::new_with_provider()`] method as the provider must have already be
     /// created with the cache configured. So in this case building will also return an error.
     ///
-    /// Replaces the value set by the [`RasterTileLayerBuilder::with_cache_controller()`] method.
+    /// Replaces the value set by the [`VectorTileLayerBuilder::with_cache_controller()`] method.
     ///
     /// # Platforms
     ///
     /// When compiling for the `wasm32` architecture, file system operations are not available, so
     /// using a file cache will result in a runtime error. If you want to use the same code to
     /// create a layer for all platforms and not worry about cache availability, you can use
-    /// [`RasterTileLayerBuilder::with_file_cache_checked()`] method.
+    /// [`VectorTileLayerBuilder::with_file_cache_checked()`] method.
     ///
     /// ```
-    /// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+    /// use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
     ///
-    /// let layer = RasterTileLayerBuilder::new_rest(
+    /// let layer = VectorTileLayerBuilder::new_rest(
     ///     |index| {
     ///         format!(
-    ///             "https://tile.openstreetmap.org/{}/{}/{}.png",
+    ///             "https://vector_tiles.example.com/{}/{}/{}.png",
     ///             index.z, index.x, index.y
     ///         )
     ///     })
@@ -174,12 +164,12 @@ impl RasterTileLayerBuilder {
     /// Currently it only checks if the target architecture is "wasm32".
     ///
     /// ```
-    /// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+    /// use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
     ///
-    /// let layer = RasterTileLayerBuilder::new_rest(
+    /// let layer = VectorTileLayerBuilder::new_rest(
     ///     |index| {
     ///         format!(
-    ///             "https://tile.openstreetmap.org/{}/{}/{}.png",
+    ///             "https://vector_tiles.example.com/{}/{}/{}.png",
     ///             index.z, index.x, index.y
     ///         )
     ///     })
@@ -200,20 +190,20 @@ impl RasterTileLayerBuilder {
     /// Adds the given persistent cache for the tiles.
     ///
     /// Cannot be used with custom tile provider given by
-    /// [`RasterTileLayerBuilder::new_with_provider()`] method as the provider must have already be
+    /// [`VectorTileLayerBuilder::new_with_provider()`] method as the provider must have already be
     /// created with the cache configured. So in this case building will also return an error.
     ///
-    /// Replaces the value set by the [`RasterTileLayerBuilder::with_file_cache()`] method.
+    /// Replaces the value set by the [`VectorTileLayerBuilder::with_file_cache()`] method.
     ///
     /// ```
-    /// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+    /// use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
     /// use galileo::layer::data_provider::FileCacheController;
     ///
     /// let cache_controller = FileCacheController::new("target")?;
-    /// let layer = RasterTileLayerBuilder::new_rest(
+    /// let layer = VectorTileLayerBuilder::new_rest(
     ///     |index| {
     ///         format!(
-    ///             "https://tile.openstreetmap.org/{}/{}/{}.png",
+    ///             "https://vector_tiles.example.com/{}/{}/{}.png",
     ///             index.z, index.x, index.y
     ///         )
     ///     })
@@ -235,19 +225,19 @@ impl RasterTileLayerBuilder {
     /// to identify tiles in the cache.
     ///
     /// Cannot be used with custom tile provider given by
-    /// [`RasterTileLayerBuilder::new_with_provider()`] method as the provider must have already be
+    /// [`VectorTileLayerBuilder::new_with_provider()`] method as the provider must have already be
     /// created with the offline mode. So in this case building will also return an error.
     ///
     /// If the layer is set to offline mode but there is no cache configured, building it will
     /// return a configuration error.
     ///
     /// ```
-    /// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+    /// use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
     ///
-    /// let layer = RasterTileLayerBuilder::new_rest(
+    /// let layer = VectorTileLayerBuilder::new_rest(
     ///     |index| {
     ///         format!(
-    ///             "https://tile.openstreetmap.org/{}/{}/{}.png",
+    ///             "https://vector_tiles.example.com/{}/{}/{}.png",
     ///             index.z, index.x, index.y
     ///         )
     ///     })
@@ -263,23 +253,25 @@ impl RasterTileLayerBuilder {
 
     /// Sets the layer's tile schema.
     ///
-    /// Defaults to `TileSchema::web(18)`.
+    /// Defaults to `TileSchema::web(18)`. Note that for vector tiles you usually don't want to use
+    /// the default schema as vector tiles usually are larger than 256 px.
     ///
     /// ```
-    /// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+    /// use galileo::layer::Layer;
+    /// use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
     /// use galileo::TileSchema;
     ///
-    /// let layer = RasterTileLayerBuilder::new_rest(
+    /// let layer = VectorTileLayerBuilder::new_rest(
     ///     |index| {
     ///         format!(
-    ///             "https://tile.openstreetmap.org/{}/{}/{}.png",
+    ///             "https://vector_tiles.example.com/{}/{}/{}.png",
     ///             index.z, index.x, index.y
     ///         )
     ///     })
     ///     .with_tile_schema(TileSchema::web(10))
     ///     .build()?;
     ///
-    /// assert_eq!(*layer.tile_schema(), TileSchema::web(10));
+    /// assert_eq!(*layer.tile_schema().as_ref().unwrap(), TileSchema::web(10));
     /// # Ok::<(), galileo::error::GalileoError>(())
     /// ```
     pub fn with_tile_schema(mut self, tile_schema: TileSchema) -> Self {
@@ -289,7 +281,7 @@ impl RasterTileLayerBuilder {
 
     /// Sets the layer's messenger.
     ///
-    /// Raster tile layer uses the messenger to notify application when a new tile is loaded and
+    /// Vector tile layer uses the messenger to notify application when a new tile is loaded and
     /// ready to be drawn. This is required since the tiles are loaded asynchronously.
     ///
     /// If the messenger is not set, after call to
@@ -303,13 +295,40 @@ impl RasterTileLayerBuilder {
         self
     }
 
-    /// Consumes the builder and constructs the raster tile layer.
+    /// Sets the layer's style.
+    ///
+    /// ```
+    /// use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
+    /// use galileo::layer::vector_tile_layer::style::VectorTileStyle;
+    ///
+    /// # fn load_style() -> VectorTileStyle { VectorTileStyle::default() }
+    ///
+    /// let style = load_style();
+    ///
+    /// let layer = VectorTileLayerBuilder::new_rest(
+    ///     |index| {
+    ///         format!(
+    ///             "https://vector_tiles.example.com/{}/{}/{}.png",
+    ///             index.z, index.x, index.y
+    ///         )
+    ///     })
+    ///     .with_style(style)
+    ///     .build()?;
+    /// # Ok::<(), galileo::error::GalileoError>(())
+    /// ```
+    pub fn with_style(mut self, style: VectorTileStyle) -> Self {
+        self.style = Some(style);
+        self
+    }
+
+    /// Consumes the builder and constructs the vector tile layer.
     ///
     /// Will return an error if the layer is configured incorrectly or if the cache controller
     /// fails to initialize.
-    pub fn build(self) -> Result<RasterTileLayer, GalileoError> {
+    pub fn build(self) -> Result<VectorTileLayer, GalileoError> {
         let Self {
             provider_type,
+            style,
             tile_schema,
             messenger,
             cache,
@@ -330,12 +349,14 @@ impl RasterTileLayerBuilder {
             ));
         }
 
-        let provider: Box<dyn RasterTileProvider> = match provider_type {
-            ProviderType::Rest(url_source) => Box::new(RestTileProvider::new(
-                url_source,
-                cache_controller,
-                offline_mode,
-            )),
+        let processor = Self::create_processor(tile_schema.clone());
+
+        let provider = match provider_type {
+            ProviderType::Rest(url_source) => {
+                let loader = WebVtLoader::new(cache_controller, url_source, offline_mode);
+
+                VectorTileProvider::new(Arc::new(loader), Arc::new(processor))
+            }
             ProviderType::Custom(raster_tile_provider) => {
                 if cache_controller.is_some() {
                     return Err(GalileoError::Configuration(
@@ -348,7 +369,55 @@ impl RasterTileLayerBuilder {
             }
         };
 
-        Ok(RasterTileLayer::new_raw(provider, tile_schema, messenger))
+        let style = style.unwrap_or_else(Self::default_style);
+
+        let mut layer = VectorTileLayer::new(provider, style, tile_schema);
+        if let Some(messenger) = messenger {
+            layer.set_messenger(messenger);
+        }
+
+        Ok(layer)
+    }
+
+    fn create_processor(tile_schema: TileSchema) -> impl VectorTileProcessor {
+        #[cfg(target_arch = "wasm32")]
+        {
+            crate::platform::web::vt_processor::WebWorkerVtProcessor::new(
+                tile_schema.clone(),
+                crate::platform::web::web_workers::WebWorkerService::instance(),
+            )
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
+            use crate::render::render_bundle::{RenderBundle, RenderBundleType};
+
+            crate::platform::native::vt_processor::ThreadVtProcessor::new(
+                tile_schema.clone(),
+                RenderBundle(RenderBundleType::Tessellating(
+                    TessellatingRenderBundle::new(),
+                )),
+            )
+        }
+    }
+
+    fn default_style() -> VectorTileStyle {
+        VectorTileStyle {
+            rules: vec![],
+            default_symbol: VectorTileDefaultSymbol {
+                point: None,
+                line: Some(VectorTileLineSymbol {
+                    width: 1.0,
+                    stroke_color: Color::BLACK,
+                }),
+                polygon: Some(VectorTilePolygonSymbol {
+                    fill_color: Color::GRAY,
+                }),
+                label: None,
+            },
+            background: Color::WHITE,
+        }
     }
 }
 
@@ -358,10 +427,18 @@ mod tests {
 
     use super::*;
 
+    fn custom_provider() -> VectorTileProvider {
+        VectorTileLayerBuilder::new_rest(|_| unimplemented!())
+            .build()
+            .unwrap()
+            .provider()
+            .clone()
+    }
+
     #[test]
     fn with_file_cache_replaces_cache_controller() {
         let cache = FileCacheController::new("target").unwrap();
-        let builder = RasterTileLayerBuilder::new_rest(|_| unimplemented!())
+        let builder = VectorTileLayerBuilder::new_rest(|_| unimplemented!())
             .with_cache_controller(cache)
             .with_file_cache("target");
 
@@ -370,7 +447,7 @@ mod tests {
 
     #[test]
     fn with_file_cache_fails_build_if_cannot_init_folder() {
-        let result = RasterTileLayerBuilder::new_rest(|_| unimplemented!())
+        let result = VectorTileLayerBuilder::new_rest(|_| unimplemented!())
             .with_file_cache("Cargo.toml")
             .build();
 
@@ -380,8 +457,8 @@ mod tests {
 
     #[test]
     fn with_file_cache_fails_build_if_custom_provider() {
-        let provider = RestTileProvider::new(|_| unimplemented!(), None, false);
-        let result = RasterTileLayerBuilder::new_with_provider(provider)
+        let provider = custom_provider();
+        let result = VectorTileLayerBuilder::new_with_provider(provider)
             .with_file_cache("target")
             .build();
 
@@ -392,7 +469,7 @@ mod tests {
     #[test]
     fn with_cache_controller_replaces_file_cache() {
         let cache = FileCacheController::new("target").unwrap();
-        let builder = RasterTileLayerBuilder::new_rest(|_| unimplemented!())
+        let builder = VectorTileLayerBuilder::new_rest(|_| unimplemented!())
             .with_file_cache("target")
             .with_cache_controller(cache);
 
@@ -401,9 +478,9 @@ mod tests {
 
     #[test]
     fn with_cache_controller_fails_build_if_custom_provider() {
-        let provider = RestTileProvider::new(|_| unimplemented!(), None, false);
+        let provider = custom_provider();
         let cache = FileCacheController::new("target").unwrap();
-        let result = RasterTileLayerBuilder::new_with_provider(provider)
+        let result = VectorTileLayerBuilder::new_with_provider(provider)
             .with_cache_controller(cache)
             .build();
 
@@ -413,8 +490,8 @@ mod tests {
 
     #[test]
     fn with_offline_mode_incompatible_with_custom_provider() {
-        let provider = RestTileProvider::new(|_| unimplemented!(), None, false);
-        let result = RasterTileLayerBuilder::new_with_provider(provider)
+        let provider = custom_provider();
+        let result = VectorTileLayerBuilder::new_with_provider(provider)
             .with_file_cache("target")
             .with_offline_mode()
             .build();
@@ -425,7 +502,7 @@ mod tests {
 
     #[test]
     fn with_offline_mode_does_not_work_without_cache() {
-        let result = RasterTileLayerBuilder::new_rest(|_| unimplemented!())
+        let result = VectorTileLayerBuilder::new_rest(|_| unimplemented!())
             .with_offline_mode()
             .build();
 
@@ -435,10 +512,10 @@ mod tests {
 
     #[test]
     fn default_tile_schema() {
-        let layer = RasterTileLayerBuilder::new_rest(|_| unimplemented!())
+        let layer = VectorTileLayerBuilder::new_rest(|_| unimplemented!())
             .build()
             .unwrap();
 
-        assert_eq!(*layer.tile_schema(), TileSchema::web(18));
+        assert_eq!(*layer.tile_schema().as_ref().unwrap(), TileSchema::web(18));
     }
 }

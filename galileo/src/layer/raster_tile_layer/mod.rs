@@ -22,7 +22,7 @@ pub use provider::{RasterTileProvider, RestTileProvider};
 mod builder;
 pub use builder::RasterTileLayerBuilder;
 
-/// Raster tile layers load prerender tile sets using [`Provider`](DataProvider) and render them to the map.
+/// Raster tile layers load prerendered tile sets using [tile provider](RasterTileProvider) and render them to the map.
 pub struct RasterTileLayer {
     tile_provider: Arc<dyn RasterTileProvider>,
     tile_schema: TileSchema,

@@ -4,8 +4,9 @@ use std::sync::Arc;
 
 use galileo::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
+use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
 use galileo::tile_schema::{TileIndex, TileSchema, VerticalDirection};
-use galileo::{Lod, Map, MapBuilder, MapBuilderOld};
+use galileo::{Lod, Map, MapBuilder};
 use galileo_types::cartesian::{Point2d, Rect};
 use galileo_types::geo::Crs;
 use parking_lot::RwLock;
@@ -21,18 +22,21 @@ pub(crate) fn run() {
     };
 
     let style = default_style();
-    let layer = Arc::new(RwLock::new(MapBuilderOld::create_vector_tile_layer(
-        move |&index: &TileIndex| {
-            format!(
-                "https://api.maptiler.com/tiles/v3-openmaptiles/{z}/{x}/{y}.pbf?key={api_key}",
-                z = index.z,
-                x = index.x,
-                y = index.y
-            )
-        },
-        tile_schema(),
-        style,
-    )));
+    let layer = VectorTileLayerBuilder::new_rest(move |&index: &TileIndex| {
+        format!(
+            "https://api.maptiler.com/tiles/v3-openmaptiles/{z}/{x}/{y}.pbf?key={api_key}",
+            z = index.z,
+            x = index.x,
+            y = index.y
+        )
+    })
+    .with_style(style)
+    .with_tile_schema(tile_schema())
+    .with_file_cache_checked(".tile_cache")
+    .build()
+    .expect("failed to create layer");
+
+    let layer = Arc::new(RwLock::new(layer));
 
     let layer_copy = layer.clone();
     let handler = move |ev: &UserEvent, map: &mut Map| match ev {
