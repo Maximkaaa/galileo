@@ -15,11 +15,12 @@ use crate::layer::Layer;
 ///
 /// ```no_run
 /// use galileo::layer::{RasterTileLayer, VectorTileLayer};
+/// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 /// use galileo::LayerCollection;
 /// use galileo::MapBuilderOld;
-/// use galileo::tile_scheme::TileIndex;
+/// use galileo::tile_schema::TileIndex;
 ///
-/// let raster_tiles = MapBuilderOld::create_raster_tile_layer(|index| format!("url from {index:?}"), todo!());
+/// let raster_tiles = RasterTileLayerBuilder::new_osm().build()?;
 /// let vector_tiles = MapBuilderOld::create_vector_tile_layer(|index| format!("url from {index:?}"), todo!(), todo!());
 ///
 /// let mut collection = LayerCollection::default();
@@ -27,6 +28,7 @@ use crate::layer::Layer;
 /// collection.push(vector_tiles);
 ///
 /// assert!(collection.get_typed::<VectorTileLayer>(1).is_some());
+/// # Ok::<(), galileo::error::GalileoError>(())
 /// ```
 #[derive(Default)]
 pub struct LayerCollection(Vec<LayerEntry>);

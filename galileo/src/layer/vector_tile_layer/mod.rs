@@ -19,7 +19,7 @@ use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::render_bundle::RenderPrimitive;
 use crate::render::{Canvas, PackedBundle, PolygonPaint, RenderOptions};
-use crate::tile_scheme::{TileIndex, TileSchema};
+use crate::tile_schema::{TileIndex, TileSchema};
 use crate::view::MapView;
 use crate::Color;
 

@@ -7,11 +7,11 @@ use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::view::MapView;
 
-mod layer_collection;
 mod builder;
+mod layer_collection;
 
-pub use layer_collection::LayerCollection;
 pub use builder::MapBuilder;
+pub use layer_collection::LayerCollection;
 
 const FRAME_DURATION: Duration = Duration::from_millis(16);
 

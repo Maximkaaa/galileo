@@ -11,7 +11,7 @@ use processor::VectorTileProcessor;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, PackedBundle};
-use crate::tile_scheme::TileIndex;
+use crate::tile_schema::TileIndex;
 
 pub mod loader;
 pub mod processor;

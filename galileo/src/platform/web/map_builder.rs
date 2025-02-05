@@ -5,27 +5,17 @@ use std::sync::Arc;
 use crate::galileo_map::MapBuilder as MapBuilderOld;
 use crate::layer::data_provider::dummy::DummyCacheController;
 use crate::layer::data_provider::UrlSource;
-use crate::layer::raster_tile_layer::RestTileProvider;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::loader::WebVtLoader;
 use crate::layer::vector_tile_layer::tile_provider::VectorTileProvider;
-use crate::layer::{RasterTileLayer, VectorTileLayer};
+use crate::layer::VectorTileLayer;
 use crate::platform::web::vt_processor::WebWorkerVtProcessor;
 use crate::platform::web::web_workers::WebWorkerService;
 use crate::platform::{PlatformService, PlatformServiceImpl};
-use crate::tile_scheme::TileIndex;
+use crate::tile_schema::TileIndex;
 use crate::TileSchema;
 
 impl MapBuilderOld {
-    /// Creates a raster tile layer.
-    pub fn create_raster_tile_layer(
-        tile_source: impl UrlSource<TileIndex> + 'static,
-        tile_scheme: TileSchema,
-    ) -> RasterTileLayer {
-        let tile_provider = RestTileProvider::new(tile_source, None, false);
-        RasterTileLayer::new(tile_scheme, tile_provider, None)
-    }
-
     /// Create a new vector tile layer.
     pub fn create_vector_tile_layer(
         tile_source: impl UrlSource<TileIndex> + 'static,

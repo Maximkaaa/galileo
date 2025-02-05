@@ -20,7 +20,7 @@ use crate::map::Map;
 #[cfg(target_arch = "wasm32")]
 use crate::platform::web::map_builder::sleep;
 use crate::render::WgpuRenderer;
-use crate::tile_scheme::{TileIndex, TileSchema};
+use crate::tile_schema::{TileIndex, TileSchema};
 use crate::view::MapView;
 use crate::winit::{WinitInputHandler, WinitMessenger};
 use crate::Messenger;
@@ -294,12 +294,12 @@ impl MapBuilder {
     pub fn with_vector_tiles(
         mut self,
         tile_source: impl UrlSource<TileIndex> + 'static,
-        tile_scheme: TileSchema,
+        tile_schema: TileSchema,
         style: VectorTileStyle,
     ) -> Self {
         self.layers.push(Box::new(Self::create_vector_tile_layer(
             tile_source,
-            tile_scheme,
+            tile_schema,
             style,
         )));
         self

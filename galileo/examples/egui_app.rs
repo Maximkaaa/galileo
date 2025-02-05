@@ -1,7 +1,8 @@
 //! Example showing how to integrate Galileo map into your egui application.
 
 use eframe::CreationContext;
-use galileo::{Map, MapBuilder, MapBuilderOld, TileSchema};
+use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+use galileo::{Map, MapBuilder};
 use galileo_egui::{EguiMap, EguiMapState};
 use galileo_types::geo::impls::GeoPoint2d;
 use galileo_types::geo::GeoPoint;
@@ -66,15 +67,10 @@ pub(crate) fn run() {
 }
 
 fn create_map() -> Map {
-    let layer = MapBuilderOld::create_raster_tile_layer(
-        |index| {
-            format!(
-                "https://tile.openstreetmap.org/{}/{}/{}.png",
-                index.z, index.x, index.y
-            )
-        },
-        TileSchema::web(18),
-    );
+    let layer = RasterTileLayerBuilder::new_osm()
+        .with_file_cache_checked(".tile_cache")
+        .build()
+        .expect("failed to create layer");
 
     MapBuilder::default()
         .with_latlon(37.566, 128.9784)

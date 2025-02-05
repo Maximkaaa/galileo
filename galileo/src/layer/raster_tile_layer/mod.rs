@@ -13,21 +13,32 @@ use super::Layer;
 use crate::decoded_image::DecodedImage;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, ImagePaint, PackedBundle, RenderOptions};
-use crate::tile_scheme::{TileIndex, TileSchema};
+use crate::tile_schema::{TileIndex, TileSchema};
 use crate::view::MapView;
 
 mod provider;
-pub use provider::*;
+pub use provider::{RasterTileProvider, RestTileProvider};
+
+mod builder;
+pub use builder::RasterTileLayerBuilder;
 
 /// Raster tile layers load prerender tile sets using [`Provider`](DataProvider) and render them to the map.
-pub struct RasterTileLayer
-{
+pub struct RasterTileLayer {
     tile_provider: Arc<dyn RasterTileProvider>,
     tile_schema: TileSchema,
     fade_in_duration: Duration,
     tiles: Arc<Cache<TileIndex, Arc<TileState>>>,
     prev_drawn_tiles: Mutex<Vec<TileIndex>>,
     messenger: Option<Arc<dyn Messenger>>,
+}
+
+impl std::fmt::Debug for RasterTileLayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RasterTileLayer")
+            .field("tile_schema", &self.tile_schema)
+            .field("fade_in_duration", &self.fade_in_duration)
+            .finish()
+    }
 }
 
 enum TileState {
@@ -49,8 +60,7 @@ impl RenderedTile {
     }
 }
 
-impl RasterTileLayer
-{
+impl RasterTileLayer {
     /// Creates anew layer.
     pub fn new(
         tile_schema: TileSchema,
@@ -64,6 +74,21 @@ impl RasterTileLayer
             fade_in_duration: Duration::from_millis(300),
             tiles: Arc::new(Cache::new(5000)),
             messenger,
+        }
+    }
+
+    fn new_raw(
+        tile_provider: Box<dyn RasterTileProvider>,
+        tile_schema: TileSchema,
+        messenger: Option<Box<dyn Messenger>>,
+    ) -> Self {
+        Self {
+            tile_provider: tile_provider.into(),
+            tile_schema,
+            prev_drawn_tiles: Mutex::new(vec![]),
+            fade_in_duration: Duration::from_millis(300),
+            tiles: Arc::new(Cache::new(5000)),
+            messenger: messenger.map(|m| m.into()),
         }
     }
 
@@ -278,7 +303,7 @@ impl RasterTileLayer
                     Err(err) => {
                         log::debug!("Failed to load tile: {err}");
                         tiles.insert(index, Arc::new(TileState::Error))
-                    },
+                    }
                 }
             }
         }
@@ -302,8 +327,7 @@ impl RasterTileLayer
     }
 }
 
-impl Layer for RasterTileLayer
-{
+impl Layer for RasterTileLayer {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         let tiles = self.get_tiles_to_draw(view);
         self.prepare_tile_renders(&tiles, canvas);

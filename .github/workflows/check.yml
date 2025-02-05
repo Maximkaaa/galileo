@@ -19,6 +19,8 @@ jobs:
         run: cargo build --verbose --all
       - name: Tests
         run: cargo test --features _tests,geojson --verbose
+      - name: Doc tests
+        run: cargo test --doc --features geojson --verbose
 
   fmt:
     name: Rustfmt

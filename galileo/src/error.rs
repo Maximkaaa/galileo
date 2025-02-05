@@ -7,6 +7,7 @@ use thiserror::Error;
 
 /// Galileo error type.
 #[derive(Debug, Error, Clone)]
+#[non_exhaustive]
 pub enum GalileoError {
     /// I/O error (network or file)
     #[error("failed to load data")]
@@ -29,7 +30,10 @@ pub enum GalileoError {
     Generic(String),
     /// Error reading/writing data to the FS.
     #[error("failed to read file")]
-    FsIo,
+    FsIo(String),
+    /// Invalid configuration for the type.
+    #[error("invalid configuration: {0}")]
+    Configuration(String),
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -40,8 +44,8 @@ impl From<reqwest::Error> for GalileoError {
 }
 
 impl From<std::io::Error> for GalileoError {
-    fn from(_value: Error) -> Self {
-        Self::FsIo
+    fn from(value: Error) -> Self {
+        Self::FsIo(value.to_string())
     }
 }
 

@@ -7,15 +7,13 @@
 //! cargo run --example render_to_file --features geojson -- "./galileo/examples/data/Museums 2021.geojson"
 //! ```
 
-use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
-use galileo::layer::data_provider::{FileCacheController, UrlImageProvider};
-use galileo::layer::{FeatureLayer, RasterTileLayer};
+use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+use galileo::layer::FeatureLayer;
 use galileo::render::WgpuRenderer;
 use galileo::symbol::ArbitraryGeometrySymbol;
-use galileo::tile_scheme::TileIndex;
 use galileo::{Map, MapView, Messenger, TileSchema};
 use galileo_types::cartesian::Size;
 use galileo_types::geo::Crs;
@@ -66,21 +64,10 @@ async fn main() -> Result<()> {
     );
 
     // Create OSM layer for background
-    let cache_controller = FileCacheController::new(".tile_cache");
-    let tile_provider = UrlImageProvider::new_cached(
-        |index: &TileIndex| {
-            format!(
-                "https://tile.openstreetmap.org/{}/{}/{}.png",
-                index.z, index.x, index.y
-            )
-        },
-        cache_controller,
-    );
-    let mut osm = RasterTileLayer::new(
-        TileSchema::web(18),
-        tile_provider,
-        None::<Arc<dyn Messenger>>,
-    );
+    let mut osm = RasterTileLayerBuilder::new_osm()
+        .with_file_cache_checked(".tile_cache")
+        .build()
+        .expect("failed to create layer");
 
     // If we don't set fade in duration to 0, when the image is first drawn, all tiles will
     // be transparent.

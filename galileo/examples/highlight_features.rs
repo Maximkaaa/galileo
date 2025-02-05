@@ -7,10 +7,10 @@ use galileo::control::{EventPropagation, UserEvent, UserEventHandler};
 use galileo::decoded_image::DecodedImage;
 use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::{Feature, FeatureLayer};
+use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
-use galileo::tile_scheme::TileSchema;
-use galileo::{Map, MapBuilder, MapBuilderOld};
+use galileo::{Map, MapBuilder};
 use galileo_types::cartesian::{CartesianPoint3d, Point2d};
 use galileo_types::geo::{Crs, Projection};
 use galileo_types::geometry::Geom;
@@ -149,15 +149,10 @@ fn create_mouse_handler(
 }
 
 fn create_map() -> Map {
-    let raster_layer = MapBuilderOld::create_raster_tile_layer(
-        |index| {
-            format!(
-                "https://tile.openstreetmap.org/{}/{}/{}.png",
-                index.z, index.x, index.y
-            )
-        },
-        TileSchema::web(18),
-    );
+    let raster_layer = RasterTileLayerBuilder::new_osm()
+        .with_file_cache_checked(".tile_cache")
+        .build()
+        .expect("failed to create layer");
 
     MapBuilder::default()
         .with_latlon(53.732562, -1.863383)

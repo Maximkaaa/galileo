@@ -10,7 +10,7 @@ use tokio::sync::OnceCell;
 use crate::layer::vector_tile_layer::tile_provider::VtStyleId;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::PackedBundle;
-use crate::tile_scheme::TileIndex;
+use crate::tile_schema::TileIndex;
 
 const DEFAULT_CACHE_CAPACITY: usize = 100_000_000;
 const AVG_TILE_SIZE: usize = 100_000;

@@ -1,9 +1,9 @@
 //! This exmample shows how to use geometries from `geo` crate as inputs for feature layers.
 
 use galileo::layer::feature_layer::{FeatureLayer, FeatureLayerOptions};
+use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::symbol::ImagePointSymbol;
-use galileo::tile_scheme::TileSchema;
-use galileo::{Map, MapBuilder, MapBuilderOld};
+use galileo::{Map, MapBuilder};
 use galileo_types::geo::Crs;
 use galileo_types::geometry_type::GeoSpace2d;
 use galileo_types::{Disambig, Disambiguate};
@@ -48,15 +48,10 @@ fn create_map() -> Map {
         ..Default::default()
     });
 
-    let raster_layer = MapBuilderOld::create_raster_tile_layer(
-        |index| {
-            format!(
-                "https://tile.openstreetmap.org/{}/{}/{}.png",
-                index.z, index.x, index.y
-            )
-        },
-        TileSchema::web(18),
-    );
+    let raster_layer = RasterTileLayerBuilder::new_osm()
+        .with_file_cache_checked(".tile_cache")
+        .build()
+        .expect("failed to create layer");
 
     MapBuilder::default()
         .with_latlon(53.732562, -1.863383)

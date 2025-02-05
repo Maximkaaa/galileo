@@ -42,9 +42,9 @@ pub mod web;
 /// Default implementation of the [`PlatformService`] for the current platform.
 pub type PlatformServiceImpl = web::WebPlatformService;
 
-lazy_static!(
+lazy_static! {
     static ref SERVICE: PlatformServiceImpl = PlatformServiceImpl::new();
-);
+}
 
 /// Returns the singleton instance of the platform service
 pub fn instance() -> &'static PlatformServiceImpl {
