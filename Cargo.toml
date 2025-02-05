@@ -92,6 +92,8 @@ strfmt = "0.2"
 thiserror = "1"
 tokio = { version = "1.39", default-features = false }
 tokio-test = "0.4"
+# Fix the version of uuid to prevent build breaking
+uuid = "=1.12.1"
 wasm-bindgen = "0.2"
 wasm-bindgen-derive = "0.2"
 wasm-bindgen-futures = "0.4"

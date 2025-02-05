@@ -38,4 +38,6 @@ num-traits = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, optional = true }
+# Fix the version of uuid to prevent build breaking
+uuid = { workspace = true }
 wasm-bindgen = { workspace = true }
