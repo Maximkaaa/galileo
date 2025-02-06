@@ -157,9 +157,9 @@ comes with additional advantages:
 
 ## Current sponsors
 
-<img src="https://github.com/user-attachments/assets/6909ab5b-e5e3-461c-8d1e-e7abe32c0505" alt="Tzevet 5" width="200"/>
+[<img src="https://github.com/user-attachments/assets/6909ab5b-e5e3-461c-8d1e-e7abe32c0505" alt="Tzevet 5" width="200"/>](https://www.tzevet5.co.il/טכנולוגיות-אבטחה)
 
-Thank you [Ragarnoy](https://github.com/Ragarnoy) and Tzevet 5 for sponsoring Galileo!
+Thank you [Ragarnoy](https://github.com/Ragarnoy) and [Tzevet 5](https://www.tzevet5.co.il/טכנולוגיות-אבטחה) for sponsoring Galileo!
 
 ## Former sponsors
 
