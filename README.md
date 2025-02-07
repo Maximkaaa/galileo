@@ -163,7 +163,7 @@ Thank you [Ragarnoy](https://github.com/Ragarnoy), [Tzevet 5](https://www.tzevet
 
 ## Former sponsors
 
-Thanks @spencer741, @quietlychris, @alexkirsz for your support!
+Thanks @spencer741, @alexkirsz for your support!
 
 # License
 
