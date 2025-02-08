@@ -2,11 +2,14 @@
 
 use std::sync::Arc;
 
+use eframe::CreationContext;
 use galileo::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
 use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
+use galileo::layer::VectorTileLayer;
 use galileo::tile_schema::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Lod, Map, MapBuilder};
+use galileo_egui::{EguiMap, EguiMapState};
 use galileo_types::cartesian::{Point2d, Rect};
 use galileo_types::geo::Crs;
 use parking_lot::RwLock;
@@ -14,6 +17,59 @@ use parking_lot::RwLock;
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
     run()
+}
+
+struct App {
+    map: EguiMapState,
+    layer: Arc<RwLock<VectorTileLayer>>,
+}
+
+impl eframe::App for App {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            EguiMap::new(&mut self.map).show_ui(ui);
+        });
+
+        egui::Window::new("Buttons")
+            .title_bar(false)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    if ui.button("Default style").clicked() {
+                        self.set_style(default_style());
+                    }
+                    if ui.button("Gray style").clicked() {
+                        self.set_style(gray_style());
+                    }
+                });
+            });
+    }
+}
+
+impl App {
+    fn new(
+        map: Map,
+        layer: Arc<RwLock<VectorTileLayer>>,
+        cc: &CreationContext,
+        handler: impl UserEventHandler + 'static,
+    ) -> Self {
+        Self {
+            map: EguiMapState::new(
+                map,
+                cc.egui_ctx.clone(),
+                cc.wgpu_render_state.clone().expect("no render state"),
+                [Box::new(handler) as Box<dyn UserEventHandler>],
+            ),
+            layer,
+        }
+    }
+
+    fn set_style(&mut self, style: VectorTileStyle) {
+        let mut layer = self.layer.write();
+        if style != *layer.style() {
+            layer.update_style(style);
+            self.map.request_redraw();
+        }
+    }
 }
 
 pub(crate) fn run() {
@@ -58,14 +114,34 @@ pub(crate) fn run() {
         _ => EventPropagation::Propagate,
     };
 
-    let map = MapBuilder::default().with_layer(layer).build();
-
-    galileo_egui::init(map, [Box::new(handler) as Box<dyn UserEventHandler>])
-        .expect("failed to initialize");
+    let map = MapBuilder::default().with_layer(layer.clone()).build();
+    galileo_egui::init_with_app(Box::new(|cc| {
+        Ok(Box::new(App::new(map, layer, cc, handler)))
+    }))
+    .expect("failed to initialize");
 }
 
 fn default_style() -> VectorTileStyle {
     serde_json::from_str(include_str!("data/vt_style.json")).expect("invalid style json")
+}
+
+fn gray_style() -> VectorTileStyle {
+    let style_str = r##"
+{
+  "rules": [
+  ],
+  "background": "#ffffffff",
+  "default_symbol": {
+    "line": {
+      "stroke_color": "#000000ff",
+      "width": 0.5
+    },
+    "polygon": {
+      "fill_color": "#999999ff"
+    }
+  }
+}"##;
+    serde_json::from_str(style_str).expect("invalid style json")
 }
 
 fn tile_schema() -> TileSchema {

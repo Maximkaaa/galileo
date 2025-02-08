@@ -19,7 +19,7 @@ georust = ["nalgebra", "geo-types", "geozero"]
 highlight_features = ["nalgebra"]
 lambert = ["nalgebra"]
 many_points = []
-vector_tiles = ["serde_json"]
+vector_tiles = ["serde_json", "eframe", "egui"]
 
 [dependencies]
 bincode = { workspace = true }

@@ -13,7 +13,7 @@ use crate::Color;
 /// Style of a vector tile layer. This specifies how each feature in a tile should be rendered.
 ///
 /// <div class="warning">This exact type is experimental and is likely to change in near future.</div>
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VectorTileStyle {
     /// Rules for feature to be drawn. Rules are traversed in sequence until a rule that corresponds to a current feature
     /// is found, and that rule is used for drawing. If no rule corresponds to the feature, default symbol is used.
@@ -30,7 +30,7 @@ pub struct VectorTileStyle {
 ///
 /// These symbols are applied to the features in the tile if no of the style rules are selected for
 /// this feature.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VectorTileDefaultSymbol {
     /// Symbol for point objects.
     pub point: Option<VectorTilePointSymbol>,
@@ -61,7 +61,7 @@ impl VectorTileStyle {
 }
 
 /// A rule that specifies what kind of features can be drawing with the given symbol.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StyleRule {
     /// If set, a feature must belong to the set layer. If not set, layer is not checked.
     pub layer_name: Option<String>,
@@ -76,7 +76,7 @@ pub struct StyleRule {
 /// Symbol of an object in a vector tile.
 ///
 /// An the object has incompatible type with the symbol, the object is not renderred.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum VectorTileSymbol {
     /// Do not render object.
     None,
@@ -131,7 +131,7 @@ impl VectorTileSymbol {
 }
 
 /// Symbol for point geometries.
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VectorTilePointSymbol {
     /// Size of the point.
     pub size: f64,
@@ -146,7 +146,7 @@ impl From<VectorTilePointSymbol> for PointPaint<'_> {
 }
 
 /// Symbol for line geometries.
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VectorTileLineSymbol {
     /// Width of the line in pixels.
     pub width: f64,
@@ -166,7 +166,7 @@ impl From<VectorTileLineSymbol> for LinePaint {
 }
 
 /// Symbol for polygon geometries.
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VectorTilePolygonSymbol {
     /// Color of the fill of polygon.
     pub fill_color: Color,
@@ -181,7 +181,7 @@ impl From<VectorTilePolygonSymbol> for PolygonPaint {
 }
 
 /// Symbol of a point geometry that is renderred as text label on the map.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VectorTileLabelSymbol {
     /// Text of the label with substitutes for feature attributes.
     pub pattern: String,
