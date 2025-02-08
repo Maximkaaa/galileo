@@ -19,7 +19,7 @@ use crate::render::text::font_service::FontServiceError;
 mod rustybuzz;
 
 /// Style of a text label on the map.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TextStyle {
     /// Name of the font to use.
     pub font_name: String,
@@ -41,7 +41,7 @@ fn default_font_color() -> Color {
 }
 
 /// Horizontal alignment.
-#[derive(Default, Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Copy, Clone, Serialize, Deserialize, PartialEq)]
 pub enum HorizontalAlignment {
     /// Align to left.
     Left,
@@ -53,7 +53,7 @@ pub enum HorizontalAlignment {
 }
 
 /// Vertical alignment.
-#[derive(Default, Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Copy, Clone, Serialize, Deserialize, PartialEq)]
 pub enum VerticalAlignment {
     /// Align to top.
     Top,
