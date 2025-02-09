@@ -8,11 +8,11 @@ use lyon::tessellation::VertexBuffers;
 use nalgebra::{Rotation3, Vector3};
 use wgpu::util::DeviceExt;
 use wgpu::{
-    Adapter, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Extent3d,
-    ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, Origin3d, Queue,
-    RenderPassDepthStencilAttachment, StoreOp, Surface, SurfaceConfiguration, SurfaceError,
-    SurfaceTexture, Texture, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat,
-    TextureUsages, TextureView, TextureViewDescriptor, WasmNotSendSync,
+    Adapter, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Extent3d, Origin3d,
+    Queue, RenderPassDepthStencilAttachment, StoreOp, Surface, SurfaceConfiguration, SurfaceError,
+    SurfaceTexture, TexelCopyBufferInfo, TexelCopyBufferLayout, TexelCopyTextureInfo, Texture,
+    TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
+    TextureViewDescriptor, WasmNotSendSync,
 };
 
 use super::render_bundle::tessellating::{ImageInfo, ImageStoreInfo};
@@ -37,8 +37,8 @@ const TARGET_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
 
 /// Render backend that uses `wgpu` crate to render the map.
 pub struct WgpuRenderer {
-    device: Arc<Device>,
-    queue: Arc<Queue>,
+    device: Device,
+    queue: Queue,
     render_set: Option<RenderSet>,
     background: Color,
 }
@@ -54,7 +54,7 @@ struct RenderSet {
 enum RenderTarget {
     Surface {
         config: SurfaceConfiguration,
-        surface: Arc<Surface<'static>>,
+        surface: Surface<'static>,
     },
     Texture(Texture, Size<u32>),
 }
@@ -122,8 +122,8 @@ impl WgpuRenderer {
         let (device, queue) = Self::create_device(&adapter).await;
 
         Some(Self {
-            device: Arc::new(device),
-            queue: Arc::new(queue),
+            device,
+            queue,
             render_set: None,
             background: DEFAULT_BACKGROUND,
         })
@@ -230,10 +230,7 @@ impl WgpuRenderer {
         surface.configure(&device, &config);
 
         Some(Self::new_with_device_and_surface(
-            Arc::new(device),
-            Arc::new(surface),
-            Arc::new(queue),
-            config,
+            device, surface, queue, config,
         ))
     }
 
@@ -295,9 +292,9 @@ impl WgpuRenderer {
 
     /// Creates a new renderer from the initialized wgpu structs.
     pub fn new_with_device_and_surface(
-        device: Arc<Device>,
-        surface: Arc<Surface<'static>>,
-        queue: Arc<Queue>,
+        device: Device,
+        surface: Surface<'static>,
+        queue: Queue,
         config: SurfaceConfiguration,
     ) -> Self {
         let render_target = RenderTarget::Surface { surface, config };
@@ -314,11 +311,7 @@ impl WgpuRenderer {
 
     /// Creates a new rendering using the given wgpu device and queue, and rendering to a texture
     /// with the given size.
-    pub fn new_with_device_and_texture(
-        device: Arc<Device>,
-        queue: Arc<Queue>,
-        size: Size<u32>,
-    ) -> Self {
+    pub fn new_with_device_and_texture(device: Device, queue: Queue, size: Size<u32>) -> Self {
         let mut renderer = Self {
             device,
             queue,
@@ -350,11 +343,9 @@ impl WgpuRenderer {
             }
         }
 
-        wgpu::Instance::new(wgpu::InstanceDescriptor {
+        wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends,
-            flags: Default::default(),
-            dx12_shader_compiler: Default::default(),
-            gles_minor_version: Default::default(),
+            ..Default::default()
         })
     }
 
@@ -459,10 +450,7 @@ impl WgpuRenderer {
         let config = Self::get_surface_configuration(&surface, &adapter, size);
         surface.configure(&self.device, &config);
 
-        let render_target = RenderTarget::Surface {
-            surface: Arc::new(surface),
-            config,
-        };
+        let render_target = RenderTarget::Surface { surface, config };
         self.init_render_set(render_target);
     }
 
@@ -541,15 +529,15 @@ impl WgpuRenderer {
 
         let mut encoder = self.device.create_command_encoder(&Default::default());
         encoder.copy_texture_to_buffer(
-            ImageCopyTexture {
+            TexelCopyTextureInfo {
                 aspect: TextureAspect::All,
                 texture,
                 mip_level: 0,
                 origin: Origin3d::ZERO,
             },
-            ImageCopyBuffer {
+            TexelCopyBufferInfo {
                 buffer: &buffer,
-                layout: ImageDataLayout {
+                layout: TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(size_of::<u32>() as u32 * size.width()),
                     rows_per_image: Some(size.height()),
