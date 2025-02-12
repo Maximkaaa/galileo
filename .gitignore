@@ -8,6 +8,9 @@ Cargo.lock
 # Ignore large sample files
 **/*.laz
 
+# Fonts for examples can be downloaded by running `just get_fonts`
+galileo/examples/data/fonts
+
 # Npm
 **/package-lock.json
 **/node_modules
