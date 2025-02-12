@@ -23,7 +23,7 @@ pub(crate) fn run() {
     };
 
     let mut provider = RustybuzzFontServiceProvider::default();
-    let font = include_bytes!("data/NotoSansAdlam-Regular.ttf");
+    let font = include_bytes!("data/fonts/NotoSans.ttf"); // Use `just get_fonts` to load fonts
     provider
         .load_fonts(Bytes::from_static(font))
         .expect("failed to load font");
