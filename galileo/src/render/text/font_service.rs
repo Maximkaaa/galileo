@@ -1,20 +1,15 @@
 //! Service for text rendering.
 
-use std::sync::Arc;
+use std::sync::OnceLock;
 
 use bytes::Bytes;
-use lazy_static::lazy_static;
 use nalgebra::Vector2;
-use parking_lot::RwLock;
 use rustybuzz::ttf_parser::FaceParsingError;
 use thiserror::Error;
 
-use crate::render::text::rustybuzz::RustybuzzFontServiceProvider;
 use crate::render::text::{FontServiceProvider, TextShaping, TextStyle};
 
-lazy_static! {
-    static ref INSTANCE: Arc<RwLock<FontService>> = Arc::new(RwLock::new(FontService::default()));
-}
+static INSTANCE: OnceLock<FontService> = OnceLock::new();
 
 /// Error from a font service
 #[derive(Debug, Error)]
@@ -26,6 +21,10 @@ pub enum FontServiceError {
     /// Font file not found
     #[error("font is not loaded")]
     FontNotFound,
+
+    /// Font service is not initialized
+    #[error("font service is not initialize")]
+    NotInitialized,
 }
 
 /// Provides common access to underlying text shaping engine implementation.
@@ -33,38 +32,35 @@ pub struct FontService {
     pub(crate) provider: Box<dyn FontServiceProvider + Send + Sync>,
 }
 
-impl Default for FontService {
-    fn default() -> Self {
-        Self {
-            provider: Box::new(RustybuzzFontServiceProvider::default()),
-        }
-    }
-}
-
 impl FontService {
-    /// Return a singleton instance of the service.
-    pub fn instance() -> Arc<RwLock<Self>> {
-        INSTANCE.clone()
+    /// Initailizes the font service with the given provider.
+    pub fn initialize(provider: impl FontServiceProvider + Send + Sync + 'static) {
+        if INSTANCE.get().is_some() {
+            log::warn!(
+                "Font service is already initialized. Second initialization call is ignored."
+            );
+        }
+
+        INSTANCE.get_or_init(|| Self {
+            provider: Box::new(provider),
+        });
     }
 
-    /// Execute the closure with the font service instance as an argument.
-    pub fn with<T>(f: impl FnOnce(&Self) -> T) -> T {
-        f(&INSTANCE.read())
-    }
-
-    /// Execute the closure with mutable reference to the font service instance as an argument.
-    pub fn with_mut<T>(f: impl FnOnce(&mut Self) -> T) -> T {
-        f(&mut INSTANCE.write())
+    fn instance() -> Option<&'static Self> {
+        INSTANCE.get()
     }
 
     /// Shape the given text input with the given style.
     pub fn shape(
-        &self,
         text: &str,
         style: &TextStyle,
         offset: Vector2<f32>,
     ) -> Result<TextShaping, FontServiceError> {
-        self.provider.shape(text, style, offset)
+        let Some(service) = Self::instance() else {
+            return Err(FontServiceError::NotInitialized);
+        };
+
+        service.provider.shape(text, style, offset)
     }
 
     /// Try parse input binary data to load fonts to the font service.

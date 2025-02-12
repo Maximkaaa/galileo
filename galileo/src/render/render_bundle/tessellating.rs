@@ -1029,43 +1029,37 @@ impl TessellatingRenderBundle {
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
-        FontService::with(
-            |font_service| match font_service.shape(text, style, offset) {
-                Ok(TextShaping::Tessellation { glyphs, .. }) => {
-                    let indices_start = self.screen_ref.indices.len();
+        match FontService::shape(text, style, offset) {
+            Ok(TextShaping::Tessellation { glyphs, .. }) => {
+                let indices_start = self.screen_ref.indices.len();
 
-                    for glyph in glyphs {
-                        let vertices_start = self.screen_ref.vertices.len() as u32;
-                        for vertex in glyph.vertices {
-                            self.screen_ref.vertices.push(ScreenRefVertex {
-                                position: [
-                                    position.x().as_(),
-                                    position.y().as_(),
-                                    position.z().as_(),
-                                ],
-                                normal: vertex,
-                                color: style.font_color.to_u8_array(),
-                            });
-                        }
-                        for index in glyph.indices {
-                            self.screen_ref.indices.push(index + vertices_start);
-                        }
+                for glyph in glyphs {
+                    let vertices_start = self.screen_ref.vertices.len() as u32;
+                    for vertex in glyph.vertices {
+                        self.screen_ref.vertices.push(ScreenRefVertex {
+                            position: [position.x().as_(), position.y().as_(), position.z().as_()],
+                            normal: vertex,
+                            color: style.font_color.to_u8_array(),
+                        });
                     }
-
-                    PrimitiveInfo::ScreenRef {
-                        vertex_range: indices_start..self.screen_ref.indices.len(),
+                    for index in glyph.indices {
+                        self.screen_ref.indices.push(index + vertices_start);
                     }
                 }
-                Err(err) => {
-                    log::error!("Error shaping text label: {err:?}");
-                    PrimitiveInfo::None
+
+                PrimitiveInfo::ScreenRef {
+                    vertex_range: indices_start..self.screen_ref.indices.len(),
                 }
-                _ => {
-                    log::error!("Not supported font type");
-                    PrimitiveInfo::None
-                }
-            },
-        )
+            }
+            Err(err) => {
+                log::error!("Error shaping text label: {err:?}");
+                PrimitiveInfo::None
+            }
+            _ => {
+                log::error!("Not supported font type");
+                PrimitiveInfo::None
+            }
+        }
     }
 }
 

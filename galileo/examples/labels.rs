@@ -10,7 +10,10 @@ use galileo::layer::FeatureLayer;
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
 use galileo::render::text::font_service::FontService;
-use galileo::render::text::{HorizontalAlignment, TextStyle, VerticalAlignment};
+use galileo::render::text::{
+    FontServiceProvider, HorizontalAlignment, RustybuzzFontServiceProvider, TextStyle,
+    VerticalAlignment,
+};
 use galileo::symbol::Symbol;
 use galileo::{Color, Map, MapBuilder};
 use galileo_egui::{EguiMap, EguiMapState};
@@ -187,12 +190,12 @@ pub(crate) fn run() {
 }
 
 fn create_map() -> Map {
-    FontService::with_mut(|service| {
-        let font = include_bytes!("data/NotoSansAdlam-Regular.ttf");
-        service
-            .load_fonts(Bytes::from_static(font))
-            .expect("failed to load font");
-    });
+    let mut provider = RustybuzzFontServiceProvider::default();
+    let font = include_bytes!("data/NotoSansAdlam-Regular.ttf");
+    provider
+        .load_fonts(Bytes::from_static(font))
+        .expect("failed to load font");
+    FontService::initialize(provider);
 
     let layer = RasterTileLayerBuilder::new_osm()
         .with_file_cache_checked(".tile_cache")

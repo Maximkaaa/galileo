@@ -17,6 +17,8 @@ use crate::render::text::font_service::FontServiceError;
 
 #[cfg(feature = "rustybuzz")]
 mod rustybuzz;
+#[cfg(feature = "rustybuzz")]
+pub use rustybuzz::RustybuzzFontServiceProvider;
 
 /// Style of a text label on the map.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

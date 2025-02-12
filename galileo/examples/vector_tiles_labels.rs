@@ -6,7 +6,7 @@ use galileo::layer::vector_tile_layer::style::{
 };
 use galileo::layer::vector_tile_layer::{VectorTileLayer, VectorTileLayerBuilder};
 use galileo::render::text::font_service::FontService;
-use galileo::render::text::TextStyle;
+use galileo::render::text::{FontServiceProvider, RustybuzzFontServiceProvider, TextStyle};
 use galileo::tile_schema::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Color, Lod, MapBuilder};
 use galileo_types::cartesian::{Point2d, Rect};
@@ -22,12 +22,12 @@ pub(crate) fn run() {
         panic!("Set the MapTiler API key into VT_API_KEY library when building this example");
     };
 
-    FontService::with_mut(|service| {
-        let font = include_bytes!("data/NotoSansAdlam-Regular.ttf");
-        service
-            .load_fonts(Bytes::from_static(font))
-            .expect("failed to load font");
-    });
+    let mut provider = RustybuzzFontServiceProvider::default();
+    let font = include_bytes!("data/NotoSansAdlam-Regular.ttf");
+    provider
+        .load_fonts(Bytes::from_static(font))
+        .expect("failed to load font");
+    FontService::initialize(provider);
 
     let graphics_layer = VectorTileLayerBuilder::new_rest(move |&index: &TileIndex| {
         format!(
