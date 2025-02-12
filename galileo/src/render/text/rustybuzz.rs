@@ -11,6 +11,7 @@ use rustybuzz::{Face, UnicodeBuffer};
 use crate::render::text::font_service::FontServiceError;
 use crate::render::text::{FontServiceProvider, TessellatedGlyph, TextShaping, TextStyle};
 
+/// Font service provider that uses RustyBuzz crate for text shaping and vectorization
 #[derive(Default)]
 pub struct RustybuzzFontServiceProvider {
     fonts_data: Vec<Bytes>,
