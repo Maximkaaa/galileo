@@ -209,6 +209,16 @@ impl<F> FeatureStore<F> {
         std::mem::take(&mut *updates)
     }
 
+    pub(super) fn reset(&self) {
+        let mut updates = self.pending_updates.lock();
+        for (index, entry) in self.features.iter().enumerate() {
+            entry.render_indices.lock().clear();
+            updates.push(FeatureUpdate::Update {
+                feature_index: index,
+            });
+        }
+    }
+
     /// Iterates over immutable containers of the features.
     pub fn iter(&self) -> impl Iterator<Item = FeatureContainer<F>> {
         self.features
