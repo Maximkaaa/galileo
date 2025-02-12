@@ -55,6 +55,10 @@ impl FeatureRenderStore {
         }
     }
 
+    pub fn reset(&self) -> Self {
+        Self::new(self.id, self.min_resolution, self.buffer_size_limit)
+    }
+
     fn has_not_full_bundles(&self) -> bool {
         self.render_bundles
             .iter()

@@ -182,6 +182,27 @@ where
     pub fn crs(&self) -> &Crs {
         &self.crs
     }
+
+    /// Changes the symbol of the layer.
+    pub fn set_symbol(&mut self, symbol: S) {
+        self.symbol = symbol;
+        self.drop_render_cache();
+        self.request_redraw();
+    }
+
+    fn drop_render_cache(&mut self) {
+        for lod in &mut self.lods {
+            let mut content = lod.contents.lock();
+            *content = content.reset();
+        }
+        self.features.reset();
+    }
+
+    fn request_redraw(&self) {
+        if let Some(messenger) = self.messenger.read().as_ref() {
+            messenger.request_redraw();
+        }
+    }
 }
 
 impl<P, F, S> FeatureLayer<P, F, S, GeoSpace2d>
