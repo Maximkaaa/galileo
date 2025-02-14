@@ -83,21 +83,24 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
         let glyph_buffer = rustybuzz::shape(&face, &[], buffer);
         let mut tessellations = vec![];
 
-        let mut advance_x = 0;
-        let mut advance_y = 0;
+        let mut advance_x = 0.0;
+        let mut advance_y = 0.0;
+
         for index in 0..glyph_buffer.len() {
             let position = glyph_buffer.glyph_positions()[index];
             let glyph_info = glyph_buffer.glyph_infos()[index];
 
             let mut path_builder = GlyphPathBuilder::new(scale);
             face.outline_glyph(GlyphId(glyph_info.glyph_id as u16), &mut path_builder);
-            tessellations.push(path_builder.tessellate(Vector2::new(
-                offset.x + (position.x_offset + advance_x) as f32 * scale,
-                offset.y + (position.y_offset + advance_y) as f32 * scale,
-            )));
 
-            advance_x += position.x_advance;
-            advance_y += position.y_advance;
+            let snapped_x = (position.x_offset as f32 * scale + advance_x).round();
+            let snapped_y = (position.y_offset as f32 * scale + advance_y).round();
+            tessellations.push(
+                path_builder.tessellate(Vector2::new(offset.x + snapped_x, offset.y + snapped_y)),
+            );
+
+            advance_x += position.x_advance as f32 * scale;
+            advance_y += position.y_advance as f32 * scale;
         }
 
         Ok(TextShaping::Tessellation {

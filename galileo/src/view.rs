@@ -165,7 +165,10 @@ impl MapView {
         }
 
         let position = self.projected_position?;
-        let translate = Translation3::new(-position.x, -position.y, -position.z).to_homogeneous();
+        let x = (position.x / self.resolution).round() * self.resolution;
+        let y = (position.y / self.resolution).round() * self.resolution;
+        let z = (position.z / self.resolution).round() * self.resolution;
+        let translate = Translation3::new(-x, -y, -z).to_homogeneous();
         let rotation_x = Rotation3::new(Vector3::new(-self.rotation_x, 0.0, 0.0)).to_homogeneous();
         let rotation_z = Rotation3::new(Vector3::new(0.0, 0.0, self.rotation_z)).to_homogeneous();
 
