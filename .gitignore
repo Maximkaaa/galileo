@@ -4,6 +4,7 @@ target
 galileo/pkg
 Cargo.lock
 .env
+.cargo
 
 # Ignore large sample files
 **/*.laz
@@ -18,3 +19,4 @@ galileo/examples/data/fonts
 
 # ctags
 tags
+

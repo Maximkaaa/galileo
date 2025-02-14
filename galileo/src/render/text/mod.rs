@@ -24,7 +24,7 @@ pub use rustybuzz::RustybuzzFontServiceProvider;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TextStyle {
     /// Name of the font to use.
-    pub font_name: String,
+    pub font_family: Vec<String>,
     /// Size of the font in pixels.
     pub font_size: f32,
     /// Color of the font.

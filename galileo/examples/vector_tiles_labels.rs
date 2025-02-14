@@ -1,5 +1,8 @@
 //! This examples shows how to render labels for vector tile points.
 
+use std::fs::File;
+use std::io::Read;
+
 use bytes::Bytes;
 use galileo::layer::vector_tile_layer::style::{
     VectorTileDefaultSymbol, VectorTileLabelSymbol, VectorTileStyle,
@@ -22,12 +25,7 @@ pub(crate) fn run() {
         panic!("Set the MapTiler API key into VT_API_KEY library when building this example");
     };
 
-    let mut provider = RustybuzzFontServiceProvider::default();
-    let font = include_bytes!("data/fonts/NotoSans.ttf"); // Use `just get_fonts` to load fonts
-    provider
-        .load_fonts(Bytes::from_static(font))
-        .expect("failed to load font");
-    FontService::initialize(provider);
+    initialize_font_service();
 
     let graphics_layer = VectorTileLayerBuilder::new_rest(move |&index: &TileIndex| {
         format!(
@@ -47,9 +45,16 @@ pub(crate) fn run() {
         rules: vec![],
         default_symbol: VectorTileDefaultSymbol {
             label: Some(VectorTileLabelSymbol {
-                pattern: "{name_en}".into(),
+                pattern: "{name}".into(),
                 text_style: TextStyle {
-                    font_name: "Noto Sans".to_string(),
+                    font_family: vec![
+                        "Noto Sans".to_string(),
+                        "Noto Sans Arabic".to_string(),
+                        "Noto Sans Hebrew".to_string(),
+                        "Noto Sans SC".to_string(),
+                        "Noto Sans KR".to_string(),
+                        "Noto Sans JP".to_string(),
+                    ],
                     font_size: 12.0,
                     font_color: Color::BLACK,
                     horizontal_alignment: Default::default(),
@@ -73,6 +78,32 @@ pub(crate) fn run() {
         .build();
 
     galileo_egui::init(map, []).expect("failed to initialize");
+}
+
+fn initialize_font_service() {
+    const FONTS: [&str; 6] = [
+        "galileo/examples/data/fonts/NotoSans.ttf",
+        "galileo/examples/data/fonts/NotoSansArabic.ttf",
+        "galileo/examples/data/fonts/NotoSansHebrew.ttf",
+        "galileo/examples/data/fonts/NotoSansJP.ttf",
+        "galileo/examples/data/fonts/NotoSansKR.ttf",
+        "galileo/examples/data/fonts/NotoSansSC.ttf",
+    ];
+    let mut provider = RustybuzzFontServiceProvider::default();
+
+    for font_path in FONTS {
+        let mut font_data = vec![];
+        File::open(font_path)
+            .unwrap_or_else(|e| panic!("failed to open font file {font_path}: {e}"))
+            .read_to_end(&mut font_data)
+            .expect("failed to read font file");
+
+        provider
+            .load_fonts(Bytes::from_owner(font_data))
+            .expect("failed to load font");
+    }
+
+    FontService::initialize(provider);
 }
 
 fn default_style() -> VectorTileStyle {

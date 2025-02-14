@@ -1,27 +1,59 @@
+use ahash::HashMap;
 use bytes::Bytes;
+use font_query::{Database, Query, Stretch, Style, Weight, ID};
 use lyon::lyon_tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor, VertexBuffers,
 };
 use lyon::path::path::Builder;
 use lyon::path::Path;
 use nalgebra::Vector2;
-use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder};
-use rustybuzz::{Face, UnicodeBuffer};
+use owned_ttf_parser::{AsFaceRef, OwnedFace};
+use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder, Tag};
+use rustybuzz::UnicodeBuffer;
 
 use crate::render::text::font_service::FontServiceError;
 use crate::render::text::{FontServiceProvider, TessellatedGlyph, TextShaping, TextStyle};
 
-/// Font service provider that uses RustyBuzz crate for text shaping and vectorization
+/// Font service provider that uses `rustybuzz` crate to shape and vectorize text
 #[derive(Default)]
 pub struct RustybuzzFontServiceProvider {
-    fonts_data: Vec<Bytes>,
+    font_db: Database,
+    loaded_faces: HashMap<ID, OwnedFace>,
 }
 
 impl RustybuzzFontServiceProvider {
-    fn select_face(&self, _buffer: &UnicodeBuffer) -> Option<Face<'_>> {
-        // todo
-        let fonts_data = self.fonts_data.first()?;
-        Face::from_slice(fonts_data, 0)
+    fn select_face(&self, text: &str, style: &TextStyle) -> Option<&OwnedFace> {
+        let query = Query {
+            families: &style
+                .font_family
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            weight: Weight::NORMAL,
+            stretch: Stretch::Normal,
+            style: Style::Normal,
+        };
+
+        let matches = self.font_db.query(&query);
+
+        let mut last_face = None;
+        for face_id in matches {
+            let Some(face) = self.loaded_faces.get(&face_id) else {
+                continue;
+            };
+
+            let Some(first_char) = text.chars().next() else {
+                return Some(face);
+            };
+
+            if face.as_face_ref().glyph_index(first_char).is_some() {
+                return Some(face);
+            } else {
+                last_face = Some(face);
+            }
+        }
+
+        last_face
     }
 }
 
@@ -36,9 +68,14 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
         buffer.push_str(text);
         buffer.guess_segment_properties();
 
-        let Some(face) = self.select_face(&buffer) else {
+        let Some(face) = self.select_face(text, style) else {
             return Err(FontServiceError::FontNotFound);
         };
+
+        let mut face = rustybuzz::Face::from_face(face.as_face_ref().clone());
+
+        face.set_variation(Tag::from_bytes(b"wght"), 400.0);
+        face.set_variation(Tag::from_bytes(b"wdth"), 1.0);
 
         let units = face.units_per_em() as f32;
         let scale = style.font_size / units;
@@ -69,7 +106,13 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
     }
 
     fn load_fonts(&mut self, fonts_data: Bytes) -> Result<(), FontServiceError> {
-        self.fonts_data.push(fonts_data);
+        let face_ids = self.font_db.load_font_data(fonts_data.to_vec());
+
+        for face_index in 0..face_ids.len() {
+            let face = OwnedFace::from_vec(fonts_data.to_vec(), face_index as u32)?;
+            self.loaded_faces.insert(face_ids[face_index], face);
+        }
+
         Ok(())
     }
 }
@@ -87,7 +130,7 @@ impl GlyphPathBuilder {
         if tessellator
             .tessellate(
                 &self.builder.build(),
-                &FillOptions::default(),
+                &FillOptions::default().with_fill_rule(lyon::path::FillRule::NonZero),
                 &mut BuffersBuilder::new(&mut buffers, vertex_constructor),
             )
             .is_ok()

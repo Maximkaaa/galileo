@@ -28,6 +28,7 @@ base64 = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 bytes = { workspace = true }
 cfg-if = { workspace = true }
+font-query = { workspace = true }
 futures-intrusive = { workspace = true }
 galileo-mvt = { workspace = true }
 galileo-types = { workspace = true }
@@ -39,8 +40,9 @@ log = { workspace = true }
 lyon = { workspace = true }
 nalgebra = { workspace = true }
 num-traits = { workspace = true }
-quick_cache = { workspace = true }
+owned_ttf_parser = { workspace = true }
 parking_lot = { workspace = true }
+quick_cache = { workspace = true }
 raw-window-handle = { workspace = true, optional = true }
 rustybuzz = { workspace = true, optional = true }
 serde = { workspace = true, optional = true, features = ["std", "derive", "rc"] }
