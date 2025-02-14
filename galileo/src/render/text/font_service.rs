@@ -33,7 +33,7 @@ pub struct FontService {
 }
 
 impl FontService {
-    /// Initailizes the font service with the given provider.
+    /// Initializes the font service with the given provider.
     pub fn initialize(provider: impl FontServiceProvider + Send + Sync + 'static) {
         if INSTANCE.get().is_some() {
             log::warn!(

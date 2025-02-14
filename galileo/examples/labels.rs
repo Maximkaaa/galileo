@@ -1,5 +1,7 @@
 //! Labels in feature layers
 
+use std::fs::File;
+use std::io::Read;
 use std::sync::Arc;
 
 use bytes::Bytes;
@@ -60,7 +62,7 @@ impl EguiMapApp {
     fn update_symbol(&mut self) {
         let symbol = LabeledSymbol {
             style: TextStyle {
-                font_name: "Noto Sans".to_string(),
+                font_family: LabeledSymbol::new().style.font_family,
                 font_size: self.font_size,
                 font_color: Color::BLACK,
                 horizontal_alignment: self.horizontal_align,
@@ -184,19 +186,39 @@ fn main() {
 }
 
 pub(crate) fn run() {
+    initialize_font_service();
     let map = create_map();
     galileo_egui::init_with_app(Box::new(|cc| Ok(Box::new(EguiMapApp::new(map, cc)))))
         .expect("failed to initialize");
 }
 
-fn create_map() -> Map {
+fn initialize_font_service() {
+    const FONTS: [&str; 6] = [
+        "galileo/examples/data/fonts/NotoSans.ttf",
+        "galileo/examples/data/fonts/NotoSansArabic.ttf",
+        "galileo/examples/data/fonts/NotoSansHebrew.ttf",
+        "galileo/examples/data/fonts/NotoSansJP.ttf",
+        "galileo/examples/data/fonts/NotoSansKR.ttf",
+        "galileo/examples/data/fonts/NotoSansSC.ttf",
+    ];
     let mut provider = RustybuzzFontServiceProvider::default();
-    let font = include_bytes!("data/fonts/NotoSans.ttf"); // Use `just get_fonts` to load fonts
-    provider
-        .load_fonts(Bytes::from_static(font))
-        .expect("failed to load font");
-    FontService::initialize(provider);
 
+    for font_path in FONTS {
+        let mut font_data = vec![];
+        File::open(font_path)
+            .unwrap_or_else(|e| panic!("failed to open font file {font_path}: {e}"))
+            .read_to_end(&mut font_data)
+            .expect("failed to read font file");
+
+        provider
+            .load_fonts(Bytes::from_owner(font_data))
+            .expect("failed to load font");
+    }
+
+    FontService::initialize(provider);
+}
+
+fn create_map() -> Map {
     let layer = RasterTileLayerBuilder::new_osm()
         .with_file_cache_checked(".tile_cache")
         .build()
@@ -263,7 +285,14 @@ impl LabeledSymbol {
     fn new() -> Self {
         Self {
             style: TextStyle {
-                font_name: "Noto Sans".to_string(),
+                font_family: vec![
+                    "Noto Sans".to_string(),
+                    "Noto Sans Arabic".to_string(),
+                    "Noto Sans Hebrew".to_string(),
+                    "Noto Sans SC".to_string(),
+                    "Noto Sans KR".to_string(),
+                    "Noto Sans JP".to_string(),
+                ],
                 font_size: 20.0,
                 font_color: Color::BLACK,
                 horizontal_alignment: Default::default(),
