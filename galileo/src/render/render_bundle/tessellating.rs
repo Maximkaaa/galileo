@@ -1038,8 +1038,8 @@ impl TessellatingRenderBundle {
                     for vertex in glyph.vertices {
                         self.screen_ref.vertices.push(ScreenRefVertex {
                             position: [position.x().as_(), position.y().as_(), position.z().as_()],
-                            normal: vertex,
-                            color: style.font_color.to_u8_array(),
+                            normal: vertex.position,
+                            color: vertex.color.to_u8_array(),
                         });
                     }
                     for index in glyph.indices {

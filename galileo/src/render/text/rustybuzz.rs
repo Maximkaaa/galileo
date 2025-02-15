@@ -5,12 +5,15 @@ use lyon::lyon_tessellation::{
 };
 use lyon::path::path::Builder;
 use lyon::path::Path;
+use lyon::tessellation::{StrokeOptions, StrokeTessellator, StrokeVertexConstructor};
 use nalgebra::Vector2;
 use rustybuzz::ttf_parser::{self, GlyphId, OutlineBuilder, Tag};
 use rustybuzz::{Direction, UnicodeBuffer};
 
+use super::GlyphVertex;
 use crate::render::text::font_service::FontServiceError;
 use crate::render::text::{FontServiceProvider, TessellatedGlyph, TextShaping, TextStyle};
+use crate::Color;
 
 /// Font service provider that uses `rustybuzz` crate to shape and vectorize text
 #[derive(Default)]
@@ -88,7 +91,8 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
                     Direction::TopToBottom | Direction::BottomToTop
                 );
                 let glyph_buffer = rustybuzz::shape(&face, &[], buffer);
-                let mut tessellations = vec![];
+                let mut fill = vec![];
+                let mut outline = vec![];
 
                 let (width, height) = if is_vertical {
                     let width = face.units_per_em();
@@ -135,16 +139,25 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
 
                     let snapped_x = (position.x_offset as f32 * scale + advance_x).round();
                     let snapped_y = (position.y_offset as f32 * scale + advance_y).round();
-                    tessellations.push(
-                        path_builder
-                            .tessellate(Vector2::new(offset_x + snapped_x, offset_y + snapped_y)),
-                    );
+
+                    let glyph_position = Vector2::new(offset_x + snapped_x, offset_y + snapped_y);
+
+                    if style.outline_width > 0.0 && !style.outline_color.is_transparent() {
+                        outline.push(path_builder.clone().tessellate_outline(
+                            glyph_position,
+                            style.outline_width,
+                            style.outline_color,
+                        ));
+                    }
+
+                    fill.push(path_builder.tessellate_fill(glyph_position, style.font_color));
 
                     advance_x += position.x_advance as f32 * scale;
                     advance_y += position.y_advance as f32 * scale;
                 }
 
-                Some(tessellations)
+                outline.append(&mut fill);
+                Some(outline)
             })
             .flatten()
             .ok_or(FontServiceError::FontNotFound)?;
@@ -160,20 +173,47 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
     }
 }
 
+#[derive(Clone)]
 struct GlyphPathBuilder {
     builder: Builder,
     scale: f32,
 }
 
 impl GlyphPathBuilder {
-    fn tessellate(self, offset: Vector2<f32>) -> TessellatedGlyph {
-        let vertex_constructor = GlyphVertexConstructor { offset };
+    fn tessellate_fill(self, offset: Vector2<f32>, color: Color) -> TessellatedGlyph {
+        let vertex_constructor = GlyphVertexConstructor { offset, color };
         let mut tessellator = FillTessellator::new();
-        let mut buffers: VertexBuffers<[f32; 2], u32> = VertexBuffers::new();
+        let mut buffers: VertexBuffers<GlyphVertex, u32> = VertexBuffers::new();
         if tessellator
             .tessellate(
                 &self.builder.build(),
                 &FillOptions::default().with_fill_rule(lyon::path::FillRule::NonZero),
+                &mut BuffersBuilder::new(&mut buffers, vertex_constructor),
+            )
+            .is_ok()
+        {
+            TessellatedGlyph {
+                vertices: buffers.vertices,
+                indices: buffers.indices,
+            }
+        } else {
+            invalid_glyph_substitution()
+        }
+    }
+
+    fn tessellate_outline(
+        self,
+        offset: Vector2<f32>,
+        width: f32,
+        color: Color,
+    ) -> TessellatedGlyph {
+        let vertex_constructor = GlyphVertexConstructor { offset, color };
+        let mut tessellator = StrokeTessellator::new();
+        let mut buffers: VertexBuffers<GlyphVertex, u32> = VertexBuffers::new();
+        if tessellator
+            .tessellate(
+                &self.builder.build(),
+                &StrokeOptions::default().with_line_width(width),
                 &mut BuffersBuilder::new(&mut buffers, vertex_constructor),
             )
             .is_ok()
@@ -234,13 +274,29 @@ impl OutlineBuilder for GlyphPathBuilder {
 
 struct GlyphVertexConstructor {
     offset: Vector2<f32>,
+    color: Color,
 }
 
-impl FillVertexConstructor<[f32; 2]> for GlyphVertexConstructor {
-    fn new_vertex(&mut self, vertex: FillVertex) -> [f32; 2] {
-        [
-            vertex.position().x + self.offset.x,
-            vertex.position().y + self.offset.y,
-        ]
+impl FillVertexConstructor<GlyphVertex> for GlyphVertexConstructor {
+    fn new_vertex(&mut self, vertex: FillVertex) -> GlyphVertex {
+        GlyphVertex {
+            position: [
+                vertex.position().x + self.offset.x,
+                vertex.position().y + self.offset.y,
+            ],
+            color: self.color,
+        }
+    }
+}
+
+impl StrokeVertexConstructor<GlyphVertex> for GlyphVertexConstructor {
+    fn new_vertex(&mut self, vertex: lyon::tessellation::StrokeVertex) -> GlyphVertex {
+        GlyphVertex {
+            position: [
+                vertex.position().x + self.offset.x,
+                vertex.position().y + self.offset.y,
+            ],
+            color: self.color,
+        }
     }
 }

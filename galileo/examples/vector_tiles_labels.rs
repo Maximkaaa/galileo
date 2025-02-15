@@ -61,6 +61,8 @@ pub(crate) fn run() {
                     vertical_alignment: Default::default(),
                     weight: Default::default(),
                     style: Default::default(),
+                    outline_width: 2.0,
+                    outline_color: Color::WHITE,
                 },
             }),
             ..Default::default()
