@@ -137,10 +137,12 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
                     let mut path_builder = GlyphPathBuilder::new(scale);
                     face.outline_glyph(GlyphId(glyph_info.glyph_id as u16), &mut path_builder);
 
-                    let snapped_x = (position.x_offset as f32 * scale + advance_x).round();
-                    let snapped_y = (position.y_offset as f32 * scale + advance_y).round();
+                    let snapped_x =
+                        (position.x_offset as f32 * scale + advance_x + offset_x).round();
+                    let snapped_y =
+                        (position.y_offset as f32 * scale + advance_y + offset_y).round();
 
-                    let glyph_position = Vector2::new(offset_x + snapped_x, offset_y + snapped_y);
+                    let glyph_position = Vector2::new(snapped_x, snapped_y);
 
                     if style.outline_width > 0.0 && !style.outline_color.is_transparent() {
                         outline.push(path_builder.clone().tessellate_outline(

@@ -9,7 +9,9 @@ use galileo::layer::vector_tile_layer::style::{
 };
 use galileo::layer::vector_tile_layer::{VectorTileLayer, VectorTileLayerBuilder};
 use galileo::render::text::font_service::FontService;
-use galileo::render::text::{FontServiceProvider, RustybuzzFontServiceProvider, TextStyle};
+use galileo::render::text::{
+    FontServiceProvider, FontWeight, RustybuzzFontServiceProvider, TextStyle,
+};
 use galileo::tile_schema::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Color, Lod, MapBuilder};
 use galileo_types::cartesian::{Point2d, Rect};
@@ -59,7 +61,7 @@ pub(crate) fn run() {
                     font_color: Color::BLACK,
                     horizontal_alignment: Default::default(),
                     vertical_alignment: Default::default(),
-                    weight: Default::default(),
+                    weight: FontWeight::BOLD,
                     style: Default::default(),
                     outline_width: 2.0,
                     outline_color: Color::WHITE,
