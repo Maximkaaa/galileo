@@ -7,7 +7,7 @@ use lyon::path::path::Builder;
 use lyon::path::Path;
 use nalgebra::Vector2;
 use rustybuzz::ttf_parser::{self, GlyphId, OutlineBuilder, Tag};
-use rustybuzz::UnicodeBuffer;
+use rustybuzz::{Direction, UnicodeBuffer};
 
 use crate::render::text::font_service::FontServiceError;
 use crate::render::text::{FontServiceProvider, TessellatedGlyph, TextShaping, TextStyle};
@@ -83,8 +83,45 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
                 let units = face.units_per_em() as f32;
                 let scale = style.font_size / units;
 
+                let is_vertical = matches!(
+                    buffer.direction(),
+                    Direction::TopToBottom | Direction::BottomToTop
+                );
                 let glyph_buffer = rustybuzz::shape(&face, &[], buffer);
                 let mut tessellations = vec![];
+
+                let (width, height) = if is_vertical {
+                    let width = face.units_per_em();
+                    let height = glyph_buffer
+                        .glyph_positions()
+                        .iter()
+                        .fold(0, |aggr, glyph| aggr + glyph.y_advance);
+                    (width as f32, height as f32)
+                } else {
+                    let width = glyph_buffer
+                        .glyph_positions()
+                        .iter()
+                        .fold(0, |aggr, glyph| aggr + glyph.x_advance);
+                    let height = face.ascender() + face.descender();
+                    (width as f32, height as f32)
+                };
+
+                let width = width * scale;
+                let height = height * scale;
+
+                let offset_x = offset.x
+                    + match style.horizontal_alignment {
+                        super::HorizontalAlignment::Left => 0.0,
+                        super::HorizontalAlignment::Center => -width / 2.0,
+                        super::HorizontalAlignment::Right => -width,
+                    };
+
+                let offset_y = offset.y
+                    + match style.vertical_alignment {
+                        super::VerticalAlignment::Top => -height,
+                        super::VerticalAlignment::Middle => -height / 2.0,
+                        super::VerticalAlignment::Bottom => 0.0,
+                    };
 
                 let mut advance_x = 0.0;
                 let mut advance_y = 0.0;
@@ -100,7 +137,7 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
                     let snapped_y = (position.y_offset as f32 * scale + advance_y).round();
                     tessellations.push(
                         path_builder
-                            .tessellate(Vector2::new(offset.x + snapped_x, offset.y + snapped_y)),
+                            .tessellate(Vector2::new(offset_x + snapped_x, offset_y + snapped_y)),
                     );
 
                     advance_x += position.x_advance as f32 * scale;
