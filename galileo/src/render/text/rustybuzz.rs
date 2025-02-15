@@ -1,14 +1,12 @@
-use ahash::HashMap;
 use bytes::Bytes;
-use font_query::{Database, Query, Stretch, Style, Weight, ID};
+use font_query::{Database, Query, Stretch, Style, Weight, ID as FaceId};
 use lyon::lyon_tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor, VertexBuffers,
 };
 use lyon::path::path::Builder;
 use lyon::path::Path;
 use nalgebra::Vector2;
-use owned_ttf_parser::{AsFaceRef, OwnedFace};
-use rustybuzz::ttf_parser::{GlyphId, OutlineBuilder, Tag};
+use rustybuzz::ttf_parser::{self, GlyphId, OutlineBuilder, Tag};
 use rustybuzz::UnicodeBuffer;
 
 use crate::render::text::font_service::FontServiceError;
@@ -18,11 +16,10 @@ use crate::render::text::{FontServiceProvider, TessellatedGlyph, TextShaping, Te
 #[derive(Default)]
 pub struct RustybuzzFontServiceProvider {
     font_db: Database,
-    loaded_faces: HashMap<ID, OwnedFace>,
 }
 
 impl RustybuzzFontServiceProvider {
-    fn select_face(&self, text: &str, style: &TextStyle) -> Option<&OwnedFace> {
+    fn select_face(&self, text: &str, style: &TextStyle) -> Option<FaceId> {
         let query = Query {
             families: &style
                 .font_family
@@ -37,19 +34,21 @@ impl RustybuzzFontServiceProvider {
         let matches = self.font_db.query(&query);
 
         let mut last_face = None;
+        let first_char = text.chars().next()?;
+
         for face_id in matches {
-            let Some(face) = self.loaded_faces.get(&face_id) else {
-                continue;
-            };
-
-            let Some(first_char) = text.chars().next() else {
-                return Some(face);
-            };
-
-            if face.as_face_ref().glyph_index(first_char).is_some() {
-                return Some(face);
+            if self
+                .font_db
+                .with_face_data(face_id, |data, index| {
+                    let face = ttf_parser::Face::parse(data, index).ok()?;
+                    Some(face.glyph_index(first_char).is_some())
+                })
+                .flatten()
+                == Some(true)
+            {
+                return Some(face_id);
             } else {
-                last_face = Some(face);
+                last_face = Some(face_id);
             }
         }
 
@@ -68,40 +67,50 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
         buffer.push_str(text);
         buffer.guess_segment_properties();
 
-        let Some(face) = self.select_face(text, style) else {
+        let Some(face_id) = self.select_face(text, style) else {
             return Err(FontServiceError::FontNotFound);
         };
 
-        let mut face = rustybuzz::Face::from_face(face.as_face_ref().clone());
+        let tessellations = self
+            .font_db
+            .with_face_data(face_id, |data, index| {
+                let face = ttf_parser::Face::parse(data, index).ok()?;
+                let mut face = rustybuzz::Face::from_face(face);
 
-        face.set_variation(Tag::from_bytes(b"wght"), 400.0);
-        face.set_variation(Tag::from_bytes(b"wdth"), 1.0);
+                face.set_variation(Tag::from_bytes(b"wght"), 400.0);
+                face.set_variation(Tag::from_bytes(b"wdth"), 1.0);
 
-        let units = face.units_per_em() as f32;
-        let scale = style.font_size / units;
+                let units = face.units_per_em() as f32;
+                let scale = style.font_size / units;
 
-        let glyph_buffer = rustybuzz::shape(&face, &[], buffer);
-        let mut tessellations = vec![];
+                let glyph_buffer = rustybuzz::shape(&face, &[], buffer);
+                let mut tessellations = vec![];
 
-        let mut advance_x = 0.0;
-        let mut advance_y = 0.0;
+                let mut advance_x = 0.0;
+                let mut advance_y = 0.0;
 
-        for index in 0..glyph_buffer.len() {
-            let position = glyph_buffer.glyph_positions()[index];
-            let glyph_info = glyph_buffer.glyph_infos()[index];
+                for index in 0..glyph_buffer.len() {
+                    let position = glyph_buffer.glyph_positions()[index];
+                    let glyph_info = glyph_buffer.glyph_infos()[index];
 
-            let mut path_builder = GlyphPathBuilder::new(scale);
-            face.outline_glyph(GlyphId(glyph_info.glyph_id as u16), &mut path_builder);
+                    let mut path_builder = GlyphPathBuilder::new(scale);
+                    face.outline_glyph(GlyphId(glyph_info.glyph_id as u16), &mut path_builder);
 
-            let snapped_x = (position.x_offset as f32 * scale + advance_x).round();
-            let snapped_y = (position.y_offset as f32 * scale + advance_y).round();
-            tessellations.push(
-                path_builder.tessellate(Vector2::new(offset.x + snapped_x, offset.y + snapped_y)),
-            );
+                    let snapped_x = (position.x_offset as f32 * scale + advance_x).round();
+                    let snapped_y = (position.y_offset as f32 * scale + advance_y).round();
+                    tessellations.push(
+                        path_builder
+                            .tessellate(Vector2::new(offset.x + snapped_x, offset.y + snapped_y)),
+                    );
 
-            advance_x += position.x_advance as f32 * scale;
-            advance_y += position.y_advance as f32 * scale;
-        }
+                    advance_x += position.x_advance as f32 * scale;
+                    advance_y += position.y_advance as f32 * scale;
+                }
+
+                Some(tessellations)
+            })
+            .flatten()
+            .ok_or(FontServiceError::FontNotFound)?;
 
         Ok(TextShaping::Tessellation {
             glyphs: tessellations,
@@ -109,13 +118,7 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
     }
 
     fn load_fonts(&mut self, fonts_data: Bytes) -> Result<(), FontServiceError> {
-        let face_ids = self.font_db.load_font_data(fonts_data.to_vec());
-
-        for face_index in 0..face_ids.len() {
-            let face = OwnedFace::from_vec(fonts_data.to_vec(), face_index as u32)?;
-            self.loaded_faces.insert(face_ids[face_index], face);
-        }
-
+        self.font_db.load_font_data(fonts_data.to_vec());
         Ok(())
     }
 }
