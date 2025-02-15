@@ -42,10 +42,20 @@ pub struct TextStyle {
     /// sTyle of the font.
     #[serde(default)]
     pub style: FontStyle,
+    /// Width of the outline around the letters.
+    #[serde(default)]
+    pub outline_width: f32,
+    /// Color of the outline around the letters.
+    #[serde(default = "default_outline_color")]
+    pub outline_color: Color,
 }
 
 fn default_font_color() -> Color {
     Color::BLACK
+}
+
+fn default_outline_color() -> Color {
+    Color::TRANSPARENT
 }
 
 /// Horizontal alignment.
@@ -84,10 +94,20 @@ pub enum TextShaping {
     Raster,
 }
 
+/// Vertex of a vectorized glyph
+#[derive(Debug, Copy, Clone)]
+pub struct GlyphVertex {
+    /// Coordinate of the vertex (pixels)
+    pub position: [f32; 2],
+    /// Color of the vertex
+    pub color: Color,
+}
+
 /// Tessellation of a single font glyph.
+#[derive(Debug, Clone)]
 pub struct TessellatedGlyph {
     /// Vertices.
-    pub vertices: Vec<[f32; 2]>,
+    pub vertices: Vec<GlyphVertex>,
     /// Indices.
     pub indices: Vec<u32>,
 }

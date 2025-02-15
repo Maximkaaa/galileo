@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use eframe::CreationContext;
+use egui::Color32;
 use galileo::layer::feature_layer::Feature;
 use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::layer::FeatureLayer;
@@ -34,6 +35,8 @@ struct EguiMapApp {
     vertical_align: VerticalAlignment,
     is_bold: bool,
     is_italic: bool,
+    outline_width: f32,
+    outline_color: Color32,
 }
 
 impl EguiMapApp {
@@ -56,6 +59,8 @@ impl EguiMapApp {
             vertical_align: VerticalAlignment::Middle,
             is_bold: false,
             is_italic: false,
+            outline_width: 0.0,
+            outline_color: Color32::WHITE,
         }
     }
 
@@ -78,6 +83,13 @@ impl EguiMapApp {
                 vertical_alignment: self.vertical_align,
                 weight,
                 style,
+                outline_width: self.outline_width,
+                outline_color: Color::rgba(
+                    self.outline_color.r(),
+                    self.outline_color.g(),
+                    self.outline_color.b(),
+                    self.outline_color.a(),
+                ),
             },
         };
 
@@ -183,6 +195,27 @@ impl eframe::App for EguiMapApp {
 
                     if ui.selectable_label(self.is_italic, "Italic").clicked() {
                         self.is_italic = !self.is_italic;
+                        self.update_symbol();
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Outline");
+                    if ui
+                        .add(
+                            egui::DragValue::new(&mut self.outline_width)
+                                .speed(0.01)
+                                .range(0.0..=5.0),
+                        )
+                        .changed()
+                    {
+                        self.update_symbol();
+                    }
+
+                    if ui
+                        .color_edit_button_srgba(&mut self.outline_color)
+                        .changed()
+                    {
                         self.update_symbol();
                     }
                 });
@@ -311,6 +344,8 @@ impl LabeledSymbol {
                 vertical_alignment: Default::default(),
                 weight: Default::default(),
                 style: Default::default(),
+                outline_width: Default::default(),
+                outline_color: Default::default(),
             },
         }
     }
