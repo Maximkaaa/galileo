@@ -13,8 +13,8 @@ use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderPrimitive;
 use galileo::render::text::font_service::FontService;
 use galileo::render::text::{
-    FontServiceProvider, HorizontalAlignment, RustybuzzFontServiceProvider, TextStyle,
-    VerticalAlignment,
+    FontServiceProvider, FontStyle, FontWeight, HorizontalAlignment, RustybuzzFontServiceProvider,
+    TextStyle, VerticalAlignment,
 };
 use galileo::symbol::Symbol;
 use galileo::{Color, Map, MapBuilder};
@@ -60,6 +60,15 @@ impl EguiMapApp {
     }
 
     fn update_symbol(&mut self) {
+        let weight = match self.is_bold {
+            true => FontWeight::BOLD,
+            false => FontWeight::NORMAL,
+        };
+        let style = match self.is_italic {
+            true => FontStyle::Italic,
+            false => FontStyle::Normal,
+        };
+
         let symbol = LabeledSymbol {
             style: TextStyle {
                 font_family: LabeledSymbol::new().style.font_family,
@@ -67,6 +76,8 @@ impl EguiMapApp {
                 font_color: Color::BLACK,
                 horizontal_alignment: self.horizontal_align,
                 vertical_alignment: self.vertical_align,
+                weight,
+                style,
             },
         };
 
@@ -193,8 +204,9 @@ pub(crate) fn run() {
 }
 
 fn initialize_font_service() {
-    const FONTS: [&str; 6] = [
+    const FONTS: [&str; 7] = [
         "galileo/examples/data/fonts/NotoSans.ttf",
+        "galileo/examples/data/fonts/NotoSans-Italic.ttf",
         "galileo/examples/data/fonts/NotoSansArabic.ttf",
         "galileo/examples/data/fonts/NotoSansHebrew.ttf",
         "galileo/examples/data/fonts/NotoSansJP.ttf",
@@ -297,6 +309,8 @@ impl LabeledSymbol {
                 font_color: Color::BLACK,
                 horizontal_alignment: Default::default(),
                 vertical_alignment: Default::default(),
+                weight: Default::default(),
+                style: Default::default(),
             },
         }
     }

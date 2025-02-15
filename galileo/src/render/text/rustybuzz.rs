@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use font_query::{Database, Query, Stretch, Style, Weight, ID as FaceId};
+use font_query::{Database, Query, Stretch, ID as FaceId};
 use lyon::lyon_tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor, VertexBuffers,
 };
@@ -26,9 +26,9 @@ impl RustybuzzFontServiceProvider {
                 .iter()
                 .map(String::as_str)
                 .collect::<Vec<_>>(),
-            weight: Weight::NORMAL,
+            weight: style.weight.into(),
             stretch: Stretch::Normal,
-            style: Style::Normal,
+            style: style.style.into(),
         };
 
         let matches = self.font_db.query(&query);
@@ -77,7 +77,7 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
                 let face = ttf_parser::Face::parse(data, index).ok()?;
                 let mut face = rustybuzz::Face::from_face(face);
 
-                face.set_variation(Tag::from_bytes(b"wght"), 400.0);
+                face.set_variation(Tag::from_bytes(b"wght"), style.weight.0 as f32);
                 face.set_variation(Tag::from_bytes(b"wdth"), 1.0);
 
                 let units = face.units_per_em() as f32;

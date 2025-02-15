@@ -59,6 +59,8 @@ pub(crate) fn run() {
                     font_color: Color::BLACK,
                     horizontal_alignment: Default::default(),
                     vertical_alignment: Default::default(),
+                    weight: Default::default(),
+                    style: Default::default(),
                 },
             }),
             ..Default::default()

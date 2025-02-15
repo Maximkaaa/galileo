@@ -36,6 +36,12 @@ pub struct TextStyle {
     /// Alignment of label along vertical axis.
     #[serde(default)]
     pub vertical_alignment: VerticalAlignment,
+    /// Weight of the font.
+    #[serde(default)]
+    pub weight: FontWeight,
+    /// sTyle of the font.
+    #[serde(default)]
+    pub style: FontStyle,
 }
 
 fn default_font_color() -> Color {
@@ -98,4 +104,56 @@ pub trait FontServiceProvider {
 
     /// Try to Load fonts from the given binary data.
     fn load_fonts(&mut self, fonts_data: Bytes) -> Result<(), FontServiceError>;
+}
+
+/// Font weight.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct FontWeight(pub(crate) u16);
+
+impl FontWeight {
+    /// Normal font.
+    pub const NORMAL: Self = FontWeight(500);
+    /// Bold font.
+    pub const BOLD: Self = FontWeight(700);
+    /// Thin font.
+    pub const THIN: Self = FontWeight(300);
+}
+
+impl Default for FontWeight {
+    fn default() -> Self {
+        Self::NORMAL
+    }
+}
+
+impl From<FontWeight> for font_query::Weight {
+    fn from(value: FontWeight) -> Self {
+        Self(value.0)
+    }
+}
+
+/// Font style.
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+pub enum FontStyle {
+    /// Normal font.
+    Normal,
+    /// Italic font.
+    Italic,
+    /// Oblique font.
+    Oblique,
+}
+
+impl Default for FontStyle {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
+impl From<FontStyle> for font_query::Style {
+    fn from(value: FontStyle) -> Self {
+        match value {
+            FontStyle::Normal => Self::Normal,
+            FontStyle::Italic => Self::Italic,
+            FontStyle::Oblique => Self::Oblique,
+        }
+    }
 }
