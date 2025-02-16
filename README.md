@@ -124,6 +124,8 @@ them all done at the same time. So here's our current plan and priorities:
 
 * [ ] Testing, documentation and examples
 
+\* Stabiliaing before v1.0 doesn't mean that API won't have any breaking changes at all, but rather that the API will be well thought through and tested and all the changes will be tracked, and if anything breaking is introduced, there will be clear instructions how to upgrade.
+
 # Running examples
 
 Rust examples of using Galileo are located at [`galileo/examples`](galileo/examples). Refer to the [readme](galileo/examples/README.md)
