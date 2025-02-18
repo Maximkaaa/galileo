@@ -11,7 +11,7 @@ use galileo::layer::feature_layer::Feature;
 use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::layer::FeatureLayer;
 use galileo::render::point_paint::PointPaint;
-use galileo::render::render_bundle::RenderPrimitive;
+use galileo::render::render_bundle::RenderBundle;
 use galileo::render::text::font_service::FontService;
 use galileo::render::text::{
     FontServiceProvider, FontStyle, FontWeight, HorizontalAlignment, RustybuzzFontServiceProvider,
@@ -20,6 +20,7 @@ use galileo::render::text::{
 use galileo::symbol::Symbol;
 use galileo::{Color, Map, MapBuilder};
 use galileo_egui::{EguiMap, EguiMapState};
+use galileo_types::cartesian::Point3d;
 use galileo_types::geo::impls::GeoPoint2d;
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
@@ -352,34 +353,22 @@ impl LabeledSymbol {
 }
 
 impl Symbol<LabeledPoint> for LabeledSymbol {
-    fn render<'a, N, P>(
+    fn render(
         &self,
         feature: &LabeledPoint,
-        geometry: &'a galileo_types::geometry::Geom<P>,
-        _min_resolution: f64,
-    ) -> Vec<
-        galileo::render::render_bundle::RenderPrimitive<
-            'a,
-            N,
-            P,
-            galileo_types::impls::Contour<P>,
-            galileo_types::impls::Polygon<P>,
-        >,
-    >
-    where
-        N: num_traits::AsPrimitive<f32>,
-        P: galileo_types::cartesian::CartesianPoint3d<Num = N> + Clone,
-    {
+        geometry: &Geom<Point3d>,
+        min_resolution: f64,
+        bundle: &mut RenderBundle,
+    ) {
         let Geom::Point(point) = geometry else {
-            return vec![];
+            return;
         };
 
-        vec![
-            RenderPrimitive::new_point(point.clone(), PointPaint::circle(Color::BLUE, 3.0)),
-            RenderPrimitive::new_point(
-                point.clone(),
-                PointPaint::label_owned(feature.label.to_string(), self.style.clone()),
-            ),
-        ]
+        bundle.add_point(point, &PointPaint::circle(Color::BLUE, 3.0), min_resolution);
+        bundle.add_point(
+            point,
+            &PointPaint::label_owned(feature.label.to_string(), self.style.clone()),
+            min_resolution,
+        );
     }
 }

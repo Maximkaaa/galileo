@@ -11,16 +11,14 @@ use galileo::layer::feature_layer::{Feature, FeatureLayerOptions};
 use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::layer::FeatureLayer;
 use galileo::render::point_paint::PointPaint;
-use galileo::render::render_bundle::RenderPrimitive;
+use galileo::render::render_bundle::RenderBundle;
 use galileo::symbol::Symbol;
 use galileo::{Color, Map, MapBuilder};
-use galileo_types::cartesian::{CartesianPoint3d, Point3d};
+use galileo_types::cartesian::Point3d;
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
-use galileo_types::impls::{Contour, Polygon};
 use las::Read;
 use nalgebra::{Rotation3, Translation3, Vector3};
-use num_traits::AsPrimitive;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
@@ -56,9 +54,16 @@ fn load_points() -> Vec<ColoredPoint> {
     let translation = Translation3::new(x, y, z);
     let transform = translation * rotation;
 
+    let mut counter = 0;
     reader
         .points()
         .map(|p| {
+            if counter % 1_000_000 == 0 {
+                eprintln!("Loaded {counter} points");
+            }
+
+            counter += 1;
+
             let p = p.expect("invalid laz file");
             let color = p.color.expect("invalid laz file");
             let point = Point3d::new(p.x * scale_lat, p.y * scale_lat, p.z * scale_lat);
@@ -92,23 +97,15 @@ impl Feature for ColoredPoint {
 
 struct ColoredPointSymbol {}
 impl Symbol<ColoredPoint> for ColoredPointSymbol {
-    fn render<'a, N, P>(
+    fn render(
         &self,
         feature: &ColoredPoint,
-        geometry: &'a Geom<P>,
-        _min_resolution: f64,
-    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
-    where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N> + Clone,
-    {
+        geometry: &Geom<Point3d>,
+        min_resolution: f64,
+        bundle: &mut RenderBundle,
+    ) {
         if let Geom::Point(point) = geometry {
-            vec![RenderPrimitive::new_point(
-                point.clone(),
-                PointPaint::dot(feature.color),
-            )]
-        } else {
-            vec![]
+            bundle.add_point(point, &PointPaint::dot(feature.color), min_resolution);
         }
     }
 }
@@ -122,6 +119,7 @@ fn create_map() -> Map {
     let points = load_points();
     let feature_layer = FeatureLayer::new(points, ColoredPointSymbol {}, Crs::EPSG3857)
         .with_options(FeatureLayerOptions {
+            buffer_size_limit: 200_000_000,
             use_antialiasing: true,
             ..Default::default()
         });

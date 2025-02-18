@@ -1,323 +1,87 @@
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
-use parking_lot::Mutex;
+use ahash::{HashMap, HashMapExt};
+use maybe_sync::{MaybeSend, MaybeSync};
 
-/// Feature storage of a [FeatureLayer](super::FeatureLayer).
+/// Unique identifier of a feature in a feature layer.
 ///
-/// All access operations in the storage return [FeatureContainer] or [FeatureContainerMut] structs. These containers
-/// then allow access to references to the features themselves. When a feature is modified through
-/// [AsMut::as_mut] or [FeatureContainerMut::edit_style], the `FeatureLayer` containing them
-/// is automatically notified of the change, and the layer can update rendering of the given features without redrawing
-/// the whole feature set.
-#[derive(Default)]
-pub struct FeatureStore<F> {
-    features: Vec<FeatureEntry<F>>,
-    pending_updates: Arc<Mutex<Vec<FeatureUpdate>>>,
-}
-
-/// Immutable container for a feature in a [FeatureLayer](super::FeatureLayer).
+/// This type is opaque on purpose. Application code should not make any assumption about insides
+/// of this type, as it may change in future. The only important property of the `FeatureId` that
+/// must be observed is that an implementation of `FeatureStore` must return a unique value of
+/// `FeatureId` for each unique feature in a feature layer, and this id must not change during
+/// lifetime of the layer.
 ///
-/// Reference to the container can be converted into a reference to the feature using [AsRef] trait.
-pub struct FeatureContainer<'a, F> {
-    feature: &'a F,
-    feature_index: usize,
-}
-
-impl<F> FeatureContainer<'_, F> {
-    /// Index of the feature in the layer.
-    pub fn index(&self) -> usize {
-        self.feature_index
-    }
-}
-
-impl<F> AsRef<F> for FeatureContainer<'_, F> {
-    fn as_ref(&self) -> &F {
-        self.feature
-    }
-}
-
-/// Mutable container for a feature in a [FeatureLayer](super::FeatureLayer).
+/// This rule allows however for the id to change between runs of the application. And same ids can
+/// be used for different features in different layers.
 ///
-/// Reference to the container can be converted into a reference to the feature using [AsRef] and [AsMut] traits.
-pub struct FeatureContainerMut<'a, F> {
-    entry: &'a mut FeatureEntry<F>,
-    feature_index: usize,
-    is_updated: bool,
-    pending_updates: Arc<Mutex<Vec<FeatureUpdate>>>,
-}
+/// To get a unique value of a `FeatureId` use [`FeatureId::next()`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct FeatureId(u64);
 
-impl<'a, F> FeatureContainerMut<'a, F> {
-    /// Index of the feature in the layer.
-    pub fn index(&self) -> usize {
-        self.feature_index
-    }
+static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
-    /// Returns true if the feature is hidden.
-    ///
-    /// Hidden features keep their place in the layer, but are not displayed on the map.
-    pub fn is_hidden(&self) -> bool {
-        self.entry.is_hidden
-    }
-
-    /// Notifies the layer that after the feature is modified, the geometry will not be changed and only the style
-    /// is to be updated. If geometry might change, use [container.as_mut()](AsMut::as_mut) instead.
-    pub fn edit_style(self) -> &'a mut F {
-        if !self.is_updated {
-            self.pending_updates
-                .lock()
-                .push(FeatureUpdate::UpdateStyle {
-                    feature_index: self.feature_index,
-                });
-        }
-
-        &mut self.entry.feature
-    }
-
-    /// Hides the feature from the map, but leaves it in the features list.
-    pub fn hide(&mut self) {
-        if self.is_hidden() {
-            return;
-        }
-
-        self.entry.is_hidden = true;
-        let mut render_indices = self.entry.render_indices.lock();
-        let to_store = (*render_indices).clone();
-
-        for entry in &mut *render_indices {
-            *entry = None;
-        }
-
-        self.pending_updates.lock().push(FeatureUpdate::Delete {
-            render_indices: to_store,
-        });
-
-        self.is_updated = true;
-    }
-
-    /// Shows the previously hidden feature.
-    pub fn show(&mut self) {
-        if !self.is_hidden() {
-            return;
-        }
-
-        self.entry.is_hidden = false;
-
-        if !self.is_updated {
-            self.pending_updates.lock().push(FeatureUpdate::Update {
-                feature_index: self.feature_index,
-            });
-        }
-
-        self.is_updated = true;
+impl FeatureId {
+    /// Returns application-wise unique `FeatureId`.
+    pub fn next() -> Self {
+        Self(NEXT_ID.fetch_add(1, Ordering::Relaxed))
     }
 }
 
-impl<F> AsRef<F> for FeatureContainerMut<'_, F> {
-    fn as_ref(&self) -> &F {
-        self.entry.feature()
+/// Collection of features for a feature layer.
+pub trait FeatureStore<F>: MaybeSend + MaybeSync {
+    /// Returns an iterator over all features with their ids.
+    fn iter(&self) -> Box<dyn Iterator<Item = (FeatureId, &F)> + '_>;
+    /// Returns a mutable iterator over all features with their ids.
+    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = (FeatureId, &mut F)> + '_>;
+    /// Returns a shared reference to the feature with the given id, or `None` if it does not exist.
+    fn get(&self, id: FeatureId) -> Option<&F>;
+    /// Returns an exclusive reference to the feature with the given id, or `None` if it does not
+    /// exist.
+    fn get_mut(&mut self, id: FeatureId) -> Option<&mut F>;
+}
+
+pub(super) struct VecFeatureStore<F> {
+    features: Vec<(FeatureId, F)>,
+    ids: HashMap<FeatureId, usize>,
+}
+
+impl<F> VecFeatureStore<F> {
+    pub(super) fn new(feature_iter: impl IntoIterator<Item = F>) -> Self {
+        let mut features = vec![];
+        let mut ids = HashMap::new();
+        for (index, feature) in feature_iter.into_iter().enumerate() {
+            let id = FeatureId::next();
+            features.push((id, feature));
+            ids.insert(id, index);
+        }
+
+        Self { features, ids }
     }
 }
 
-impl<F> AsMut<F> for FeatureContainerMut<'_, F> {
-    fn as_mut(&mut self) -> &mut F {
-        if !self.is_updated {
-            self.pending_updates.lock().push(FeatureUpdate::Update {
-                feature_index: self.feature_index,
-            });
-        }
-
-        self.is_updated = true;
-        &mut self.entry.feature
-    }
-}
-
-#[derive(Debug)]
-pub(super) enum FeatureUpdate {
-    Update { feature_index: usize },
-    UpdateStyle { feature_index: usize },
-    Delete { render_indices: Vec<Option<usize>> },
-}
-
-impl<F> FeatureStore<F> {
-    /// Creates a new store with the given feature set.
-    pub fn new(features: impl Iterator<Item = F>) -> Self {
-        let features: Vec<_> = features.map(|f| FeatureEntry::new(f)).collect();
-        let count = features.len();
-        Self {
-            features,
-            pending_updates: Arc::new(Mutex::new(
-                (0..count)
-                    .map(|feature_index| FeatureUpdate::Update { feature_index })
-                    .collect(),
-            )),
-        }
+impl<F> FeatureStore<F> for VecFeatureStore<F>
+where
+    F: MaybeSync + MaybeSend,
+{
+    fn iter(&self) -> Box<dyn Iterator<Item = (FeatureId, &F)> + '_> {
+        Box::new(self.features.iter().map(|(id, f)| (*id, f)))
     }
 
-    /// Adds a new feature to the store.
-    pub fn insert(&mut self, feature: F) {
-        let feature_index = self.features.len();
-        self.features.push(FeatureEntry::new(feature));
-        self.pending_updates
-            .lock()
-            .push(FeatureUpdate::Update { feature_index })
+    fn iter_mut(&mut self) -> Box<dyn Iterator<Item = (FeatureId, &mut F)> + '_> {
+        Box::new(self.features.iter_mut().map(|(id, f)| (*id, f)))
     }
 
-    /// Adds a new hidden feature to the store at the end of the list.
-    pub fn insert_hidden(&mut self, feature: F) {
-        self.features.push(FeatureEntry::hidden(feature));
+    fn get(&self, id: FeatureId) -> Option<&F> {
+        self.ids
+            .get(&id)
+            .and_then(|index| self.features.get(*index))
+            .map(|(_, f)| f)
     }
 
-    /// Returns a reference to the feature. Returns `None` if a feature with the given `index` does not exist.
-    pub fn get(&self, index: usize) -> Option<&F> {
-        self.features.get(index).map(|f| &f.feature)
-    }
-
-    /// Returns a mutable reference to the feature. Returns `None` if a feature with the given `index` does not exist.
-    pub fn get_mut(&mut self, index: usize) -> Option<FeatureContainerMut<F>> {
-        self.features.get_mut(index).map(|f| FeatureContainerMut {
-            entry: f,
-            feature_index: index,
-            is_updated: false,
-            pending_updates: self.pending_updates.clone(),
-        })
-    }
-
-    /// Removes the feature with the given returning the feature.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a feature with the given index does not exist.
-    pub fn remove(&mut self, index: usize) -> F {
-        let FeatureEntry {
-            feature,
-            is_hidden: _is_hidden,
-            render_indices,
-        } = self.features.remove(index);
-        self.pending_updates.lock().push(FeatureUpdate::Delete {
-            render_indices: render_indices.into_inner(),
-        });
-
-        feature
-    }
-
-    pub(super) fn get_entry(&self, index: usize) -> Option<&FeatureEntry<F>> {
-        self.features.get(index)
-    }
-
-    pub(super) fn drain_updates(&self) -> Vec<FeatureUpdate> {
-        let mut updates = self.pending_updates.lock();
-        std::mem::take(&mut *updates)
-    }
-
-    pub(super) fn reset(&self) {
-        let mut updates = self.pending_updates.lock();
-        for (index, entry) in self.features.iter().enumerate() {
-            entry.render_indices.lock().clear();
-            updates.push(FeatureUpdate::Update {
-                feature_index: index,
-            });
-        }
-    }
-
-    /// Iterates over immutable containers of the features.
-    pub fn iter(&self) -> impl Iterator<Item = FeatureContainer<F>> {
-        self.features
-            .iter()
-            .enumerate()
-            .map(|(feature_index, f)| FeatureContainer {
-                feature: &f.feature,
-                feature_index,
-            })
-    }
-
-    /// Iterates over mutable containers of the features.
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = FeatureContainerMut<F>> {
-        self.features
-            .iter_mut()
-            .enumerate()
-            .map(|(index, f)| FeatureContainerMut {
-                entry: f,
-                feature_index: index,
-                is_updated: false,
-                pending_updates: self.pending_updates.clone(),
-            })
-    }
-}
-
-pub(super) struct FeatureEntry<F> {
-    feature: F,
-    is_hidden: bool,
-    render_indices: Mutex<Vec<Option<usize>>>,
-}
-
-impl<F> FeatureEntry<F> {
-    fn new(feature: F) -> Self {
-        Self {
-            feature,
-            is_hidden: false,
-            render_indices: Mutex::new(vec![]),
-        }
-    }
-
-    fn hidden(feature: F) -> Self {
-        Self {
-            feature,
-            is_hidden: true,
-            render_indices: Mutex::new(vec![]),
-        }
-    }
-
-    pub fn feature(&self) -> &F {
-        &self.feature
-    }
-
-    pub fn render_index(&self, render_store_id: usize) -> Option<usize> {
-        self.render_indices
-            .lock()
-            .get(render_store_id)
-            .copied()
-            .flatten()
-    }
-
-    pub fn set_render_index(&self, render_index: usize, render_store_id: usize) {
-        let mut render_indices = self.render_indices.lock();
-
-        for _ in render_indices.len()..(render_store_id + 1) {
-            render_indices.push(None)
-        }
-
-        render_indices[render_store_id] = Some(render_index)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use assert_matches::assert_matches;
-
-    use super::*;
-
-    #[test]
-    fn feature_editing() {
-        let mut store = FeatureStore::default();
-
-        store.insert(String::from("F1"));
-        let pending_updates = store.drain_updates();
-        assert_eq!(pending_updates.len(), 1);
-        assert_matches!(
-            pending_updates[0],
-            FeatureUpdate::Update { feature_index: 0 }
-        );
-
-        let mut feature = store.get_mut(0).expect("no feature");
-
-        feature.as_mut().push('2');
-        let pending_updates = store.drain_updates();
-        assert_eq!(pending_updates.len(), 1);
-        assert_matches!(
-            pending_updates[0],
-            FeatureUpdate::Update { feature_index: 0 }
-        );
-
-        assert_eq!(store.get(0).expect("no feature"), &"F12".to_string());
+    fn get_mut(&mut self, id: FeatureId) -> Option<&mut F> {
+        self.ids
+            .get(&id)
+            .and_then(|index| self.features.get_mut(*index))
+            .map(|(_, f)| f)
     }
 }

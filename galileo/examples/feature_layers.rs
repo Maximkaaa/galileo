@@ -1,24 +1,21 @@
 //! This example shows how to create custom symbols for feature layers and set the appearance of
 //! features based on their attributes.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use data::{City, Country};
 use galileo::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
 use galileo::layer::feature_layer::symbol::{SimplePolygonSymbol, Symbol};
-use galileo::layer::feature_layer::FeatureLayer;
+use galileo::layer::feature_layer::{FeatureLayer, FeatureLayerOptions};
 use galileo::layer::Layer;
 use galileo::render::point_paint::PointPaint;
-use galileo::render::render_bundle::RenderPrimitive;
+use galileo::render::render_bundle::RenderBundle;
 use galileo::{Color, Map, MapBuilder};
-use galileo_types::cartesian::{CartesianPoint3d, Point2d};
+use galileo_types::cartesian::{Point2d, Point3d};
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
 use galileo_types::geometry_type::CartesianSpace2d;
-use galileo_types::impls::{Contour, Polygon};
-use num_traits::AsPrimitive;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 
 mod data;
 
@@ -30,8 +27,7 @@ fn main() {
 pub(crate) fn run() {
     let countries_layer = Arc::new(RwLock::new(create_countries_layer()));
     let map = create_map(countries_layer.clone());
-    let selected_index = AtomicUsize::new(usize::MAX);
-    let handler = create_mouse_handler(countries_layer, selected_index);
+    let handler = create_mouse_handler(countries_layer);
 
     galileo_egui::init(map, [Box::new(handler) as Box<dyn UserEventHandler>])
         .expect("failed to initialize");
@@ -77,8 +73,8 @@ fn load_cities() -> Vec<City> {
 
 fn create_mouse_handler(
     feature_layer: Arc<RwLock<FeatureLayer<Point2d, Country, CountrySymbol, CartesianSpace2d>>>,
-    selected_index: AtomicUsize,
 ) -> impl UserEventHandler {
+    let selected_id = Mutex::new(None);
     move |ev: &UserEvent, map: &mut Map| {
         if let UserEvent::Click(button, event) = ev {
             if *button == MouseButton::Left {
@@ -88,20 +84,17 @@ fn create_mouse_handler(
                     return EventPropagation::Stop;
                 };
 
-                for mut feature_container in
+                let mut to_update = vec![];
+                for (id, feature) in
                     layer.get_features_at_mut(&position, map.view().resolution() * 2.0)
                 {
-                    log::info!(
-                        "Found {} with bbox {:?}",
-                        feature_container.as_ref().name,
-                        feature_container.as_ref().bbox
-                    );
+                    log::info!("Found {} with bbox {:?}", feature.name, feature.bbox);
+                    feature.is_hidden = !feature.is_hidden;
+                    to_update.push(id);
+                }
 
-                    if feature_container.is_hidden() {
-                        feature_container.show();
-                    } else {
-                        feature_container.hide();
-                    }
+                for id in to_update {
+                    layer.update_feature(id);
                 }
 
                 map.redraw();
@@ -113,28 +106,35 @@ fn create_mouse_handler(
         if let UserEvent::PointerMoved(event) = ev {
             let mut layer = feature_layer.write();
 
-            let mut new_selected = usize::MAX;
             let Some(position) = map.view().screen_to_map(event.screen_pointer_position) else {
                 return EventPropagation::Stop;
             };
-            if let Some(feature_container) = layer
+
+            let new_selected = if let Some((id, feature)) = layer
                 .get_features_at_mut(&position, map.view().resolution() * 2.0)
                 .next()
             {
-                let index = feature_container.index();
-                if index == selected_index.load(Ordering::Relaxed) {
+                if feature.is_selected {
                     return EventPropagation::Stop;
                 }
 
-                feature_container.edit_style().is_selected = true;
-                new_selected = index;
+                feature.is_selected = true;
+                Some(id)
+            } else {
+                None
+            };
+
+            match new_selected {
+                None => {}
+                Some(id) => layer.update_feature(id),
             }
 
-            let selected = selected_index.swap(new_selected, Ordering::Relaxed);
-            if selected != usize::MAX {
-                if let Some(feature) = layer.features_mut().get_mut(selected) {
-                    feature.edit_style().is_selected = false;
-                }
+            if let Some(old_selected) = std::mem::replace(&mut *selected_id.lock(), new_selected) {
+                layer
+                    .features_mut()
+                    .get_mut(old_selected)
+                    .map(|f| !f.is_selected);
+                layer.update_feature(old_selected)
             }
 
             map.redraw();
@@ -155,6 +155,11 @@ fn create_countries_layer() -> FeatureLayer<Point2d, Country, CountrySymbol, Car
         Crs::EPSG3857,
         &[8000.0, 1000.0, 1.0],
     )
+    .with_options(FeatureLayerOptions {
+        sort_by_depth: false,
+        buffer_size_limit: 1_000_000,
+        use_antialiasing: true,
+    })
 }
 
 struct CountrySymbol {}
@@ -171,89 +176,89 @@ impl CountrySymbol {
 }
 
 impl Symbol<Country> for CountrySymbol {
-    fn render<'a, N, P>(
+    fn render(
         &self,
         feature: &Country,
-        geometry: &'a Geom<P>,
+        geometry: &Geom<Point3d>,
         min_resolution: f64,
-    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
-    where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N> + Clone,
-    {
-        self.get_polygon_symbol(feature)
-            .render(&(), geometry, min_resolution)
+        bundle: &mut RenderBundle,
+    ) {
+        if !feature.is_hidden {
+            self.get_polygon_symbol(feature)
+                .render(&(), geometry, min_resolution, bundle)
+        }
     }
 }
 
 struct CitySymbol {}
 
 impl Symbol<City> for CitySymbol {
-    fn render<'a, N, P>(
+    fn render(
         &self,
         feature: &City,
-        geometry: &'a Geom<P>,
-        _min_resolution: f64,
-    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
-    where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N> + Clone,
-    {
+        geometry: &Geom<Point3d>,
+        min_resolution: f64,
+        bundle: &mut RenderBundle,
+    ) {
         let size = (feature.population / 1000.0).log2() as f32;
-        let mut primitives = vec![];
         let Geom::Point(point) = geometry else {
-            return primitives;
+            return;
         };
 
         match &feature.capital[..] {
             "primary" => {
-                primitives.push(RenderPrimitive::new_point(
-                    point.clone(),
-                    PointPaint::circle(Color::BLACK, size * 2.0 + 4.0),
-                ));
-                primitives.push(RenderPrimitive::new_point(
-                    point.clone(),
-                    PointPaint::sector(
+                bundle.add_point(
+                    point,
+                    &PointPaint::circle(Color::BLACK, size * 2.0 + 4.0),
+                    min_resolution,
+                );
+                bundle.add_point(
+                    point,
+                    &PointPaint::sector(
                         Color::from_hex("#ff8000"),
                         size * 2.0,
                         -5f32.to_radians(),
                         135f32.to_radians(),
                     ),
-                ));
-                primitives.push(RenderPrimitive::new_point(
-                    point.clone(),
-                    PointPaint::sector(
+                    min_resolution,
+                );
+                bundle.add_point(
+                    point,
+                    &PointPaint::sector(
                         Color::from_hex("#ffff00"),
                         size * 2.0,
                         130f32.to_radians(),
                         270f32.to_radians(),
                     ),
-                ));
-                primitives.push(RenderPrimitive::new_point(
-                    point.clone(),
-                    PointPaint::sector(
+                    min_resolution,
+                );
+                bundle.add_point(
+                    point,
+                    &PointPaint::sector(
                         Color::from_hex("#00ffff"),
                         size * 2.0,
                         265f32.to_radians(),
                         360f32.to_radians(),
                     ),
-                ))
+                    min_resolution,
+                )
             }
-            "admin" => primitives.push(RenderPrimitive::new_point(
-                point.clone(),
-                PointPaint::circle(Color::from_hex("#f5009b"), size),
-            )),
-            "minor" => primitives.push(RenderPrimitive::new_point(
-                point.clone(),
-                PointPaint::square(Color::from_hex("#0a85ed"), size)
+            "admin" => bundle.add_point(
+                point,
+                &PointPaint::circle(Color::from_hex("#f5009b"), size),
+                min_resolution,
+            ),
+            "minor" => bundle.add_point(
+                point,
+                &PointPaint::square(Color::from_hex("#0a85ed"), size)
                     .with_outline(Color::from_hex("#0d4101"), 2.0),
-            )),
-            _ => primitives.push(RenderPrimitive::new_point(
-                point.clone(),
-                PointPaint::circle(Color::from_hex("#4e00de"), size),
-            )),
+                min_resolution,
+            ),
+            _ => bundle.add_point(
+                point,
+                &PointPaint::circle(Color::from_hex("#4e00de"), size),
+                min_resolution,
+            ),
         };
-
-        primitives
     }
 }

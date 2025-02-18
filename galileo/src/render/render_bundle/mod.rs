@@ -71,6 +71,59 @@ impl RenderBundle {
         }
     }
 
+    /// Adds a point to the bundle.
+    pub fn add_point<N, P>(
+        &mut self,
+        point: &P,
+        paint: &PointPaint,
+        _min_resolution: f64,
+    ) -> PrimitiveId
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+    {
+        match &mut self.0 {
+            RenderBundleType::Tessellating(inner) => inner.add_point(point, paint),
+        }
+    }
+
+    /// Adds a line to the bundle.
+    pub fn add_line<N, P, C>(
+        &mut self,
+        line: &C,
+        paint: &LinePaint,
+        min_resolution: f64,
+    ) -> PrimitiveId
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+        C: Contour<Point = P>,
+    {
+        match &mut self.0 {
+            RenderBundleType::Tessellating(inner) => inner.add_line(line, paint, min_resolution),
+        }
+    }
+
+    /// Adds a polygon to the bundle.
+    pub fn add_polygon<N, P, Poly>(
+        &mut self,
+        polygon: &Poly,
+        paint: PolygonPaint,
+        min_resolution: f64,
+    ) -> PrimitiveId
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+        Poly: Polygon,
+        Poly::Contour: Contour<Point = P>,
+    {
+        match &mut self.0 {
+            RenderBundleType::Tessellating(inner) => {
+                inner.add_polygon(polygon, paint, min_resolution)
+            }
+        }
+    }
+
     /// Adds a primitive to the bundle and returns the id of the given primitive in the bundle. The returned id can
     /// then be used to update or remove the primitive.
     pub fn add<N, P, C, Poly>(

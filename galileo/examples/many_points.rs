@@ -4,13 +4,11 @@ use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::{Feature, FeatureLayer};
 use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::render::point_paint::PointPaint;
-use galileo::render::render_bundle::RenderPrimitive;
+use galileo::render::render_bundle::RenderBundle;
 use galileo::{Color, Map, MapBuilder};
-use galileo_types::cartesian::{CartesianPoint3d, Point3d};
+use galileo_types::cartesian::Point3d;
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
-use galileo_types::impls::{Contour, Polygon};
-use num_traits::AsPrimitive;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
@@ -36,23 +34,15 @@ impl Feature for ColoredPoint {
 
 struct ColoredPointSymbol {}
 impl Symbol<ColoredPoint> for ColoredPointSymbol {
-    fn render<'a, N, P>(
+    fn render(
         &self,
         feature: &ColoredPoint,
-        geometry: &'a Geom<P>,
-        _min_resolution: f64,
-    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
-    where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N> + Clone,
-    {
+        geometry: &Geom<Point3d>,
+        min_resolution: f64,
+        bundle: &mut RenderBundle,
+    ) {
         if let Geom::Point(point) = geometry {
-            vec![RenderPrimitive::new_point(
-                point.clone(),
-                PointPaint::dot(feature.color),
-            )]
-        } else {
-            vec![]
+            bundle.add_point(point, &PointPaint::dot(feature.color), min_resolution);
         }
     }
 }
@@ -81,7 +71,7 @@ fn generate_points() -> Vec<ColoredPoint> {
         }
     }
 
-    log::info!("Generated {} points", points.len());
+    println!("Generated {} points", points.len());
 
     points
 }

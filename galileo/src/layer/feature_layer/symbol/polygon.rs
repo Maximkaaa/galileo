@@ -1,11 +1,9 @@
-use galileo_types::cartesian::CartesianPoint3d;
+use galileo_types::cartesian::Point3d;
 use galileo_types::geometry::Geom;
-use galileo_types::impls::Contour;
 use galileo_types::{MultiPolygon, Polygon};
-use num_traits::AsPrimitive;
 
 use crate::layer::feature_layer::symbol::Symbol;
-use crate::render::render_bundle::RenderPrimitive;
+use crate::render::render_bundle::RenderBundle;
 use crate::render::{LineCap, LinePaint, PolygonPaint};
 use crate::Color;
 
@@ -58,58 +56,51 @@ impl SimplePolygonSymbol {
         }
     }
 
-    fn render_poly<'a, N, P>(
+    fn render_poly(
         &self,
-        polygon: &'a galileo_types::impls::Polygon<P>,
-    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, galileo_types::impls::Polygon<P>>>
-    where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N> + Clone,
-    {
-        let mut primitives = vec![];
-        primitives.push(RenderPrimitive::new_polygon_ref(
-            polygon,
-            PolygonPaint {
-                color: self.fill_color,
-            },
-        ));
-
-        let line_paint = LinePaint {
-            color: self.stroke_color,
-            width: self.stroke_width,
-            offset: self.stroke_offset,
-            line_cap: LineCap::Butt,
-        };
-
-        for contour in polygon.iter_contours() {
-            primitives.push(RenderPrimitive::new_contour(
-                contour.clone().into(),
-                line_paint,
-            ));
+        polygon: &galileo_types::impls::Polygon<Point3d>,
+        min_resolution: f64,
+        bundle: &mut RenderBundle,
+    ) {
+        if !self.fill_color.is_transparent() {
+            bundle.add_polygon(
+                polygon,
+                PolygonPaint {
+                    color: self.fill_color,
+                },
+                min_resolution,
+            );
         }
 
-        primitives
+        if !self.stroke_color.is_transparent() && self.stroke_width > 0.0 {
+            let line_paint = LinePaint {
+                color: self.stroke_color,
+                width: self.stroke_width,
+                offset: self.stroke_offset,
+                line_cap: LineCap::Butt,
+            };
+
+            for contour in polygon.iter_contours() {
+                bundle.add_line(contour, &line_paint, min_resolution);
+            }
+        }
     }
 }
 
 impl<F> Symbol<F> for SimplePolygonSymbol {
-    fn render<'a, N, P>(
+    fn render(
         &self,
         _feature: &F,
-        geometry: &'a Geom<P>,
-        _min_resolution: f64,
-    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, galileo_types::impls::Polygon<P>>>
-    where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N> + Clone,
-    {
+        geometry: &Geom<Point3d>,
+        min_resolution: f64,
+        bundle: &mut RenderBundle,
+    ) {
         match geometry {
-            Geom::Polygon(poly) => self.render_poly(poly),
+            Geom::Polygon(poly) => self.render_poly(poly, min_resolution, bundle),
             Geom::MultiPolygon(polygons) => polygons
                 .polygons()
-                .flat_map(|polygon| self.render_poly(polygon))
-                .collect(),
-            _ => vec![],
+                .for_each(|polygon| self.render_poly(polygon, min_resolution, bundle)),
+            _ => {}
         }
     }
 }

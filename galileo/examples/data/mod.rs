@@ -15,6 +15,9 @@ pub struct Country {
     pub color: Color,
     pub bbox: Rect,
     pub is_selected: bool,
+    #[serde(skip)]
+    #[allow(unused)]
+    pub is_hidden: bool,
 }
 
 fn des_geometry<'de, D: Deserializer<'de>>(d: D) -> Result<MultiPolygon<Point2d>, D::Error> {

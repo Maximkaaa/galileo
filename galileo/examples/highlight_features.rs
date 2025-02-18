@@ -9,16 +9,14 @@ use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::{Feature, FeatureLayer};
 use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::render::point_paint::PointPaint;
-use galileo::render::render_bundle::RenderPrimitive;
+use galileo::render::render_bundle::RenderBundle;
 use galileo::{Map, MapBuilder};
-use galileo_types::cartesian::{CartesianPoint3d, Point2d};
+use galileo_types::cartesian::{Point2d, Point3d};
 use galileo_types::geo::{Crs, Projection};
 use galileo_types::geometry::Geom;
 use galileo_types::geometry_type::CartesianSpace2d;
-use galileo_types::impls::{Contour, Polygon};
 use galileo_types::{latlon, CartesianGeometry2d, Geometry};
 use nalgebra::Vector2;
-use num_traits::AsPrimitive;
 use parking_lot::RwLock;
 
 const YELLOW_PIN: &[u8] = include_bytes!("data/pin-yellow.png");
@@ -131,16 +129,18 @@ fn create_mouse_handler(
                 return EventPropagation::Stop;
             };
 
-            for mut feature_container in layer.features_mut().iter_mut() {
-                feature_container.as_mut().highlighted = false;
+            for (_, feature) in layer.features_mut().iter_mut() {
+                if feature.highlighted {
+                    feature.highlighted = false;
+                }
             }
 
-            for mut feature_container in
-                layer.get_features_at_mut(&position, map.view().resolution() * 20.0)
+            for (_, feature) in layer.get_features_at_mut(&position, map.view().resolution() * 20.0)
             {
-                let state = feature_container.as_ref().highlighted;
-                feature_container.as_mut().highlighted = !state;
+                feature.highlighted = true;
             }
+
+            layer.update_all_features();
 
             map.redraw();
         }
@@ -167,20 +167,17 @@ struct ColoredPointSymbol {
 }
 
 impl Symbol<PointMarker> for ColoredPointSymbol {
-    fn render<'a, N, P>(
+    fn render(
         &self,
         feature: &PointMarker,
-        geometry: &'a Geom<P>,
-        _min_resolution: f64,
-    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
-    where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N> + Clone,
-    {
+        geometry: &Geom<Point3d>,
+        min_resolution: f64,
+        bundle: &mut RenderBundle,
+    ) {
         if let Geom::Point(point) = geometry {
-            vec![RenderPrimitive::new_point(
-                point.clone(),
-                PointPaint::image(
+            bundle.add_point(
+                point,
+                &PointPaint::image(
                     if feature.highlighted {
                         self.default_image.clone()
                     } else {
@@ -189,9 +186,8 @@ impl Symbol<PointMarker> for ColoredPointSymbol {
                     Vector2::new(0.5, 1.0),
                     1.0,
                 ),
-            )]
-        } else {
-            vec![]
+                min_resolution,
+            );
         }
     }
 }
