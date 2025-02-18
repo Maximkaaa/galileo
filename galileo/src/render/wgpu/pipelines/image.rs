@@ -118,7 +118,7 @@ impl ImagePipeline {
             ),
             #[cfg(target_arch = "wasm32")]
             DecodedImageType::JsImageBitmap(image) => {
-                use wgpu::{ExternalImageSource, ImageCopyExternalImage, Origin2d};
+                use wgpu::{CopyExternalImageSourceInfo, ExternalImageSource, Origin2d};
 
                 let texture = device.create_texture(&wgpu::TextureDescriptor {
                     size: texture_size,
@@ -137,7 +137,7 @@ impl ImagePipeline {
                     height: image.height(),
                     depth_or_array_layers: 1,
                 };
-                let image = ImageCopyExternalImage {
+                let image = CopyExternalImageSourceInfo {
                     source: ExternalImageSource::ImageBitmap(image.clone()),
                     origin: Origin2d::ZERO,
                     flip_y: false,

@@ -2,19 +2,17 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use galileo_types::cartesian::CartesianPoint3d;
+use galileo_types::cartesian::Point3d;
 use galileo_types::geometry::Geom;
-use galileo_types::impls::{Contour, Polygon};
 use galileo_types::MultiPoint;
 use image::EncodableLayout;
 use nalgebra::Vector2;
-use num_traits::AsPrimitive;
 
 use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::layer::feature_layer::symbol::Symbol;
 use crate::render::point_paint::PointPaint;
-use crate::render::render_bundle::RenderPrimitive;
+use crate::render::render_bundle::RenderBundle;
 use crate::Color;
 
 /// Renders a point as a circle of fixes size.
@@ -34,24 +32,24 @@ impl CirclePointSymbol {
 }
 
 impl<F> Symbol<F> for CirclePointSymbol {
-    fn render<'a, N, P>(
+    fn render(
         &self,
         _feature: &F,
-        geometry: &'a Geom<P>,
-        _min_resolution: f64,
-    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
-    where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N> + Clone,
-    {
+        geometry: &Geom<Point3d>,
+        min_resolution: f64,
+        bundle: &mut RenderBundle,
+    ) {
         let paint = PointPaint::circle(self.color, self.size as f32);
         match geometry {
-            Geom::Point(point) => vec![RenderPrimitive::new_point(point.clone(), paint)],
-            Geom::MultiPoint(points) => points
-                .iter_points()
-                .map(|p| RenderPrimitive::new_point(p.clone(), paint.clone()))
-                .collect(),
-            _ => vec![],
+            Geom::Point(point) => {
+                bundle.add_point(point, &paint, min_resolution);
+            }
+            Geom::MultiPoint(points) => {
+                points.iter_points().for_each(|p| {
+                    bundle.add_point(p, &paint, min_resolution);
+                });
+            }
+            _ => {}
         }
     }
 }
@@ -104,25 +102,23 @@ impl ImagePointSymbol {
 }
 
 impl<F> Symbol<F> for ImagePointSymbol {
-    fn render<'a, N, P>(
+    fn render(
         &self,
         _feature: &F,
-        geometry: &'a Geom<P>,
-        _min_resolution: f64,
-    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
-    where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N> + Clone,
-    {
+        geometry: &Geom<Point3d>,
+        min_resolution: f64,
+        bundle: &mut RenderBundle,
+    ) {
         let paint = PointPaint::image(self.image.clone(), self.offset, self.scale);
 
         match geometry {
-            Geom::Point(point) => vec![RenderPrimitive::new_point(point.clone(), paint)],
-            Geom::MultiPoint(points) => points
-                .iter_points()
-                .map(|point| RenderPrimitive::new_point(point.clone(), paint.clone()))
-                .collect(),
-            _ => vec![],
+            Geom::Point(point) => {
+                bundle.add_point(point, &paint, min_resolution);
+            }
+            Geom::MultiPoint(points) => points.iter_points().for_each(|point| {
+                bundle.add_point(point, &paint, min_resolution);
+            }),
+            _ => {}
         }
     }
 }

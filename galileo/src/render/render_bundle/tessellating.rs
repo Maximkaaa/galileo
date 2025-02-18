@@ -289,7 +289,7 @@ impl TessellatingRenderBundle {
         match primitive {
             RenderPrimitive::Point(point, paint) => self.add_point::<N, P>(point.borrow(), &paint),
             RenderPrimitive::Contour(contour, paint) => {
-                self.add_line::<N, P, C>(contour.borrow(), paint, min_resolution)
+                self.add_line::<N, P, C>(contour.borrow(), &paint, min_resolution)
             }
             RenderPrimitive::Polygon(polygon, paint) => {
                 self.add_polygon::<N, P, Poly>(polygon.borrow(), paint, min_resolution)
@@ -565,7 +565,7 @@ impl TessellatingRenderBundle {
     pub fn add_line<N, P, C>(
         &mut self,
         line: &C,
-        paint: LinePaint,
+        paint: &LinePaint,
         min_resolution: f64,
     ) -> PrimitiveId
     where
@@ -573,7 +573,7 @@ impl TessellatingRenderBundle {
         P: CartesianPoint3d<Num = N>,
         C: Contour<Point = P>,
     {
-        let range = self.add_line_lod(line, paint, min_resolution);
+        let range = self.add_line_lod(line, *paint, min_resolution);
 
         self.add_primitive_info(PrimitiveInfo::MapRef {
             vertex_range: range,

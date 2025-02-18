@@ -1,9 +1,7 @@
-use galileo_types::cartesian::CartesianPoint3d;
+use galileo_types::cartesian::Point3d;
 use galileo_types::geometry::Geom;
-use galileo_types::impls::{Contour, Polygon};
-use num_traits::AsPrimitive;
 
-use crate::render::render_bundle::RenderPrimitive;
+use crate::render::render_bundle::RenderBundle;
 use crate::symbol::{CirclePointSymbol, SimpleContourSymbol, SimplePolygonSymbol, Symbol};
 use crate::Color;
 
@@ -41,23 +39,28 @@ impl Default for ArbitraryGeometrySymbol {
 }
 
 impl<F> Symbol<F> for ArbitraryGeometrySymbol {
-    fn render<'a, N, P>(
+    fn render(
         &self,
         feature: &F,
-        geometry: &'a Geom<P>,
+        geometry: &Geom<Point3d>,
         min_resolution: f64,
-    ) -> Vec<RenderPrimitive<'a, N, P, Contour<P>, Polygon<P>>>
-    where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N> + Clone,
-    {
+        bundle: &mut RenderBundle,
+    ) {
         match geometry {
-            Geom::Point(_) => self.point.render(feature, geometry, min_resolution),
-            Geom::MultiPoint(_) => self.point.render(feature, geometry, min_resolution),
-            Geom::Contour(_) => self.contour.render(feature, geometry, min_resolution),
-            Geom::MultiContour(_) => self.contour.render(feature, geometry, min_resolution),
-            Geom::Polygon(_) => self.polygon.render(feature, geometry, min_resolution),
-            Geom::MultiPolygon(_) => self.polygon.render(feature, geometry, min_resolution),
+            Geom::Point(_) => self.point.render(feature, geometry, min_resolution, bundle),
+            Geom::MultiPoint(_) => self.point.render(feature, geometry, min_resolution, bundle),
+            Geom::Contour(_) => self
+                .contour
+                .render(feature, geometry, min_resolution, bundle),
+            Geom::MultiContour(_) => self
+                .contour
+                .render(feature, geometry, min_resolution, bundle),
+            Geom::Polygon(_) => self
+                .polygon
+                .render(feature, geometry, min_resolution, bundle),
+            Geom::MultiPolygon(_) => self
+                .polygon
+                .render(feature, geometry, min_resolution, bundle),
         }
     }
 }
