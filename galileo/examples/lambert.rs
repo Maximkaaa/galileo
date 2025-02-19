@@ -94,11 +94,10 @@ fn create_mouse_handler(
             }
 
             if let Some(old_selected) = std::mem::replace(&mut *selected_id.lock(), new_selected) {
-                layer
-                    .features_mut()
-                    .get_mut(old_selected)
-                    .map(|f| !f.is_selected);
-                layer.update_feature(old_selected)
+                if let Some(feature) = layer.features_mut().get_mut(old_selected) {
+                    feature.is_selected = false;
+                    layer.update_feature(old_selected);
+                }
             }
 
             map.redraw();
