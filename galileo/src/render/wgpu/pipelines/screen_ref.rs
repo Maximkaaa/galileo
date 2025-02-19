@@ -39,8 +39,8 @@ impl ScreenRefPipeline {
         let mut desc = RenderPipelineDescriptor {
             depth_stencil: Some(DepthStencilState {
                 format: DEPTH_FORMAT,
-                depth_write_enabled: false,
-                depth_compare: CompareFunction::Always,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::LessEqual,
                 stencil: StencilState {
                     front: stencil_state,
                     back: stencil_state,
