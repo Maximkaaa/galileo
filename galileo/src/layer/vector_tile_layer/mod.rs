@@ -18,7 +18,6 @@ use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::{VectorTileProvider, VtStyleId};
 use crate::layer::Layer;
 use crate::messenger::Messenger;
-use crate::render::render_bundle::RenderPrimitive;
 use crate::render::{Canvas, PackedBundle, PolygonPaint, RenderOptions};
 use crate::tile_schema::{TileIndex, TileSchema};
 use crate::view::MapView;
@@ -332,13 +331,7 @@ impl VectorTileLayer {
             None => style.background,
         };
 
-        bundle.add(
-            RenderPrimitive::<_, _, galileo_types::impls::Contour<_>, _>::new_polygon_ref(
-                &bounds,
-                PolygonPaint { color },
-            ),
-            view.resolution(),
-        );
+        bundle.add_polygon(&bounds, &PolygonPaint { color }, view.resolution());
 
         Some(canvas.pack_bundle(&bundle))
     }

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::decoded_image::{DecodedImage, DecodedImageType};
 use crate::render::render_bundle::tessellating::{
-    ImageInfo, ImageStoreInfo, PolyVertex, PrimitiveInfo, ScreenRefVertex, TessellatingRenderBundle,
+    ImageInfo, PolyVertex, ScreenRefVertex, TessellatingRenderBundle,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -15,11 +15,8 @@ pub(crate) struct TessellatingRenderBundleBytes {
     pub poly_tessellation: PolyVertexBuffersBytes,
     pub points: Vec<u32>,
     pub screen_ref: ScreenRefVertexBuffersBytes,
-    pub images: Vec<Option<ImageBytes>>,
-    pub primitives: Vec<PrimitiveInfo>,
-    pub image_store: Vec<Option<(u32, u32, Vec<u8>)>>,
-    pub vacant_image_ids: Vec<usize>,
-    pub vacant_image_store_ids: Vec<usize>,
+    pub images: Vec<ImageBytes>,
+    pub image_store: Vec<(u32, u32, Vec<u8>)>,
     pub clip_area: Option<PolyVertexBuffersBytes>,
     pub bundle_size: usize,
 }
@@ -94,31 +91,22 @@ impl TessellatingRenderBundle {
             images: self
                 .images
                 .into_iter()
-                .map(|image_info| match image_info {
-                    ImageInfo::Vacant => None,
-                    ImageInfo::Image((image_index, vertices)) => Some(ImageBytes {
-                        image_index,
-                        vertices: bytemuck::cast_vec(vertices.to_vec()),
-                    }),
+                .map(|image_info| ImageBytes {
+                    image_index: image_info.store_index,
+                    vertices: bytemuck::cast_vec(image_info.vertices.to_vec()),
                 })
                 .collect(),
-            primitives: self.primitives,
             image_store: self
                 .image_store
                 .into_iter()
-                .map(|image_info| match image_info {
-                    ImageStoreInfo::Vacant => None,
-                    ImageStoreInfo::Image(image) => match &image.0 {
-                        DecodedImageType::Bitmap { bytes, dimensions } => {
-                            Some((dimensions.width(), dimensions.height(), bytes.clone()))
-                        }
-                        #[cfg(target_arch = "wasm32")]
-                        _ => panic!("only supported for raw bitmaps"),
-                    },
+                .map(|image| match &image.0 {
+                    DecodedImageType::Bitmap { bytes, dimensions } => {
+                        (dimensions.width(), dimensions.height(), bytes.clone())
+                    }
+                    #[cfg(target_arch = "wasm32")]
+                    _ => panic!("only supported for raw bitmaps"),
                 })
                 .collect(),
-            vacant_image_ids: self.vacant_image_ids,
-            vacant_image_store_ids: self.vacant_image_store_ids,
             clip_area: self.clip_area.map(|v| v.into()),
             bundle_size: self.buffer_size,
         }
@@ -132,39 +120,29 @@ impl TessellatingRenderBundle {
             images: bundle
                 .images
                 .into_iter()
-                .map(|item| match item {
-                    Some(ImageBytes {
-                        image_index,
-                        vertices,
-                    }) => {
-                        let vertices = bytemuck::cast_vec(vertices)
-                            .try_into()
-                            .expect("invalid vector length");
+                .map(|item| {
+                    let vertices = bytemuck::cast_vec(item.vertices)
+                        .try_into()
+                        .expect("invalid vector length");
 
-                        ImageInfo::Image((image_index, vertices))
+                    ImageInfo {
+                        store_index: item.image_index,
+                        vertices,
                     }
-                    None => ImageInfo::Vacant,
                 })
                 .collect(),
-            primitives: bundle.primitives,
             image_store: bundle
                 .image_store
                 .into_iter()
-                .map(|stored| match stored {
-                    Some((width, height, bytes)) => {
-                        ImageStoreInfo::Image(Arc::new(DecodedImage(DecodedImageType::Bitmap {
-                            bytes,
-                            dimensions: Size::new(width, height),
-                        })))
-                    }
-                    None => ImageStoreInfo::Vacant,
+                .map(|stored| {
+                    Arc::new(DecodedImage(DecodedImageType::Bitmap {
+                        bytes: stored.2,
+                        dimensions: Size::new(stored.0, stored.1),
+                    }))
                 })
                 .collect(),
-            vacant_image_ids: bundle.vacant_image_ids,
-            vacant_image_store_ids: bundle.vacant_image_store_ids,
             clip_area: bundle.clip_area.map(|v| v.into_typed_unchecked()),
             buffer_size: bundle.bundle_size,
-            vacant_ids: vec![],
         }
     }
 }
