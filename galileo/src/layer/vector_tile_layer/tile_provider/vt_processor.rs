@@ -8,7 +8,7 @@ use strfmt::strfmt;
 use crate::error::GalileoError;
 use crate::layer::vector_tile_layer::style::{VectorTileLabelSymbol, VectorTileStyle};
 use crate::render::point_paint::PointPaint;
-use crate::render::render_bundle::{RenderBundle, RenderPrimitive};
+use crate::render::render_bundle::RenderBundle;
 use crate::render::{LinePaint, PolygonPaint};
 use crate::tile_schema::TileIndex;
 use crate::TileSchema;
@@ -66,25 +66,27 @@ impl VtProcessor {
                         };
 
                         for point in points {
-                            bundle.add(RenderPrimitive::<_, _, galileo_types::impls::Contour<_>, Polygon<_>>::new_point_ref(&Self::transform_point(point, bbox, tile_resolution), &paint), lod_resolution);
+                            bundle.add_point(
+                                &Self::transform_point(point, bbox, tile_resolution),
+                                &paint,
+                                lod_resolution,
+                            );
                         }
                     }
                     MvtGeometry::LineString(contours) => {
                         if let Some(paint) = Self::get_line_symbol(style, &layer.name, feature) {
                             for contour in contours {
-                                bundle.add(
-                                    RenderPrimitive::<_, _, _, Polygon<_>>::new_contour_ref(
-                                        &galileo_types::impls::Contour::new(
-                                            contour
-                                                .iter_points()
-                                                .map(|p| {
-                                                    Self::transform_point(p, bbox, tile_resolution)
-                                                })
-                                                .collect(),
-                                            false,
-                                        ),
-                                        paint,
+                                bundle.add_line(
+                                    &galileo_types::impls::Contour::new(
+                                        contour
+                                            .iter_points()
+                                            .map(|p| {
+                                                Self::transform_point(p, bbox, tile_resolution)
+                                            })
+                                            .collect(),
+                                        false,
                                     ),
+                                    &paint,
                                     lod_resolution,
                                 );
                             }
@@ -93,13 +95,11 @@ impl VtProcessor {
                     MvtGeometry::Polygon(polygons) => {
                         if let Some(paint) = Self::get_polygon_symbol(style, &layer.name, feature) {
                             for polygon in polygons {
-                                bundle.add(
-                                    RenderPrimitive::<_, _, galileo_types::impls::Contour<_>, _>::new_polygon_ref(
-                                        &polygon.cast_points(|p| {
-                                            Self::transform_point(p, bbox, tile_resolution)
-                                        }),
-                                        paint,
-                                    ),
+                                bundle.add_polygon(
+                                    &polygon.cast_points(|p| {
+                                        Self::transform_point(p, bbox, tile_resolution)
+                                    }),
+                                    &paint,
                                     lod_resolution,
                                 );
                             }

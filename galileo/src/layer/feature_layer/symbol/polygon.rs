@@ -65,7 +65,7 @@ impl SimplePolygonSymbol {
         if !self.fill_color.is_transparent() {
             bundle.add_polygon(
                 polygon,
-                PolygonPaint {
+                &PolygonPaint {
                     color: self.fill_color,
                 },
                 min_resolution,

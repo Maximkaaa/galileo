@@ -22,10 +22,6 @@ pub mod point_paint;
 pub mod render_bundle;
 pub mod text;
 
-/// Id of a rendering primitive
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub struct PrimitiveId(usize);
-
 /// Canvas that a layer can be rendered to.
 ///
 /// As layers can contain a lot of data, canvases use two-step process for rendering.

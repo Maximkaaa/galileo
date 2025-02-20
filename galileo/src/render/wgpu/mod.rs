@@ -15,7 +15,6 @@ use wgpu::{
     TextureViewDescriptor, WasmNotSendSync,
 };
 
-use super::render_bundle::tessellating::{ImageInfo, ImageStoreInfo};
 use super::{Canvas, PackedBundle, RenderOptions};
 use crate::error::GalileoError;
 use crate::layer::Layer;
@@ -907,35 +906,28 @@ impl WgpuPackedBundle {
 
         let textures: Vec<_> = image_store
             .iter()
-            .map(|stored| match stored {
-                ImageStoreInfo::Vacant => None,
-                ImageStoreInfo::Image(decoded_image) => {
-                    Some(render_set.pipelines.image_pipeline().create_image_texture(
-                        &renderer.device,
-                        &renderer.queue,
-                        decoded_image,
-                    ))
-                }
+            .map(|decoded_image| {
+                Some(render_set.pipelines.image_pipeline().create_image_texture(
+                    &renderer.device,
+                    &renderer.queue,
+                    decoded_image,
+                ))
             })
             .collect();
 
         let mut image_buffers = vec![];
         for image_info in images {
-            if let ImageInfo::Image((image_index, vertices)) = image_info {
-                let image = render_set.pipelines.image_pipeline().create_image(
-                    &renderer.device,
-                    textures
-                        .get(*image_index)
-                        .expect("texture at index must exist")
-                        .clone()
-                        .expect("image texture must not be None")
-                        .clone(),
-                    vertices,
-                );
-                image_buffers.push(image);
-            } else {
-                // ignore vacant image slots
-            }
+            let image = render_set.pipelines.image_pipeline().create_image(
+                &renderer.device,
+                textures
+                    .get(image_info.store_index)
+                    .expect("texture at index must exist")
+                    .clone()
+                    .expect("image texture must not be None")
+                    .clone(),
+                &image_info.vertices,
+            );
+            image_buffers.push(image);
         }
 
         Self {
