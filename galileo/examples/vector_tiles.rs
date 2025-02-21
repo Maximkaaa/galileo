@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use eframe::CreationContext;
+use egui::Align2;
 use galileo::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
 use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
@@ -29,6 +30,22 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |ui| {
             EguiMap::new(&mut self.map).show_ui(ui);
         });
+
+        egui::Window::new("Attribution")
+            .collapsible(false)
+            .resizable(false)
+            .title_bar(false)
+            .anchor(Align2::RIGHT_BOTTOM, [-10., -10.])
+            .fixed_size([350., 150.])
+            .show(ctx, |ui| {
+                ui.hyperlink_to(
+                    self.map.collect_attributions().text,
+                    self.map
+                        .collect_attributions()
+                        .url
+                        .expect("failed to get url"),
+                );
+            });
 
         egui::Window::new("Buttons")
             .title_bar(false)

@@ -1,4 +1,5 @@
 use eframe::{AppCreator, CreationContext};
+use egui::Align2;
 use galileo::control::UserEventHandler;
 use galileo::Map;
 
@@ -28,7 +29,24 @@ impl MapApp {
 impl eframe::App for MapApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            self.map.render(ui);
+            let attribution = self.map.collect_attributions();
+            if !attribution.text.is_empty() {
+                egui::Window::new("Attribution")
+                    .collapsible(false)
+                    .resizable(false)
+                    .title_bar(false)
+                    .anchor(Align2::RIGHT_BOTTOM, [-10., -10.])
+                    .fixed_size([350., 150.])
+                    .show(ui.ctx(), |ui| {
+                        ui.hyperlink_to(
+                            self.map.collect_attributions().text,
+                            self.map.collect_attributions().url.expect("URL error"),
+                        );
+                    });
+                self.map.render(ui);
+            } else {
+                self.map.render(ui);
+            }
         });
     }
 }

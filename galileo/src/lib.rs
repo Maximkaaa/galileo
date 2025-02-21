@@ -27,6 +27,7 @@
 //! * [`controls`](control) that actually change state of the map or layers based on the user input.
 
 pub(crate) mod async_runtime;
+pub mod attribution;
 mod color;
 pub mod control;
 pub mod decoded_image;

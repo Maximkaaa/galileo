@@ -5,6 +5,7 @@ use egui::load::SizedTexture;
 use egui::{Event, Image, ImageSource, Sense, TextureId, Ui, Vec2};
 use egui_wgpu::wgpu::{FilterMode, TextureView};
 use egui_wgpu::RenderState;
+use galileo::attribution::Attribution;
 use galileo::control::{
     EventProcessor, MapController, MouseButton, RawUserEvent, UserEventHandler,
 };
@@ -160,6 +161,23 @@ impl EguiMapState {
             Vec2::new(map_size.width(), map_size.height()),
         )))
         .paint_at(ui, rect);
+    }
+
+    pub fn collect_attributions(&self) -> Attribution {
+        let all_layer: Vec<_> = self
+            .map
+            .layers()
+            .iter()
+            .filter_map(|layer| layer.attribution())
+            .collect();
+        if all_layer.is_empty() {
+            Attribution {
+                text: "",
+                url: Some(""),
+            }
+        } else {
+            all_layer[0].clone()
+        }
     }
 
     fn resize_map(&mut self, size: Vec2) {
