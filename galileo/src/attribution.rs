@@ -1,4 +1,5 @@
-/// Represents an attribution, typically used for citing sources or providing credit.
+//! This module provides functionality for handling attributions.
+//! Represents an attribution, typically used for citing sources or providing credit.
 ///
 /// This struct stores a text description along with an optional URL where more information
 /// or the source can be found.
