@@ -10,6 +10,7 @@ use quick_cache::sync::Cache;
 use web_time::{Duration, SystemTime};
 
 use super::Layer;
+use crate::attribution::Attribution;
 use crate::decoded_image::DecodedImage;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, ImagePaint, PackedBundle, RenderOptions};
@@ -30,6 +31,7 @@ pub struct RasterTileLayer {
     tiles: Arc<Cache<TileIndex, Arc<TileState>>>,
     prev_drawn_tiles: Mutex<Vec<TileIndex>>,
     messenger: Option<Arc<dyn Messenger>>,
+    attribution: Option<Attribution>,
 }
 
 impl std::fmt::Debug for RasterTileLayer {
@@ -74,6 +76,7 @@ impl RasterTileLayer {
             fade_in_duration: Duration::from_millis(300),
             tiles: Arc::new(Cache::new(5000)),
             messenger,
+            attribution: None,
         }
     }
 
@@ -89,6 +92,10 @@ impl RasterTileLayer {
             fade_in_duration: Duration::from_millis(300),
             tiles: Arc::new(Cache::new(5000)),
             messenger: messenger.map(|m| m.into()),
+            attribution: Some(Attribution::new(
+                "© OpenStreetMap contributors",
+                Some("https://www.openstreetmap.org/copyright"),
+            )),
         }
     }
 
@@ -380,5 +387,9 @@ impl Layer for RasterTileLayer {
 
     fn tile_schema(&self) -> Option<TileSchema> {
         Some(self.tile_schema.clone())
+    }
+
+    fn attribution(&self) -> Option<Attribution> {
+        self.attribution.clone()
     }
 }

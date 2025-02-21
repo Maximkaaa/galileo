@@ -16,6 +16,7 @@ use maybe_sync::{MaybeSend, MaybeSync};
 use num_traits::AsPrimitive;
 use parking_lot::{Mutex, RwLock};
 
+use crate::attribution::Attribution;
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, RenderOptions};
@@ -386,6 +387,10 @@ where
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+
+    fn attribution(&self) -> Option<Attribution> {
+        None
+    }
 }
 
 impl<P, F, S> FeatureLayer<P, F, S, CartesianSpace2d>
@@ -445,6 +450,10 @@ where
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+
+    fn attribution(&self) -> Option<Attribution> {
+        None
+    }
 }
 
 impl<P, F, S> FeatureLayer<P, F, S, CartesianSpace3d>
@@ -492,5 +501,9 @@ where
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn attribution(&self) -> Option<Attribution> {
+        None
     }
 }

@@ -6,10 +6,10 @@ use std::sync::Arc;
 use maybe_sync::{MaybeSend, MaybeSync};
 use parking_lot::RwLock;
 
-use crate::messenger::Messenger;
 use crate::render::Canvas;
 use crate::view::MapView;
 use crate::TileSchema;
+use crate::{attribution::Attribution, messenger::Messenger};
 
 pub mod data_provider;
 pub mod feature_layer;
@@ -44,6 +44,10 @@ pub trait Layer: MaybeSend + MaybeSync {
     fn tile_schema(&self) -> Option<TileSchema> {
         None
     }
+    /// Returns the attribution of the layer, if available.
+    fn attribution(&self) -> Option<Attribution> {
+        None
+    }
 }
 
 impl<T: Layer + 'static> Layer for Arc<RwLock<T>> {
@@ -69,6 +73,10 @@ impl<T: Layer + 'static> Layer for Arc<RwLock<T>> {
 
     fn tile_schema(&self) -> Option<TileSchema> {
         self.read().tile_schema()
+    }
+
+    fn attribution(&self) -> Option<Attribution> {
+        self.read().attribution()
     }
 }
 
