@@ -76,6 +76,7 @@ pub(crate) fn run() {
         graphics_layer.provider().clone(),
         labels_style,
         tile_schema(),
+        None,
     );
 
     let map = MapBuilder::default()

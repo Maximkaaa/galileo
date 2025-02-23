@@ -16,11 +16,11 @@ use maybe_sync::{MaybeSend, MaybeSync};
 use num_traits::AsPrimitive;
 use parking_lot::{Mutex, RwLock};
 
-use crate::attribution::Attribution;
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, RenderOptions};
 use crate::view::MapView;
+use crate::layer::attribution::Attribution;
 
 mod feature;
 mod feature_store;
@@ -391,6 +391,7 @@ where
     fn attribution(&self) -> Option<Attribution> {
         None
     }
+
 }
 
 impl<P, F, S> FeatureLayer<P, F, S, CartesianSpace2d>

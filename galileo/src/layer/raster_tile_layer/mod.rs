@@ -10,12 +10,12 @@ use quick_cache::sync::Cache;
 use web_time::{Duration, SystemTime};
 
 use super::Layer;
-use crate::attribution::Attribution;
 use crate::decoded_image::DecodedImage;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, ImagePaint, PackedBundle, RenderOptions};
 use crate::tile_schema::{TileIndex, TileSchema};
 use crate::view::MapView;
+use crate::layer::attribution::Attribution;
 
 mod provider;
 pub use provider::{RasterTileProvider, RestTileProvider};
@@ -84,6 +84,7 @@ impl RasterTileLayer {
         tile_provider: Box<dyn RasterTileProvider>,
         tile_schema: TileSchema,
         messenger: Option<Box<dyn Messenger>>,
+        attribution: Option<Attribution>,
     ) -> Self {
         Self {
             tile_provider: tile_provider.into(),
@@ -92,10 +93,7 @@ impl RasterTileLayer {
             fade_in_duration: Duration::from_millis(300),
             tiles: Arc::new(Cache::new(5000)),
             messenger: messenger.map(|m| m.into()),
-            attribution: Some(Attribution::new(
-                "© OpenStreetMap contributors",
-                Some("https://www.openstreetmap.org/copyright"),
-            )),
+            attribution,
         }
     }
 

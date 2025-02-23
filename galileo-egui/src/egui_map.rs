@@ -5,7 +5,7 @@ use egui::load::SizedTexture;
 use egui::{Event, Image, ImageSource, Sense, TextureId, Ui, Vec2};
 use egui_wgpu::wgpu::{FilterMode, TextureView};
 use egui_wgpu::RenderState;
-use galileo::attribution::Attribution;
+use galileo::layer::attribution::Attribution;
 use galileo::control::{
     EventProcessor, MapController, MouseButton, RawUserEvent, UserEventHandler,
 };
@@ -141,6 +141,21 @@ impl EguiMapState {
 
         let (rect, response) = ui.allocate_exact_size(available_size, Sense::click_and_drag());
 
+        let attributions = self.collect_attributions();
+        if attributions.is_some() {
+            egui::Window::new("Attributions")
+            .collapsible(false)
+            .resizable(false)
+            .title_bar(false)
+            .anchor(egui::Align2::RIGHT_BOTTOM, [-10., -10.]) // Position bottom-right
+            .fixed_size([350., 150.])
+            .show(ui.ctx(), |ui| {
+                self.show_attributions(ui); // Render the attributions inside this window
+            });
+        }
+        
+
+
         if self.event_processor.is_dragging() || response.contains_pointer() {
             let events = ui.input(|input_state| input_state.events.clone());
             self.process_events(&events);
@@ -163,21 +178,37 @@ impl EguiMapState {
         .paint_at(ui, rect);
     }
 
-    pub fn collect_attributions(&self) -> Attribution {
-        let all_layer: Vec<_> = self
+    pub fn collect_attributions(&mut self) -> Option<Vec<Attribution>> {
+        let all_layer: Vec<Attribution> = self
             .map
             .layers()
             .iter()
             .filter_map(|layer| layer.attribution())
             .collect();
         if all_layer.is_empty() {
-            Attribution {
-                text: "",
-                url: Some(""),
-            }
+            None
         } else {
-            all_layer[0].clone()
+            Some(all_layer)
         }
+    }
+    fn add_attribution_entry(&mut self, ui: &mut egui::Ui, attribution: &Attribution) {
+        if let Some(url) = attribution.get_url() {
+          ui.hyperlink_to(attribution.get_text(), url);
+        } else {
+          ui.label(attribution.get_text());
+        }
+    }
+
+    pub fn show_attributions(&mut self, ui: &mut egui::Ui) {
+        let attributions = self.collect_attributions().expect("Failed to collect attributions");
+
+        let mut is_first = true;
+        for attribution in &attributions {
+            self.add_attribution_entry(ui,attribution);
+            if !is_first { ui.label(" | "); }
+            is_first = false;
+        }
+        
     }
 
     fn resize_map(&mut self, size: Vec2) {

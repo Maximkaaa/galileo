@@ -14,7 +14,7 @@ use nalgebra::Point2;
 use parking_lot::Mutex;
 pub use vector_tile::VectorTile;
 
-use crate::attribution::Attribution;
+use crate::layer::attribution::Attribution;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::{VectorTileProvider, VtStyleId};
 use crate::layer::Layer;
@@ -130,6 +130,7 @@ impl VectorTileLayer {
         mut tile_provider: VectorTileProvider,
         style: VectorTileStyle,
         tile_schema: TileSchema,
+        attribution: Option<Attribution>,
     ) -> Self {
         let style_id = tile_provider.add_style(style);
         Self {
@@ -138,10 +139,7 @@ impl VectorTileLayer {
             style_id,
             displayed_tiles: Default::default(),
             prev_background: Default::default(),
-            attribution: Some(Attribution {
-                text: "© MapTiler © OpenStreetMap contributors",
-                url: Some("https://www.maptiler.com/copyright/"),
-            }),
+            attribution,
         }
     }
 
@@ -377,10 +375,7 @@ mod tests {
             style_id,
             displayed_tiles: Default::default(),
             prev_background: Default::default(),
-            attribution: Some(Attribution {
-                text: "© MapTiler © OpenStreetMap contributors",
-                url: Some("https://www.maptiler.com/copyright/"),
-            }),
+            attribution: None,
         }
     }
 

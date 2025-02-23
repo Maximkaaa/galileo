@@ -9,12 +9,14 @@ use parking_lot::RwLock;
 use crate::render::Canvas;
 use crate::view::MapView;
 use crate::TileSchema;
-use crate::{attribution::Attribution, messenger::Messenger};
+use crate::messenger::Messenger;
+use crate::layer::attribution::Attribution;
 
 pub mod data_provider;
 pub mod feature_layer;
 pub mod raster_tile_layer;
 pub mod vector_tile_layer;
+pub mod attribution;
 
 pub use feature_layer::{FeatureId, FeatureLayer};
 pub use raster_tile_layer::RasterTileLayer;
@@ -45,9 +47,7 @@ pub trait Layer: MaybeSend + MaybeSync {
         None
     }
     /// Returns the attribution of the layer, if available.
-    fn attribution(&self) -> Option<Attribution> {
-        None
-    }
+    fn attribution(&self) -> Option<Attribution> ;
 }
 
 impl<T: Layer + 'static> Layer for Arc<RwLock<T>> {
@@ -105,5 +105,8 @@ impl Layer for TestLayer {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+    fn attribution(&self) -> Option<Attribution> {
+        None
     }
 }

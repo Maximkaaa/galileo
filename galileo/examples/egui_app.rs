@@ -1,7 +1,6 @@
 //! Example showing how to integrate Galileo map into your egui application.
 
 use eframe::CreationContext;
-use egui::Align2;
 use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::{Map, MapBuilder};
 use galileo_egui::{EguiMap, EguiMapState};
@@ -39,24 +38,7 @@ impl eframe::App for EguiMapApp {
                 .with_position(&mut self.position)
                 .with_resolution(&mut self.resolution)
                 .show_ui(ui);
-
-            egui::Window::new("Attribution")
-                .collapsible(false)
-                .resizable(false)
-                .title_bar(false)
-                .anchor(Align2::RIGHT_BOTTOM, [-10., -10.])
-                .fixed_size([350., 150.])
-                .show(ui.ctx(), |ui| {
-                    ui.hyperlink_to(
-                        self.map.collect_attributions().text,
-                        self.map
-                            .collect_attributions()
-                            .url
-                            .clone()
-                            .expect("failed to get url"),
-                    );
-                });
-
+            
             egui::Window::new("Galileo map").show(ctx, |ui| {
                 ui.label("Map center position:");
                 ui.label(format!(
