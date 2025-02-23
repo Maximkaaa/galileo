@@ -38,7 +38,7 @@ impl eframe::App for EguiMapApp {
                 .with_position(&mut self.position)
                 .with_resolution(&mut self.resolution)
                 .show_ui(ui);
-            
+
             egui::Window::new("Galileo map").show(ctx, |ui| {
                 ui.label("Map center position:");
                 ui.label(format!(

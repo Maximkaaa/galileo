@@ -89,7 +89,10 @@ pub(crate) fn run() {
     .with_style(style)
     .with_tile_schema(tile_schema())
     .with_file_cache_checked(".tile_cache")
-    .with_attribution("© MapTiler© OpenStreetMap contributors".to_string(),"https://www.maptiler.com/copyright/".to_string())
+    .with_attribution(
+        "© MapTiler© OpenStreetMap contributors".to_string(),
+        "https://www.maptiler.com/copyright/".to_string(),
+    )
     .build()
     .expect("failed to create layer");
 

@@ -11,11 +11,11 @@ use web_time::{Duration, SystemTime};
 
 use super::Layer;
 use crate::decoded_image::DecodedImage;
+use crate::layer::attribution::Attribution;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, ImagePaint, PackedBundle, RenderOptions};
 use crate::tile_schema::{TileIndex, TileSchema};
 use crate::view::MapView;
-use crate::layer::attribution::Attribution;
 
 mod provider;
 pub use provider::{RasterTileProvider, RestTileProvider};

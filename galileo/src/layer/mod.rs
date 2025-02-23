@@ -6,17 +6,17 @@ use std::sync::Arc;
 use maybe_sync::{MaybeSend, MaybeSync};
 use parking_lot::RwLock;
 
+use crate::layer::attribution::Attribution;
+use crate::messenger::Messenger;
 use crate::render::Canvas;
 use crate::view::MapView;
 use crate::TileSchema;
-use crate::messenger::Messenger;
-use crate::layer::attribution::Attribution;
 
+pub mod attribution;
 pub mod data_provider;
 pub mod feature_layer;
 pub mod raster_tile_layer;
 pub mod vector_tile_layer;
-pub mod attribution;
 
 pub use feature_layer::{FeatureId, FeatureLayer};
 pub use raster_tile_layer::RasterTileLayer;
@@ -47,7 +47,7 @@ pub trait Layer: MaybeSend + MaybeSync {
         None
     }
     /// Returns the attribution of the layer, if available.
-    fn attribution(&self) -> Option<Attribution> ;
+    fn attribution(&self) -> Option<Attribution>;
 }
 
 impl<T: Layer + 'static> Layer for Arc<RwLock<T>> {

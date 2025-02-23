@@ -49,7 +49,7 @@ pub struct VectorTileLayerBuilder {
     messenger: Option<Box<dyn Messenger>>,
     cache: CacheType,
     offline_mode: bool,
-    attribution:Option<Attribution>
+    attribution: Option<Attribution>,
 }
 
 enum ProviderType {
@@ -114,7 +114,7 @@ impl VectorTileLayerBuilder {
             messenger: None,
             cache: CacheType::None,
             offline_mode: false,
-            attribution:None
+            attribution: None,
         }
     }
 
@@ -174,7 +174,7 @@ impl VectorTileLayerBuilder {
     /// * `text` - A `String` containing the text of the attribution.
     /// * `url` - A `String` containing the URL associated with the attribution.
     ///
-    pub fn with_attribution(mut self, text:String, url:String) -> Self {
+    pub fn with_attribution(mut self, text: String, url: String) -> Self {
         self.attribution = Some(Attribution::new(text, Some(url)));
         self
     }
