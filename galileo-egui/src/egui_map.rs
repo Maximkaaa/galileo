@@ -145,10 +145,9 @@ impl EguiMapState {
         if attributions.is_some() {
             egui::Window::new("Attributions")
                 .collapsible(false)
-                .resizable(false)
                 .title_bar(false)
-                .anchor(egui::Align2::RIGHT_BOTTOM, [-10., -10.]) // Position bottom-right
-                .fixed_size([350., 150.])
+                .anchor(egui::Align2::RIGHT_BOTTOM, [-10., -10.])
+                .auto_sized() // Position bottom-right
                 .show(ui.ctx(), |ui| {
                     self.show_attributions(ui); // Render the attributions inside this window
                 });

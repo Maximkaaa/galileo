@@ -311,6 +311,14 @@ impl RasterTileLayerBuilder {
         self
     }
 
+    /// Sets the custom attribution with the given text and URL.
+    /// The attribution consists of a text
+    /// description and an optional URL where more information or the source can be found.
+    pub fn with_attribution(mut self, text: String, url: String) -> Self {
+        self.attribution = Some(Attribution::new(text, Some(url)));
+        self
+    }
+
     /// Consumes the builder and constructs the raster tile layer.
     ///
     /// Will return an error if the layer is configured incorrectly or if the cache controller
