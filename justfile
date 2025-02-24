@@ -9,6 +9,6 @@ web_example NAME:
 
 # Download font files needed for examples
 get_fonts:
-  wget https://Maximkaaa.github.io/fonts.zip
+  if command -v wget > /dev/null; then wget https://Maximkaaa.github.io/fonts.zip; else curl -L https://Maximkaaa.github.io/fonts.zip -o fonts.zip; fi
   unzip fonts.zip -d galileo/examples/data
   rm fonts.zip

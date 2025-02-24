@@ -11,6 +11,7 @@ use web_time::{Duration, SystemTime};
 
 use super::Layer;
 use crate::decoded_image::DecodedImage;
+use crate::layer::attribution::Attribution;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, ImagePaint, PackedBundle, RenderOptions};
 use crate::tile_schema::{TileIndex, TileSchema};
@@ -30,6 +31,7 @@ pub struct RasterTileLayer {
     tiles: Arc<Cache<TileIndex, Arc<TileState>>>,
     prev_drawn_tiles: Mutex<Vec<TileIndex>>,
     messenger: Option<Arc<dyn Messenger>>,
+    attribution: Option<Attribution>,
 }
 
 impl std::fmt::Debug for RasterTileLayer {
@@ -74,6 +76,7 @@ impl RasterTileLayer {
             fade_in_duration: Duration::from_millis(300),
             tiles: Arc::new(Cache::new(5000)),
             messenger,
+            attribution: None,
         }
     }
 
@@ -81,6 +84,7 @@ impl RasterTileLayer {
         tile_provider: Box<dyn RasterTileProvider>,
         tile_schema: TileSchema,
         messenger: Option<Box<dyn Messenger>>,
+        attribution: Option<Attribution>,
     ) -> Self {
         Self {
             tile_provider: tile_provider.into(),
@@ -89,6 +93,7 @@ impl RasterTileLayer {
             fade_in_duration: Duration::from_millis(300),
             tiles: Arc::new(Cache::new(5000)),
             messenger: messenger.map(|m| m.into()),
+            attribution,
         }
     }
 
@@ -380,5 +385,9 @@ impl Layer for RasterTileLayer {
 
     fn tile_schema(&self) -> Option<TileSchema> {
         Some(self.tile_schema.clone())
+    }
+
+    fn attribution(&self) -> Option<Attribution> {
+        self.attribution.clone()
     }
 }

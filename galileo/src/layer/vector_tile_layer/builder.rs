@@ -11,6 +11,7 @@ use super::tile_provider::processor::VectorTileProcessor;
 use super::tile_provider::VectorTileProvider;
 use super::VectorTileLayer;
 use crate::error::GalileoError;
+use crate::layer::attribution::Attribution;
 use crate::layer::data_provider::{FileCacheController, PersistentCacheController, UrlSource};
 use crate::layer::Layer;
 use crate::tile_schema::TileIndex;
@@ -48,6 +49,7 @@ pub struct VectorTileLayerBuilder {
     messenger: Option<Box<dyn Messenger>>,
     cache: CacheType,
     offline_mode: bool,
+    attribution: Option<Attribution>,
 }
 
 enum ProviderType {
@@ -84,6 +86,7 @@ impl VectorTileLayerBuilder {
             messenger: None,
             cache: CacheType::None,
             offline_mode: false,
+            attribution: None,
         }
     }
 
@@ -111,6 +114,7 @@ impl VectorTileLayerBuilder {
             messenger: None,
             cache: CacheType::None,
             offline_mode: false,
+            attribution: None,
         }
     }
 
@@ -156,6 +160,22 @@ impl VectorTileLayerBuilder {
         // have both methods for future, when we want to add support for more platforms or have a
         // better way to check if the FS operations are available on the current target.
         self.cache = CacheType::File(path.as_ref().into());
+        self
+    }
+
+    /// Sets the attribution for the vector tile layer with the given text and URL.
+    ///
+    /// This method allows specifying an attribution, typically used for citing sources
+    /// or providing credit for the data being used. The attribution consists of a text
+    /// description and an optional URL where more information or the source can be found.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - A `String` containing the text of the attribution.
+    /// * `url` - A `String` containing the URL associated with the attribution.
+    ///
+    pub fn with_attribution(mut self, text: String, url: String) -> Self {
+        self.attribution = Some(Attribution::new(text, Some(url)));
         self
     }
 
@@ -333,6 +353,7 @@ impl VectorTileLayerBuilder {
             messenger,
             cache,
             offline_mode,
+            attribution,
         } = self;
 
         let tile_schema = tile_schema.unwrap_or_else(|| TileSchema::web(18));
@@ -371,7 +392,7 @@ impl VectorTileLayerBuilder {
 
         let style = style.unwrap_or_else(Self::default_style);
 
-        let mut layer = VectorTileLayer::new(provider, style, tile_schema);
+        let mut layer = VectorTileLayer::new(provider, style, tile_schema, attribution);
         if let Some(messenger) = messenger {
             layer.set_messenger(messenger);
         }

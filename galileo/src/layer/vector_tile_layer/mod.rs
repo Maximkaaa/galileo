@@ -14,6 +14,7 @@ use nalgebra::Point2;
 use parking_lot::Mutex;
 pub use vector_tile::VectorTile;
 
+use crate::layer::attribution::Attribution;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::{VectorTileProvider, VtStyleId};
 use crate::layer::Layer;
@@ -37,6 +38,7 @@ pub struct VectorTileLayer {
     style_id: VtStyleId,
     displayed_tiles: Mutex<Vec<DisplayedTile>>,
     prev_background: Mutex<Option<PreviousBackground>>,
+    attribution: Option<Attribution>,
 }
 
 impl std::fmt::Debug for VectorTileLayer {
@@ -109,6 +111,10 @@ impl Layer for VectorTileLayer {
     fn tile_schema(&self) -> Option<TileSchema> {
         Some(self.tile_schema.clone())
     }
+
+    fn attribution(&self) -> Option<Attribution> {
+        self.attribution.clone()
+    }
 }
 
 impl VectorTileLayer {
@@ -124,6 +130,7 @@ impl VectorTileLayer {
         mut tile_provider: VectorTileProvider,
         style: VectorTileStyle,
         tile_schema: TileSchema,
+        attribution: Option<Attribution>,
     ) -> Self {
         let style_id = tile_provider.add_style(style);
         Self {
@@ -132,6 +139,7 @@ impl VectorTileLayer {
             style_id,
             displayed_tiles: Default::default(),
             prev_background: Default::default(),
+            attribution,
         }
     }
 
@@ -367,6 +375,7 @@ mod tests {
             style_id,
             displayed_tiles: Default::default(),
             prev_background: Default::default(),
+            attribution: None,
         }
     }
 
