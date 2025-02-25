@@ -4,6 +4,7 @@ use bytes::Bytes;
 
 use super::{RasterTileLayer, RasterTileProvider, RestTileProvider};
 use crate::error::GalileoError;
+use crate::layer::attribution::Attribution;
 use crate::layer::data_provider::{FileCacheController, PersistentCacheController, UrlSource};
 use crate::tile_schema::TileIndex;
 use crate::{Messenger, TileSchema};
@@ -30,6 +31,7 @@ pub struct RasterTileLayerBuilder {
     messenger: Option<Box<dyn Messenger>>,
     cache: CacheType,
     offline_mode: bool,
+    attribution: Option<Attribution>,
 }
 
 enum ProviderType {
@@ -65,6 +67,7 @@ impl RasterTileLayerBuilder {
             messenger: None,
             cache: CacheType::None,
             offline_mode: false,
+            attribution: None,
         }
     }
 
@@ -92,6 +95,10 @@ impl RasterTileLayerBuilder {
             messenger: None,
             cache: CacheType::None,
             offline_mode: false,
+            attribution: Some(Attribution::new(
+                "© OpenStreetMap contributors".to_string(),
+                Some("https://www.openstreetmap.org/copyright".to_string()),
+            )),
         }
     }
 
@@ -121,6 +128,7 @@ impl RasterTileLayerBuilder {
             messenger: None,
             cache: CacheType::None,
             offline_mode: false,
+            attribution: None,
         }
     }
 
@@ -303,6 +311,14 @@ impl RasterTileLayerBuilder {
         self
     }
 
+    /// Sets the custom attribution with the given text and URL.
+    /// The attribution consists of a text
+    /// description and an optional URL where more information or the source can be found.
+    pub fn with_attribution(mut self, text: String, url: String) -> Self {
+        self.attribution = Some(Attribution::new(text, Some(url)));
+        self
+    }
+
     /// Consumes the builder and constructs the raster tile layer.
     ///
     /// Will return an error if the layer is configured incorrectly or if the cache controller
@@ -314,6 +330,7 @@ impl RasterTileLayerBuilder {
             messenger,
             cache,
             offline_mode,
+            attribution,
         } = self;
 
         let tile_schema = tile_schema.unwrap_or_else(|| TileSchema::web(18));
@@ -348,7 +365,12 @@ impl RasterTileLayerBuilder {
             }
         };
 
-        Ok(RasterTileLayer::new_raw(provider, tile_schema, messenger))
+        Ok(RasterTileLayer::new_raw(
+            provider,
+            tile_schema,
+            messenger,
+            attribution,
+        ))
     }
 }
 

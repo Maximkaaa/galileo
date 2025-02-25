@@ -40,6 +40,10 @@ pub(crate) fn run() {
     .with_file_cache_checked(".tile_cache")
     .with_style(default_style())
     .with_tile_schema(tile_schema())
+    .with_attribution(
+        "© MapTiler© OpenStreetMap contributors".to_string(),
+        "https://www.maptiler.com/copyright/".to_string(),
+    )
     .build()
     .expect("failed to create layer");
 
@@ -76,6 +80,7 @@ pub(crate) fn run() {
         graphics_layer.provider().clone(),
         labels_style,
         tile_schema(),
+        None,
     );
 
     let map = MapBuilder::default()

@@ -10,6 +10,7 @@ use galileo::control::{
 };
 use galileo::galileo_types::cartesian::{Point2d, Size};
 use galileo::galileo_types::geo::impls::GeoPoint2d;
+use galileo::layer::attribution::Attribution;
 use galileo::render::WgpuRenderer;
 use galileo::{Map, Messenger};
 
@@ -140,6 +141,18 @@ impl EguiMapState {
 
         let (rect, response) = ui.allocate_exact_size(available_size, Sense::click_and_drag());
 
+        let attributions = self.collect_attributions();
+        if attributions.is_some() {
+            egui::Window::new("Attributions")
+                .collapsible(false)
+                .title_bar(false)
+                .anchor(egui::Align2::RIGHT_BOTTOM, [-10., -10.])
+                .auto_sized() // Position bottom-right
+                .show(ui.ctx(), |ui| {
+                    self.show_attributions(ui); // Render the attributions inside this window
+                });
+        }
+
         if self.event_processor.is_dragging() || response.contains_pointer() {
             let events = ui.input(|input_state| input_state.events.clone());
             self.process_events(&events);
@@ -160,6 +173,42 @@ impl EguiMapState {
             Vec2::new(map_size.width(), map_size.height()),
         )))
         .paint_at(ui, rect);
+    }
+
+    pub fn collect_attributions(&mut self) -> Option<Vec<Attribution>> {
+        let all_layer: Vec<Attribution> = self
+            .map
+            .layers()
+            .iter()
+            .filter_map(|layer| layer.attribution())
+            .collect();
+        if all_layer.is_empty() {
+            None
+        } else {
+            Some(all_layer)
+        }
+    }
+    fn add_attribution_entry(&mut self, ui: &mut egui::Ui, attribution: &Attribution) {
+        if let Some(url) = attribution.get_url() {
+            ui.hyperlink_to(attribution.get_text(), url);
+        } else {
+            ui.label(attribution.get_text());
+        }
+    }
+
+    pub fn show_attributions(&mut self, ui: &mut egui::Ui) {
+        let attributions = self
+            .collect_attributions()
+            .expect("Failed to collect attributions");
+
+        let mut is_first = true;
+        for attribution in &attributions {
+            self.add_attribution_entry(ui, attribution);
+            if !is_first {
+                ui.label(" | ");
+            }
+            is_first = false;
+        }
     }
 
     fn resize_map(&mut self, size: Vec2) {
