@@ -390,15 +390,7 @@ impl VectorTileLayerBuilder {
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
-            use crate::render::render_bundle::{RenderBundle, RenderBundleType};
-
-            crate::platform::native::vt_processor::ThreadVtProcessor::new(
-                tile_schema.clone(),
-                RenderBundle(RenderBundleType::Tessellating(
-                    TessellatingRenderBundle::new(),
-                )),
-            )
+            crate::platform::native::vt_processor::ThreadVtProcessor::new(tile_schema.clone())
         }
     }
 

@@ -12,6 +12,7 @@ use web_time::{Duration, SystemTime};
 use super::Layer;
 use crate::decoded_image::DecodedImage;
 use crate::messenger::Messenger;
+use crate::render::render_bundle::RenderBundle;
 use crate::render::{Canvas, ImagePaint, PackedBundle, RenderOptions};
 use crate::tile_schema::{TileIndex, TileSchema};
 use crate::view::MapView;
@@ -223,7 +224,7 @@ impl RasterTileLayer {
                     }
                 }
                 TileState::Loaded(decoded_image) => {
-                    let mut bundle = canvas.create_bundle();
+                    let mut bundle = RenderBundle::default();
                     let mut decoded_image = decoded_image.lock();
 
                     let owned = std::mem::replace(

@@ -19,10 +19,8 @@ use super::{Canvas, PackedBundle, RenderOptions};
 use crate::error::GalileoError;
 use crate::layer::Layer;
 use crate::map::Map;
-use crate::render::render_bundle::tessellating::{
-    PointInstance, PolyVertex, TessellatingRenderBundle,
-};
-use crate::render::render_bundle::{RenderBundle, RenderBundleType};
+use crate::render::render_bundle::tessellating::{PointInstance, PolyVertex, WorldRenderSet};
+use crate::render::render_bundle::RenderBundle;
 use crate::render::wgpu::pipelines::image::WgpuImage;
 use crate::render::wgpu::pipelines::Pipelines;
 use crate::view::MapView;
@@ -662,12 +660,6 @@ impl WgpuRenderer {
 
         Size::new(size.width() as f64, size.height() as f64)
     }
-
-    fn create_bundle(&self) -> RenderBundle {
-        RenderBundle(RenderBundleType::Tessellating(
-            TessellatingRenderBundle::new(),
-        ))
-    }
 }
 
 #[allow(dead_code)]
@@ -718,18 +710,12 @@ impl Canvas for WgpuCanvas<'_> {
         self.renderer.size()
     }
 
-    fn create_bundle(&self) -> RenderBundle {
-        self.renderer.create_bundle()
-    }
-
     fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle> {
-        match bundle {
-            RenderBundle(RenderBundleType::Tessellating(inner)) => Box::new(WgpuPackedBundle::new(
-                inner,
-                self.renderer,
-                self.renderer_targets,
-            )),
-        }
+        Box::new(WgpuPackedBundle::new(
+            &bundle.world_set,
+            self.renderer,
+            self.renderer_targets,
+        ))
     }
 
     fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle], options: RenderOptions) {
@@ -846,11 +832,11 @@ struct WgpuDotBuffers {
 
 impl WgpuPackedBundle {
     fn new(
-        bundle: &TessellatingRenderBundle,
+        bundle: &WorldRenderSet,
         renderer: &WgpuRenderer,
         renderer_targets: &RendererTargets,
     ) -> Self {
-        let TessellatingRenderBundle {
+        let WorldRenderSet {
             poly_tessellation,
             points,
             screen_ref,

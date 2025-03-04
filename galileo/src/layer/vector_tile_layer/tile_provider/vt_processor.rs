@@ -54,7 +54,7 @@ impl VtProcessor {
             ]),
             vec![],
         );
-        bundle.clip_area(&bounds);
+        bundle.world_set.clip_area(&bounds);
 
         for layer in mvt_tile.layers.iter().rev() {
             for feature in &layer.features {

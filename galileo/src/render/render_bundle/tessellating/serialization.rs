@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::decoded_image::{DecodedImage, DecodedImageType};
 use crate::render::render_bundle::tessellating::{
-    ImageInfo, PolyVertex, ScreenRefVertex, TessellatingRenderBundle,
+    ImageInfo, PolyVertex, ScreenRefVertex, WorldRenderSet,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -82,7 +82,7 @@ impl ScreenRefVertexBuffersBytes {
     }
 }
 
-impl TessellatingRenderBundle {
+impl WorldRenderSet {
     pub(crate) fn into_bytes(self) -> TessellatingRenderBundleBytes {
         TessellatingRenderBundleBytes {
             poly_tessellation: self.poly_tessellation.into(),

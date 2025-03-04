@@ -93,11 +93,10 @@ impl BundleStore {
 
     pub(super) fn with_bundle(
         &mut self,
-        canvas: &dyn Canvas,
         predicate: impl FnOnce(&mut RenderBundle) -> FeatureId,
     ) {
         let (bundle_id, curr_bundle) = {
-            let v = self.curr_bundle(canvas);
+            let v = self.curr_bundle();
             (v.0, &mut v.1)
         };
 
@@ -108,12 +107,10 @@ impl BundleStore {
         self.feature_to_bundle_map.insert(feature_id, bundle_id);
     }
 
-    fn curr_bundle(&mut self, canvas: &dyn Canvas) -> &mut (BundleId, RenderBundle) {
+    fn curr_bundle(&mut self) -> &mut (BundleId, RenderBundle) {
         if self.last_bundle_is_full() {
-            let new_bundle = canvas.create_bundle();
             let new_id = BundleId::next();
-
-            self.unpacked.push((new_id, new_bundle));
+            self.unpacked.push((new_id, RenderBundle::default()));
         }
 
         let idx = self.unpacked.len() - 1;
@@ -124,7 +121,7 @@ impl BundleStore {
         self.unpacked
             .iter()
             .last()
-            .map(|(_, last)| last.approx_buffer_size() >= self.bundle_size_limit)
+            .map(|(_, last)| last.world_set.approx_buffer_size() >= self.bundle_size_limit)
             .unwrap_or(true)
     }
 

@@ -18,7 +18,7 @@ use wasm_bindgen::JsCast;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::processor::TileProcessingError;
 use crate::render::render_bundle::tessellating::serialization::TessellatingRenderBundleBytes;
-use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
+use crate::render::render_bundle::tessellating::WorldRenderSet;
 use crate::render::render_bundle::{RenderBundle, RenderBundleType};
 use crate::tile_schema::TileIndex;
 use crate::TileSchema;
@@ -114,7 +114,7 @@ impl TryFrom<Result<WebWorkerResponsePayload, WebWorkerError>> for RenderBundle 
                     bincode::serde::decode_from_slice(&bytes, bincode::config::standard())
                         .expect("Failed to deserialize render bundle bytes");
                 RenderBundle(RenderBundleType::Tessellating(
-                    TessellatingRenderBundle::from_bytes_unchecked(converted),
+                    WorldRenderSet::from_bytes_unchecked(converted),
                 ))
             }),
             _ => {
@@ -304,7 +304,7 @@ mod worker {
     use wasm_bindgen::{JsCast, JsValue};
 
     use super::{
-        RenderBundleType, TessellatingRenderBundle, WebWorkerRequest, WebWorkerRequestId,
+        RenderBundleType, WorldRenderSet, WebWorkerRequest, WebWorkerRequestId,
         WebWorkerRequestPayload, WebWorkerResponse,
     };
     use crate::layer::vector_tile_layer::style::VectorTileStyle;
@@ -413,7 +413,7 @@ mod worker {
         tile_schema: TileSchema,
     ) -> WebWorkerResponsePayload {
         let mut bundle = RenderBundle(RenderBundleType::Tessellating(
-            TessellatingRenderBundle::new(),
+            WorldRenderSet::new(),
         ));
         let result = match VtProcessor::prepare(&tile, &mut bundle, index, &style, &tile_schema) {
             Ok(()) => {
