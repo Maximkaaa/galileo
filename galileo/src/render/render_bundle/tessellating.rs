@@ -25,14 +25,14 @@ use crate::render::{ImagePaint, LinePaint, PolygonPaint};
 use crate::Color;
 
 #[derive(Debug, Clone)]
-pub(crate) struct TessellatingRenderBundle {
+pub(crate) struct WorldRenderSet {
     pub poly_tessellation: VertexBuffers<PolyVertex, u32>,
     pub points: Vec<PointInstance>,
     pub screen_ref: ScreenRefTessellation,
     pub images: Vec<ImageInfo>,
     pub clip_area: Option<VertexBuffers<PolyVertex, u32>>,
     pub image_store: Vec<Arc<DecodedImage>>,
-    buffer_size: usize,
+    pub buffer_size: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -51,13 +51,13 @@ pub(crate) struct ScreenRefVertex {
     color: [u8; 4],
 }
 
-impl Default for TessellatingRenderBundle {
+impl Default for WorldRenderSet {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl TessellatingRenderBundle {
+impl WorldRenderSet {
     pub fn new() -> Self {
         Self {
             poly_tessellation: VertexBuffers::new(),
@@ -72,10 +72,6 @@ impl TessellatingRenderBundle {
 
     pub fn approx_buffer_size(&self) -> usize {
         self.buffer_size
-    }
-
-    pub fn set_approx_buffer_size(&mut self, size: usize) {
-        self.buffer_size = size;
     }
 
     pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly)

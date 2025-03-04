@@ -37,8 +37,6 @@ pub mod text;
 pub trait Canvas {
     /// Size of the drawing area.
     fn size(&self) -> Size;
-    /// Creates a new render bundle.
-    fn create_bundle(&self) -> RenderBundle;
     /// Packs a bundle to make it ready for be rendered with [`Canvas::draw_bundles`] method.
     fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle>;
     /// Render the bundles.

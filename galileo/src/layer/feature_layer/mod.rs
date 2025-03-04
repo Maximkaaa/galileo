@@ -236,7 +236,7 @@ where
         match store.required_update() {
             UpdateType::All => {
                 for (id, feature) in self.features.iter() {
-                    store.with_bundle(canvas, |bundle| {
+                    store.with_bundle(|bundle| {
                         if let Some(projected) = feature.geometry().project(&*projection) {
                             self.symbol
                                 .render(feature, &projected, lod.min_resolution, bundle);
@@ -251,7 +251,7 @@ where
                     let Some(feature) = self.features.get(id) else {
                         continue;
                     };
-                    store.with_bundle(canvas, |bundle| {
+                    store.with_bundle(|bundle| {
                         if let Some(projected) = feature.geometry().project(&*projection) {
                             self.symbol
                                 .render(feature, &projected, lod.min_resolution, bundle);

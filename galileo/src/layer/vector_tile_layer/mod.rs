@@ -19,6 +19,7 @@ use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::{VectorTileProvider, VtStyleId};
 use crate::layer::Layer;
 use crate::messenger::Messenger;
+use crate::render::render_bundle::RenderBundle;
 use crate::render::{Canvas, PackedBundle, PolygonPaint, RenderOptions};
 use crate::tile_schema::{TileIndex, TileSchema};
 use crate::view::MapView;
@@ -304,7 +305,7 @@ impl VectorTileLayer {
         view: &MapView,
         canvas: &mut dyn Canvas,
     ) -> Option<Box<dyn PackedBundle>> {
-        let mut bundle = canvas.create_bundle();
+        let mut bundle = RenderBundle::default();
         let bbox = view.get_bbox()?;
         let bounds = Polygon::new(
             ClosedContour::new(vec![
@@ -354,18 +355,13 @@ impl VectorTileLayer {
 mod tests {
     use super::*;
     use crate::platform::native::vt_processor::ThreadVtProcessor;
-    use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
-    use crate::render::render_bundle::{RenderBundle, RenderBundleType};
     use crate::tests::TestTileLoader;
 
     fn test_layer() -> VectorTileLayer {
         let tile_schema = TileSchema::web(18);
-        let empty_bundle = RenderBundle(RenderBundleType::Tessellating(
-            TessellatingRenderBundle::new(),
-        ));
         let mut provider = VectorTileProvider::new(
             Arc::new(TestTileLoader {}),
-            Arc::new(ThreadVtProcessor::new(tile_schema.clone(), empty_bundle)),
+            Arc::new(ThreadVtProcessor::new(tile_schema.clone())),
         );
 
         let style_id = provider.add_style(VectorTileStyle::default());

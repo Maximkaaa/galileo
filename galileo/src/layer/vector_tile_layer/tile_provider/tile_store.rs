@@ -77,7 +77,7 @@ struct TileWeighter;
 impl Weighter<(TileIndex, VtStyleId), TileStoreEntry> for TileWeighter {
     fn weight(&self, _key: &(TileIndex, VtStyleId), val: &TileStoreEntry) -> u32 {
         match &val.prepared_tile {
-            PreparedTileState::Loaded(v) => v.approx_buffer_size() as u32,
+            PreparedTileState::Loaded(v) => v.world_set.approx_buffer_size() as u32,
             _ => EMPTY_CELL_SIZE,
         }
     }
@@ -227,14 +227,10 @@ impl TileStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::render::render_bundle::tessellating::TessellatingRenderBundle;
-    use crate::render::render_bundle::RenderBundleType;
 
     fn render_bundle(size: usize) -> RenderBundle {
-        let mut bundle = RenderBundle(RenderBundleType::Tessellating(
-            TessellatingRenderBundle::new(),
-        ));
-        bundle.set_approx_buffer_size(size);
+        let mut bundle = RenderBundle::default();
+        bundle.world_set.buffer_size = size;
 
         bundle
     }

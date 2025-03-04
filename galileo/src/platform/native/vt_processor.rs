@@ -19,16 +19,14 @@ use crate::TileSchema;
 /// Vector tile processor that uses a thread pool to run vector tile tessellation in parallel.
 pub struct ThreadVtProcessor {
     tile_schema: TileSchema,
-    empty_bundle: RenderBundle,
     styles: RwLock<HashMap<VtStyleId, Arc<VectorTileStyle>>>,
 }
 
 impl ThreadVtProcessor {
     /// Create a new instance of the processor.
-    pub fn new(tile_schema: TileSchema, empty_bundle: RenderBundle) -> Self {
+    pub fn new(tile_schema: TileSchema) -> Self {
         Self {
             tile_schema,
-            empty_bundle,
             styles: Default::default(),
         }
     }
@@ -63,7 +61,7 @@ impl VectorTileProcessor for ThreadVtProcessor {
             return Err(TileProcessingError::InvalidStyle);
         };
 
-        let mut bundle = self.empty_bundle.clone();
+        let mut bundle = RenderBundle::default();
         let tile_schema = self.tile_schema.clone();
 
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
