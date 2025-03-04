@@ -38,11 +38,11 @@ const TARGET_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
 pub struct WgpuRenderer {
     device: Device,
     queue: Queue,
-    render_set: Option<RenderSet>,
+    renderer_targets: Option<RendererTargets>,
     background: Color,
 }
 
-struct RenderSet {
+struct RendererTargets {
     render_target: RenderTarget,
     pipelines: Pipelines,
     multisampling_view: TextureView,
@@ -123,7 +123,7 @@ impl WgpuRenderer {
         Some(Self {
             device,
             queue,
-            render_set: None,
+            renderer_targets: None,
             background: DEFAULT_BACKGROUND,
         })
     }
@@ -141,7 +141,7 @@ impl WgpuRenderer {
     fn init_target_texture(&mut self, size: Size<u32>) {
         let target_texture = Self::create_target_texture(&self.device, size);
         let render_target = RenderTarget::Texture(target_texture, size);
-        self.init_render_set(render_target);
+        self.init_renderer_targets(render_target);
     }
 
     fn create_target_texture(device: &Device, size: Size<u32>) -> Texture {
@@ -163,10 +163,10 @@ impl WgpuRenderer {
         })
     }
 
-    fn init_render_set(&mut self, new_target: RenderTarget) {
-        let current_set = self.render_set.take();
+    fn init_renderer_targets(&mut self, new_target: RenderTarget) {
+        let current_set = self.renderer_targets.take();
         match current_set {
-            Some(RenderSet {
+            Some(RendererTargets {
                 render_target,
                 pipelines,
                 multisampling_view,
@@ -179,7 +179,7 @@ impl WgpuRenderer {
                     Pipelines::create(&self.device, new_target.format())
                 };
 
-                self.render_set = Some(RenderSet {
+                self.renderer_targets = Some(RendererTargets {
                     render_target: new_target,
                     pipelines,
                     multisampling_view,
@@ -187,11 +187,11 @@ impl WgpuRenderer {
                     stencil_view,
                 })
             }
-            _ => self.render_set = Some(self.create_render_set(new_target)),
+            _ => self.renderer_targets = Some(self.create_renderer_targets(new_target)),
         }
     }
 
-    fn create_render_set(&self, render_target: RenderTarget) -> RenderSet {
+    fn create_renderer_targets(&self, render_target: RenderTarget) -> RendererTargets {
         let size = render_target.size();
         let format = render_target.format();
 
@@ -201,7 +201,7 @@ impl WgpuRenderer {
 
         let pipelines = Pipelines::create(&self.device, format);
 
-        RenderSet {
+        RendererTargets {
             render_target,
             pipelines,
             multisampling_view,
@@ -300,10 +300,10 @@ impl WgpuRenderer {
         let mut renderer = Self {
             device,
             queue,
-            render_set: None,
+            renderer_targets: None,
             background: DEFAULT_BACKGROUND,
         };
-        renderer.init_render_set(render_target);
+        renderer.init_renderer_targets(render_target);
 
         renderer
     }
@@ -314,7 +314,7 @@ impl WgpuRenderer {
         let mut renderer = Self {
             device,
             queue,
-            render_set: None,
+            renderer_targets: None,
             background: DEFAULT_BACKGROUND,
         };
 
@@ -330,7 +330,7 @@ impl WgpuRenderer {
 
     /// Returns `true` if the renderer can be used to draw to.
     pub fn initialized(&self) -> bool {
-        self.render_set.is_some()
+        self.renderer_targets.is_some()
     }
 
     fn create_instance() -> wgpu::Instance {
@@ -414,7 +414,7 @@ impl WgpuRenderer {
 
     /// De-initializes the renderer.
     pub fn clear_render_target(&mut self) {
-        self.render_set = None;
+        self.renderer_targets = None;
     }
 
     /// Re-initializes the renderer with the given window.
@@ -450,7 +450,7 @@ impl WgpuRenderer {
         surface.configure(&self.device, &config);
 
         let render_target = RenderTarget::Surface { surface, config };
-        self.init_render_set(render_target);
+        self.init_renderer_targets(render_target);
     }
 
     /// Changes the size of the buffer to be drawn to.
@@ -458,15 +458,15 @@ impl WgpuRenderer {
     /// This must be called if a window size is change before any render calls are done.
     pub fn resize(&mut self, new_size: Size<u32>) {
         let format = self.target_format();
-        let Some(render_set) = &mut self.render_set else {
+        let Some(renderer_targets) = &mut self.renderer_targets else {
             return;
         };
 
-        if render_set.render_target.size() != new_size
+        if renderer_targets.render_target.size() != new_size
             && new_size.width() > 0
             && new_size.height() > 0
         {
-            match &mut render_set.render_target {
+            match &mut renderer_targets.render_target {
                 RenderTarget::Surface { config, surface } => {
                     config.width = new_size.width();
                     config.height = new_size.height();
@@ -479,17 +479,17 @@ impl WgpuRenderer {
                 }
             }
 
-            render_set.multisampling_view =
+            renderer_targets.multisampling_view =
                 Self::create_multisample_texture(&self.device, new_size, format);
-            render_set.stencil_view_multisample =
+            renderer_targets.stencil_view_multisample =
                 Self::create_stencil_texture(&self.device, new_size, 4);
-            render_set.stencil_view = Self::create_stencil_texture(&self.device, new_size, 1);
+            renderer_targets.stencil_view = Self::create_stencil_texture(&self.device, new_size, 1);
         }
     }
 
     fn target_format(&self) -> TextureFormat {
-        match &self.render_set {
-            Some(RenderSet {
+        match &self.renderer_targets {
+            Some(RendererTargets {
                 render_target: RenderTarget::Surface { config, .. },
                 ..
             }) => config.format,
@@ -501,18 +501,18 @@ impl WgpuRenderer {
     ///
     /// Returns `None` if render target is not initialized.
     pub fn get_target_texture_view(&self) -> Option<TextureView> {
-        self.render_set
+        self.renderer_targets
             .as_ref()
             .and_then(|rs| rs.render_target.texture().ok().map(|rt| rt.view()))
     }
 
     /// Returns the image of the last render operation.
     pub async fn get_image(&self) -> Result<Vec<u8>, SurfaceError> {
-        let Some(render_set) = &self.render_set else {
+        let Some(renderer_targets) = &self.renderer_targets else {
             return Err(SurfaceError::Lost);
         };
 
-        let size = render_set.render_target.size();
+        let size = renderer_targets.render_target.size();
         let buffer_size = (size.width() * size.height() * size_of::<u32>() as u32) as BufferAddress;
         let buffer_desc = BufferDescriptor {
             size: buffer_size,
@@ -522,7 +522,7 @@ impl WgpuRenderer {
         };
         let buffer = self.device.create_buffer(&buffer_desc);
 
-        let RenderTarget::Texture(texture, _) = &render_set.render_target else {
+        let RenderTarget::Texture(texture, _) = &renderer_targets.render_target else {
             todo!()
         };
 
@@ -579,7 +579,7 @@ impl WgpuRenderer {
 
     /// Renders the map to the given texture.
     pub fn render_to_texture_view(&self, map: &Map, view: &TextureView) {
-        if let Some(render_set) = &self.render_set {
+        if let Some(renderer_targets) = &self.renderer_targets {
             let mut encoder = self
                 .device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -591,7 +591,7 @@ impl WgpuRenderer {
                 let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Render Pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &render_set.multisampling_view,
+                        view: &renderer_targets.multisampling_view,
                         resolve_target: Some(view),
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -619,11 +619,11 @@ impl WgpuRenderer {
 
     /// Renders the map.
     pub fn render(&self, map: &Map) -> Result<(), SurfaceError> {
-        let Some(render_set) = &self.render_set else {
+        let Some(renderer_targets) = &self.renderer_targets else {
             return Ok(());
         };
 
-        let texture = render_set.render_target.texture()?;
+        let texture = renderer_targets.render_target.texture()?;
         let view = texture.view();
 
         self.render_to_texture_view(map, &view);
@@ -641,10 +641,11 @@ impl WgpuRenderer {
     }
 
     fn render_layer(&self, layer: &dyn Layer, view: &MapView, texture_view: &TextureView) {
-        let Some(render_set) = &self.render_set else {
+        let Some(renderer_targets) = &self.renderer_targets else {
             return;
         };
-        let Some(mut canvas) = WgpuCanvas::new(self, render_set, texture_view, view.clone()) else {
+        let Some(mut canvas) = WgpuCanvas::new(self, renderer_targets, texture_view, view.clone())
+        else {
             log::warn!("Layer cannot be rendered to the map view.");
             return;
         };
@@ -654,7 +655,7 @@ impl WgpuRenderer {
 
     /// Returns the size of the rendering area.
     pub fn size(&self) -> Size {
-        let size = match &self.render_set {
+        let size = match &self.renderer_targets {
             Some(set) => set.render_target.size(),
             None => Size::default(),
         };
@@ -672,14 +673,14 @@ impl WgpuRenderer {
 #[allow(dead_code)]
 struct WgpuCanvas<'a> {
     renderer: &'a WgpuRenderer,
-    render_set: &'a RenderSet,
+    renderer_targets: &'a RendererTargets,
     view: &'a TextureView,
 }
 
 impl<'a> WgpuCanvas<'a> {
     fn new(
         renderer: &'a WgpuRenderer,
-        render_set: &'a RenderSet,
+        renderer_targets: &'a RendererTargets,
         view: &'a TextureView,
         map_view: MapView,
     ) -> Option<Self> {
@@ -690,7 +691,7 @@ impl<'a> WgpuCanvas<'a> {
         ))
         .to_homogeneous();
         renderer.queue.write_buffer(
-            render_set.pipelines.map_view_buffer(),
+            renderer_targets.pipelines.map_view_buffer(),
             0,
             bytemuck::cast_slice(&[ViewUniform {
                 view_proj: map_view.map_to_scene_mtx()?,
@@ -706,7 +707,7 @@ impl<'a> WgpuCanvas<'a> {
 
         Some(Self {
             renderer,
-            render_set,
+            renderer_targets,
             view,
         })
     }
@@ -723,9 +724,11 @@ impl Canvas for WgpuCanvas<'_> {
 
     fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle> {
         match bundle {
-            RenderBundle(RenderBundleType::Tessellating(inner)) => {
-                Box::new(WgpuPackedBundle::new(inner, self.renderer, self.render_set))
-            }
+            RenderBundle(RenderBundleType::Tessellating(inner)) => Box::new(WgpuPackedBundle::new(
+                inner,
+                self.renderer,
+                self.renderer_targets,
+            )),
         }
     }
 
@@ -754,12 +757,12 @@ impl Canvas for WgpuCanvas<'_> {
         {
             let (view, resolve_target, depth_view) = if options.antialias {
                 (
-                    &self.render_set.multisampling_view,
+                    &self.renderer_targets.multisampling_view,
                     Some(self.view),
-                    &self.render_set.stencil_view_multisample,
+                    &self.renderer_targets.stencil_view_multisample,
                 )
             } else {
-                (self.view, None, &self.render_set.stencil_view)
+                (self.view, None, &self.renderer_targets.stencil_view)
             };
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -800,9 +803,12 @@ impl Canvas for WgpuCanvas<'_> {
 
             for (index, (bundle, _)) in bundles.iter().enumerate() {
                 if let Some(cast) = bundle.as_any().downcast_ref::<WgpuPackedBundle>() {
-                    self.render_set
-                        .pipelines
-                        .render(&mut render_pass, cast, options, index as u32);
+                    self.renderer_targets.pipelines.render(
+                        &mut render_pass,
+                        cast,
+                        options,
+                        index as u32,
+                    );
                 }
             }
         }
@@ -842,7 +848,7 @@ impl WgpuPackedBundle {
     fn new(
         bundle: &TessellatingRenderBundle,
         renderer: &WgpuRenderer,
-        render_set: &RenderSet,
+        renderer_targets: &RendererTargets,
     ) -> Self {
         let TessellatingRenderBundle {
             poly_tessellation,
@@ -907,17 +913,18 @@ impl WgpuPackedBundle {
         let textures: Vec<_> = image_store
             .iter()
             .map(|decoded_image| {
-                Some(render_set.pipelines.image_pipeline().create_image_texture(
-                    &renderer.device,
-                    &renderer.queue,
-                    decoded_image,
-                ))
+                Some(
+                    renderer_targets
+                        .pipelines
+                        .image_pipeline()
+                        .create_image_texture(&renderer.device, &renderer.queue, decoded_image),
+                )
             })
             .collect();
 
         let mut image_buffers = vec![];
         for image_info in images {
-            let image = render_set.pipelines.image_pipeline().create_image(
+            let image = renderer_targets.pipelines.image_pipeline().create_image(
                 &renderer.device,
                 textures
                     .get(image_info.store_index)
