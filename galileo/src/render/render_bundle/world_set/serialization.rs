@@ -6,7 +6,7 @@ use lyon::lyon_tessellation::VertexBuffers;
 use serde::{Deserialize, Serialize};
 
 use crate::decoded_image::{DecodedImage, DecodedImageType};
-use crate::render::render_bundle::tessellating::{
+use crate::render::render_bundle::world_set::{
     ImageInfo, PolyVertex, ScreenRefVertex, WorldRenderSet,
 };
 

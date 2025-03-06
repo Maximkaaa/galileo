@@ -1,11 +1,13 @@
 use std::mem::size_of;
 
+use screen_set::ScreenSetPipeline;
 use wgpu::{
     BindGroup, Buffer, CompareFunction, DepthStencilState, Device, PipelineLayout, RenderPass,
     RenderPipelineDescriptor, ShaderModule, StencilFaceState, StencilOperation, StencilState,
     TextureFormat, VertexBufferLayout,
 };
 
+use super::ScreenRefBuffers;
 use crate::render::wgpu::pipelines::clip::ClipPipeline;
 use crate::render::wgpu::pipelines::dot::DotPipeline;
 use crate::render::wgpu::pipelines::image::ImagePipeline;
@@ -19,16 +21,18 @@ mod dot;
 pub mod image;
 mod map_ref;
 mod screen_ref;
+mod screen_set;
 
 pub struct Pipelines {
     map_view_binding: BindGroup,
     map_view_buffer: Buffer,
 
     image: ImagePipeline,
-    screen_ref: ScreenRefPipeline,
+    pub(super) screen_ref: ScreenRefPipeline,
     map_ref: MapRefPipeline,
     clip: ClipPipeline,
     dot: DotPipeline,
+    screen_set: ScreenSetPipeline,
 }
 
 impl Pipelines {
@@ -72,6 +76,7 @@ impl Pipelines {
             screen_ref: ScreenRefPipeline::create(device, format, &map_view_bind_group_layout),
             clip: ClipPipeline::create(device, format, &map_view_bind_group_layout),
             dot: DotPipeline::create(device, format, &map_view_bind_group_layout),
+            screen_set: ScreenSetPipeline::create(device, format, &map_view_bind_group_layout),
         }
     }
 
@@ -131,6 +136,16 @@ impl Pipelines {
 
     fn set_bindings<'a>(&'a self, render_pass: &mut RenderPass<'a>) {
         render_pass.set_bind_group(0, &self.map_view_binding, &[]);
+    }
+
+    pub fn render_screen_set<'a>(
+        &'a self,
+        buffers: &'a ScreenRefBuffers,
+        render_pass: &mut RenderPass<'a>,
+        bundle_index: u32,
+    ) {
+        self.set_bindings(render_pass);
+        self.screen_set.render(buffers, render_pass, bundle_index);
     }
 }
 

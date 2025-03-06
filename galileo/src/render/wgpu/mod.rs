@@ -1,11 +1,14 @@
 use std::any::Any;
+use std::cmp::Ordering;
 use std::mem::size_of;
 use std::sync::Arc;
+use std::time::Duration;
 
 use cfg_if::cfg_if;
-use galileo_types::cartesian::Size;
+use galileo_types::cartesian::{Rect, Size};
 use lyon::tessellation::VertexBuffers;
-use nalgebra::{Rotation3, Vector3};
+use nalgebra::{Point4, Rotation3, Vector3};
+use parking_lot::Mutex;
 use wgpu::util::DeviceExt;
 use wgpu::{
     Adapter, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Extent3d, Origin3d,
@@ -15,11 +18,11 @@ use wgpu::{
     TextureViewDescriptor, WasmNotSendSync,
 };
 
+use super::render_bundle::screen_set::RenderSetState;
 use super::{Canvas, PackedBundle, RenderOptions};
 use crate::error::GalileoError;
-use crate::layer::Layer;
 use crate::map::Map;
-use crate::render::render_bundle::tessellating::{PointInstance, PolyVertex, WorldRenderSet};
+use crate::render::render_bundle::world_set::{PointInstance, PolyVertex, WorldRenderSet};
 use crate::render::render_bundle::RenderBundle;
 use crate::render::wgpu::pipelines::image::WgpuImage;
 use crate::render::wgpu::pipelines::Pipelines;
@@ -633,22 +636,24 @@ impl WgpuRenderer {
 
     fn render_map(&self, map: &Map, texture_view: &TextureView) {
         let view = map.view();
-        for layer in map.layers().iter_visible() {
-            self.render_layer(layer, view, texture_view);
-        }
-    }
-
-    fn render_layer(&self, layer: &dyn Layer, view: &MapView, texture_view: &TextureView) {
         let Some(renderer_targets) = &self.renderer_targets else {
             return;
         };
+
         let Some(mut canvas) = WgpuCanvas::new(self, renderer_targets, texture_view, view.clone())
         else {
             log::warn!("Layer cannot be rendered to the map view.");
             return;
         };
 
-        layer.render(view, &mut canvas);
+        for layer in map.layers().iter_visible() {
+            layer.render(view, &mut canvas);
+        }
+
+        let needs_animation = canvas.draw_screen_sets();
+        if needs_animation {
+            map.redraw();
+        }
     }
 
     /// Returns the size of the rendering area.
@@ -667,6 +672,9 @@ struct WgpuCanvas<'a> {
     renderer: &'a WgpuRenderer,
     renderer_targets: &'a RendererTargets,
     view: &'a TextureView,
+    map_view: MapView,
+
+    screen_sets: Vec<Arc<Mutex<WgpuScreenSet>>>,
 }
 
 impl<'a> WgpuCanvas<'a> {
@@ -701,6 +709,8 @@ impl<'a> WgpuCanvas<'a> {
             renderer,
             renderer_targets,
             view,
+            map_view,
+            screen_sets: vec![],
         })
     }
 }
@@ -712,7 +722,7 @@ impl Canvas for WgpuCanvas<'_> {
 
     fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle> {
         Box::new(WgpuPackedBundle::new(
-            &bundle.world_set,
+            bundle,
             self.renderer,
             self.renderer_targets,
         ))
@@ -795,6 +805,10 @@ impl Canvas for WgpuCanvas<'_> {
                         options,
                         index as u32,
                     );
+
+                    for screen_set in &cast.screen_sets {
+                        self.screen_sets.push(screen_set.clone());
+                    }
                 }
             }
         }
@@ -802,6 +816,215 @@ impl Canvas for WgpuCanvas<'_> {
         self.renderer
             .queue
             .submit(std::iter::once(encoder.finish()));
+    }
+
+    fn draw_screen_sets(&mut self) -> bool {
+        if self.screen_sets.is_empty() {
+            return false;
+        }
+
+        let view = &self.map_view;
+        let Some(transform) = view.map_to_scene_transform() else {
+            // current view cannot be rendered to screen
+            return false;
+        };
+        let size = view.size();
+
+        let screen_sets = std::mem::take(&mut self.screen_sets);
+        let mut sets: Vec<_> = screen_sets
+            .iter()
+            .map(|set| {
+                let locked = set.lock();
+                let projected_anchor = transform
+                    * Point4::new(
+                        locked.anchor_point[0] as f64,
+                        locked.anchor_point[1] as f64,
+                        locked.anchor_point[2] as f64,
+                        1.0,
+                    );
+                let normalaized = projected_anchor / projected_anchor.w.abs();
+
+                (locked, normalaized)
+            })
+            .collect();
+        sets.sort_by(|a, b| {
+            let displayed_cmp = match (a.0.state.is_displayed(), b.0.state.is_displayed()) {
+                (true, false) => Ordering::Less,
+                (false, true) => Ordering::Greater,
+                _ => Ordering::Equal,
+            };
+
+            displayed_cmp.then(
+                a.1.z
+                    .partial_cmp(&b.1.z)
+                    .unwrap_or(std::cmp::Ordering::Equal),
+            )
+        });
+
+        let now = web_time::Instant::now();
+        let mut displayed: Vec<Rect<f32>> = vec![];
+        let mut filtered_sets: Vec<_> = sets
+            .into_iter()
+            .filter_map(|(mut set, anchor)| {
+                if anchor.w <= 0.0 {
+                    // The point is in imaginary plane
+                    return None;
+                }
+
+                let dx = anchor.x * size.width() / 2.0;
+                let dy = anchor.y * size.height() / 2.0;
+
+                let set_bbox = set.bbox.shift(dx as f32, dy as f32);
+
+                if displayed.iter().any(|bbox| bbox.intersects(set_bbox)) {
+                    // Hiding the set
+                    match set.state {
+                        RenderSetState::Hidden => None,
+                        RenderSetState::FadingIn { start_time } => {
+                            let fade_out_start_time =
+                                now + (now - start_time) - set.animation_duration;
+                            set.state = RenderSetState::FadingOut {
+                                start_time: fade_out_start_time,
+                            };
+
+                            Some(set)
+                        }
+                        RenderSetState::Displayed => {
+                            set.state = RenderSetState::FadingOut {
+                                start_time: web_time::Instant::now(),
+                            };
+                            Some(set)
+                        }
+                        RenderSetState::FadingOut { .. } => Some(set),
+                    }
+                } else {
+                    // Showing the set
+                    displayed.push(set_bbox);
+
+                    match set.state {
+                        RenderSetState::Hidden => {
+                            set.state = RenderSetState::FadingIn {
+                                start_time: web_time::Instant::now(),
+                            };
+                        }
+                        RenderSetState::FadingOut { start_time } => {
+                            let fade_in_start_time =
+                                now + (now - start_time) - set.animation_duration;
+                            set.state = RenderSetState::FadingIn {
+                                start_time: fade_in_start_time,
+                            };
+                        }
+                        _ => {}
+                    }
+
+                    Some(set)
+                }
+            })
+            .collect();
+
+        let mut is_animating = false;
+        let mut encoder =
+            self.renderer
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
+
+        {
+            let view = &self.renderer_targets.multisampling_view;
+            let resolve_target = Some(self.view);
+            let depth_view = &self.renderer_targets.stencil_view_multisample;
+
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                    view: depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: StoreOp::Discard,
+                    }),
+                    stencil_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(0),
+                        store: StoreOp::Discard,
+                    }),
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            let instances: Vec<ScreenSetInstance> = filtered_sets
+                .iter_mut()
+                .map(|set| {
+                    let opacity = match set.state {
+                        RenderSetState::Hidden => 0.0,
+                        RenderSetState::FadingIn { start_time } => {
+                            is_animating = true;
+
+                            let mut opacity = (now - start_time).as_millis() as f32
+                                / set.animation_duration.as_millis() as f32;
+                            if opacity >= 1.0 {
+                                set.state = RenderSetState::Displayed;
+                                opacity = 1.0;
+                            }
+
+                            opacity
+                        }
+                        RenderSetState::Displayed => 1.0,
+                        RenderSetState::FadingOut { start_time } => {
+                            is_animating = true;
+
+                            let mut opacity = 1.0
+                                - ((now - start_time).as_millis() as f32
+                                    / set.animation_duration.as_millis() as f32);
+
+                            if opacity <= 0.0 {
+                                set.state = RenderSetState::Hidden;
+                                opacity = 0.0;
+                            }
+
+                            opacity
+                        }
+                    };
+                    ScreenSetInstance {
+                        anchor: set.anchor_point,
+                        opacity,
+                    }
+                })
+                .collect();
+
+            let display_buffer =
+                self.renderer
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: None,
+                        usage: wgpu::BufferUsages::VERTEX,
+                        contents: bytemuck::cast_slice(&instances),
+                    });
+
+            render_pass.set_vertex_buffer(1, display_buffer.slice(..));
+
+            for (index, set) in filtered_sets.iter().enumerate() {
+                self.renderer_targets.pipelines.render_screen_set(
+                    &set.buffers,
+                    &mut render_pass,
+                    index as u32,
+                );
+            }
+        }
+
+        self.renderer
+            .queue
+            .submit(std::iter::once(encoder.finish()));
+
+        is_animating
     }
 }
 
@@ -811,6 +1034,16 @@ struct WgpuPackedBundle {
     screen_ref_buffers: Option<ScreenRefBuffers>,
     dot_buffers: Option<WgpuDotBuffers>,
     image_buffers: Vec<WgpuImage>,
+
+    screen_sets: Vec<Arc<Mutex<WgpuScreenSet>>>,
+}
+
+struct WgpuScreenSet {
+    state: RenderSetState,
+    animation_duration: Duration,
+    anchor_point: [f32; 3],
+    bbox: Rect<f32>,
+    buffers: ScreenRefBuffers,
 }
 
 struct WgpuPolygonBuffers {
@@ -832,10 +1065,14 @@ struct WgpuDotBuffers {
 
 impl WgpuPackedBundle {
     fn new(
-        bundle: &WorldRenderSet,
+        bundle: &RenderBundle,
         renderer: &WgpuRenderer,
         renderer_targets: &RendererTargets,
     ) -> Self {
+        let RenderBundle {
+            world_set,
+            screen_sets: bundle_screen_sets,
+        } = bundle;
         let WorldRenderSet {
             poly_tessellation,
             points,
@@ -844,7 +1081,7 @@ impl WgpuPackedBundle {
             clip_area,
             image_store,
             ..
-        } = bundle;
+        } = world_set;
 
         let clip_area_buffers = clip_area
             .as_ref()
@@ -923,12 +1160,48 @@ impl WgpuPackedBundle {
             image_buffers.push(image);
         }
 
+        let mut screen_sets = vec![];
+        for bundle_screen_set in bundle_screen_sets {
+            let index_buffer =
+                renderer
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: None,
+                        contents: bytemuck::cast_slice(&bundle_screen_set.indices),
+                        usage: wgpu::BufferUsages::INDEX,
+                    });
+
+            let vertex_buffer =
+                renderer
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: None,
+                        usage: wgpu::BufferUsages::VERTEX,
+                        contents: bytemuck::cast_slice(&bundle_screen_set.vertices),
+                    });
+
+            let buffers = ScreenRefBuffers {
+                index: index_buffer,
+                vertex: vertex_buffer,
+                index_count: bundle_screen_set.indices.len() as u32,
+            };
+
+            screen_sets.push(Arc::new(Mutex::new(WgpuScreenSet {
+                state: bundle_screen_set.initial_state,
+                animation_duration: bundle_screen_set.animation_duration,
+                anchor_point: bundle_screen_set.anchor_point,
+                bbox: bundle_screen_set.bbox,
+                buffers,
+            })));
+        }
+
         Self {
             clip_area_buffers,
             map_ref_buffers: poly_buffers,
             image_buffers,
             screen_ref_buffers,
             dot_buffers,
+            screen_sets,
         }
     }
 
@@ -1048,6 +1321,34 @@ impl DisplayInstance {
                 shader_location: 10,
                 format: wgpu::VertexFormat::Float32,
             }],
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct ScreenSetInstance {
+    anchor: [f32; 3],
+    opacity: f32,
+}
+
+impl ScreenSetInstance {
+    fn wgpu_desc() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: size_of::<ScreenSetInstance>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 10,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+                wgpu::VertexAttribute {
+                    offset: size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    shader_location: 11,
+                    format: wgpu::VertexFormat::Float32,
+                },
+            ],
         }
     }
 }

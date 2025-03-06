@@ -91,10 +91,7 @@ impl BundleStore {
         self.required_update.update_all();
     }
 
-    pub(super) fn with_bundle(
-        &mut self,
-        predicate: impl FnOnce(&mut RenderBundle) -> FeatureId,
-    ) {
+    pub(super) fn with_bundle(&mut self, predicate: impl FnOnce(&mut RenderBundle) -> FeatureId) {
         let (bundle_id, curr_bundle) = {
             let v = self.curr_bundle();
             (v.0, &mut v.1)

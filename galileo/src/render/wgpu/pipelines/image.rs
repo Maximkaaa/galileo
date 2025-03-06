@@ -7,7 +7,7 @@ use wgpu::{
 };
 
 use crate::decoded_image::{DecodedImage, DecodedImageType};
-use crate::render::render_bundle::tessellating::ImageVertex;
+use crate::render::render_bundle::world_set::ImageVertex;
 use crate::render::wgpu::pipelines::default_targets;
 use crate::render::wgpu::{pipelines, DisplayInstance};
 use crate::render::RenderOptions;

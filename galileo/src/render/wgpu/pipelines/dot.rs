@@ -4,7 +4,7 @@ use wgpu::{
     VertexStepMode,
 };
 
-use crate::render::render_bundle::tessellating::PointInstance;
+use crate::render::render_bundle::world_set::PointInstance;
 use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
 use crate::render::wgpu::{DisplayInstance, WgpuDotBuffers, DEPTH_FORMAT};
 use crate::render::RenderOptions;
