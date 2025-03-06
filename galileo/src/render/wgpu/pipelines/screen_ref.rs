@@ -5,7 +5,7 @@ use wgpu::{
     RenderPipelineDescriptor, StencilFaceState, StencilOperation, StencilState, TextureFormat,
 };
 
-use crate::render::render_bundle::tessellating::ScreenRefVertex;
+use crate::render::render_bundle::world_set::ScreenRefVertex;
 use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
 use crate::render::wgpu::{DisplayInstance, ScreenRefBuffers, DEPTH_FORMAT};
 use crate::render::RenderOptions;

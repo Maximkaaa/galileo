@@ -3,7 +3,7 @@ use wgpu::{
     RenderPipelineDescriptor, StencilFaceState, StencilOperation, StencilState, TextureFormat,
 };
 
-use crate::render::render_bundle::tessellating::PolyVertex;
+use crate::render::render_bundle::world_set::PolyVertex;
 use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
 use crate::render::wgpu::{DisplayInstance, WgpuPolygonBuffers, DEPTH_FORMAT};
 use crate::render::RenderOptions;

@@ -26,6 +26,7 @@ use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
 use galileo_types::geometry_type::GeoSpace2d;
 use galileo_types::latlon;
+use nalgebra::Vector2;
 use parking_lot::RwLock;
 
 struct EguiMapApp {
@@ -364,11 +365,11 @@ impl Symbol<LabeledPoint> for LabeledSymbol {
             return;
         };
 
-        bundle.add_point(point, &PointPaint::circle(Color::BLUE, 3.0), min_resolution);
         bundle.add_point(
             point,
-            &PointPaint::label_owned(feature.label.to_string(), self.style.clone()),
+            &PointPaint::circle(Color::BLUE, 10.0),
             min_resolution,
         );
+        bundle.add_label(point, feature.label, &self.style, Vector2::new(0.0, 0.0));
     }
 }

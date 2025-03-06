@@ -1,5 +1,5 @@
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
-use galileo_types::cartesian::{CartesianPoint2d, Point3d, Rect};
+use galileo_types::cartesian::{CartesianPoint2d, Point2d, Point3d, Rect};
 use galileo_types::impls::{ClosedContour, Polygon};
 use galileo_types::Contour;
 use num_traits::ToPrimitive;
@@ -7,7 +7,7 @@ use strfmt::strfmt;
 
 use crate::error::GalileoError;
 use crate::layer::vector_tile_layer::style::{VectorTileLabelSymbol, VectorTileStyle};
-use crate::render::point_paint::PointPaint;
+use crate::render::point_paint::{PointPaint, PointShape};
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{LinePaint, PolygonPaint};
 use crate::tile_schema::TileIndex;
@@ -66,11 +66,22 @@ impl VtProcessor {
                         };
 
                         for point in points {
-                            bundle.add_point(
-                                &Self::transform_point(point, bbox, tile_resolution),
-                                &paint,
-                                lod_resolution,
-                            );
+                            let position = Self::transform_point(point, bbox, tile_resolution);
+                            if !bbox.contains(&Point2d::new(position.x, position.y)) {
+                                // Some vector tiles add out-of-bounds point to start displaying labels that
+                                // are not fully on the screen yet. We need to deal with that case
+                                // in some clever way, but for now let's ignore those points.
+                                continue;
+                            }
+
+                            match &paint.shape {
+                                PointShape::Label { text, style } => {
+                                    bundle.add_label(&position, text, style, [0.0, 0.0].into());
+                                }
+                                _ => {
+                                    bundle.add_point(&position, &paint, lod_resolution);
+                                }
+                            }
                         }
                     }
                     MvtGeometry::LineString(contours) => {

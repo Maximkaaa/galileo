@@ -3,19 +3,24 @@
 use galileo_types::cartesian::{CartesianPoint3d, Point2d};
 use galileo_types::contour::Contour;
 use galileo_types::Polygon;
+use nalgebra::Vector2;
 use num_traits::AsPrimitive;
+use screen_set::ScreenRenderSet;
 
+use super::text::TextStyle;
 use crate::decoded_image::DecodedImage;
 use crate::render::point_paint::PointPaint;
-use crate::render::render_bundle::tessellating::WorldRenderSet;
+use crate::render::render_bundle::world_set::WorldRenderSet;
 use crate::render::{ImagePaint, LinePaint, PolygonPaint};
 
-pub(crate) mod tessellating;
+pub(crate) mod screen_set;
+pub(crate) mod world_set;
 
 /// Render bundle is used to store render primitives and prepare them to be rendered with the rendering backend.
 #[derive(Debug, Default, Clone)]
 pub struct RenderBundle {
     pub(crate) world_set: WorldRenderSet,
+    pub(crate) screen_sets: Vec<ScreenRenderSet>,
 }
 
 impl RenderBundle {
@@ -56,5 +61,21 @@ impl RenderBundle {
         Poly::Contour: Contour<Point = P>,
     {
         self.world_set.add_polygon(polygon, paint, min_resolution);
+    }
+
+    /// Adds a label to the bundle.
+    pub fn add_label<N, P>(
+        &mut self,
+        position: &P,
+        text: &str,
+        style: &TextStyle,
+        offset: Vector2<f32>,
+    ) where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+    {
+        if let Some(set) = ScreenRenderSet::new_from_label(position, text, style, offset) {
+            self.screen_sets.push(set);
+        }
     }
 }

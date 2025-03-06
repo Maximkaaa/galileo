@@ -17,9 +17,9 @@ use wasm_bindgen::JsCast;
 
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::processor::TileProcessingError;
-use crate::render::render_bundle::tessellating::serialization::TessellatingRenderBundleBytes;
-use crate::render::render_bundle::tessellating::WorldRenderSet;
-use crate::render::render_bundle::{RenderBundle, RenderBundleType};
+use crate::render::render_bundle::world_set::serialization::TessellatingRenderBundleBytes;
+use crate::render::render_bundle::world_set::WorldRenderSet;
+use crate::render::render_bundle::RenderBundle;
 use crate::tile_schema::TileIndex;
 use crate::TileSchema;
 
@@ -113,9 +113,10 @@ impl TryFrom<Result<WebWorkerResponsePayload, WebWorkerError>> for RenderBundle 
                 let (converted, _): (TessellatingRenderBundleBytes, _) =
                     bincode::serde::decode_from_slice(&bytes, bincode::config::standard())
                         .expect("Failed to deserialize render bundle bytes");
-                RenderBundle(RenderBundleType::Tessellating(
-                    WorldRenderSet::from_bytes_unchecked(converted),
-                ))
+                RenderBundle {
+                    world_set: WorldRenderSet::from_bytes_unchecked(converted),
+                    screen_sets: vec![],
+                }
             }),
             _ => {
                 log::error!("Unexpected response type for tile processing request: {value:?}");
@@ -303,10 +304,7 @@ mod worker {
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::{JsCast, JsValue};
 
-    use super::{
-        RenderBundleType, WorldRenderSet, WebWorkerRequest, WebWorkerRequestId,
-        WebWorkerRequestPayload, WebWorkerResponse,
-    };
+    use super::{WebWorkerRequest, WebWorkerRequestId, WebWorkerRequestPayload, WebWorkerResponse};
     use crate::layer::vector_tile_layer::style::VectorTileStyle;
     use crate::layer::vector_tile_layer::tile_provider::processor::TileProcessingError;
     use crate::layer::vector_tile_layer::tile_provider::VtProcessor;
@@ -412,14 +410,10 @@ mod worker {
         style: VectorTileStyle,
         tile_schema: TileSchema,
     ) -> WebWorkerResponsePayload {
-        let mut bundle = RenderBundle(RenderBundleType::Tessellating(
-            WorldRenderSet::new(),
-        ));
+        let mut bundle = RenderBundle::default();
         let result = match VtProcessor::prepare(&tile, &mut bundle, index, &style, &tile_schema) {
             Ok(()) => {
-                let RenderBundle(RenderBundleType::Tessellating(tessellating)) = bundle;
-
-                let bytes = tessellating.into_bytes();
+                let bytes = bundle.world_set.into_bytes();
                 let serialized = bincode::serde::encode_to_vec(&bytes, bincode::config::standard())
                     .expect("failed to serialize render bundle");
                 Ok(serialized)

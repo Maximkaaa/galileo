@@ -47,6 +47,10 @@ pub trait Canvas {
         bundles: &[(&dyn PackedBundle, f32)],
         options: RenderOptions,
     );
+    /// Render screen sets that were added previously by the `draw_bundles` calls.
+    ///
+    /// Returns `true` if canvas requires further animation (fading in or out some of the objects).
+    fn draw_screen_sets(&mut self) -> bool;
 }
 
 /// Packed render bundle ready to be drawn.

@@ -105,6 +105,16 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
         }
     }
 
+    /// Adds the given amount to the coordinates of the rectangle.
+    pub fn shift(&self, dx: N, dy: N) -> Self {
+        Self {
+            x_min: self.x_min + dx,
+            x_max: self.x_max + dx,
+            y_min: self.y_min + dy,
+            y_max: self.y_max + dy,
+        }
+    }
+
     /// Creates a new rectangle with the boundaries of this and other one.
     pub fn merge(&self, other: Self) -> Self {
         Self {
@@ -255,7 +265,7 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
     pub fn intersects(&self, other: Rect<N>) -> bool {
         self.x_max >= other.x_min
             && self.x_min <= other.x_max
-            && self.y_max >= other.y_max
+            && self.y_max >= other.y_min
             && self.y_min <= other.y_max
     }
 }
