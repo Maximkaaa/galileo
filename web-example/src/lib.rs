@@ -30,6 +30,10 @@ mod many_points;
 #[path = "../../galileo/examples/vector_tiles.rs"]
 mod vector_tiles;
 
+#[cfg(feature = "add_remove_features")]
+#[path = "../../galileo/examples/add_remove_features.rs"]
+mod add_remove_features;
+
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -59,4 +63,7 @@ pub fn main() {
 
     #[cfg(feature = "vector_tiles")]
     vector_tiles::run();
+
+    #[cfg(feature = "add_remove_features")]
+    add_remove_features::run();
 }

@@ -20,6 +20,7 @@ highlight_features = ["nalgebra"]
 lambert = ["nalgebra"]
 many_points = []
 vector_tiles = ["serde_json", "eframe", "egui"]
+add_remove_features = []
 
 [dependencies]
 bincode = { workspace = true }
