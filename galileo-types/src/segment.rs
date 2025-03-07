@@ -23,15 +23,15 @@ impl<P: CartesianPoint2d> Segment<'_, P> {
 
         let ds = self.1.sub(self.0);
         let dp = point.sub(self.0);
-        let ds_len = ds.x * ds.x + ds.y * ds.y;
+        let ds_len = ds.magnitude_sq();
 
-        let r = (dp.x * ds.x + dp.y * ds.y) / ds_len;
+        let r = dp.magnitude_sq() / ds_len;
         if r <= P::Num::zero() {
             self.0.distance_sq(point)
         } else if r >= P::Num::one() {
             self.1.distance_sq(point)
         } else {
-            let s = (dp.y * ds.x - dp.x * ds.y) / ds_len;
+            let s = (dp.dy() * ds.dx() - dp.dx() * ds.dy()) / ds_len;
             (s * s) * ds_len
         }
     }

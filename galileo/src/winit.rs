@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use galileo_types::cartesian::Point2d;
+use galileo_types::cartesian::Point2;
 use winit::event::{ElementState, MouseScrollDelta, Touch, TouchPhase, WindowEvent};
 use winit::window::Window;
 
@@ -26,7 +26,7 @@ impl WinitInputHandler {
                 ElementState::Released => Some(RawUserEvent::ButtonReleased(button.into())),
             },
             WindowEvent::CursorMoved { position, .. } => {
-                let pointer_position = Point2d::new(position.x / scale, position.y / scale);
+                let pointer_position = Point2::new(position.x / scale, position.y / scale);
                 Some(RawUserEvent::PointerMoved(pointer_position))
             }
             WindowEvent::MouseWheel { delta, .. } => {
@@ -58,7 +58,7 @@ impl WinitInputHandler {
     fn get_touch_event(&mut self, touch: &Touch, scale: f64) -> TouchEvent {
         TouchEvent {
             touch_id: touch.id,
-            position: Point2d::new(touch.location.x / scale, touch.location.y / scale),
+            position: Point2::new(touch.location.x / scale, touch.location.y / scale),
         }
     }
 }

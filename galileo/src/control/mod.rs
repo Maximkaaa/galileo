@@ -11,9 +11,8 @@
 //! To write a user interaction logic, the app must provide an implementation of [`UserEventHandler`] trait and add it
 //! to the `EventProcessor` handler list.
 
-use galileo_types::cartesian::Point2d;
+use galileo_types::cartesian::{Point2, Vector2};
 use maybe_sync::{MaybeSend, MaybeSync};
-use nalgebra::Vector2;
 
 use crate::map::Map;
 
@@ -48,7 +47,7 @@ pub enum RawUserEvent {
     /// A mouse button was released.
     ButtonReleased(MouseButton),
     /// Mouse pointer was moved to the given screen pixel position.
-    PointerMoved(Point2d),
+    PointerMoved(Point2),
     /// Scroll was called (by a mouse wheel or touch pad scrolling). The number is the number of lines that the event
     /// would scroll if it was scrolling a text.
     Scroll(f64),
@@ -93,7 +92,7 @@ pub enum UserEvent {
 
     /// Zoom is called around a point. This is different from [`UserEvent::Scroll`], as it is not produced by a mouse
     /// but rather by multi-tough gestures. The first parameter is zoom delta value.
-    Zoom(f64, Point2d),
+    Zoom(f64, Point2),
 }
 
 /// Value returned by an [`UserEventHandler`] to indicate the status of the event.
@@ -125,7 +124,7 @@ pub enum MouseButton {
 #[derive(Debug, Clone)]
 pub struct MouseEvent {
     /// Pointer position on the screen in pixels from the top-left corner.
-    pub screen_pointer_position: Point2d,
+    pub screen_pointer_position: Point2,
     /// State of the mouse buttons.
     pub buttons: MouseButtonsState,
 }
@@ -140,7 +139,7 @@ pub struct TouchEvent {
     /// id.
     pub touch_id: TouchId,
     /// Position of the touch on the screen in pixels from the top-left corner.
-    pub position: Point2d,
+    pub position: Point2,
 }
 
 /// State of a mouse button.

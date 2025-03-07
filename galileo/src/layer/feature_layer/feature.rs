@@ -1,4 +1,4 @@
-use galileo_types::cartesian::{Point2d, Point3d};
+use galileo_types::cartesian::{Point2, Point3};
 use galileo_types::geo::impls::GeoPoint2d;
 use galileo_types::geometry::Geometry;
 use galileo_types::geometry_type::GeometryType;
@@ -33,8 +33,8 @@ macro_rules! impl_feature {
     };
 }
 
-impl_feature!(Point2d);
-impl_feature!(Point3d);
+impl_feature!(Point2);
+impl_feature!(Point3);
 impl_feature!(GeoPoint2d);
 impl_feature!(Contour, Point);
 impl_feature!(MultiContour, Point);

@@ -8,7 +8,7 @@ use egui_wgpu::RenderState;
 use galileo::control::{
     EventProcessor, MapController, MouseButton, RawUserEvent, UserEventHandler,
 };
-use galileo::galileo_types::cartesian::{Point2d, Size};
+use galileo::galileo_types::cartesian::{Point2, Size};
 use galileo::galileo_types::geo::impls::GeoPoint2d;
 use galileo::layer::attribution::Attribution;
 use galileo::render::WgpuRenderer;
@@ -276,7 +276,7 @@ impl EguiMapState {
             }
             Event::PointerMoved(position) => {
                 let scale = 1.0;
-                let pointer_position = Point2d::new(
+                let pointer_position = Point2::new(
                     (position.x + offset[0]) as f64 / scale,
                     (position.y + offset[1]) as f64 / scale,
                 );

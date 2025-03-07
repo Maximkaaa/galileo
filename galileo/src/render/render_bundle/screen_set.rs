@@ -1,5 +1,4 @@
-use galileo_types::cartesian::{CartesianPoint3d, Rect};
-use nalgebra::{Point2, Vector2};
+use galileo_types::cartesian::{CartesianPoint3d, Point2, Rect, Vector2};
 use num_traits::AsPrimitive;
 use web_time::{Duration, Instant};
 

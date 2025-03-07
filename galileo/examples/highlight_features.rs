@@ -11,12 +11,11 @@ use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderBundle;
 use galileo::{Map, MapBuilder};
-use galileo_types::cartesian::{Point2d, Point3d};
+use galileo_types::cartesian::{Point2, Point3, Vector2};
 use galileo_types::geo::{Crs, Projection};
 use galileo_types::geometry::Geom;
 use galileo_types::geometry_type::CartesianSpace2d;
 use galileo_types::{latlon, CartesianGeometry2d, Geometry};
-use nalgebra::Vector2;
 use parking_lot::RwLock;
 
 const YELLOW_PIN: &[u8] = include_bytes!("data/pin-yellow.png");
@@ -69,7 +68,7 @@ pub(crate) fn run() {
 
 #[derive(Debug, PartialEq, Default)]
 pub(crate) struct PointMarker {
-    pub(crate) point: Point2d,
+    pub(crate) point: Point2,
     pub(crate) highlighted: bool,
 }
 
@@ -82,7 +81,7 @@ impl Feature for PointMarker {
 }
 
 impl Geometry for PointMarker {
-    type Point = Point2d;
+    type Point = Point2;
 
     fn project<P: Projection<InPoint = Self::Point> + ?Sized>(
         &self,
@@ -92,15 +91,15 @@ impl Geometry for PointMarker {
     }
 }
 
-impl CartesianGeometry2d<Point2d> for PointMarker {
+impl CartesianGeometry2d<Point2> for PointMarker {
     fn is_point_inside<
         Other: galileo_types::cartesian::CartesianPoint2d<
-            Num = <Point2d as galileo_types::cartesian::CartesianPoint2d>::Num,
+            Num = <Point2 as galileo_types::cartesian::CartesianPoint2d>::Num,
         >,
     >(
         &self,
         point: &Other,
-        tolerance: <Point2d as galileo_types::cartesian::CartesianPoint2d>::Num,
+        tolerance: <Point2 as galileo_types::cartesian::CartesianPoint2d>::Num,
     ) -> bool {
         self.point.is_point_inside(point, tolerance)
     }
@@ -108,9 +107,7 @@ impl CartesianGeometry2d<Point2d> for PointMarker {
     fn bounding_rectangle(
         &self,
     ) -> Option<
-        galileo_types::cartesian::Rect<
-            <Point2d as galileo_types::cartesian::CartesianPoint2d>::Num,
-        >,
+        galileo_types::cartesian::Rect<<Point2 as galileo_types::cartesian::CartesianPoint2d>::Num>,
     > {
         None
     }
@@ -118,7 +115,7 @@ impl CartesianGeometry2d<Point2d> for PointMarker {
 
 fn create_mouse_handler(
     feature_layer: Arc<
-        RwLock<FeatureLayer<Point2d, PointMarker, ColoredPointSymbol, CartesianSpace2d>>,
+        RwLock<FeatureLayer<Point2, PointMarker, ColoredPointSymbol, CartesianSpace2d>>,
     >,
 ) -> impl UserEventHandler {
     move |ev: &UserEvent, map: &mut Map| {
@@ -170,7 +167,7 @@ impl Symbol<PointMarker> for ColoredPointSymbol {
     fn render(
         &self,
         feature: &PointMarker,
-        geometry: &Geom<Point3d>,
+        geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
     ) {

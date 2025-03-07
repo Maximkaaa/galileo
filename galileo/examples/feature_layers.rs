@@ -11,7 +11,7 @@ use galileo::layer::Layer;
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderBundle;
 use galileo::{Color, Map, MapBuilder};
-use galileo_types::cartesian::{Point2d, Point3d};
+use galileo_types::cartesian::{Point2, Point3};
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
 use galileo_types::geometry_type::CartesianSpace2d;
@@ -72,7 +72,7 @@ fn load_cities() -> Vec<City> {
 }
 
 fn create_mouse_handler(
-    feature_layer: Arc<RwLock<FeatureLayer<Point2d, Country, CountrySymbol, CartesianSpace2d>>>,
+    feature_layer: Arc<RwLock<FeatureLayer<Point2, Country, CountrySymbol, CartesianSpace2d>>>,
 ) -> impl UserEventHandler {
     let selected_id = Mutex::new(None);
     move |ev: &UserEvent, map: &mut Map| {
@@ -145,7 +145,7 @@ fn create_mouse_handler(
     }
 }
 
-fn create_countries_layer() -> FeatureLayer<Point2d, Country, CountrySymbol, CartesianSpace2d> {
+fn create_countries_layer() -> FeatureLayer<Point2, Country, CountrySymbol, CartesianSpace2d> {
     let countries = load_countries();
 
     FeatureLayer::with_lods(
@@ -178,7 +178,7 @@ impl Symbol<Country> for CountrySymbol {
     fn render(
         &self,
         feature: &Country,
-        geometry: &Geom<Point3d>,
+        geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
     ) {
@@ -195,7 +195,7 @@ impl Symbol<City> for CitySymbol {
     fn render(
         &self,
         feature: &City,
-        geometry: &Geom<Point3d>,
+        geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
     ) {

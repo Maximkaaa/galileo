@@ -1,4 +1,4 @@
-use galileo_types::cartesian::{CartesianPoint2d, Point2d};
+use galileo_types::cartesian::{CartesianPoint2d, Point2};
 use web_time::SystemTime;
 
 use crate::control::{
@@ -13,9 +13,9 @@ const DBL_CLICK_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(
 
 struct TouchInfo {
     id: TouchId,
-    start_position: Point2d,
+    start_position: Point2,
     _start_time: SystemTime,
-    prev_position: Point2d,
+    prev_position: Point2,
 }
 
 /// Stores input state, converts [`RawUserEvent`] into [`UserEvent`] and manages a list of event handlers.
@@ -24,8 +24,8 @@ struct TouchInfo {
 /// [`EventPropagation::Consume`] or [`EventPropagation::Stop`]. At this point the event is considered to be handled.
 pub struct EventProcessor {
     handlers: Vec<Box<dyn UserEventHandler>>,
-    pointer_position: Point2d,
-    pointer_pressed_position: Point2d,
+    pointer_position: Point2,
+    pointer_pressed_position: Point2,
     touches: Vec<TouchInfo>,
 
     buttons_state: MouseButtonsState,
@@ -284,7 +284,7 @@ impl EventProcessor {
         self.get_mouse_event_pos(self.pointer_position)
     }
 
-    fn get_mouse_event_pos(&self, screen_pointer_position: Point2d) -> MouseEvent {
+    fn get_mouse_event_pos(&self, screen_pointer_position: Point2) -> MouseEvent {
         MouseEvent {
             screen_pointer_position,
             buttons: self.buttons_state,

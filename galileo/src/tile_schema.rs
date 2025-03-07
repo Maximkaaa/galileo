@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use galileo_types::cartesian::{CartesianPoint2d, Point2d, Rect};
+use galileo_types::cartesian::{CartesianPoint2d, Point2, Rect};
 use galileo_types::geo::Crs;
 #[cfg(target_arch = "wasm32")]
 use js_sys::wasm_bindgen::prelude::wasm_bindgen;
@@ -51,7 +51,7 @@ impl TileIndex {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TileSchema {
     /// Position where all tiles have `X == 0, Y == 0` indices.
-    pub origin: Point2d,
+    pub origin: Point2,
     /// Rectangle that contains all tiles of the tile scheme.
     pub bounds: Rect,
     /// Sorted set of levels of detail that specify resolutions for each z-level.
@@ -200,7 +200,7 @@ impl TileSchema {
 
     /// Standard Web Mercator based tile scheme (used, for example, by OSM and Google maps).
     pub fn web(lods_count: u32) -> Self {
-        const ORIGIN: Point2d = Point2d::new(-20037508.342787, 20037508.342787);
+        const ORIGIN: Point2 = Point2::new(-20037508.342787, 20037508.342787);
         const TOP_RESOLUTION: f64 = 156543.03392800014;
 
         let mut lods = vec![Lod::new(TOP_RESOLUTION, 0).expect("invalid const parameters")];
@@ -301,7 +301,7 @@ mod tests {
 
     fn simple_schema() -> TileSchema {
         TileSchema {
-            origin: Point2d::default(),
+            origin: Point2::default(),
             bounds: Rect::new(0.0, 0.0, 2048.0, 2048.0),
             lods: [
                 Lod::new(8.0, 0).unwrap(),

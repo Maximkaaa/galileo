@@ -10,7 +10,7 @@ use galileo::layer::feature_layer::{FeatureLayer, FeatureLayerOptions};
 use galileo::layer::Layer;
 use galileo::render::render_bundle::RenderBundle;
 use galileo::{Map, MapBuilder};
-use galileo_types::cartesian::{Point2d, Point3d};
+use galileo_types::cartesian::{Point2, Point3};
 use galileo_types::geo::impls::GeoPoint2d;
 use galileo_types::geo::{
     ChainProjection, Crs, Datum, InvertedProjection, Projection, ProjectionType,
@@ -45,7 +45,7 @@ fn load_countries() -> Vec<Country> {
 }
 
 fn create_mouse_handler(
-    feature_layer: Arc<RwLock<FeatureLayer<Point2d, Country, CountrySymbol, CartesianSpace2d>>>,
+    feature_layer: Arc<RwLock<FeatureLayer<Point2, Country, CountrySymbol, CartesianSpace2d>>>,
 ) -> impl UserEventHandler {
     let selected_id = Mutex::new(None);
 
@@ -66,7 +66,7 @@ fn create_mouse_handler(
                 )),
                 layer
                     .crs()
-                    .get_projection::<_, Point2d>()
+                    .get_projection::<_, Point2>()
                     .expect("cannot find projection"),
             );
 
@@ -109,7 +109,7 @@ fn create_mouse_handler(
     }
 }
 
-fn create_countries_layer() -> FeatureLayer<Point2d, Country, CountrySymbol, CartesianSpace2d> {
+fn create_countries_layer() -> FeatureLayer<Point2, Country, CountrySymbol, CartesianSpace2d> {
     let countries = load_countries();
 
     FeatureLayer::with_lods(
@@ -153,7 +153,7 @@ impl Symbol<Country> for CountrySymbol {
     fn render(
         &self,
         feature: &Country,
-        geometry: &Geom<Point3d>,
+        geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
     ) {

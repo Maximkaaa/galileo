@@ -9,7 +9,7 @@ mod polygon;
 
 pub use arbitrary::ArbitraryGeometrySymbol;
 pub use contour::SimpleContourSymbol;
-use galileo_types::cartesian::Point3d;
+use galileo_types::cartesian::Point3;
 use galileo_types::geometry::Geom;
 pub use point::{CirclePointSymbol, ImagePointSymbol};
 pub use polygon::SimplePolygonSymbol;
@@ -31,7 +31,7 @@ pub trait Symbol<F> {
     fn render(
         &self,
         feature: &F,
-        geometry: &Geom<Point3d>,
+        geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
     );

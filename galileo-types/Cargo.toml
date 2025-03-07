@@ -14,6 +14,7 @@ readme = "../README.md"
 default = ["geo-types", "geodesy"]
 
 [dependencies]
+approx = { workspace = true }
 geo-types = { workspace = true, optional = true }
 geodesy = { workspace = true, optional = true }
 geojson = { workspace = true, optional = true }

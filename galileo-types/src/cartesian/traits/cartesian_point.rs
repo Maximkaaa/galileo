@@ -1,7 +1,7 @@
-use nalgebra::{Point2, Scalar, Vector2};
+use nalgebra::Scalar;
 use num_traits::{Bounded, Float, FromPrimitive, Num};
 
-use crate::cartesian::Rect;
+use crate::cartesian::{Point2, Rect, Vector2};
 use crate::geo::Projection;
 use crate::geometry::{CartesianGeometry2dSpecialization, Geom, GeometrySpecialization};
 use crate::geometry_type::{CartesianSpace2d, GeometryType, PointGeometryType};
@@ -43,7 +43,7 @@ pub trait CartesianPoint2d {
     where
         Self: Sized,
     {
-        Point2::new(self.x() + vec.x, self.y() + vec.y)
+        Point2::new(self.x() + vec.dx(), self.y() + vec.dy())
     }
 
     /// Returns a vector between this and the `other` points.
@@ -54,7 +54,7 @@ pub trait CartesianPoint2d {
     /// Returns squared euclidean distance between two points.
     fn distance_sq(&self, other: &impl CartesianPoint2d<Num = Self::Num>) -> Self::Num {
         let v = self.sub(other);
-        v.x * v.x + v.y * v.y
+        v.dx() * v.dx() + v.dy() * v.dy()
     }
 
     /// Returns [taxicab distance](https://en.wikipedia.org/wiki/Taxicab_geometry) between two points.

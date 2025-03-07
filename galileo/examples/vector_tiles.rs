@@ -10,7 +10,7 @@ use galileo::layer::VectorTileLayer;
 use galileo::tile_schema::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Lod, Map, MapBuilder};
 use galileo_egui::{EguiMap, EguiMapState};
-use galileo_types::cartesian::{Point2d, Rect};
+use galileo_types::cartesian::{Point2, Rect};
 use galileo_types::geo::Crs;
 use parking_lot::RwLock;
 
@@ -149,7 +149,7 @@ fn gray_style() -> VectorTileStyle {
 }
 
 fn tile_schema() -> TileSchema {
-    const ORIGIN: Point2d = Point2d::new(-20037508.342787, 20037508.342787);
+    const ORIGIN: Point2 = Point2::new(-20037508.342787, 20037508.342787);
     const TOP_RESOLUTION: f64 = 156543.03392800014 / 4.0;
 
     let mut lods = vec![Lod::new(TOP_RESOLUTION, 0).expect("invalid config")];

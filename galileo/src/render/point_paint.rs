@@ -3,8 +3,8 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use galileo_types::cartesian::{Point2, Vector2};
 use galileo_types::impls::ClosedContour;
-use nalgebra::{Point2, Vector2};
 use serde::{Deserialize, Serialize};
 
 use crate::decoded_image::DecodedImage;
@@ -98,7 +98,7 @@ impl<'a> PointPaint<'a> {
     /// Creates a paint that draws given text label with the specified style.
     pub fn label(text: &'a String, style: &'a TextStyle) -> Self {
         Self {
-            offset: Vector2::new(0.0, 0.0),
+            offset: Vector2::default(),
             shape: PointShape::Label {
                 text: Cow::Borrowed(text),
                 style: Cow::Borrowed(style),
@@ -109,7 +109,7 @@ impl<'a> PointPaint<'a> {
     /// Creates a paint that draws given text label with the specified style.
     pub fn label_owned(text: String, style: TextStyle) -> Self {
         Self {
-            offset: Vector2::new(0.0, 0.0),
+            offset: Vector2::default(),
             shape: PointShape::Label {
                 text: Cow::Owned(text),
                 style: Cow::Owned(style),

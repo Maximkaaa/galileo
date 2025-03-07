@@ -7,7 +7,7 @@ use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::layer::FeatureLayer;
 use galileo::symbol::CirclePointSymbol;
 use galileo::{Color, Map, MapBuilder};
-use galileo_types::cartesian::Point2d;
+use galileo_types::cartesian::Point2;
 use galileo_types::geo::Crs;
 use galileo_types::geometry_type::CartesianSpace2d;
 use parking_lot::RwLock;
@@ -33,7 +33,7 @@ pub(crate) fn run() {
 }
 
 fn create_mouse_handler(
-    feature_layer: Arc<RwLock<FeatureLayer<Point2d, Point2d, CirclePointSymbol, CartesianSpace2d>>>,
+    feature_layer: Arc<RwLock<FeatureLayer<Point2, Point2, CirclePointSymbol, CartesianSpace2d>>>,
 ) -> impl UserEventHandler {
     move |ev: &UserEvent, map: &mut Map| {
         if let UserEvent::Click(_, event) = ev {
@@ -68,7 +68,7 @@ fn create_mouse_handler(
 }
 
 fn create_map(
-    feature_layer: Arc<RwLock<FeatureLayer<Point2d, Point2d, CirclePointSymbol, CartesianSpace2d>>>,
+    feature_layer: Arc<RwLock<FeatureLayer<Point2, Point2, CirclePointSymbol, CartesianSpace2d>>>,
 ) -> Map {
     let raster_layer = RasterTileLayerBuilder::new_osm()
         .with_file_cache_checked(".tile_cache")

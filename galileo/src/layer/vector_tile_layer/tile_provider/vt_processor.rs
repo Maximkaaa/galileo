@@ -1,5 +1,5 @@
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
-use galileo_types::cartesian::{CartesianPoint2d, Point2d, Point3d, Rect};
+use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d, Point2, Point3, Rect, Vector2};
 use galileo_types::impls::{ClosedContour, Polygon};
 use galileo_types::Contour;
 use num_traits::ToPrimitive;
@@ -47,10 +47,10 @@ impl VtProcessor {
 
         let bounds = Polygon::new(
             ClosedContour::new(vec![
-                Point3d::new(bbox.x_min(), bbox.y_min(), 0.0),
-                Point3d::new(bbox.x_min(), bbox.y_max(), 0.0),
-                Point3d::new(bbox.x_max(), bbox.y_max(), 0.0),
-                Point3d::new(bbox.x_max(), bbox.y_min(), 0.0),
+                Point3::new(bbox.x_min(), bbox.y_min(), 0.0),
+                Point3::new(bbox.x_min(), bbox.y_max(), 0.0),
+                Point3::new(bbox.x_max(), bbox.y_max(), 0.0),
+                Point3::new(bbox.x_max(), bbox.y_min(), 0.0),
             ]),
             vec![],
         );
@@ -67,7 +67,7 @@ impl VtProcessor {
 
                         for point in points {
                             let position = Self::transform_point(point, bbox, tile_resolution);
-                            if !bbox.contains(&Point2d::new(position.x, position.y)) {
+                            if !bbox.contains(&Point2::new(position.x(), position.y())) {
                                 // Some vector tiles add out-of-bounds point to start displaying labels that
                                 // are not fully on the screen yet. We need to deal with that case
                                 // in some clever way, but for now let's ignore those points.
@@ -76,7 +76,7 @@ impl VtProcessor {
 
                             match &paint.shape {
                                 PointShape::Label { text, style } => {
-                                    bundle.add_label(&position, text, style, [0.0, 0.0].into());
+                                    bundle.add_label(&position, text, style, Vector2::default());
                                 }
                                 _ => {
                                     bundle.add_point(&position, &paint, lod_resolution);
@@ -195,9 +195,9 @@ impl VtProcessor {
         p_in: &impl CartesianPoint2d<Num = Num>,
         tile_bbox: Rect,
         tile_resolution: f64,
-    ) -> Point3d {
+    ) -> Point3 {
         let x = tile_bbox.x_min() + p_in.x().to_f64().expect("double overflow") * tile_resolution;
         let y = tile_bbox.y_max() - p_in.y().to_f64().expect("double overflow") * tile_resolution;
-        Point3d::new(x, y, 0.0)
+        Point3::new(x, y, 0.0)
     }
 }

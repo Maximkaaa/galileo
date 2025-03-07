@@ -1,7 +1,7 @@
 use std::mem::size_of;
 use std::sync::Arc;
 
-use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d, Point2d};
+use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d, Point2, Vector2};
 use galileo_types::contour::Contour;
 use galileo_types::impls::ClosedContour;
 use galileo_types::Polygon;
@@ -14,7 +14,6 @@ use lyon::path::builder::PathBuilder;
 use lyon::path::path::BuilderWithAttributes;
 use lyon::path::{EndpointId, Path};
 use lyon::tessellation::VertexSource;
-use nalgebra::{Point2, Vector2};
 use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
 
@@ -96,7 +95,7 @@ impl WorldRenderSet {
         self.clip_area = Some(tessellation);
     }
 
-    pub fn add_image(&mut self, image: DecodedImage, vertices: [Point2d; 4], paint: ImagePaint) {
+    pub fn add_image(&mut self, image: DecodedImage, vertices: [Point2; 4], paint: ImagePaint) {
         let opacity = paint.opacity as f32 / 255.0;
 
         self.buffer_size += image.size() + std::mem::size_of::<ImageVertex>() * 4;
@@ -149,8 +148,8 @@ impl WorldRenderSet {
         self.buffer_size += image.size() + size_of::<ImageVertex>() * 4;
 
         let position = [position.x().as_(), position.y().as_()];
-        let offset_x = -offset[0] * width;
-        let offset_y = offset[1] * height;
+        let offset_x = -offset.dx() * width;
+        let offset_y = offset.dy() * height;
 
         let index = self.add_image_to_store(image);
         let vertices = [
@@ -519,7 +518,7 @@ impl WorldRenderSet {
 
         let center = ScreenRefVertex {
             position: [position.x().as_(), position.y().as_(), position.z().as_()],
-            normal: [offset.x, offset.y],
+            normal: [offset.dx(), offset.dy()],
             color: fill.center_color.to_u8_array(),
         };
 
@@ -542,7 +541,7 @@ impl WorldRenderSet {
 
             vertices.push(ScreenRefVertex {
                 position: [position.x().as_(), position.y().as_(), position.z().as_()],
-                normal: (point + offset).coords.into(),
+                normal: (*point + offset).coords(),
                 color: fill.side_color.to_u8_array(),
             });
         }
@@ -582,8 +581,8 @@ impl WorldRenderSet {
         P: CartesianPoint3d<Num = N>,
     {
         let position = [
-            point.x().as_() + offset.x,
-            point.y().as_() + offset.y,
+            point.x().as_() + offset.dx(),
+            point.y().as_() + offset.dy(),
             point.z().as_(),
         ];
         self.points.push(PointInstance {
@@ -765,7 +764,7 @@ impl ScreenRefVertexConstructor {
     fn create_vertex(&self, position: lyon::math::Point) -> ScreenRefVertex {
         ScreenRefVertex {
             position: self.position,
-            normal: [position.x + self.offset.x, position.y + self.offset.y],
+            normal: [position.x + self.offset.dx(), position.y + self.offset.dy()],
             color: self.color,
         }
     }

@@ -1,4 +1,4 @@
-use galileo_types::cartesian::Point3d;
+use galileo_types::cartesian::Point3;
 use galileo_types::geometry::Geom;
 
 use crate::render::render_bundle::RenderBundle;
@@ -42,7 +42,7 @@ impl<F> Symbol<F> for ArbitraryGeometrySymbol {
     fn render(
         &self,
         feature: &F,
-        geometry: &Geom<Point3d>,
+        geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
     ) {

@@ -1,9 +1,8 @@
 //! [`RenderBundle`] is used to store primitives and prepare them for rendering with the rendering backend.
 
-use galileo_types::cartesian::{CartesianPoint3d, Point2d};
+use galileo_types::cartesian::{CartesianPoint3d, Point2, Vector2};
 use galileo_types::contour::Contour;
 use galileo_types::Polygon;
-use nalgebra::Vector2;
 use num_traits::AsPrimitive;
 use screen_set::ScreenRenderSet;
 
@@ -25,7 +24,7 @@ pub struct RenderBundle {
 
 impl RenderBundle {
     /// Adds an image to the bundle.
-    pub fn add_image(&mut self, image: DecodedImage, vertices: [Point2d; 4], paint: ImagePaint) {
+    pub fn add_image(&mut self, image: DecodedImage, vertices: [Point2; 4], paint: ImagePaint) {
         self.world_set.add_image(image, vertices, paint);
     }
 

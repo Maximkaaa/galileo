@@ -14,7 +14,7 @@ use galileo::render::text::{
 };
 use galileo::tile_schema::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Color, Lod, MapBuilder};
-use galileo_types::cartesian::{Point2d, Rect};
+use galileo_types::cartesian::{Point2, Rect};
 use galileo_types::geo::Crs;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -122,7 +122,7 @@ fn default_style() -> VectorTileStyle {
 }
 
 fn tile_schema() -> TileSchema {
-    const ORIGIN: Point2d = Point2d::new(-20037508.342787, 20037508.342787);
+    const ORIGIN: Point2 = Point2::new(-20037508.342787, 20037508.342787);
     const TOP_RESOLUTION: f64 = 156543.03392800014 / 4.0;
 
     let mut lods = vec![Lod::new(TOP_RESOLUTION, 0).expect("invalid config")];
