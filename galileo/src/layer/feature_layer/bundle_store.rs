@@ -123,6 +123,8 @@ impl BundleStore {
     }
 
     pub(super) fn reset_feature(&mut self, feature_id: FeatureId) {
+        self.required_update.update_feature(feature_id);
+
         let Some(&bundle_id) = self.feature_to_bundle_map.get(&feature_id) else {
             return;
         };
@@ -131,7 +133,6 @@ impl BundleStore {
             self.unpacked.retain(|(id, _)| *id != bundle_id);
         }
 
-        self.required_update.update_feature(feature_id);
         for (&feature_id, &id) in &self.feature_to_bundle_map {
             if id == bundle_id {
                 self.required_update.update_feature(feature_id);

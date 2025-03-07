@@ -155,7 +155,7 @@ impl EguiMapState {
 
         if self.event_processor.is_dragging() || response.contains_pointer() {
             let events = ui.input(|input_state| input_state.events.clone());
-            self.process_events(&events);
+            self.process_events(&events, [-rect.left(), -rect.top()]);
         }
 
         self.map.animate();
@@ -249,15 +249,15 @@ impl EguiMapState {
             .render_to_texture_view(&self.map, &self.texture_view);
     }
 
-    fn process_events(&mut self, events: &[Event]) {
+    fn process_events(&mut self, events: &[Event], offset: [f32; 2]) {
         for event in events {
-            if let Some(raw_event) = Self::convert_event(event) {
+            if let Some(raw_event) = Self::convert_event(event, offset) {
                 self.event_processor.handle(raw_event, &mut self.map);
             }
         }
     }
 
-    fn convert_event(event: &Event) -> Option<RawUserEvent> {
+    fn convert_event(event: &Event, offset: [f32; 2]) -> Option<RawUserEvent> {
         match event {
             Event::PointerButton {
                 button, pressed, ..
@@ -276,8 +276,10 @@ impl EguiMapState {
             }
             Event::PointerMoved(position) => {
                 let scale = 1.0;
-                let pointer_position =
-                    Point2d::new(position.x as f64 / scale, position.y as f64 / scale);
+                let pointer_position = Point2d::new(
+                    (position.x + offset[0]) as f64 / scale,
+                    (position.y + offset[1]) as f64 / scale,
+                );
                 Some(RawUserEvent::PointerMoved(pointer_position))
             }
             Event::MouseWheel { delta, .. } => {

@@ -31,13 +31,24 @@ impl FeatureId {
 pub trait FeatureStore<F>: MaybeSend + MaybeSync {
     /// Returns an iterator over all features with their ids.
     fn iter(&self) -> Box<dyn Iterator<Item = (FeatureId, &F)> + '_>;
+
     /// Returns a mutable iterator over all features with their ids.
     fn iter_mut(&mut self) -> Box<dyn Iterator<Item = (FeatureId, &mut F)> + '_>;
+
     /// Returns a shared reference to the feature with the given id, or `None` if it does not exist.
     fn get(&self, id: FeatureId) -> Option<&F>;
+
     /// Returns an exclusive reference to the feature with the given id, or `None` if it does not
     /// exist.
     fn get_mut(&mut self, id: FeatureId) -> Option<&mut F>;
+
+    /// Adds the `feature` to the store and returns its id.
+    fn add(&mut self, feature: F) -> FeatureId;
+
+    /// Removes the feature from the store returning the feature itself.
+    ///
+    /// If the feature with the given id is not in the store, returns `None`.
+    fn remove(&mut self, id: FeatureId) -> Option<F>;
 }
 
 pub(super) struct VecFeatureStore<F> {
@@ -83,5 +94,47 @@ where
             .get(&id)
             .and_then(|index| self.features.get_mut(*index))
             .map(|(_, f)| f)
+    }
+
+    fn add(&mut self, feature: F) -> FeatureId {
+        let id = FeatureId::next();
+        let index = self.features.len();
+        self.features.push((id, feature));
+        self.ids.insert(id, index);
+
+        id
+    }
+
+    fn remove(&mut self, id: FeatureId) -> Option<F> {
+        let index = self.ids.remove(&id)?;
+        let (_, feature) = self.features.remove(index);
+
+        for (to_adjust_id, _) in self.features.iter().skip(index) {
+            if let Some(index) = self.ids.get_mut(to_adjust_id) {
+                *index -= 1;
+            }
+        }
+
+        Some(feature)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn vec_store_add_remove_features_preserves_indices() {
+        let mut store = VecFeatureStore::new([]);
+
+        let ids: Vec<_> = (0..5).map(|i| store.add(i)).collect();
+        store.remove(ids[2]);
+
+        assert_eq!(store.get(ids[2]), None);
+
+        assert_eq!(store.get(ids[0]), Some(&0));
+        assert_eq!(store.get(ids[1]), Some(&1));
+        assert_eq!(store.get(ids[3]), Some(&3));
+        assert_eq!(store.get(ids[4]), Some(&4));
     }
 }

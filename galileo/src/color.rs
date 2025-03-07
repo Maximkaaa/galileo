@@ -39,6 +39,8 @@ impl Color {
     pub const BLACK: Color = Color::rgba(0, 0, 0, 255);
     /// Gray color: `#AAAAAAFF`
     pub const GRAY: Color = Color::rgba(170, 170, 170, 255);
+    /// Purple color: `#800080FF`
+    pub const PURPLE: Color = Color::rgba(128, 0, 128, 255);
 
     /// Constructs color from its RGBA channels.
     pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
