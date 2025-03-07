@@ -93,7 +93,7 @@ impl<T: Contour<Point = P>, P: CartesianPoint2d> CartesianContour<P> for T {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cartesian::impls::Point2d;
+    use crate::cartesian::impls::Point2;
     use crate::contour::Contour;
     use crate::impls::ClosedContour;
     use crate::segment::Segment;
@@ -101,43 +101,43 @@ mod tests {
     #[test]
     fn iter_points_closing() {
         let contour =
-            crate::impls::Contour::open(vec![Point2d::new(0.0, 0.0), Point2d::new(1.0, 1.0)]);
+            crate::impls::Contour::open(vec![Point2::new(0.0, 0.0), Point2::new(1.0, 1.0)]);
         assert_eq!(contour.iter_points_closing().count(), 2);
         assert_eq!(
             *contour.iter_points_closing().last().unwrap(),
-            Point2d::new(1.0, 1.0)
+            Point2::new(1.0, 1.0)
         );
 
         let contour = ClosedContour {
-            points: vec![Point2d::new(0.0, 0.0), Point2d::new(1.0, 1.0)],
+            points: vec![Point2::new(0.0, 0.0), Point2::new(1.0, 1.0)],
         };
         assert_eq!(contour.iter_points_closing().count(), 3);
         assert_eq!(
             *contour.iter_points_closing().last().unwrap(),
-            Point2d::new(0.0, 0.0)
+            Point2::new(0.0, 0.0)
         );
     }
 
     #[test]
     fn iter_segments() {
-        let contour = crate::impls::Contour::open(vec![Point2d::new(0.0, 0.0)]);
+        let contour = crate::impls::Contour::open(vec![Point2::new(0.0, 0.0)]);
         assert_eq!(contour.iter_segments().count(), 0);
 
         let contour =
-            crate::impls::Contour::open(vec![Point2d::new(0.0, 0.0), Point2d::new(1.0, 1.0)]);
+            crate::impls::Contour::open(vec![Point2::new(0.0, 0.0), Point2::new(1.0, 1.0)]);
         assert_eq!(contour.iter_segments().count(), 1);
         assert_eq!(
             contour.iter_segments().last().unwrap(),
-            Segment(&Point2d::new(0.0, 0.0), &Point2d::new(1.0, 1.0))
+            Segment(&Point2::new(0.0, 0.0), &Point2::new(1.0, 1.0))
         );
 
         let contour = ClosedContour {
-            points: vec![Point2d::new(0.0, 0.0), Point2d::new(1.0, 1.0)],
+            points: vec![Point2::new(0.0, 0.0), Point2::new(1.0, 1.0)],
         };
         assert_eq!(contour.iter_segments().count(), 2);
         assert_eq!(
             contour.iter_segments().last().unwrap(),
-            Segment(&Point2d::new(1.0, 1.0), &Point2d::new(0.0, 0.0))
+            Segment(&Point2::new(1.0, 1.0), &Point2::new(0.0, 0.0))
         );
     }
 
@@ -145,34 +145,34 @@ mod tests {
     fn distance_to_point() {
         let contour = ClosedContour {
             points: vec![
-                Point2d::new(0.0, 0.0),
-                Point2d::new(1.0, 1.0),
-                Point2d::new(1.0, 0.0),
+                Point2::new(0.0, 0.0),
+                Point2::new(1.0, 1.0),
+                Point2::new(1.0, 0.0),
             ],
         };
 
         assert_eq!(
-            contour.distance_to_point_sq(&Point2d::new(0.0, 0.0)),
+            contour.distance_to_point_sq(&Point2::new(0.0, 0.0)),
             Some(0.0)
         );
         assert_eq!(
-            contour.distance_to_point_sq(&Point2d::new(0.5, 0.0)),
+            contour.distance_to_point_sq(&Point2::new(0.5, 0.0)),
             Some(0.0)
         );
         assert_eq!(
-            contour.distance_to_point_sq(&Point2d::new(0.5, 0.5)),
+            contour.distance_to_point_sq(&Point2::new(0.5, 0.5)),
             Some(0.0)
         );
         assert_eq!(
-            contour.distance_to_point_sq(&Point2d::new(0.0, 1.0)),
+            contour.distance_to_point_sq(&Point2::new(0.0, 1.0)),
             Some(0.5)
         );
         assert_eq!(
-            contour.distance_to_point_sq(&Point2d::new(2.0, 2.0)),
+            contour.distance_to_point_sq(&Point2::new(2.0, 2.0)),
             Some(2.0)
         );
         assert_eq!(
-            contour.distance_to_point_sq(&Point2d::new(-2.0, -2.0)),
+            contour.distance_to_point_sq(&Point2::new(-2.0, -2.0)),
             Some(8.0)
         );
     }
@@ -180,17 +180,17 @@ mod tests {
     #[test]
     fn area() {
         let contour = ClosedContour::new(vec![
-            Point2d::new(0.0, 0.0),
-            Point2d::new(0.0, 1.0),
-            Point2d::new(1.0, 0.0),
+            Point2::new(0.0, 0.0),
+            Point2::new(0.0, 1.0),
+            Point2::new(1.0, 0.0),
         ]);
 
         assert_eq!(contour.area_signed(), -0.5);
 
         let contour = ClosedContour::new(vec![
-            Point2d::new(0.0, 0.0),
-            Point2d::new(1.0, 0.0),
-            Point2d::new(0.0, 1.0),
+            Point2::new(0.0, 0.0),
+            Point2::new(1.0, 0.0),
+            Point2::new(0.0, 1.0),
         ]);
 
         assert_eq!(contour.area_signed(), 0.5);
@@ -199,17 +199,17 @@ mod tests {
     #[test]
     fn winding() {
         let contour = ClosedContour::new(vec![
-            Point2d::new(0.0, 0.0),
-            Point2d::new(0.0, 1.0),
-            Point2d::new(1.0, 0.0),
+            Point2::new(0.0, 0.0),
+            Point2::new(0.0, 1.0),
+            Point2::new(1.0, 0.0),
         ]);
 
         assert_eq!(contour.winding(), Winding::Clockwise);
 
         let contour = ClosedContour::new(vec![
-            Point2d::new(0.0, 0.0),
-            Point2d::new(1.0, 0.0),
-            Point2d::new(0.0, 1.0),
+            Point2::new(0.0, 0.0),
+            Point2::new(1.0, 0.0),
+            Point2::new(0.0, 1.0),
         ]);
 
         assert_eq!(contour.winding(), Winding::CounterClockwise);

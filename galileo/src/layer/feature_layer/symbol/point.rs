@@ -2,11 +2,10 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use galileo_types::cartesian::Point3d;
+use galileo_types::cartesian::{Point3, Vector2};
 use galileo_types::geometry::Geom;
 use galileo_types::MultiPoint;
 use image::EncodableLayout;
-use nalgebra::Vector2;
 
 use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
@@ -35,7 +34,7 @@ impl<F> Symbol<F> for CirclePointSymbol {
     fn render(
         &self,
         _feature: &F,
-        geometry: &Geom<Point3d>,
+        geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
     ) {
@@ -105,7 +104,7 @@ impl<F> Symbol<F> for ImagePointSymbol {
     fn render(
         &self,
         _feature: &F,
-        geometry: &Geom<Point3d>,
+        geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
     ) {

@@ -1,6 +1,5 @@
-use nalgebra::Point2;
-
 use crate::cartesian::traits::cartesian_point::CartesianPoint2d;
+use crate::cartesian::Point2;
 use crate::contour::ClosedContour;
 use crate::polygon::Polygon;
 use crate::segment::Segment;
@@ -62,7 +61,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::cartesian::impls::Point2d;
     use crate::cartesian::traits::polygon::*;
 
     #[test]
@@ -70,20 +68,20 @@ mod tests {
         let polygon = crate::impls::Polygon {
             outer_contour: crate::impls::ClosedContour {
                 points: vec![
-                    Point2d::new(0.0, 0.0),
-                    Point2d::new(1.0, 1.0),
-                    Point2d::new(1.0, 0.0),
+                    Point2::new(0.0, 0.0),
+                    Point2::new(1.0, 1.0),
+                    Point2::new(1.0, 0.0),
                 ],
             },
             inner_contours: vec![],
         };
 
-        assert!(polygon.contains_point(&Point2d::new(0.0, 0.0)));
-        assert!(polygon.contains_point(&Point2d::new(1.0, 1.0)));
-        assert!(polygon.contains_point(&Point2d::new(0.5, 0.0)));
-        assert!(polygon.contains_point(&Point2d::new(0.2, 0.1)));
-        assert!(!polygon.contains_point(&Point2d::new(0.2, 0.3)));
-        assert!(!polygon.contains_point(&Point2d::new(0.2, -0.3)));
-        assert!(!polygon.contains_point(&Point2d::new(1.1, 0.0)));
+        assert!(polygon.contains_point(&Point2::new(0.0, 0.0)));
+        assert!(polygon.contains_point(&Point2::new(1.0, 1.0)));
+        assert!(polygon.contains_point(&Point2::new(0.5, 0.0)));
+        assert!(polygon.contains_point(&Point2::new(0.2, 0.1)));
+        assert!(!polygon.contains_point(&Point2::new(0.2, 0.3)));
+        assert!(!polygon.contains_point(&Point2::new(0.2, -0.3)));
+        assert!(!polygon.contains_point(&Point2::new(1.1, 0.0)));
     }
 }

@@ -1,4 +1,4 @@
-use galileo_types::cartesian::{CartesianPoint2d, Point2d};
+use galileo_types::cartesian::{CartesianPoint2d, Point2};
 use galileo_types::geo::impls::GeoPoint2d;
 use galileo_types::geo::{Crs, GeoPoint};
 use galileo_types::latlon;
@@ -29,7 +29,7 @@ const DEFAULT_RESOLUTION: f64 = 156543.03392800014 / 16.0;
 #[derive(Default)]
 pub struct MapBuilder {
     position: Option<GeoPoint2d>,
-    projected_position: Option<Point2d>,
+    projected_position: Option<Point2>,
     resolution: Option<f64>,
     z_level: Option<u32>,
     crs: Option<Crs>,
@@ -100,18 +100,18 @@ impl MapBuilder {
     ///
     /// ```
     /// use galileo::MapBuilder;
-    /// use galileo::galileo_types::cartesian::Point2d;
+    /// use galileo::galileo_types::cartesian::{Point2, NewCartesianPoint2d};
     /// use galileo::galileo_types::geo::GeoPoint;
     /// # use approx::assert_relative_eq;
     ///
-    /// let position = Point2d::new(338639.2, 4404718.1);
+    /// let position = Point2::new(338639.2, 4404718.1);
     /// let map = MapBuilder::default().with_projected_position(position).build();
     ///
     /// assert_relative_eq!(map.view().position().unwrap().lat(), 36.752887, epsilon = 1e-6);
     /// assert_relative_eq!(map.view().position().unwrap().lon(), 3.042048, epsilon = 1e-6);
     /// ```
     pub fn with_projected_position(mut self, position: impl CartesianPoint2d<Num = f64>) -> Self {
-        self.projected_position = Some(Point2d::new(position.x(), position.y()));
+        self.projected_position = Some(Point2::new(position.x(), position.y()));
         self.position = None;
         self
     }
@@ -319,7 +319,7 @@ mod tests {
     fn with_position_replaces_projected_position() {
         let position = latlon!(10.0, 0.0);
         let map = MapBuilder::default()
-            .with_projected_position(Point2d::new(100.0, 100.0))
+            .with_projected_position(Point2::new(100.0, 100.0))
             .with_position(position)
             .build();
         assert_relative_eq!(
@@ -337,11 +337,11 @@ mod tests {
     #[test]
     fn with_projected_position_sets_position() {
         let projection = Crs::EPSG3857
-            .get_projection::<GeoPoint2d, Point2d>()
+            .get_projection::<GeoPoint2d, Point2>()
             .unwrap();
-        let position1 = Point2d::new(10.0, 0.0);
+        let position1 = Point2::new(10.0, 0.0);
         let projected1 = projection.unproject(&position1).unwrap();
-        let position2 = Point2d::new(20.0, 10.1);
+        let position2 = Point2::new(20.0, 10.1);
         let projected2 = projection.unproject(&position2).unwrap();
 
         let map = MapBuilder::default()
@@ -359,13 +359,13 @@ mod tests {
     #[test]
     fn with_projected_position_replaces_position() {
         let projection = Crs::EPSG3857
-            .get_projection::<GeoPoint2d, Point2d>()
+            .get_projection::<GeoPoint2d, Point2>()
             .unwrap();
         let position = latlon!(10.0, 0.0);
-        let projected = projection.unproject(&Point2d::new(100.0, 100.0)).unwrap();
+        let projected = projection.unproject(&Point2::new(100.0, 100.0)).unwrap();
         let map = MapBuilder::default()
             .with_position(position)
-            .with_projected_position(Point2d::new(100.0, 100.0))
+            .with_projected_position(Point2::new(100.0, 100.0))
             .build();
         assert_eq!(map.view().position(), Some(projected));
     }

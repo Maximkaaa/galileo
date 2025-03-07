@@ -1,6 +1,6 @@
 use galileo::layer::feature_layer::Feature;
 use galileo::Color;
-use galileo_types::cartesian::{CartesianPoint2d, Point2d, Rect};
+use galileo_types::cartesian::{CartesianPoint2d, Point2, Rect};
 use galileo_types::geo::impls::GeoPoint2d;
 use galileo_types::geo::{GeoPoint, NewGeoPoint, Projection};
 use galileo_types::geometry::{CartesianGeometry2d, Geom, Geometry};
@@ -11,7 +11,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 pub struct Country {
     pub name: String,
     #[serde(deserialize_with = "des_geometry")]
-    pub geometry: MultiPolygon<Point2d>,
+    pub geometry: MultiPolygon<Point2>,
     pub color: Color,
     pub bbox: Rect,
     pub is_selected: bool,
@@ -20,8 +20,8 @@ pub struct Country {
     pub is_hidden: bool,
 }
 
-fn des_geometry<'de, D: Deserializer<'de>>(d: D) -> Result<MultiPolygon<Point2d>, D::Error> {
-    Ok(Vec::<Polygon<Point2d>>::deserialize(d)?.into())
+fn des_geometry<'de, D: Deserializer<'de>>(d: D) -> Result<MultiPolygon<Point2>, D::Error> {
+    Ok(Vec::<Polygon<Point2>>::deserialize(d)?.into())
 }
 
 impl Country {
@@ -39,7 +39,7 @@ impl Feature for Country {
 }
 
 impl Geometry for Country {
-    type Point = Point2d;
+    type Point = Point2;
 
     fn project<P: Projection<InPoint = Self::Point> + ?Sized>(
         &self,
@@ -49,7 +49,7 @@ impl Geometry for Country {
     }
 }
 
-impl CartesianGeometry2d<Point2d> for Country {
+impl CartesianGeometry2d<Point2> for Country {
     fn is_point_inside<Other: CartesianPoint2d<Num = f64>>(
         &self,
         point: &Other,

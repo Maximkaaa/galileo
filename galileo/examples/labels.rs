@@ -20,13 +20,12 @@ use galileo::render::text::{
 use galileo::symbol::Symbol;
 use galileo::{Color, Map, MapBuilder};
 use galileo_egui::{EguiMap, EguiMapState};
-use galileo_types::cartesian::Point3d;
+use galileo_types::cartesian::{Point3, Vector2};
 use galileo_types::geo::impls::GeoPoint2d;
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
 use galileo_types::geometry_type::GeoSpace2d;
 use galileo_types::latlon;
-use nalgebra::Vector2;
 use parking_lot::RwLock;
 
 struct EguiMapApp {
@@ -357,7 +356,7 @@ impl Symbol<LabeledPoint> for LabeledSymbol {
     fn render(
         &self,
         feature: &LabeledPoint,
-        geometry: &Geom<Point3d>,
+        geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
     ) {

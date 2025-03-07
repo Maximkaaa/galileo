@@ -4,12 +4,12 @@ use galileo::layer::feature_layer::{FeatureLayer, FeatureLayerOptions};
 use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::symbol::ImagePointSymbol;
 use galileo::{Map, MapBuilder};
+use galileo_types::cartesian::Vector2;
 use galileo_types::geo::Crs;
 use galileo_types::geometry_type::GeoSpace2d;
 use galileo_types::{Disambig, Disambiguate};
 use geozero::geojson::GeoJson;
 use geozero::ToGeo;
-use nalgebra::Vector2;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {

@@ -1,7 +1,7 @@
 //! Types for text rendering.
 
 use bytes::Bytes;
-use nalgebra::Vector2;
+use galileo_types::cartesian::Vector2;
 use serde::{Deserialize, Serialize};
 
 use crate::Color;

@@ -60,14 +60,14 @@ impl<In: NewGeoPoint<f64>, Out: NewCartesianPoint2d<f64>> Projection
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cartesian::Point2d;
+    use crate::cartesian::Point2;
     use crate::geo::impls::point::GeoPoint2d;
 
     #[test]
     fn lambert_projection() {
         let pr = GeodesyProjection::new("laea lon_0=10 lat_0=52 x_0=4321000 y_0=3210000").unwrap();
         let center = GeoPoint2d::latlon(52.0, 10.0);
-        let projected: Point2d = pr.project(&center).unwrap();
+        let projected: Point2 = pr.project(&center).unwrap();
         let unprojected = pr.unproject(&projected).unwrap();
 
         dbg!(center, projected, unprojected);

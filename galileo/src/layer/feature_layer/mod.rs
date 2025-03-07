@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 
 use galileo_types::cartesian::{
-    CartesianPoint2d, NewCartesianPoint2d, NewCartesianPoint3d, Point2d, Point3d, Rect,
+    CartesianPoint2d, NewCartesianPoint2d, NewCartesianPoint3d, Point2, Point3, Rect,
 };
 use galileo_types::geo::impls::projection::{AddDimensionProjection, IdentityProjection};
 use galileo_types::geo::impls::GeoPoint2d;
@@ -224,7 +224,7 @@ where
         &self.lods[self.lods.len() - 1]
     }
 
-    fn render_with_projection<Proj: Projection<InPoint = P, OutPoint = Point3d> + ?Sized>(
+    fn render_with_projection<Proj: Projection<InPoint = P, OutPoint = Point3> + ?Sized>(
         &self,
         view: &MapView,
         canvas: &mut dyn Canvas,
@@ -286,7 +286,7 @@ where
     /// If the layer doesn't contain any features, or if at least one of them cannot be projected into the given
     /// CRS, `None` will be returned.
     pub fn extent_projected(&self, crs: &Crs) -> Option<Rect> {
-        let projection = crs.get_projection::<P, Point2d>()?;
+        let projection = crs.get_projection::<P, Point2>()?;
         self.features
             .iter()
             .filter_map(|(_, f)| f.geometry().project(&*projection))
@@ -347,12 +347,9 @@ where
     F::Geom: Geometry<Point = P>,
     S: Symbol<F> + MaybeSend + MaybeSync + 'static,
 {
-    fn get_projection(
-        &self,
-        crs: &Crs,
-    ) -> Option<impl Projection<InPoint = P, OutPoint = Point3d>> {
+    fn get_projection(&self, crs: &Crs) -> Option<impl Projection<InPoint = P, OutPoint = Point3>> {
         Some(ChainProjection::new(
-            crs.get_projection::<P, Point2d>()?,
+            crs.get_projection::<P, Point2>()?,
             Box::new(AddDimensionProjection::new(0.0)),
         ))
     }
@@ -403,12 +400,12 @@ where
     fn get_projection(
         &self,
         crs: &Crs,
-    ) -> Option<Box<dyn Projection<InPoint = P, OutPoint = Point3d>>> {
+    ) -> Option<Box<dyn Projection<InPoint = P, OutPoint = Point3>>> {
         if crs == &self.crs {
             Some(Box::new(AddDimensionProjection::new(0.0)))
         } else {
             let self_proj = self.crs.get_projection::<GeoPoint2d, P>()?;
-            let view_proj: Box<dyn Projection<InPoint = _, OutPoint = Point2d>> =
+            let view_proj: Box<dyn Projection<InPoint = _, OutPoint = Point2>> =
                 crs.get_projection()?;
             Some(Box::new(ChainProjection::new(
                 Box::new(ChainProjection::new(
@@ -464,7 +461,7 @@ where
     F::Geom: Geometry<Point = P>,
     S: Symbol<F> + MaybeSend + MaybeSync + 'static,
 {
-    fn get_projection(&self) -> IdentityProjection<P, Point3d, CartesianSpace3d> {
+    fn get_projection(&self) -> IdentityProjection<P, Point3, CartesianSpace3d> {
         IdentityProjection::new()
     }
 }

@@ -7,10 +7,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use galileo_mvt::{MvtFeature, MvtGeometry};
-use galileo_types::cartesian::{CartesianPoint2d, Point3d};
+use galileo_types::cartesian::{CartesianPoint2d, Point2, Point3};
 use galileo_types::geometry::CartesianGeometry2d;
 use galileo_types::impls::{ClosedContour, Polygon};
-use nalgebra::Point2;
 use parking_lot::Mutex;
 pub use vector_tile::VectorTile;
 
@@ -309,10 +308,10 @@ impl VectorTileLayer {
         let bbox = view.get_bbox()?;
         let bounds = Polygon::new(
             ClosedContour::new(vec![
-                Point3d::new(bbox.x_min(), bbox.y_min(), 0.0),
-                Point3d::new(bbox.x_min(), bbox.y_max(), 0.0),
-                Point3d::new(bbox.x_max(), bbox.y_max(), 0.0),
-                Point3d::new(bbox.x_max(), bbox.y_min(), 0.0),
+                Point3::new(bbox.x_min(), bbox.y_min(), 0.0),
+                Point3::new(bbox.x_min(), bbox.y_max(), 0.0),
+                Point3::new(bbox.x_max(), bbox.y_max(), 0.0),
+                Point3::new(bbox.x_max(), bbox.y_min(), 0.0),
             ]),
             vec![],
         );

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use nalgebra::Vector2;
+use galileo_types::cartesian::Vector2;
 
 use crate::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
 use crate::map::Map;
@@ -50,7 +50,7 @@ impl UserEventHandler for MapController {
             UserEvent::Drag(button, delta, e) => match button {
                 MouseButton::Left | MouseButton::Other => {
                     let current_position = e.screen_pointer_position;
-                    let prev_position = current_position - delta;
+                    let prev_position = current_position - *delta;
 
                     map.set_view(
                         map.view()
@@ -97,11 +97,12 @@ impl MapController {
         }
     }
 
-    fn get_rotation(&self, curr_view: &MapView, px_delta: Vector2<f64>) -> MapView {
-        let dz = px_delta.x * self.parameters.rotation_speed;
+    fn get_rotation(&self, curr_view: &MapView, px_delta: Vector2) -> MapView {
+        let dz = px_delta.dx() * self.parameters.rotation_speed;
 
         let rotation_z = curr_view.rotation_z() + dz;
-        let mut rotation_x = curr_view.rotation_x() - px_delta.y * self.parameters.rotation_speed;
+        let mut rotation_x =
+            curr_view.rotation_x() - px_delta.dy() * self.parameters.rotation_speed;
 
         if rotation_x < 0.0 {
             rotation_x = 0.0;

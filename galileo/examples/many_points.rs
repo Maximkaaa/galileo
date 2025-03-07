@@ -6,7 +6,7 @@ use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderBundle;
 use galileo::{Color, Map, MapBuilder};
-use galileo_types::cartesian::Point3d;
+use galileo_types::cartesian::Point3;
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
 
@@ -20,12 +20,12 @@ pub(crate) fn run() {
 }
 
 struct ColoredPoint {
-    point: Point3d,
+    point: Point3,
     color: Color,
 }
 
 impl Feature for ColoredPoint {
-    type Geom = Point3d;
+    type Geom = Point3;
 
     fn geometry(&self) -> &Self::Geom {
         &self.point
@@ -37,7 +37,7 @@ impl Symbol<ColoredPoint> for ColoredPointSymbol {
     fn render(
         &self,
         feature: &ColoredPoint,
-        geometry: &Geom<Point3d>,
+        geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
     ) {
@@ -66,7 +66,7 @@ fn generate_points() -> Vec<ColoredPoint> {
             let x = theta.cos() * rel_radius;
             let y = theta.sin() * rel_radius;
 
-            let point = Point3d::new(x * radius, y * radius, z * radius);
+            let point = Point3::new(x * radius, y * radius, z * radius);
             points.push(ColoredPoint { point, color });
         }
     }

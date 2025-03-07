@@ -3,7 +3,7 @@
 use std::sync::OnceLock;
 
 use bytes::Bytes;
-use nalgebra::Vector2;
+use galileo_types::cartesian::Vector2;
 use rustybuzz::ttf_parser::FaceParsingError;
 use thiserror::Error;
 

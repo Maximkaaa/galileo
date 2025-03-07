@@ -14,7 +14,7 @@ use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderBundle;
 use galileo::symbol::Symbol;
 use galileo::{Color, Map, MapBuilder};
-use galileo_types::cartesian::Point3d;
+use galileo_types::cartesian::Point3;
 use galileo_types::geo::Crs;
 use galileo_types::geometry::Geom;
 use las::Read;
@@ -66,8 +66,9 @@ fn load_points() -> Vec<ColoredPoint> {
 
             let p = p.expect("invalid laz file");
             let color = p.color.expect("invalid laz file");
-            let point = Point3d::new(p.x * scale_lat, p.y * scale_lat, p.z * scale_lat);
-            let point: Point3d = transform * point;
+            let point = nalgebra::Point3::new(p.x * scale_lat, p.y * scale_lat, p.z * scale_lat);
+            let point = transform * point;
+            let point = Point3::new(point.x, point.y, point.z);
             ColoredPoint {
                 point,
                 color: Color::rgba(
@@ -83,12 +84,12 @@ fn load_points() -> Vec<ColoredPoint> {
 
 #[derive(Clone)]
 struct ColoredPoint {
-    point: Point3d,
+    point: Point3,
     color: Color,
 }
 
 impl Feature for ColoredPoint {
-    type Geom = Point3d;
+    type Geom = Point3;
 
     fn geometry(&self) -> &Self::Geom {
         &self.point
@@ -100,7 +101,7 @@ impl Symbol<ColoredPoint> for ColoredPointSymbol {
     fn render(
         &self,
         feature: &ColoredPoint,
-        geometry: &Geom<Point3d>,
+        geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
     ) {

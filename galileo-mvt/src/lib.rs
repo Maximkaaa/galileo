@@ -2,11 +2,10 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
 use bytes::Buf;
-use galileo_types::cartesian::{CartesianClosedContour, CartesianPoint2d, Winding};
+use galileo_types::cartesian::{CartesianClosedContour, CartesianPoint2d, Point2, Winding};
 use galileo_types::impls::{ClosedContour, Contour, Polygon};
 use geozero::mvt::tile::GeomType;
 use geozero::mvt::{Message as GeozeroMessage, Tile};
-use nalgebra::Point2;
 use serde::{Deserialize, Serialize};
 use strfmt::DisplayStr;
 

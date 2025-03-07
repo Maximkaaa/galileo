@@ -1,9 +1,10 @@
 use std::ops::Deref;
 
-use nalgebra::{Point2, Scalar};
+use nalgebra::Scalar;
 use num_traits::{FromPrimitive, Num};
 use serde::{Deserialize, Serialize};
 
+use super::Point2;
 use crate::cartesian::CartesianPoint2d;
 use crate::impls::ClosedContour;
 

@@ -1,12 +1,12 @@
 use bytes::Bytes;
 use font_query::{Database, Query, Stretch, ID as FaceId};
+use galileo_types::cartesian::Vector2;
 use lyon::lyon_tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor, VertexBuffers,
 };
 use lyon::path::path::Builder;
 use lyon::path::Path;
 use lyon::tessellation::{StrokeOptions, StrokeTessellator, StrokeVertexConstructor};
-use nalgebra::Vector2;
 use rustybuzz::ttf_parser::{self, GlyphId, OutlineBuilder, Tag};
 use rustybuzz::{Direction, UnicodeBuffer};
 
@@ -113,14 +113,14 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
                 let width = width * scale;
                 let height = height * scale;
 
-                let offset_x = offset.x
+                let offset_x = offset.dx()
                     + match style.horizontal_alignment {
                         super::HorizontalAlignment::Left => 0.0,
                         super::HorizontalAlignment::Center => -width / 2.0,
                         super::HorizontalAlignment::Right => -width,
                     };
 
-                let offset_y = offset.y
+                let offset_y = offset.dy()
                     + match style.vertical_alignment {
                         super::VerticalAlignment::Top => -height,
                         super::VerticalAlignment::Middle => -height / 2.0,
@@ -283,8 +283,8 @@ impl FillVertexConstructor<GlyphVertex> for GlyphVertexConstructor {
     fn new_vertex(&mut self, vertex: FillVertex) -> GlyphVertex {
         GlyphVertex {
             position: [
-                vertex.position().x + self.offset.x,
-                vertex.position().y + self.offset.y,
+                vertex.position().x + self.offset.dx(),
+                vertex.position().y + self.offset.dy(),
             ],
             color: self.color,
         }
@@ -295,8 +295,8 @@ impl StrokeVertexConstructor<GlyphVertex> for GlyphVertexConstructor {
     fn new_vertex(&mut self, vertex: lyon::tessellation::StrokeVertex) -> GlyphVertex {
         GlyphVertex {
             position: [
-                vertex.position().x + self.offset.x,
-                vertex.position().y + self.offset.y,
+                vertex.position().x + self.offset.dx(),
+                vertex.position().y + self.offset.dy(),
             ],
             color: self.color,
         }
