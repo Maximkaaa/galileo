@@ -23,26 +23,25 @@ use crate::render::text::{FontService, TextShaping, TextStyle};
 use crate::render::{ImagePaint, LinePaint, PolygonPaint};
 use crate::Color;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct WorldRenderSet {
     pub poly_tessellation: VertexBuffers<PolyVertex, u32>,
     pub points: Vec<PointInstance>,
-    pub screen_ref: ScreenRefTessellation,
+    pub screen_ref: VertexBuffers<ScreenRefVertex, u32>,
     pub images: Vec<ImageInfo>,
     pub clip_area: Option<VertexBuffers<PolyVertex, u32>>,
     pub image_store: Vec<Arc<DecodedImage>>,
     pub buffer_size: usize,
 }
 
-#[derive(Debug, Clone)]
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
 pub(crate) struct ImageInfo {
     pub(crate) store_index: usize,
     pub(crate) vertices: [ImageVertex; 4],
 }
 
-pub(crate) type ScreenRefTessellation = VertexBuffers<ScreenRefVertex, u32>;
-
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
 #[repr(C)]
 pub(crate) struct ScreenRefVertex {
     position: [f32; 3],
@@ -361,10 +360,11 @@ impl WorldRenderSet {
 
         Self::tessellate_polygon(polygon, paint, lod);
 
-        let end_index = lod.vertices.len();
+        let end_index = self.poly_tessellation.vertices.len();
 
         self.buffer_size += (end_index - start_index) * size_of::<PolyVertex>();
-        self.buffer_size += (lod.indices.len() - start_index_count) * size_of::<u32>();
+        self.buffer_size +=
+            (self.poly_tessellation.indices.len() - start_index_count) * size_of::<u32>();
     }
 
     fn tessellate_polygon<N, P, Poly>(
@@ -432,6 +432,8 @@ impl WorldRenderSet {
         let start_vertex_count = self.screen_ref.vertices.len();
         let start_index_count = self.screen_ref.indices.len();
 
+        let screen_ref = &mut self.screen_ref;
+
         if let Some(outline) = outline {
             let vertex_constructor = ScreenRefVertexConstructor {
                 color: outline.color.to_u8_array(),
@@ -442,7 +444,7 @@ impl WorldRenderSet {
             if let Err(err) = StrokeTessellator::new().tessellate(
                 &path,
                 &StrokeOptions::DEFAULT.with_line_width(outline.width as f32 * 2.0),
-                &mut BuffersBuilder::new(&mut self.screen_ref, vertex_constructor),
+                &mut BuffersBuilder::new(screen_ref, vertex_constructor),
             ) {
                 log::warn!("Shape tessellation failed: {err:?}");
                 return;
@@ -459,7 +461,7 @@ impl WorldRenderSet {
             if let Err(err) = FillTessellator::new().tessellate(
                 &path,
                 &FillOptions::DEFAULT,
-                &mut BuffersBuilder::new(&mut self.screen_ref, vertex_constructor),
+                &mut BuffersBuilder::new(screen_ref, vertex_constructor),
             ) {
                 log::warn!("Shape tessellation failed: {err:?}");
             }
@@ -792,20 +794,17 @@ pub(crate) struct PolyVertex {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
 pub(crate) struct PointInstance {
     pub position: [f32; 3],
     pub color: [u8; 4],
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
 pub(crate) struct ImageVertex {
     pub position: [f32; 2],
     pub opacity: f32,
     pub tex_coords: [f32; 2],
     pub offset: [f32; 2],
 }
-
-#[cfg(target_arch = "wasm32")]
-pub(crate) mod serialization;

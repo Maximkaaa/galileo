@@ -1167,7 +1167,7 @@ impl WgpuPackedBundle {
                     .device
                     .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label: None,
-                        contents: bytemuck::cast_slice(&bundle_screen_set.indices),
+                        contents: bytemuck::cast_slice(&bundle_screen_set.buffers.indices),
                         usage: wgpu::BufferUsages::INDEX,
                     });
 
@@ -1177,17 +1177,17 @@ impl WgpuPackedBundle {
                     .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label: None,
                         usage: wgpu::BufferUsages::VERTEX,
-                        contents: bytemuck::cast_slice(&bundle_screen_set.vertices),
+                        contents: bytemuck::cast_slice(&bundle_screen_set.buffers.vertices),
                     });
 
             let buffers = ScreenRefBuffers {
                 index: index_buffer,
                 vertex: vertex_buffer,
-                index_count: bundle_screen_set.indices.len() as u32,
+                index_count: bundle_screen_set.buffers.indices.len() as u32,
             };
 
             screen_sets.push(Arc::new(Mutex::new(WgpuScreenSet {
-                state: bundle_screen_set.initial_state,
+                state: RenderSetState::Hidden,
                 animation_duration: bundle_screen_set.animation_duration,
                 anchor_point: bundle_screen_set.anchor_point,
                 bbox: bundle_screen_set.bbox,
