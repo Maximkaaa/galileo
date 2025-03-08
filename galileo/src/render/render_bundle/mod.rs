@@ -5,6 +5,7 @@ use galileo_types::contour::Contour;
 use galileo_types::Polygon;
 use num_traits::AsPrimitive;
 use screen_set::ScreenRenderSet;
+use serde::{Deserialize, Serialize};
 
 use super::text::TextStyle;
 use crate::decoded_image::DecodedImage;
@@ -16,7 +17,7 @@ pub(crate) mod screen_set;
 pub(crate) mod world_set;
 
 /// Render bundle is used to store render primitives and prepare them to be rendered with the rendering backend.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct RenderBundle {
     pub(crate) world_set: WorldRenderSet,
     pub(crate) screen_sets: Vec<ScreenRenderSet>,

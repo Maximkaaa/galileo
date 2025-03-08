@@ -17,8 +17,6 @@ use wasm_bindgen::JsCast;
 
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::processor::TileProcessingError;
-use crate::render::render_bundle::world_set::serialization::TessellatingRenderBundleBytes;
-use crate::render::render_bundle::world_set::WorldRenderSet;
 use crate::render::render_bundle::RenderBundle;
 use crate::tile_schema::TileIndex;
 use crate::TileSchema;
@@ -95,7 +93,7 @@ struct WebWorkerResponse {
 enum WebWorkerResponsePayload {
     Ready,
     ProcessVtTile {
-        result: Result<Vec<u8>, TileProcessingError>,
+        result: Result<RenderBundle, TileProcessingError>,
     },
 }
 
@@ -109,15 +107,7 @@ impl TryFrom<Result<WebWorkerResponsePayload, WebWorkerError>> for RenderBundle 
         value: Result<WebWorkerResponsePayload, WebWorkerError>,
     ) -> Result<Self, Self::Error> {
         match value {
-            Ok(WebWorkerResponsePayload::ProcessVtTile { result }) => result.map(|bytes| {
-                let (converted, _): (TessellatingRenderBundleBytes, _) =
-                    bincode::serde::decode_from_slice(&bytes, bincode::config::standard())
-                        .expect("Failed to deserialize render bundle bytes");
-                RenderBundle {
-                    world_set: WorldRenderSet::from_bytes_unchecked(converted),
-                    screen_sets: vec![],
-                }
-            }),
+            Ok(WebWorkerResponsePayload::ProcessVtTile { result }) => result,
             _ => {
                 log::error!("Unexpected response type for tile processing request: {value:?}");
                 Err(TileProcessingError::Internal)
@@ -412,12 +402,7 @@ mod worker {
     ) -> WebWorkerResponsePayload {
         let mut bundle = RenderBundle::default();
         let result = match VtProcessor::prepare(&tile, &mut bundle, index, &style, &tile_schema) {
-            Ok(()) => {
-                let bytes = bundle.world_set.into_bytes();
-                let serialized = bincode::serde::encode_to_vec(&bytes, bincode::config::standard())
-                    .expect("failed to serialize render bundle");
-                Ok(serialized)
-            }
+            Ok(()) => Ok(bundle),
             Err(_) => Err(TileProcessingError::Rendering),
         };
 

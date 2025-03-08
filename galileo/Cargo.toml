@@ -37,7 +37,7 @@ geozero = { workspace = true }
 image = { workspace = true, default-features = false, features = ["png", "jpeg"], optional = true }
 lazy_static = { workspace = true }
 log = { workspace = true }
-lyon = { workspace = true }
+lyon = { workspace = true, features = ["serialization"] }
 nalgebra = { workspace = true }
 num-traits = { workspace = true }
 parking_lot = { workspace = true }
@@ -47,7 +47,7 @@ rustybuzz = { workspace = true, optional = true }
 serde = { workspace = true, optional = true, features = ["std", "derive", "rc"] }
 strfmt = { workspace = true }
 thiserror = { workspace = true }
-web-time = { workspace = true }
+web-time = { workspace = true, features = ["serde"] }
 winit = { workspace = true, default-features = true, features = ["rwh_06"], optional = true }
 
 [dev-dependencies]

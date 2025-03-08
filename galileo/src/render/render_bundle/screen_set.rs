@@ -1,17 +1,17 @@
 use galileo_types::cartesian::{CartesianPoint3d, Point2, Rect, Vector2};
+use lyon::tessellation::VertexBuffers;
 use num_traits::AsPrimitive;
+use serde::{Deserialize, Serialize};
 use web_time::{Duration, Instant};
 
 use crate::render::text::{FontService, TextShaping, TextStyle};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ScreenRenderSet {
-    pub(crate) initial_state: RenderSetState,
     pub(crate) animation_duration: Duration,
     pub(crate) anchor_point: [f32; 3],
     pub(crate) bbox: Rect<f32>,
-    pub(crate) vertices: Vec<ScreenSetVertex>,
-    pub(crate) indices: Vec<u32>,
+    pub(crate) buffers: VertexBuffers<ScreenSetVertex, u32>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -28,7 +28,7 @@ impl RenderSetState {
     }
 }
 
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
 #[repr(C)]
 pub(crate) struct ScreenSetVertex {
     pub(crate) position: [f32; 2],
@@ -82,12 +82,10 @@ impl ScreenRenderSet {
                 };
 
                 Some(Self {
-                    initial_state: RenderSetState::Hidden,
                     animation_duration: Duration::from_millis(300),
                     anchor_point: [position.x().as_(), position.y().as_(), position.z().as_()],
                     bbox,
-                    vertices,
-                    indices,
+                    buffers: VertexBuffers { vertices, indices },
                 })
             }
             Err(err) => {
