@@ -7,6 +7,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use bytes::Bytes;
 use futures::channel::oneshot;
 use futures::channel::oneshot::Sender;
 use galileo_mvt::MvtTile;
@@ -14,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::watch::Receiver;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::JsCast;
+use web_sys::Worker;
 
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::processor::TileProcessingError;
@@ -81,6 +83,9 @@ enum WebWorkerRequestPayload {
         style: VectorTileStyle,
         tile_schema: TileSchema,
     },
+    LoadFont {
+        font_data: Bytes,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -95,6 +100,7 @@ enum WebWorkerResponsePayload {
     ProcessVtTile {
         result: Result<RenderBundle, TileProcessingError>,
     },
+    LoadFont,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -126,8 +132,10 @@ impl WebWorkerService {
             pending_requests: Rc::new(RefCell::new(Default::default())),
             is_ready: rx,
         };
+
+        let ready_count = Arc::new(AtomicUsize::new(0));
         for _ in 0..worker_count {
-            service.spawn_worker(tx.clone());
+            service.spawn_worker(tx.clone(), worker_count, ready_count.clone());
         }
 
         service
@@ -147,20 +155,41 @@ impl WebWorkerService {
         tile_schema: TileSchema,
     ) -> Result<RenderBundle, TileProcessingError> {
         let response = self
-            .request_operation(WebWorkerRequestPayload::ProcessVtTile {
-                tile: (*tile).clone(),
-                index,
-                style: (*style).clone(),
-                tile_schema,
-            })
+            .request_operation(
+                WebWorkerRequestPayload::ProcessVtTile {
+                    tile: (*tile).clone(),
+                    index,
+                    style: (*style).clone(),
+                    tile_schema,
+                },
+                self.next_worker(),
+            )
             .await;
 
         response.try_into()
     }
 
+    /// Loads font data to the font service in web workers.
+    pub async fn load_font(&self, font_data: Bytes) {
+        for worker in &self.worker_pool {
+            if let Err(err) = self
+                .request_operation(
+                    WebWorkerRequestPayload::LoadFont {
+                        font_data: font_data.clone(),
+                    },
+                    &worker.worker,
+                )
+                .await
+            {
+                log::error!("Failed to send font data to the web worker: {err:?}");
+            }
+        }
+    }
+
     async fn request_operation(
         &self,
         payload: WebWorkerRequestPayload,
+        worker: &Worker,
     ) -> Result<WebWorkerResponsePayload, WebWorkerError> {
         self.is_ready
             .clone()
@@ -173,10 +202,13 @@ impl WebWorkerService {
         self.add_request(request_id, sender);
 
         let start = web_time::Instant::now();
-        self.send_request(&WebWorkerRequest {
-            request_id,
-            payload,
-        });
+        self.send_request(
+            &WebWorkerRequest {
+                request_id,
+                payload,
+            },
+            worker,
+        );
 
         log::debug!(
             "Sent request {request_id} to web worker in {} ms",
@@ -196,8 +228,7 @@ impl WebWorkerService {
             .insert(request_id, result_channel);
     }
 
-    fn send_request(&self, request: &WebWorkerRequest) {
-        let worker = self.next_worker();
+    fn send_request(&self, request: &WebWorkerRequest, worker: &Worker) {
         let bytes = bincode::serde::encode_to_vec(request, bincode::config::standard())
             .expect("failed to serialize ww request");
         let buf = serde_bytes::ByteBuf::from(bytes);
@@ -213,7 +244,12 @@ impl WebWorkerService {
         &self.worker_pool[next_worker_index % self.worker_pool.len()].worker
     }
 
-    fn spawn_worker(&mut self, is_ready_sender: tokio::sync::watch::Sender<bool>) {
+    fn spawn_worker(
+        &mut self,
+        is_ready_sender: tokio::sync::watch::Sender<bool>,
+        worker_count: usize,
+        ready_count: Arc<AtomicUsize>,
+    ) {
         let worker = web_sys::Worker::new(WORKER_URL).expect("failed to create web worker");
         let worker_state = Rc::new(WorkerState {
             worker,
@@ -257,10 +293,17 @@ impl WebWorkerService {
 
                 match response.payload {
                     WebWorkerResponsePayload::Ready => {
-                        is_ready_sender
-                            .send(true)
-                            .expect("failed to send ready state through channel");
-                        worker_state_clone.is_ready.store(true, Ordering::Relaxed)
+                        let ready_count = ready_count.fetch_add(1, Ordering::Relaxed) + 1;
+                        worker_state_clone.is_ready.store(true, Ordering::Relaxed);
+
+                        log::debug!("Initialized {ready_count} out of {worker_count} workers");
+
+                        if ready_count == worker_count {
+                            log::debug!("WebWorkerService is ready to roll");
+                            is_ready_sender
+                                .send(true)
+                                .expect("failed to send ready state through channel");
+                        }
                     }
                     v => {
                         let channel = pending_requests.borrow_mut().remove(&response.request_id);
@@ -289,6 +332,7 @@ impl WebWorkerService {
 }
 
 mod worker {
+    use bytes::Bytes;
     use galileo_mvt::MvtTile;
     use serde_bytes::ByteBuf;
     use wasm_bindgen::prelude::wasm_bindgen;
@@ -300,6 +344,7 @@ mod worker {
     use crate::layer::vector_tile_layer::tile_provider::VtProcessor;
     use crate::platform::web::web_workers::WebWorkerResponsePayload;
     use crate::render::render_bundle::RenderBundle;
+    use crate::render::text::{FontService, RustybuzzFontServiceProvider};
     use crate::tile_schema::TileIndex;
     use crate::TileSchema;
 
@@ -391,7 +436,28 @@ mod worker {
                 style,
                 tile_schema,
             } => process_vt_tile(tile, index, style, tile_schema),
+            WebWorkerRequestPayload::LoadFont { font_data } => load_font(font_data),
         }
+    }
+
+    fn load_font(font_data: Bytes) -> WebWorkerResponsePayload {
+        log::debug!("Loading font data in web workder");
+
+        if FontService::instance().is_none() {
+            let provider = RustybuzzFontServiceProvider::default();
+            FontService::initialize(provider);
+        }
+
+        if let Some(instance) = FontService::instance() {
+            match instance.load_fonts(font_data) {
+                Err(err) => {
+                    log::error!("Failed to load font: {err:?}");
+                }
+                _ => {}
+            };
+        }
+
+        WebWorkerResponsePayload::LoadFont
     }
 
     fn process_vt_tile(

@@ -272,7 +272,14 @@ impl VectorTileLayer {
                     for layer in &mvt_tile.layers {
                         for feature in &layer.features {
                             match &feature.geometry {
-                                MvtGeometry::Point(_) => {}
+                                MvtGeometry::Point(points) => {
+                                    if points
+                                        .iter()
+                                        .any(|p| p.is_point_inside(&tile_point, tolerance))
+                                    {
+                                        features.push((layer.name.clone(), feature.clone()));
+                                    }
+                                }
                                 MvtGeometry::LineString(contours) => {
                                     if contours
                                         .iter()

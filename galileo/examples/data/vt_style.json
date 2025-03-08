@@ -193,6 +193,23 @@
       "properties": {
         "class": "trunk_construction"
       }
+    },
+    {
+      "properties": {
+          "rank": "1"
+      },
+      "symbol": {
+        "label": {
+          "pattern": "{name:en}",
+          "text_style": {
+              "font_family": ["Hack"],
+              "font_size": 18,
+              "weight": 700,
+              "outline_width": 4,
+              "outline_color": "#ffffffff"
+          }
+        }
+      }
     }
   ],
   "default_symbol": {
