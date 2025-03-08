@@ -3,7 +3,7 @@ use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d, Point2, Point
 use galileo_types::impls::{ClosedContour, Polygon};
 use galileo_types::Contour;
 use num_traits::ToPrimitive;
-use strfmt::strfmt;
+use regex::Regex;
 
 use crate::error::GalileoError;
 use crate::layer::vector_tile_layer::style::{VectorTileLabelSymbol, VectorTileStyle};
@@ -160,7 +160,18 @@ impl VtProcessor {
         label_symbol: &VectorTileLabelSymbol,
         feature: &MvtFeature,
     ) -> Option<PointPaint<'a>> {
-        let text = strfmt(&label_symbol.pattern, &feature.properties).ok()?;
+        let re = Regex::new("\\{(?<name>.+)}").ok()?;
+        let mut text = label_symbol.pattern.to_string();
+        for m in re.captures_iter(&label_symbol.pattern) {
+            let prop_name = &m["name"];
+            let prop = feature
+                .properties
+                .get(prop_name)
+                .map(|v| v.to_string())
+                .unwrap_or_default();
+
+            text = text.replace(&format!("{{{}}}", prop_name), &prop);
+        }
         Some(PointPaint::label_owned(
             text,
             label_symbol.text_style.clone(),

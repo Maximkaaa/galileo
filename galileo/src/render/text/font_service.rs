@@ -4,6 +4,7 @@ use std::sync::OnceLock;
 
 use bytes::Bytes;
 use galileo_types::cartesian::Vector2;
+use parking_lot::RwLock;
 use rustybuzz::ttf_parser::FaceParsingError;
 use thiserror::Error;
 
@@ -29,7 +30,7 @@ pub enum FontServiceError {
 
 /// Provides common access to underlying text shaping engine implementation.
 pub struct FontService {
-    pub(crate) provider: Box<dyn FontServiceProvider + Send + Sync>,
+    pub(crate) provider: RwLock<Box<dyn FontServiceProvider + Send + Sync>>,
 }
 
 impl FontService {
@@ -41,12 +42,17 @@ impl FontService {
             );
         }
 
-        INSTANCE.get_or_init(|| Self {
-            provider: Box::new(provider),
+        INSTANCE.get_or_init(|| {
+            log::debug!("Initializing FontService");
+
+            Self {
+                provider: RwLock::new(Box::new(provider)),
+            }
         });
     }
 
-    fn instance() -> Option<&'static Self> {
+    /// Returns static instance of the service if it was initialized.
+    pub fn instance() -> Option<&'static Self> {
         INSTANCE.get()
     }
 
@@ -60,11 +66,11 @@ impl FontService {
             return Err(FontServiceError::NotInitialized);
         };
 
-        service.provider.shape(text, style, offset)
+        service.provider.read().shape(text, style, offset)
     }
 
     /// Try parse input binary data to load fonts to the font service.
-    pub fn load_fonts(&mut self, fonts_data: Bytes) -> Result<(), FontServiceError> {
-        self.provider.load_fonts(fonts_data)
+    pub fn load_fonts(&self, fonts_data: Bytes) -> Result<(), FontServiceError> {
+        self.provider.write().load_fonts(fonts_data)
     }
 }

@@ -11,6 +11,8 @@ use rustybuzz::ttf_parser::{self, GlyphId, OutlineBuilder, Tag};
 use rustybuzz::{Direction, UnicodeBuffer};
 
 use super::GlyphVertex;
+#[cfg(target_arch = "wasm32")]
+use crate::platform::web::web_workers::WebWorkerService;
 use crate::render::text::font_service::FontServiceError;
 use crate::render::text::{FontServiceProvider, TessellatedGlyph, TextShaping, TextStyle};
 use crate::Color;
@@ -170,7 +172,17 @@ impl FontServiceProvider for RustybuzzFontServiceProvider {
     }
 
     fn load_fonts(&mut self, fonts_data: Bytes) -> Result<(), FontServiceError> {
-        self.font_db.load_font_data(fonts_data.to_vec());
+        for id in self.font_db.load_font_data(fonts_data.to_vec()) {
+            if let Some(font) = self.font_db.face(id) {
+                log::debug!("Loaded font {:?}", font.families);
+            }
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        crate::async_runtime::spawn(async move {
+            WebWorkerService::instance().load_font(fonts_data).await;
+        });
+
         Ok(())
     }
 }
