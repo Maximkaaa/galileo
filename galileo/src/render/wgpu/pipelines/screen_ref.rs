@@ -7,7 +7,7 @@ use wgpu::{
 
 use crate::render::render_bundle::world_set::ScreenRefVertex;
 use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
-use crate::render::wgpu::{DisplayInstance, ScreenRefBuffers, DEPTH_FORMAT};
+use crate::render::wgpu::{DisplayInstance, WgpuVertexBuffers, DEPTH_FORMAT};
 use crate::render::RenderOptions;
 
 pub struct ScreenRefPipeline {
@@ -65,7 +65,7 @@ impl ScreenRefPipeline {
 
     pub fn render<'a>(
         &'a self,
-        buffers: &'a ScreenRefBuffers,
+        buffers: &'a WgpuVertexBuffers,
         render_pass: &mut RenderPass<'a>,
         render_options: RenderOptions,
         bundle_index: u32,

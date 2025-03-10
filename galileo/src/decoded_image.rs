@@ -68,8 +68,13 @@ impl DecodedImage {
     }
 
     /// Bitmap size in bytes
-    pub fn size(&self) -> usize {
+    pub fn byte_size(&self) -> usize {
         self.width() as usize * self.height() as usize * 4
+    }
+
+    /// Size of the image in pixels
+    pub fn size(&self) -> Size<u32> {
+        Size::new(self.width(), self.height())
     }
 }
 

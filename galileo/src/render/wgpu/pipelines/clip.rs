@@ -5,7 +5,7 @@ use wgpu::{
 
 use crate::render::render_bundle::world_set::PolyVertex;
 use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
-use crate::render::wgpu::{DisplayInstance, WgpuPolygonBuffers, DEPTH_FORMAT};
+use crate::render::wgpu::{DisplayInstance, WgpuVertexBuffers, DEPTH_FORMAT};
 use crate::render::RenderOptions;
 
 pub struct ClipPipeline {
@@ -68,7 +68,7 @@ impl ClipPipeline {
 
     pub fn clip<'a>(
         &'a self,
-        buffers: &'a WgpuPolygonBuffers,
+        buffers: &'a WgpuVertexBuffers,
         render_pass: &mut RenderPass<'a>,
         render_options: RenderOptions,
     ) {
@@ -82,7 +82,7 @@ impl ClipPipeline {
 
     pub fn unclip<'a>(
         &'a self,
-        buffers: &'a WgpuPolygonBuffers,
+        buffers: &'a WgpuVertexBuffers,
         render_pass: &mut RenderPass<'a>,
         render_options: RenderOptions,
     ) {
@@ -91,7 +91,7 @@ impl ClipPipeline {
 
     fn render<'a>(
         &'a self,
-        buffers: &'a WgpuPolygonBuffers,
+        buffers: &'a WgpuVertexBuffers,
         render_pass: &mut RenderPass<'a>,
         stencil_reference: u32,
         render_options: RenderOptions,

@@ -18,7 +18,7 @@ use wgpu::{
     TextureViewDescriptor, WasmNotSendSync,
 };
 
-use super::render_bundle::screen_set::RenderSetState;
+use super::render_bundle::screen_set::{RenderSetState, ScreenSetData};
 use super::{Canvas, PackedBundle, RenderOptions};
 use crate::error::GalileoError;
 use crate::map::Map;
@@ -876,7 +876,7 @@ impl Canvas for WgpuCanvas<'_> {
 
                 let set_bbox = set.bbox.shift(dx as f32, dy as f32);
 
-                if displayed.iter().any(|bbox| bbox.intersects(set_bbox)) {
+                if set.hide_on_overlay && displayed.iter().any(|bbox| bbox.intersects(set_bbox)) {
                     // Hiding the set
                     match set.state {
                         RenderSetState::Hidden => None,
@@ -968,8 +968,13 @@ impl Canvas for WgpuCanvas<'_> {
                         RenderSetState::FadingIn { start_time } => {
                             is_animating = true;
 
-                            let mut opacity = (now - start_time).as_millis() as f32
-                                / set.animation_duration.as_millis() as f32;
+                            let mut opacity = if set.animation_duration.is_zero() {
+                                1.0
+                            } else {
+                                (now - start_time).as_millis() as f32
+                                    / set.animation_duration.as_millis() as f32
+                            };
+
                             if opacity >= 1.0 {
                                 set.state = RenderSetState::Displayed;
                                 opacity = 1.0;
@@ -981,9 +986,12 @@ impl Canvas for WgpuCanvas<'_> {
                         RenderSetState::FadingOut { start_time } => {
                             is_animating = true;
 
-                            let mut opacity = 1.0
-                                - ((now - start_time).as_millis() as f32
-                                    / set.animation_duration.as_millis() as f32);
+                            let mut opacity = if set.animation_duration.is_zero() {
+                                0.0
+                            } else {
+                                1.0 - ((now - start_time).as_millis() as f32
+                                    / set.animation_duration.as_millis() as f32)
+                            };
 
                             if opacity <= 0.0 {
                                 set.state = RenderSetState::Hidden;
@@ -1011,9 +1019,9 @@ impl Canvas for WgpuCanvas<'_> {
 
             render_pass.set_vertex_buffer(1, display_buffer.slice(..));
 
-            for (index, set) in filtered_sets.iter().enumerate() {
+            for (index, set) in filtered_sets.iter().enumerate().rev() {
                 self.renderer_targets.pipelines.render_screen_set(
-                    &set.buffers,
+                    &set.data,
                     &mut render_pass,
                     index as u32,
                 );
@@ -1029,9 +1037,9 @@ impl Canvas for WgpuCanvas<'_> {
 }
 
 struct WgpuPackedBundle {
-    clip_area_buffers: Option<WgpuPolygonBuffers>,
-    map_ref_buffers: WgpuPolygonBuffers,
-    screen_ref_buffers: Option<ScreenRefBuffers>,
+    clip_area_buffers: Option<WgpuVertexBuffers>,
+    map_ref_buffers: WgpuVertexBuffers,
+    screen_ref_buffers: Option<WgpuVertexBuffers>,
     dot_buffers: Option<WgpuDotBuffers>,
     image_buffers: Vec<WgpuImage>,
 
@@ -1043,16 +1051,16 @@ struct WgpuScreenSet {
     animation_duration: Duration,
     anchor_point: [f32; 3],
     bbox: Rect<f32>,
-    buffers: ScreenRefBuffers,
+    hide_on_overlay: bool,
+    data: WgpuScreenSetData,
 }
 
-struct WgpuPolygonBuffers {
-    vertex: Buffer,
-    index: Buffer,
-    index_count: u32,
+enum WgpuScreenSetData {
+    Vertex(WgpuVertexBuffers),
+    Image(WgpuImage),
 }
 
-struct ScreenRefBuffers {
+struct WgpuVertexBuffers {
     vertex: Buffer,
     index: Buffer,
     index_count: u32,
@@ -1106,7 +1114,7 @@ impl WgpuPackedBundle {
                     contents: bytemuck::cast_slice(&screen_ref.vertices),
                 });
 
-            Some(ScreenRefBuffers {
+            Some(WgpuVertexBuffers {
                 index,
                 vertex,
                 index_count: screen_ref.indices.len() as u32,
@@ -1136,12 +1144,11 @@ impl WgpuPackedBundle {
         let textures: Vec<_> = image_store
             .iter()
             .map(|decoded_image| {
-                Some(
-                    renderer_targets
-                        .pipelines
-                        .image_pipeline()
-                        .create_image_texture(&renderer.device, &renderer.queue, decoded_image),
-                )
+                Some(renderer_targets.pipelines.create_image_texture(
+                    &renderer.device,
+                    &renderer.queue,
+                    decoded_image,
+                ))
             })
             .collect();
 
@@ -1162,28 +1169,46 @@ impl WgpuPackedBundle {
 
         let mut screen_sets = vec![];
         for bundle_screen_set in bundle_screen_sets {
-            let index_buffer =
-                renderer
-                    .device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: None,
-                        contents: bytemuck::cast_slice(&bundle_screen_set.buffers.indices),
-                        usage: wgpu::BufferUsages::INDEX,
-                    });
+            let data = match &bundle_screen_set.data {
+                ScreenSetData::Vertices(buffers) => {
+                    let index_buffer =
+                        renderer
+                            .device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: None,
+                                contents: bytemuck::cast_slice(&buffers.indices),
+                                usage: wgpu::BufferUsages::INDEX,
+                            });
 
-            let vertex_buffer =
-                renderer
-                    .device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: None,
-                        usage: wgpu::BufferUsages::VERTEX,
-                        contents: bytemuck::cast_slice(&bundle_screen_set.buffers.vertices),
-                    });
+                    let vertex_buffer =
+                        renderer
+                            .device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: None,
+                                usage: wgpu::BufferUsages::VERTEX,
+                                contents: bytemuck::cast_slice(&buffers.vertices),
+                            });
 
-            let buffers = ScreenRefBuffers {
-                index: index_buffer,
-                vertex: vertex_buffer,
-                index_count: bundle_screen_set.buffers.indices.len() as u32,
+                    let buffers = WgpuVertexBuffers {
+                        index: index_buffer,
+                        vertex: vertex_buffer,
+                        index_count: buffers.indices.len() as u32,
+                    };
+
+                    WgpuScreenSetData::Vertex(buffers)
+                }
+                ScreenSetData::Image { vertices, bitmap } => {
+                    let bind_group = renderer_targets.pipelines.create_image_texture(
+                        &renderer.device,
+                        &renderer.queue,
+                        bitmap,
+                    );
+                    let image = renderer_targets
+                        .pipelines
+                        .screen_set_image_pipeline()
+                        .create_image(&renderer.device, bind_group, vertices);
+                    WgpuScreenSetData::Image(image)
+                }
             };
 
             screen_sets.push(Arc::new(Mutex::new(WgpuScreenSet {
@@ -1191,7 +1216,8 @@ impl WgpuPackedBundle {
                 animation_duration: bundle_screen_set.animation_duration,
                 anchor_point: bundle_screen_set.anchor_point,
                 bbox: bundle_screen_set.bbox,
-                buffers,
+                hide_on_overlay: bundle_screen_set.hide_on_overlay,
+                data,
             })));
         }
 
@@ -1208,7 +1234,7 @@ impl WgpuPackedBundle {
     fn write_poly_buffers(
         tessellation: &VertexBuffers<PolyVertex, u32>,
         renderer: &WgpuRenderer,
-    ) -> WgpuPolygonBuffers {
+    ) -> WgpuVertexBuffers {
         let index_bytes = bytemuck::cast_slice(&tessellation.indices);
         let bytes = bytemuck::cast_slice(&tessellation.vertices);
 
@@ -1228,7 +1254,7 @@ impl WgpuPackedBundle {
                 contents: bytes,
             });
 
-        WgpuPolygonBuffers {
+        WgpuVertexBuffers {
             index,
             vertex,
             index_count: tessellation.indices.len() as u32,

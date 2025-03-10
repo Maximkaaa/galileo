@@ -8,7 +8,7 @@ use galileo::decoded_image::DecodedImage;
 use galileo::layer::feature_layer::symbol::Symbol;
 use galileo::layer::feature_layer::{Feature, FeatureLayer};
 use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
-use galileo::render::point_paint::PointPaint;
+use galileo::render::point_paint::MarkerStyle;
 use galileo::render::render_bundle::RenderBundle;
 use galileo::{Map, MapBuilder};
 use galileo_types::cartesian::{Point2, Point3, Vector2};
@@ -168,22 +168,22 @@ impl Symbol<PointMarker> for ColoredPointSymbol {
         &self,
         feature: &PointMarker,
         geometry: &Geom<Point3>,
-        min_resolution: f64,
+        _min_resolution: f64,
         bundle: &mut RenderBundle,
     ) {
         if let Geom::Point(point) = geometry {
-            bundle.add_point(
+            let image = if feature.highlighted {
+                self.default_image.clone()
+            } else {
+                self.highlighted_image.clone()
+            };
+            bundle.add_marker(
                 point,
-                &PointPaint::image(
-                    if feature.highlighted {
-                        self.default_image.clone()
-                    } else {
-                        self.highlighted_image.clone()
-                    },
-                    Vector2::new(0.5, 1.0),
-                    1.0,
-                ),
-                min_resolution,
+                &MarkerStyle::Image {
+                    image,
+                    anchor: Vector2::new(0.5, 1.0),
+                    size: None,
+                },
             );
         }
     }
