@@ -76,7 +76,13 @@ impl VtProcessor {
 
                             match &paint.shape {
                                 PointShape::Label { text, style } => {
-                                    bundle.add_label(&position, text, style, Vector2::default());
+                                    bundle.add_label(
+                                        &position,
+                                        text,
+                                        style,
+                                        Vector2::default(),
+                                        false,
+                                    );
                                 }
                                 _ => {
                                     bundle.add_point(&position, &paint, lod_resolution);

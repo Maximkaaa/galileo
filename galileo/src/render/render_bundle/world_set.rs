@@ -27,7 +27,6 @@ use crate::Color;
 pub(crate) struct WorldRenderSet {
     pub poly_tessellation: VertexBuffers<PolyVertex, u32>,
     pub points: Vec<PointInstance>,
-    pub screen_ref: VertexBuffers<ScreenRefVertex, u32>,
     pub images: Vec<ImageInfo>,
     pub clip_area: Option<VertexBuffers<PolyVertex, u32>>,
     pub image_store: Vec<Arc<DecodedImage>>,
@@ -60,7 +59,6 @@ impl WorldRenderSet {
         Self {
             poly_tessellation: VertexBuffers::new(),
             points: Vec::new(),
-            screen_ref: VertexBuffers::new(),
             images: Vec::new(),
             clip_area: None,
             image_store: Vec::new(),
@@ -252,7 +250,7 @@ impl WorldRenderSet {
                 .with_line_width(paint.width as f32)
                 .with_miter_limit(1.0)
                 .with_tolerance(0.1)
-                .with_line_join(LineJoin::Round),
+                .with_line_join(LineJoin::MiterClip),
             &mut BuffersBuilder::new(tessellation, vertex_constructor),
         ) {
             log::error!("Tessellation failed: {err}");
@@ -365,14 +363,14 @@ impl WorldRenderSet {
         build_contour_path(&mut path_builder, shape, scale);
         let path = path_builder.build();
 
-        let start_vertex_count = self.screen_ref.vertices.len();
-        let start_index_count = self.screen_ref.indices.len();
+        let start_vertex_count = self.poly_tessellation.vertices.len();
+        let start_index_count = self.poly_tessellation.indices.len();
 
-        let screen_ref = &mut self.screen_ref;
+        let tessellation = &mut self.poly_tessellation;
 
         if let Some(outline) = outline {
             let vertex_constructor = ScreenRefVertexConstructor {
-                color: outline.color.to_u8_array(),
+                color: outline.color.to_f32_array(),
                 position: [position.x().as_(), position.y().as_(), position.z().as_()],
                 offset,
             };
@@ -380,7 +378,7 @@ impl WorldRenderSet {
             if let Err(err) = StrokeTessellator::new().tessellate(
                 &path,
                 &StrokeOptions::DEFAULT.with_line_width(outline.width as f32 * 2.0),
-                &mut BuffersBuilder::new(screen_ref, vertex_constructor),
+                &mut BuffersBuilder::new(tessellation, vertex_constructor),
             ) {
                 log::warn!("Shape tessellation failed: {err:?}");
                 return;
@@ -389,7 +387,7 @@ impl WorldRenderSet {
 
         if !fill.is_transparent() {
             let vertex_constructor = ScreenRefVertexConstructor {
-                color: fill.to_u8_array(),
+                color: fill.to_f32_array(),
                 position: [position.x().as_(), position.y().as_(), position.z().as_()],
                 offset,
             };
@@ -397,16 +395,16 @@ impl WorldRenderSet {
             if let Err(err) = FillTessellator::new().tessellate(
                 &path,
                 &FillOptions::DEFAULT,
-                &mut BuffersBuilder::new(screen_ref, vertex_constructor),
+                &mut BuffersBuilder::new(tessellation, vertex_constructor),
             ) {
                 log::warn!("Shape tessellation failed: {err:?}");
             }
         }
 
-        self.buffer_size += (self.screen_ref.vertices.len() - start_vertex_count)
+        self.buffer_size += (self.poly_tessellation.vertices.len() - start_vertex_count)
             * std::mem::size_of::<ScreenRefVertex>();
         self.buffer_size +=
-            (self.screen_ref.indices.len() - start_index_count) * std::mem::size_of::<u32>();
+            (self.poly_tessellation.indices.len() - start_index_count) * std::mem::size_of::<u32>();
     }
 
     fn add_circle<N, P>(
@@ -454,19 +452,20 @@ impl WorldRenderSet {
             .abs()
             .min(std::f32::consts::PI * 2.0);
 
-        let center = ScreenRefVertex {
+        let center = PolyVertex {
             position: [position.x().as_(), position.y().as_(), position.z().as_()],
             normal: [offset.dx(), offset.dy()],
-            color: fill.center_color.to_u8_array(),
+            color: fill.center_color.to_f32_array(),
+            norm_limit: f32::MAX,
         };
 
         let is_full_circle = (dr - std::f32::consts::PI * 2.0).abs() < TOLERANCE;
 
         let mut contour = get_circle_sector(radius, start_angle, end_angle);
-        let first_index = self.screen_ref.vertices.len() as u32;
+        let first_index = self.poly_tessellation.vertices.len() as u32;
 
-        let start_vertex_count = self.screen_ref.vertices.len();
-        let start_index_count = self.screen_ref.indices.len();
+        let start_vertex_count = self.poly_tessellation.vertices.len();
+        let start_index_count = self.poly_tessellation.indices.len();
 
         let mut vertices = vec![center];
         let mut indices = vec![];
@@ -477,10 +476,11 @@ impl WorldRenderSet {
                 indices.push(vertices.len() as u32 + first_index);
             }
 
-            vertices.push(ScreenRefVertex {
+            vertices.push(PolyVertex {
                 position: [position.x().as_(), position.y().as_(), position.z().as_()],
                 normal: (*point + offset).coords(),
-                color: fill.side_color.to_u8_array(),
+                color: fill.side_color.to_f32_array(),
+                norm_limit: f32::MAX,
             });
         }
 
@@ -490,8 +490,8 @@ impl WorldRenderSet {
             indices.push(1 + first_index);
         }
 
-        self.screen_ref.vertices.append(&mut vertices);
-        self.screen_ref.indices.append(&mut indices);
+        self.poly_tessellation.vertices.append(&mut vertices);
+        self.poly_tessellation.indices.append(&mut indices);
 
         if outline.is_some() {
             if !is_full_circle {
@@ -507,10 +507,10 @@ impl WorldRenderSet {
             );
         }
 
-        self.buffer_size += (self.screen_ref.vertices.len() - start_vertex_count)
+        self.buffer_size += (self.poly_tessellation.vertices.len() - start_vertex_count)
             * std::mem::size_of::<ScreenRefVertex>();
         self.buffer_size +=
-            (self.screen_ref.indices.len() - start_index_count) * std::mem::size_of::<u32>();
+            (self.poly_tessellation.indices.len() - start_index_count) * std::mem::size_of::<u32>();
     }
 
     fn add_dot<P, N>(&mut self, point: &P, color: Color, offset: Vector2<f32>)
@@ -530,24 +530,30 @@ impl WorldRenderSet {
         self.buffer_size += size_of::<PointInstance>();
     }
 
-    fn add_label<N, P>(&mut self, position: &P, text: &str, style: &TextStyle, offset: Vector2<f32>)
-    where
+    pub fn add_label<N, P>(
+        &mut self,
+        position: &P,
+        text: &str,
+        style: &TextStyle,
+        offset: Vector2<f32>,
+    ) where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
         match FontService::shape(text, style, offset) {
             Ok(TextShaping::Tessellation { glyphs, .. }) => {
                 for glyph in glyphs {
-                    let vertices_start = self.screen_ref.vertices.len() as u32;
+                    let vertices_start = self.poly_tessellation.vertices.len() as u32;
                     for vertex in glyph.vertices {
-                        self.screen_ref.vertices.push(ScreenRefVertex {
+                        self.poly_tessellation.vertices.push(PolyVertex {
                             position: [position.x().as_(), position.y().as_(), position.z().as_()],
                             normal: vertex.position,
-                            color: vertex.color.to_u8_array(),
+                            color: vertex.color.to_f32_array(),
+                            norm_limit: f32::MAX,
                         });
                     }
                     for index in glyph.indices {
-                        self.screen_ref.indices.push(index + vertices_start);
+                        self.poly_tessellation.indices.push(index + vertices_start);
                     }
                 }
             }
@@ -693,29 +699,30 @@ impl FillVertexConstructor<PolyVertex> for PolygonVertexConstructor {
 }
 
 struct ScreenRefVertexConstructor {
-    color: [u8; 4],
+    color: [f32; 4],
     position: [f32; 3],
     offset: Vector2<f32>,
 }
 
 impl ScreenRefVertexConstructor {
-    fn create_vertex(&self, position: lyon::math::Point) -> ScreenRefVertex {
-        ScreenRefVertex {
+    fn create_vertex(&self, position: lyon::math::Point) -> PolyVertex {
+        PolyVertex {
             position: self.position,
             normal: [position.x + self.offset.dx(), position.y + self.offset.dy()],
             color: self.color,
+            norm_limit: f32::MAX,
         }
     }
 }
 
-impl StrokeVertexConstructor<ScreenRefVertex> for ScreenRefVertexConstructor {
-    fn new_vertex(&mut self, vertex: StrokeVertex) -> ScreenRefVertex {
+impl StrokeVertexConstructor<PolyVertex> for ScreenRefVertexConstructor {
+    fn new_vertex(&mut self, vertex: StrokeVertex) -> PolyVertex {
         self.create_vertex(vertex.position())
     }
 }
 
-impl FillVertexConstructor<ScreenRefVertex> for ScreenRefVertexConstructor {
-    fn new_vertex(&mut self, vertex: FillVertex) -> ScreenRefVertex {
+impl FillVertexConstructor<PolyVertex> for ScreenRefVertexConstructor {
+    fn new_vertex(&mut self, vertex: FillVertex) -> PolyVertex {
         self.create_vertex(vertex.position())
     }
 }

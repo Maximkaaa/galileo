@@ -16,7 +16,6 @@ use crate::render::wgpu::pipelines::clip::ClipPipeline;
 use crate::render::wgpu::pipelines::dot::DotPipeline;
 use crate::render::wgpu::pipelines::image::ImagePipeline;
 use crate::render::wgpu::pipelines::map_ref::MapRefPipeline;
-use crate::render::wgpu::pipelines::screen_ref::ScreenRefPipeline;
 use crate::render::wgpu::{ViewUniform, WgpuPackedBundle, DEPTH_FORMAT};
 use crate::render::RenderOptions;
 
@@ -24,7 +23,6 @@ mod clip;
 mod dot;
 pub mod image;
 mod map_ref;
-mod screen_ref;
 mod screen_set_image;
 mod screen_set_vertex;
 
@@ -34,7 +32,6 @@ pub struct Pipelines {
     texture_bind_group_layout: BindGroupLayout,
 
     image: ImagePipeline,
-    pub(super) screen_ref: ScreenRefPipeline,
     map_ref: MapRefPipeline,
     clip: ClipPipeline,
     dot: DotPipeline,
@@ -109,7 +106,6 @@ impl Pipelines {
                 &texture_bind_group_layout,
             ),
             map_ref: MapRefPipeline::create(device, format, &map_view_bind_group_layout),
-            screen_ref: ScreenRefPipeline::create(device, format, &map_view_bind_group_layout),
             clip: ClipPipeline::create(device, format, &map_view_bind_group_layout),
             dot: DotPipeline::create(device, format, &map_view_bind_group_layout),
             screen_set: ScreenSetPipeline::create(device, format, &map_view_bind_group_layout),
@@ -151,15 +147,6 @@ impl Pipelines {
 
         if let Some(clip) = &bundle.clip_area_buffers {
             self.clip.unclip(clip, render_pass, render_options);
-        }
-
-        if let Some(screen_ref_buffers) = &bundle.screen_ref_buffers {
-            self.screen_ref.render(
-                screen_ref_buffers,
-                render_pass,
-                render_options,
-                bundle_index,
-            );
         }
 
         if let Some(dot_buffers) = &bundle.dot_buffers {

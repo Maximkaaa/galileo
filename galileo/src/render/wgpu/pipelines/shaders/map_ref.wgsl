@@ -32,7 +32,6 @@ fn vs_main(
     color[3] = model.color[3] * bundle_opacity;
     out.color = color;
 
-    var vertex_position = transform.view_proj * vec4<f32>(model.position, 1.0);
     var norm_length = sqrt(model.norm[0] * model.norm[0] + model.norm[1] * model.norm[1]) * transform.resolution;
 
     var norm_limit = 1.0;
@@ -40,9 +39,10 @@ fn vs_main(
         norm_limit = model.norm_limit / norm_length;
     }
 
-    var norm_scale = vec2<f32>(model.norm[0] * transform.inv_screen_size[0], model.norm[1] * transform.inv_screen_size[1]) * norm_limit;
-    var norm = vec4<f32>(norm_scale * vertex_position[3] * 2.0, 0.0, 0.0) * transform.view_rotation;
-    out.clip_position = vertex_position + norm;
+    let norm = model.norm * norm_limit * transform.resolution;
+    let vertex_position = transform.view_proj * vec4<f32>(model.position.xy + norm, model.position[2], 1.0);
+
+    out.clip_position = vertex_position;
 
     return out;
 }
