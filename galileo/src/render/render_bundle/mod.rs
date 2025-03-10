@@ -7,6 +7,7 @@ use num_traits::AsPrimitive;
 use screen_set::ScreenRenderSet;
 use serde::{Deserialize, Serialize};
 
+use super::point_paint::MarkerStyle;
 use super::text::TextStyle;
 use crate::decoded_image::DecodedImage;
 use crate::render::point_paint::PointPaint;
@@ -75,6 +76,17 @@ impl RenderBundle {
         P: CartesianPoint3d<Num = N>,
     {
         if let Some(set) = ScreenRenderSet::new_from_label(position, text, style, offset) {
+            self.screen_sets.push(set);
+        }
+    }
+
+    /// Adds a marker to the bundle.
+    pub fn add_marker<N, P>(&mut self, position: &P, style: &MarkerStyle)
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+    {
+        if let Some(set) = ScreenRenderSet::new_from_marker(position, style) {
             self.screen_sets.push(set);
         }
     }

@@ -3,6 +3,7 @@ use nalgebra::Scalar;
 use num_traits::{Bounded, FromPrimitive};
 use serde::{Deserialize, Serialize};
 
+use super::Size;
 use crate::cartesian::traits::{
     CartesianPoint2d, CartesianPoint3d, NewCartesianPoint2d, NewCartesianPoint3d,
 };
@@ -134,6 +135,20 @@ where
         Self {
             dx: self.dx * rhs,
             dy: self.dy * rhs,
+        }
+    }
+}
+
+impl<Num> std::ops::Mul<Size<Num>> for Vector2<Num>
+where
+    Num: num_traits::Num + Copy,
+{
+    type Output = Vector2<Num>;
+
+    fn mul(self, rhs: Size<Num>) -> Self::Output {
+        Self {
+            dx: self.dx * rhs.width(),
+            dy: self.dy * rhs.height(),
         }
     }
 }

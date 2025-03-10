@@ -4,7 +4,7 @@ use nalgebra::Scalar;
 use num_traits::{FromPrimitive, Num};
 use serde::{Deserialize, Serialize};
 
-use super::Point2;
+use super::{Point2, Vector2};
 use crate::cartesian::CartesianPoint2d;
 use crate::impls::ClosedContour;
 
@@ -17,7 +17,10 @@ pub struct Rect<N = f64> {
     y_max: N,
 }
 
-impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> Rect<N> {
+impl<N> Rect<N>
+where
+    N: Num + Copy + PartialOrd + Scalar + FromPrimitive,
+{
     /// Creates a new rectangle.
     pub fn new(x_min: N, y_min: N, x_max: N, y_max: N) -> Self {
         let (x_min, x_max) = if x_min > x_max {
@@ -282,5 +285,37 @@ impl<N: Num + Copy + PartialOrd + Scalar + FromPrimitive> FromIterator<Rect<N>>
         }
 
         Some(prev)
+    }
+}
+
+impl<N> std::ops::Add<Vector2<N>> for Rect<N>
+where
+    N: Num + Copy + PartialOrd + Scalar + FromPrimitive,
+{
+    type Output = Rect<N>;
+
+    fn add(self, rhs: Vector2<N>) -> Self::Output {
+        Self {
+            x_min: self.x_min + rhs.dx(),
+            y_min: self.y_min + rhs.dy(),
+            x_max: self.x_max + rhs.dx(),
+            y_max: self.y_max + rhs.dy(),
+        }
+    }
+}
+
+impl<N> std::ops::Sub<Vector2<N>> for Rect<N>
+where
+    N: Num + Copy + PartialOrd + Scalar + FromPrimitive,
+{
+    type Output = Rect<N>;
+
+    fn sub(self, rhs: Vector2<N>) -> Self::Output {
+        Self {
+            x_min: self.x_min - rhs.dx(),
+            y_min: self.y_min - rhs.dy(),
+            x_max: self.x_max - rhs.dx(),
+            y_max: self.y_max - rhs.dy(),
+        }
     }
 }

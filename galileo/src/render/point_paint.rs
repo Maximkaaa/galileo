@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use galileo_types::cartesian::{Point2, Vector2};
+use galileo_types::cartesian::{Point2, Size, Vector2};
 use galileo_types::impls::ClosedContour;
 use serde::{Deserialize, Serialize};
 
@@ -75,22 +75,6 @@ impl<'a> PointPaint<'a> {
                 scale,
                 outline: None,
                 shape: Cow::Borrowed(contour),
-            },
-        }
-    }
-
-    /// Creates a paint that draws a point as an image of fixed pixel size. Offset is given as a portion of image size,
-    /// e.g. offset `[0.5, 1.0]` will create an image with anchor point at the center-bottom point of the image.
-    pub fn image(image: Arc<DecodedImage>, offset: Vector2<f32>, scale: f32) -> Self {
-        let width = image.width() as f32 * scale;
-        let height = image.height() as f32 * scale;
-        Self {
-            offset,
-            shape: PointShape::Image {
-                image,
-                opacity: 255,
-                width,
-                height,
             },
         }
     }
@@ -172,15 +156,23 @@ pub(crate) enum PointShape<'a> {
         outline: Option<LinePaint>,
         shape: Cow<'a, ClosedContour<Point2<f32>>>,
     },
-    Image {
-        image: Arc<DecodedImage>,
-        opacity: u8,
-        width: f32,
-        height: f32,
-    },
     Label {
         text: Cow<'a, String>,
         style: Cow<'a, TextStyle>,
+    },
+}
+
+/// Represents a point as a marker on the map.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MarkerStyle {
+    /// Draws marker from the given image.
+    Image {
+        /// Image bitmap.
+        image: Arc<DecodedImage>,
+        /// Anchor point.
+        anchor: Vector2<f32>,
+        /// Size of the marker image in pixels. If not set, the size of the bitmap will be used.
+        size: Option<Size<u32>>,
     },
 }
 

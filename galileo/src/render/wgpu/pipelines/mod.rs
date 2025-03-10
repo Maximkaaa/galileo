@@ -1,13 +1,17 @@
 use std::mem::size_of;
+use std::sync::Arc;
 
-use screen_set::ScreenSetPipeline;
+use screen_set_image::ScreenSetImagePipeline;
+use screen_set_vertex::ScreenSetPipeline;
+use wgpu::util::{DeviceExt, TextureDataOrder};
 use wgpu::{
-    BindGroup, Buffer, CompareFunction, DepthStencilState, Device, PipelineLayout, RenderPass,
-    RenderPipelineDescriptor, ShaderModule, StencilFaceState, StencilOperation, StencilState,
-    TextureFormat, VertexBufferLayout,
+    BindGroup, BindGroupLayout, Buffer, CompareFunction, DepthStencilState, Device, PipelineLayout,
+    Queue, RenderPass, RenderPipelineDescriptor, ShaderModule, StencilFaceState, StencilOperation,
+    StencilState, TextureFormat, VertexBufferLayout,
 };
 
-use super::ScreenRefBuffers;
+use super::WgpuScreenSetData;
+use crate::decoded_image::{DecodedImage, DecodedImageType};
 use crate::render::wgpu::pipelines::clip::ClipPipeline;
 use crate::render::wgpu::pipelines::dot::DotPipeline;
 use crate::render::wgpu::pipelines::image::ImagePipeline;
@@ -21,11 +25,13 @@ mod dot;
 pub mod image;
 mod map_ref;
 mod screen_ref;
-mod screen_set;
+mod screen_set_image;
+mod screen_set_vertex;
 
 pub struct Pipelines {
     map_view_binding: BindGroup,
     map_view_buffer: Buffer,
+    texture_bind_group_layout: BindGroupLayout,
 
     image: ImagePipeline,
     pub(super) screen_ref: ScreenRefPipeline,
@@ -33,6 +39,7 @@ pub struct Pipelines {
     clip: ClipPipeline,
     dot: DotPipeline,
     screen_set: ScreenSetPipeline,
+    screen_set_image: ScreenSetImagePipeline,
 }
 
 impl Pipelines {
@@ -68,15 +75,50 @@ impl Pipelines {
             label: Some("view_bind_group"),
         });
 
+        let texture_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+                label: Some("texture_bind_group_label"),
+            });
+
         Self {
             map_view_binding,
             map_view_buffer,
-            image: ImagePipeline::create(device, format, &map_view_bind_group_layout),
+            texture_bind_group_layout: texture_bind_group_layout.clone(),
+            image: ImagePipeline::create(
+                device,
+                format,
+                &map_view_bind_group_layout,
+                &texture_bind_group_layout,
+            ),
             map_ref: MapRefPipeline::create(device, format, &map_view_bind_group_layout),
             screen_ref: ScreenRefPipeline::create(device, format, &map_view_bind_group_layout),
             clip: ClipPipeline::create(device, format, &map_view_bind_group_layout),
             dot: DotPipeline::create(device, format, &map_view_bind_group_layout),
             screen_set: ScreenSetPipeline::create(device, format, &map_view_bind_group_layout),
+            screen_set_image: ScreenSetImagePipeline::create(
+                device,
+                format,
+                &map_view_bind_group_layout,
+                &texture_bind_group_layout,
+            ),
         }
     }
 
@@ -134,18 +176,127 @@ impl Pipelines {
         &self.image
     }
 
+    pub fn screen_set_image_pipeline(&self) -> &ScreenSetImagePipeline {
+        &self.screen_set_image
+    }
+
     fn set_bindings<'a>(&'a self, render_pass: &mut RenderPass<'a>) {
         render_pass.set_bind_group(0, &self.map_view_binding, &[]);
     }
 
     pub fn render_screen_set<'a>(
         &'a self,
-        buffers: &'a ScreenRefBuffers,
+        data: &'a WgpuScreenSetData,
         render_pass: &mut RenderPass<'a>,
         bundle_index: u32,
     ) {
         self.set_bindings(render_pass);
-        self.screen_set.render(buffers, render_pass, bundle_index);
+        match data {
+            WgpuScreenSetData::Vertex(wgpu_vertex_buffers) => {
+                self.screen_set
+                    .render(wgpu_vertex_buffers, render_pass, bundle_index)
+            }
+            WgpuScreenSetData::Image(wgpu_image) => {
+                self.screen_set_image
+                    .render(wgpu_image, render_pass, bundle_index)
+            }
+        }
+    }
+
+    pub fn create_image_texture(
+        &self,
+        device: &Device,
+        queue: &Queue,
+        image: &DecodedImage,
+    ) -> Arc<BindGroup> {
+        let texture_size = wgpu::Extent3d {
+            width: image.width(),
+            height: image.height(),
+            depth_or_array_layers: 1,
+        };
+
+        let texture = match &image.0 {
+            DecodedImageType::Bitmap { bytes, .. } => device.create_texture_with_data(
+                queue,
+                &wgpu::TextureDescriptor {
+                    size: texture_size,
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: TextureFormat::Rgba8UnormSrgb,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                    label: None,
+                    view_formats: &[],
+                },
+                TextureDataOrder::default(),
+                bytes,
+            ),
+            #[cfg(target_arch = "wasm32")]
+            DecodedImageType::JsImageBitmap(image) => {
+                use wgpu::{CopyExternalImageSourceInfo, ExternalImageSource, Origin2d};
+
+                let texture = device.create_texture(&wgpu::TextureDescriptor {
+                    size: texture_size,
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: TextureFormat::Rgba8UnormSrgb,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING
+                        | wgpu::TextureUsages::COPY_DST
+                        | wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    label: None,
+                    view_formats: &[],
+                });
+                let texture_size = wgpu::Extent3d {
+                    width: image.width(),
+                    height: image.height(),
+                    depth_or_array_layers: 1,
+                };
+                let image = CopyExternalImageSourceInfo {
+                    source: ExternalImageSource::ImageBitmap(image.clone()),
+                    origin: Origin2d::ZERO,
+                    flip_y: false,
+                };
+                queue.copy_external_image_to_texture(
+                    &image,
+                    texture
+                        .as_image_copy()
+                        .to_tagged(wgpu::PredefinedColorSpace::Srgb, false),
+                    texture_size,
+                );
+
+                texture
+            }
+        };
+
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let diffuse_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &self.texture_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&diffuse_sampler),
+                },
+            ],
+            label: Some("diffuse_bind_group"),
+        });
+
+        Arc::new(texture_bind_group)
     }
 }
 

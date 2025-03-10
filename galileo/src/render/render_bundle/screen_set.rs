@@ -1,9 +1,13 @@
+use std::sync::Arc;
+
 use galileo_types::cartesian::{CartesianPoint3d, Point2, Rect, Vector2};
 use lyon::tessellation::VertexBuffers;
 use num_traits::AsPrimitive;
 use serde::{Deserialize, Serialize};
 use web_time::{Duration, Instant};
 
+use crate::decoded_image::DecodedImage;
+use crate::render::point_paint::MarkerStyle;
 use crate::render::text::{FontService, TextShaping, TextStyle};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -11,7 +15,17 @@ pub(crate) struct ScreenRenderSet {
     pub(crate) animation_duration: Duration,
     pub(crate) anchor_point: [f32; 3],
     pub(crate) bbox: Rect<f32>,
-    pub(crate) buffers: VertexBuffers<ScreenSetVertex, u32>,
+    pub(crate) hide_on_overlay: bool,
+    pub(crate) data: ScreenSetData,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) enum ScreenSetData {
+    Vertices(VertexBuffers<ScreenSetVertex, u32>),
+    Image {
+        vertices: [ScreenSetImageVertex; 4],
+        bitmap: Arc<DecodedImage>,
+    },
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -33,6 +47,13 @@ impl RenderSetState {
 pub(crate) struct ScreenSetVertex {
     pub(crate) position: [f32; 2],
     pub(crate) color: [u8; 4],
+}
+
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
+#[repr(C)]
+pub(crate) struct ScreenSetImageVertex {
+    pub(crate) position: [f32; 2],
+    pub(crate) tex_coords: [f32; 2],
 }
 
 impl ScreenRenderSet {
@@ -85,7 +106,8 @@ impl ScreenRenderSet {
                     animation_duration: Duration::from_millis(300),
                     anchor_point: [position.x().as_(), position.y().as_(), position.z().as_()],
                     bbox,
-                    buffers: VertexBuffers { vertices, indices },
+                    hide_on_overlay: true,
+                    data: ScreenSetData::Vertices(VertexBuffers { vertices, indices }),
                 })
             }
             Err(err) => {
@@ -95,6 +117,59 @@ impl ScreenRenderSet {
             _ => {
                 log::error!("Not supported font type");
                 None
+            }
+        }
+    }
+
+    pub(crate) fn new_from_marker<N, P>(position: &P, style: &MarkerStyle) -> Option<Self>
+    where
+        N: AsPrimitive<f32>,
+        P: CartesianPoint3d<Num = N>,
+    {
+        match style {
+            MarkerStyle::Image {
+                image,
+                anchor,
+                size,
+            } => {
+                let size = size.unwrap_or(image.size()).cast::<f32>();
+                let anchor_px = *anchor * size;
+                let bbox = Rect::new(
+                    -anchor_px.dx(),
+                    anchor_px.dy(),
+                    size.width() - anchor_px.dx(),
+                    anchor_px.dy() - size.height(),
+                );
+
+                let vertices = [
+                    ScreenSetImageVertex {
+                        position: [bbox.x_min(), bbox.y_min()],
+                        tex_coords: [0.0, 1.0],
+                    },
+                    ScreenSetImageVertex {
+                        position: [bbox.x_min(), bbox.y_max()],
+                        tex_coords: [0.0, 0.0],
+                    },
+                    ScreenSetImageVertex {
+                        position: [bbox.x_max(), bbox.y_min()],
+                        tex_coords: [1.0, 1.0],
+                    },
+                    ScreenSetImageVertex {
+                        position: [bbox.x_max(), bbox.y_max()],
+                        tex_coords: [1.0, 0.0],
+                    },
+                ];
+
+                Some(Self {
+                    animation_duration: Duration::from_millis(0),
+                    anchor_point: [position.x().as_(), position.y().as_(), position.z().as_()],
+                    bbox,
+                    hide_on_overlay: false,
+                    data: ScreenSetData::Image {
+                        vertices,
+                        bitmap: image.clone(),
+                    },
+                })
             }
         }
     }

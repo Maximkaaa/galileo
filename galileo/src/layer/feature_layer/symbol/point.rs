@@ -10,7 +10,7 @@ use image::EncodableLayout;
 use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::layer::feature_layer::symbol::Symbol;
-use crate::render::point_paint::PointPaint;
+use crate::render::point_paint::{MarkerStyle, PointPaint};
 use crate::render::render_bundle::RenderBundle;
 use crate::Color;
 
@@ -105,17 +105,24 @@ impl<F> Symbol<F> for ImagePointSymbol {
         &self,
         _feature: &F,
         geometry: &Geom<Point3>,
-        min_resolution: f64,
+        _min_resolution: f64,
         bundle: &mut RenderBundle,
     ) {
-        let paint = PointPaint::image(self.image.clone(), self.offset, self.scale);
+        let add_marker = |point: &Point3, bundle: &mut RenderBundle| {
+            bundle.add_marker(
+                point,
+                &MarkerStyle::Image {
+                    image: self.image.clone(),
+                    anchor: self.offset,
+                    size: Some((self.image.size().cast::<f32>() * self.scale).cast()),
+                },
+            );
+        };
 
         match geometry {
-            Geom::Point(point) => {
-                bundle.add_point(point, &paint, min_resolution);
-            }
+            Geom::Point(point) => add_marker(point, bundle),
             Geom::MultiPoint(points) => points.iter_points().for_each(|point| {
-                bundle.add_point(point, &paint, min_resolution);
+                add_marker(point, bundle);
             }),
             _ => {}
         }
@@ -136,6 +143,6 @@ mod tests {
         .unwrap();
         assert_eq!(symbol.image.width(), 62);
         assert_eq!(symbol.image.height(), 99);
-        assert_eq!(symbol.image.size(), 62 * 99 * 4);
+        assert_eq!(symbol.image.byte_size(), 62 * 99 * 4);
     }
 }

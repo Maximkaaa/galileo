@@ -2,7 +2,7 @@ use wgpu::{BindGroupLayout, Device, RenderPass, RenderPipeline, TextureFormat};
 
 use crate::render::render_bundle::world_set::PolyVertex;
 use crate::render::wgpu::pipelines::default_targets;
-use crate::render::wgpu::{pipelines, DisplayInstance, WgpuPolygonBuffers};
+use crate::render::wgpu::{pipelines, DisplayInstance, WgpuVertexBuffers};
 use crate::render::RenderOptions;
 
 pub struct MapRefPipeline {
@@ -40,7 +40,7 @@ impl MapRefPipeline {
 
     pub fn render<'a>(
         &'a self,
-        buffers: &'a WgpuPolygonBuffers,
+        buffers: &'a WgpuVertexBuffers,
         render_pass: &mut RenderPass<'a>,
         render_options: RenderOptions,
         bundle_index: u32,

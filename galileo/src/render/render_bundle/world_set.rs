@@ -97,7 +97,7 @@ impl WorldRenderSet {
     pub fn add_image(&mut self, image: DecodedImage, vertices: [Point2; 4], paint: ImagePaint) {
         let opacity = paint.opacity as f32 / 255.0;
 
-        self.buffer_size += image.size() + std::mem::size_of::<ImageVertex>() * 4;
+        self.buffer_size += image.byte_size() + std::mem::size_of::<ImageVertex>() * 4;
 
         let index = self.add_image_to_store(Arc::new(image));
         let vertices = [
@@ -124,57 +124,6 @@ impl WorldRenderSet {
                 opacity,
                 tex_coords: [1.0, 0.0],
                 offset: [0.0, 0.0],
-            },
-        ];
-
-        self.add_image_info(index, vertices);
-    }
-
-    fn add_image_point<N, P>(
-        &mut self,
-        position: &P,
-        image: Arc<DecodedImage>,
-        opacity: u8,
-        width: f32,
-        height: f32,
-        offset: Vector2<f32>,
-    ) where
-        N: AsPrimitive<f32>,
-        P: CartesianPoint3d<Num = N>,
-    {
-        let opacity = opacity as f32 / 255.0;
-
-        self.buffer_size += image.size() + size_of::<ImageVertex>() * 4;
-
-        let position = [position.x().as_(), position.y().as_()];
-        let offset_x = -offset.dx() * width;
-        let offset_y = offset.dy() * height;
-
-        let index = self.add_image_to_store(image);
-        let vertices = [
-            ImageVertex {
-                position,
-                opacity,
-                tex_coords: [0.0, 1.0],
-                offset: [offset_x, offset_y - height],
-            },
-            ImageVertex {
-                position,
-                opacity,
-                tex_coords: [0.0, 0.0],
-                offset: [offset_x, offset_y],
-            },
-            ImageVertex {
-                position,
-                opacity,
-                tex_coords: [1.0, 1.0],
-                offset: [offset_x + width, offset_y - height],
-            },
-            ImageVertex {
-                position,
-                opacity,
-                tex_coords: [1.0, 0.0],
-                offset: [offset_x + width, offset_y],
             },
         ];
 
@@ -211,19 +160,6 @@ impl WorldRenderSet {
             PointShape::Dot { color } => {
                 self.add_dot(point, *color, paint.offset);
             }
-            PointShape::Image {
-                image,
-                opacity,
-                width,
-                height,
-            } => self.add_image_point(
-                point,
-                image.clone(),
-                *opacity,
-                *width,
-                *height,
-                paint.offset,
-            ),
             PointShape::Circle {
                 fill,
                 radius,

@@ -4,7 +4,7 @@ use wgpu::{BindGroupLayout, Device, RenderPass, RenderPipeline, TextureFormat};
 
 use crate::render::render_bundle::screen_set::ScreenSetVertex;
 use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
-use crate::render::wgpu::{ScreenRefBuffers, ScreenSetInstance};
+use crate::render::wgpu::{ScreenSetInstance, WgpuVertexBuffers};
 
 pub struct ScreenSetPipeline {
     wgpu_pipeline: RenderPipeline,
@@ -56,7 +56,7 @@ impl ScreenSetPipeline {
 
     pub fn render<'a>(
         &'a self,
-        buffers: &'a ScreenRefBuffers,
+        buffers: &'a WgpuVertexBuffers,
         render_pass: &mut RenderPass<'a>,
         bundle_index: u32,
     ) {
