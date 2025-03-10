@@ -38,6 +38,7 @@ struct EguiMapApp {
     is_italic: bool,
     outline_width: f32,
     outline_color: Color32,
+    attach_to_map: bool,
 }
 
 impl EguiMapApp {
@@ -62,6 +63,7 @@ impl EguiMapApp {
             is_italic: false,
             outline_width: 0.0,
             outline_color: Color32::WHITE,
+            attach_to_map: false,
         }
     }
 
@@ -92,6 +94,7 @@ impl EguiMapApp {
                     self.outline_color.a(),
                 ),
             },
+            attach_to_map: self.attach_to_map,
         };
 
         self.feature_layer.write().set_symbol(symbol);
@@ -220,6 +223,14 @@ impl eframe::App for EguiMapApp {
                         self.update_symbol();
                     }
                 });
+
+                if ui
+                    .selectable_label(self.attach_to_map, "Attach to map")
+                    .clicked()
+                {
+                    self.attach_to_map = !self.attach_to_map;
+                    self.update_symbol();
+                }
             });
         });
     }
@@ -325,6 +336,7 @@ impl Feature for LabeledPoint {
 
 struct LabeledSymbol {
     style: TextStyle,
+    attach_to_map: bool,
 }
 
 impl LabeledSymbol {
@@ -348,6 +360,7 @@ impl LabeledSymbol {
                 outline_width: Default::default(),
                 outline_color: Default::default(),
             },
+            attach_to_map: false,
         }
     }
 }
@@ -369,6 +382,12 @@ impl Symbol<LabeledPoint> for LabeledSymbol {
             &PointPaint::circle(Color::BLUE, 10.0),
             min_resolution,
         );
-        bundle.add_label(point, feature.label, &self.style, Vector2::new(0.0, 0.0));
+        bundle.add_label(
+            point,
+            feature.label,
+            &self.style,
+            Vector2::new(0.0, 0.0),
+            self.attach_to_map,
+        );
     }
 }

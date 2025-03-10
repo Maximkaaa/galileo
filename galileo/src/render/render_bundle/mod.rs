@@ -71,11 +71,14 @@ impl RenderBundle {
         text: &str,
         style: &TextStyle,
         offset: Vector2<f32>,
+        attach_to_map: bool,
     ) where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
-        if let Some(set) = ScreenRenderSet::new_from_label(position, text, style, offset) {
+        if attach_to_map {
+            self.world_set.add_label(position, text, style, offset);
+        } else if let Some(set) = ScreenRenderSet::new_from_label(position, text, style, offset) {
             self.screen_sets.push(set);
         }
     }

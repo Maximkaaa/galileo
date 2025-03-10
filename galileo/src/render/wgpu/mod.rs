@@ -1039,7 +1039,6 @@ impl Canvas for WgpuCanvas<'_> {
 struct WgpuPackedBundle {
     clip_area_buffers: Option<WgpuVertexBuffers>,
     map_ref_buffers: WgpuVertexBuffers,
-    screen_ref_buffers: Option<WgpuVertexBuffers>,
     dot_buffers: Option<WgpuDotBuffers>,
     image_buffers: Vec<WgpuImage>,
 
@@ -1084,7 +1083,6 @@ impl WgpuPackedBundle {
         let WorldRenderSet {
             poly_tessellation,
             points,
-            screen_ref,
             images,
             clip_area,
             image_store,
@@ -1096,32 +1094,6 @@ impl WgpuPackedBundle {
             .map(|v| Self::write_poly_buffers(v, renderer));
 
         let poly_buffers = Self::write_poly_buffers(poly_tessellation, renderer);
-
-        let screen_ref_buffers = if !screen_ref.vertices.is_empty() {
-            let index = renderer
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: None,
-                    contents: bytemuck::cast_slice(&screen_ref.indices),
-                    usage: wgpu::BufferUsages::INDEX,
-                });
-
-            let vertex = renderer
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: None,
-                    usage: wgpu::BufferUsages::VERTEX,
-                    contents: bytemuck::cast_slice(&screen_ref.vertices),
-                });
-
-            Some(WgpuVertexBuffers {
-                index,
-                vertex,
-                index_count: screen_ref.indices.len() as u32,
-            })
-        } else {
-            None
-        };
 
         let dot_buffers = if points.is_empty() {
             None
@@ -1225,7 +1197,6 @@ impl WgpuPackedBundle {
             clip_area_buffers,
             map_ref_buffers: poly_buffers,
             image_buffers,
-            screen_ref_buffers,
             dot_buffers,
             screen_sets,
         }
