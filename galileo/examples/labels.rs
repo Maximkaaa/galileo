@@ -12,9 +12,9 @@ use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::layer::FeatureLayer;
 use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderBundle;
-use galileo::render::text::font_service::FontService;
+use galileo::render::text::text_service::TextService;
 use galileo::render::text::{
-    FontServiceProvider, FontStyle, FontWeight, HorizontalAlignment, RustybuzzFontServiceProvider,
+    TextRasterizer, FontStyle, FontWeight, HorizontalAlignment, RustybuzzRasterizer,
     TextStyle, VerticalAlignment,
 };
 use galileo::symbol::Symbol;
@@ -258,7 +258,7 @@ fn initialize_font_service() {
         "galileo/examples/data/fonts/NotoSansKR.ttf",
         "galileo/examples/data/fonts/NotoSansSC.ttf",
     ];
-    let mut provider = RustybuzzFontServiceProvider::default();
+    let mut provider = RustybuzzRasterizer::default();
 
     for font_path in FONTS {
         let mut font_data = vec![];
@@ -272,7 +272,7 @@ fn initialize_font_service() {
             .expect("failed to load font");
     }
 
-    FontService::initialize(provider);
+    TextService::initialize(provider);
 }
 
 fn create_map() -> Map {

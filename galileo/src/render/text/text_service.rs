@@ -8,9 +8,9 @@ use parking_lot::RwLock;
 use rustybuzz::ttf_parser::FaceParsingError;
 use thiserror::Error;
 
-use crate::render::text::{FontServiceProvider, TextShaping, TextStyle};
+use crate::render::text::{TextRasterizer, TextShaping, TextStyle};
 
-static INSTANCE: OnceLock<FontService> = OnceLock::new();
+static INSTANCE: OnceLock<TextService> = OnceLock::new();
 
 /// Error from a font service
 #[derive(Debug, Error)]
@@ -29,13 +29,13 @@ pub enum FontServiceError {
 }
 
 /// Provides common access to underlying text shaping engine implementation.
-pub struct FontService {
-    pub(crate) provider: RwLock<Box<dyn FontServiceProvider + Send + Sync>>,
+pub struct TextService {
+    pub(crate) provider: RwLock<Box<dyn TextRasterizer + Send + Sync>>,
 }
 
-impl FontService {
+impl TextService {
     /// Initializes the font service with the given provider.
-    pub fn initialize(provider: impl FontServiceProvider + Send + Sync + 'static) {
+    pub fn initialize(provider: impl TextRasterizer + Send + Sync + 'static) {
         if INSTANCE.get().is_some() {
             log::warn!(
                 "Font service is already initialized. Second initialization call is ignored."

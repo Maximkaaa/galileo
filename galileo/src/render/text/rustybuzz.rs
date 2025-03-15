@@ -13,17 +13,17 @@ use rustybuzz::{Direction, UnicodeBuffer};
 use super::GlyphVertex;
 #[cfg(target_arch = "wasm32")]
 use crate::platform::web::web_workers::WebWorkerService;
-use crate::render::text::font_service::FontServiceError;
-use crate::render::text::{FontServiceProvider, TessellatedGlyph, TextShaping, TextStyle};
+use crate::render::text::text_service::FontServiceError;
+use crate::render::text::{TextRasterizer, TessellatedGlyph, TextShaping, TextStyle};
 use crate::Color;
 
 /// Font service provider that uses `rustybuzz` crate to shape and vectorize text
 #[derive(Default)]
-pub struct RustybuzzFontServiceProvider {
+pub struct RustybuzzRasterizer {
     font_db: Database,
 }
 
-impl RustybuzzFontServiceProvider {
+impl RustybuzzRasterizer {
     fn select_face(&self, text: &str, style: &TextStyle) -> Option<FaceId> {
         let query = Query {
             families: &style
@@ -61,7 +61,7 @@ impl RustybuzzFontServiceProvider {
     }
 }
 
-impl FontServiceProvider for RustybuzzFontServiceProvider {
+impl TextRasterizer for RustybuzzRasterizer {
     fn shape(
         &self,
         text: &str,

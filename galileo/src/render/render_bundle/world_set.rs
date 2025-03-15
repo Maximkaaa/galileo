@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::decoded_image::DecodedImage;
 use crate::render::point_paint::{CircleFill, PointPaint, PointShape, SectorParameters};
-use crate::render::text::{FontService, TextShaping, TextStyle};
+use crate::render::text::{TextService, TextShaping, TextStyle};
 use crate::render::{ImagePaint, LinePaint, PolygonPaint};
 use crate::Color;
 
@@ -530,17 +530,12 @@ impl WorldRenderSet {
         self.buffer_size += size_of::<PointInstance>();
     }
 
-    pub fn add_label<N, P>(
-        &mut self,
-        position: &P,
-        text: &str,
-        style: &TextStyle,
-        offset: Vector2<f32>,
-    ) where
+    pub fn add_label<N, P>(&mut self, position: &P, text: &str, style: &TextStyle, offset: Vector2<f32>)
+    where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
-        match FontService::shape(text, style, offset) {
+        match TextService::shape(text, style, offset) {
             Ok(TextShaping::Tessellation { glyphs, .. }) => {
                 for glyph in glyphs {
                     let vertices_start = self.poly_tessellation.vertices.len() as u32;
