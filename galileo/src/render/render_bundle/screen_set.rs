@@ -8,7 +8,7 @@ use web_time::{Duration, Instant};
 
 use crate::decoded_image::DecodedImage;
 use crate::render::point_paint::MarkerStyle;
-use crate::render::text::{FontService, TextShaping, TextStyle};
+use crate::render::text::{TextService, TextShaping, TextStyle};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ScreenRenderSet {
@@ -67,7 +67,7 @@ impl ScreenRenderSet {
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
-        match FontService::shape(text, style, offset) {
+        match TextService::shape(text, style, offset) {
             Ok(TextShaping::Tessellation { glyphs, .. }) => {
                 let mut vertices = vec![];
                 let mut indices = vec![];

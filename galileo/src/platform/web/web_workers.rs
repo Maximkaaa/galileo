@@ -344,7 +344,7 @@ mod worker {
     use crate::layer::vector_tile_layer::tile_provider::VtProcessor;
     use crate::platform::web::web_workers::WebWorkerResponsePayload;
     use crate::render::render_bundle::RenderBundle;
-    use crate::render::text::{FontService, RustybuzzFontServiceProvider};
+    use crate::render::text::{TextService, RustybuzzRasterizer};
     use crate::tile_schema::TileIndex;
     use crate::TileSchema;
 
@@ -443,12 +443,12 @@ mod worker {
     fn load_font(font_data: Bytes) -> WebWorkerResponsePayload {
         log::debug!("Loading font data in web workder");
 
-        if FontService::instance().is_none() {
-            let provider = RustybuzzFontServiceProvider::default();
-            FontService::initialize(provider);
+        if TextService::instance().is_none() {
+            let provider = RustybuzzRasterizer::default();
+            TextService::initialize(provider);
         }
 
-        if let Some(instance) = FontService::instance() {
+        if let Some(instance) = TextService::instance() {
             match instance.load_fonts(font_data) {
                 Err(err) => {
                     log::error!("Failed to load font: {err:?}");

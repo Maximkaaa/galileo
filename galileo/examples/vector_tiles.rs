@@ -8,8 +8,8 @@ use galileo::control::{EventPropagation, MouseButton, UserEvent, UserEventHandle
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
 use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
 use galileo::layer::VectorTileLayer;
-use galileo::render::text::font_service::FontService;
-use galileo::render::text::{FontServiceProvider, RustybuzzFontServiceProvider};
+use galileo::render::text::text_service::TextService;
+use galileo::render::text::{TextRasterizer, RustybuzzRasterizer};
 use galileo::tile_schema::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Lod, Map, MapBuilder};
 use galileo_egui::{EguiMap, EguiMapState};
@@ -56,13 +56,13 @@ impl App {
         handler: impl UserEventHandler + 'static,
     ) -> Self {
         let fonts = FontDefinitions::default();
-        let mut provider = RustybuzzFontServiceProvider::default();
+        let mut provider = RustybuzzRasterizer::default();
 
         for font in fonts.font_data.values() {
             let _ = provider.load_fonts(font.font.to_vec().into());
         }
 
-        FontService::initialize(provider);
+        TextService::initialize(provider);
 
         Self {
             map: EguiMapState::new(

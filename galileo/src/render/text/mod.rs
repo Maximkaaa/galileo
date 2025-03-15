@@ -6,11 +6,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::Color;
 
-pub mod font_service;
+pub mod text_service;
 
-pub(crate) use font_service::FontService;
+pub(crate) use text_service::TextService;
 
-use crate::render::text::font_service::FontServiceError;
+use crate::render::text::text_service::FontServiceError;
 
 // #[cfg(feature = "cosmic-text")]
 // mod cosmic_text;
@@ -18,7 +18,7 @@ use crate::render::text::font_service::FontServiceError;
 #[cfg(feature = "rustybuzz")]
 mod rustybuzz;
 #[cfg(feature = "rustybuzz")]
-pub use rustybuzz::RustybuzzFontServiceProvider;
+pub use rustybuzz::RustybuzzRasterizer;
 
 /// Style of a text label on the map.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -113,7 +113,7 @@ pub struct TessellatedGlyph {
 }
 
 /// Data provider for font service.
-pub trait FontServiceProvider {
+pub trait TextRasterizer {
     /// Shape text label.
     fn shape(
         &self,

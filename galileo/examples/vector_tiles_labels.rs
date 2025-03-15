@@ -8,9 +8,9 @@ use galileo::layer::vector_tile_layer::style::{
     VectorTileDefaultSymbol, VectorTileLabelSymbol, VectorTileStyle,
 };
 use galileo::layer::vector_tile_layer::{VectorTileLayer, VectorTileLayerBuilder};
-use galileo::render::text::font_service::FontService;
+use galileo::render::text::text_service::TextService;
 use galileo::render::text::{
-    FontServiceProvider, FontWeight, RustybuzzFontServiceProvider, TextStyle,
+    TextRasterizer, FontWeight, RustybuzzRasterizer, TextStyle,
 };
 use galileo::tile_schema::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Color, Lod, MapBuilder};
@@ -100,7 +100,7 @@ fn initialize_font_service() {
         "galileo/examples/data/fonts/NotoSansKR.ttf",
         "galileo/examples/data/fonts/NotoSansSC.ttf",
     ];
-    let mut provider = RustybuzzFontServiceProvider::default();
+    let mut provider = RustybuzzRasterizer::default();
 
     for font_path in FONTS {
         let mut font_data = vec![];
@@ -114,7 +114,7 @@ fn initialize_font_service() {
             .expect("failed to load font");
     }
 
-    FontService::initialize(provider);
+    TextService::initialize(provider);
 }
 
 fn default_style() -> VectorTileStyle {
