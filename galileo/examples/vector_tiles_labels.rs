@@ -1,17 +1,11 @@
 //! This examples shows how to render labels for vector tile points.
 
-use std::fs::File;
-use std::io::Read;
-
-use bytes::Bytes;
 use galileo::layer::vector_tile_layer::style::{
     VectorTileDefaultSymbol, VectorTileLabelSymbol, VectorTileStyle,
 };
 use galileo::layer::vector_tile_layer::{VectorTileLayer, VectorTileLayerBuilder};
 use galileo::render::text::text_service::TextService;
-use galileo::render::text::{
-    TextRasterizer, FontWeight, RustybuzzRasterizer, TextStyle,
-};
+use galileo::render::text::{FontWeight, RustybuzzRasterizer, TextStyle};
 use galileo::tile_schema::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Color, Lod, MapBuilder};
 use galileo_types::cartesian::{Point2, Rect};
@@ -92,29 +86,8 @@ pub(crate) fn run() {
 }
 
 fn initialize_font_service() {
-    const FONTS: [&str; 6] = [
-        "galileo/examples/data/fonts/NotoSans.ttf",
-        "galileo/examples/data/fonts/NotoSansArabic.ttf",
-        "galileo/examples/data/fonts/NotoSansHebrew.ttf",
-        "galileo/examples/data/fonts/NotoSansJP.ttf",
-        "galileo/examples/data/fonts/NotoSansKR.ttf",
-        "galileo/examples/data/fonts/NotoSansSC.ttf",
-    ];
-    let mut provider = RustybuzzRasterizer::default();
-
-    for font_path in FONTS {
-        let mut font_data = vec![];
-        File::open(font_path)
-            .unwrap_or_else(|e| panic!("failed to open font file {font_path}: {e}"))
-            .read_to_end(&mut font_data)
-            .expect("failed to read font file");
-
-        provider
-            .load_fonts(Bytes::from_owner(font_data))
-            .expect("failed to load font");
-    }
-
-    TextService::initialize(provider);
+    let rasterizer = RustybuzzRasterizer::default();
+    TextService::initialize(rasterizer).load_fonts("galileo/examples/data/fonts");
 }
 
 fn default_style() -> VectorTileStyle {

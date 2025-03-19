@@ -17,6 +17,7 @@ wgpu = ["dep:wgpu", "raw-window-handle"]
 geojson = ["dep:geojson", "galileo-types/geojson"]
 rustybuzz = ["dep:rustybuzz"]
 image = ["dep:image"]
+fontconfig-dlopen = ["font-kit/source-fontconfig-dlopen"]
 
 # Used to provide some fixtures for doctests
 _tests = []
@@ -28,8 +29,6 @@ base64 = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 bytes = { workspace = true }
 cfg-if = { workspace = true }
-font-kit = { workspace = true }
-font-query = { workspace = true }
 futures-intrusive = { workspace = true }
 galileo-mvt = { workspace = true }
 galileo-types = { workspace = true }
@@ -75,16 +74,18 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-wgpu = { workspace = true, default-features = true, optional = true }
-tokio = { workspace = true, default-features = true, features = ["macros", "rt", "rt-multi-thread"] }
+font-kit = { workspace = true }
 maybe-sync = { workspace = true, features = ["sync"] }
 reqwest = { workspace = true }
+tokio = { workspace = true, default-features = true, features = ["macros", "rt", "rt-multi-thread"] }
+wgpu = { workspace = true, default-features = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 bytemuck = { workspace = true, features = ["derive", "extern_crate_alloc"] }
 bytes = { workspace = true, features = ["serde"] }
 console_error_panic_hook = { workspace = true }
 console_log = { workspace = true }
+fontdb = { workspace = true }
 futures = { workspace = true }
 wgpu = { workspace = true, default-features = false, features = ["webgl", "wgsl"] }
 wasm-bindgen-futures = { workspace = true }
