@@ -1,11 +1,12 @@
 //! Types for text rendering.
 
-use bytes::Bytes;
+use font_provider::FontProvider;
 use galileo_types::cartesian::Vector2;
 use serde::{Deserialize, Serialize};
 
 use crate::Color;
 
+pub(crate) mod font_provider;
 pub mod text_service;
 
 pub(crate) use text_service::TextService;
@@ -120,10 +121,8 @@ pub trait TextRasterizer {
         text: &str,
         style: &TextStyle,
         offset: Vector2<f32>,
+        font_provider: &dyn FontProvider,
     ) -> Result<TextShaping, FontServiceError>;
-
-    /// Try to Load fonts from the given binary data.
-    fn load_fonts(&mut self, fonts_data: Bytes) -> Result<(), FontServiceError>;
 }
 
 /// Font weight.
@@ -145,12 +144,6 @@ impl Default for FontWeight {
     }
 }
 
-impl From<FontWeight> for font_query::Weight {
-    fn from(value: FontWeight) -> Self {
-        Self(value.0)
-    }
-}
-
 /// Font style.
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum FontStyle {
@@ -168,12 +161,10 @@ impl Default for FontStyle {
     }
 }
 
-impl From<FontStyle> for font_query::Style {
-    fn from(value: FontStyle) -> Self {
-        match value {
-            FontStyle::Normal => Self::Normal,
-            FontStyle::Italic => Self::Italic,
-            FontStyle::Oblique => Self::Oblique,
-        }
-    }
+/// Queryable properties of a font
+pub struct FontProperties {
+    /// Font weight
+    pub weight: FontWeight,
+    /// Font style
+    pub style: FontStyle,
 }

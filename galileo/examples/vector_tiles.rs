@@ -9,7 +9,7 @@ use galileo::layer::vector_tile_layer::style::VectorTileStyle;
 use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
 use galileo::layer::VectorTileLayer;
 use galileo::render::text::text_service::TextService;
-use galileo::render::text::{TextRasterizer, RustybuzzRasterizer};
+use galileo::render::text::RustybuzzRasterizer;
 use galileo::tile_schema::{TileIndex, TileSchema, VerticalDirection};
 use galileo::{Lod, Map, MapBuilder};
 use galileo_egui::{EguiMap, EguiMapState};
@@ -56,13 +56,12 @@ impl App {
         handler: impl UserEventHandler + 'static,
     ) -> Self {
         let fonts = FontDefinitions::default();
-        let mut provider = RustybuzzRasterizer::default();
+        let provider = RustybuzzRasterizer::default();
 
+        let text_service = TextService::initialize(provider);
         for font in fonts.font_data.values() {
-            let _ = provider.load_fonts(font.font.to_vec().into());
+            text_service.load_font(Arc::new(font.font.to_vec()));
         }
-
-        TextService::initialize(provider);
 
         Self {
             map: EguiMapState::new(

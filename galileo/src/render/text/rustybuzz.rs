@@ -1,5 +1,5 @@
-use bytes::Bytes;
-use font_query::{Database, Query, Stretch, ID as FaceId};
+use std::sync::Arc;
+
 use galileo_types::cartesian::Vector2;
 use lyon::lyon_tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor, VertexBuffers,
@@ -10,54 +10,29 @@ use lyon::tessellation::{StrokeOptions, StrokeTessellator, StrokeVertexConstruct
 use rustybuzz::ttf_parser::{self, GlyphId, OutlineBuilder, Tag};
 use rustybuzz::{Direction, UnicodeBuffer};
 
-use super::GlyphVertex;
-#[cfg(target_arch = "wasm32")]
-use crate::platform::web::web_workers::WebWorkerService;
-use crate::render::text::text_service::FontServiceError;
-use crate::render::text::{TextRasterizer, TessellatedGlyph, TextShaping, TextStyle};
+use super::font_provider::FontProvider;
+use super::text_service::FontServiceError;
+use super::{FontProperties, GlyphVertex};
+use crate::render::text::{TessellatedGlyph, TextRasterizer, TextShaping, TextStyle};
 use crate::Color;
 
 /// Font service provider that uses `rustybuzz` crate to shape and vectorize text
 #[derive(Default)]
-pub struct RustybuzzRasterizer {
-    font_db: Database,
-}
+pub struct RustybuzzRasterizer {}
 
 impl RustybuzzRasterizer {
-    fn select_face(&self, text: &str, style: &TextStyle) -> Option<FaceId> {
-        let query = Query {
-            families: &style
-                .font_family
-                .iter()
-                .map(String::as_str)
-                .collect::<Vec<_>>(),
-            weight: style.weight.into(),
-            stretch: Stretch::Normal,
-            style: style.style.into(),
+    fn select_face(
+        &self,
+        text: &str,
+        style: &TextStyle,
+        font_provider: &dyn FontProvider,
+    ) -> Option<(Arc<Vec<u8>>, u32)> {
+        let properties = FontProperties {
+            weight: style.weight,
+            style: style.style,
         };
 
-        let matches = self.font_db.query(&query);
-
-        let mut last_face = None;
-        let first_char = text.chars().next()?;
-
-        for face_id in matches {
-            if self
-                .font_db
-                .with_face_data(face_id, |data, index| {
-                    let face = ttf_parser::Face::parse(data, index).ok()?;
-                    Some(face.glyph_index(first_char).is_some())
-                })
-                .flatten()
-                == Some(true)
-            {
-                return Some(face_id);
-            } else {
-                last_face = Some(face_id);
-            }
-        }
-
-        last_face
+        font_provider.best_match(text, &style.font_family, properties)
     }
 }
 
@@ -67,123 +42,98 @@ impl TextRasterizer for RustybuzzRasterizer {
         text: &str,
         style: &TextStyle,
         offset: Vector2<f32>,
+        font_provider: &dyn FontProvider,
     ) -> Result<TextShaping, FontServiceError> {
         let mut buffer = UnicodeBuffer::new();
         buffer.push_str(text);
         buffer.guess_segment_properties();
 
-        let Some(face_id) = self.select_face(text, style) else {
+        let Some((font_data, index)) = self.select_face(text, style, font_provider) else {
             return Err(FontServiceError::FontNotFound);
         };
 
-        let tessellations = self
-            .font_db
-            .with_face_data(face_id, |data, index| {
-                let face = ttf_parser::Face::parse(data, index).ok()?;
-                let mut face = rustybuzz::Face::from_face(face);
+        let face = ttf_parser::Face::parse(&font_data, index)?;
+        let mut face = rustybuzz::Face::from_face(face);
 
-                face.set_variation(Tag::from_bytes(b"wght"), style.weight.0 as f32);
-                face.set_variation(Tag::from_bytes(b"wdth"), 1.0);
+        face.set_variation(Tag::from_bytes(b"wght"), style.weight.0 as f32);
+        face.set_variation(Tag::from_bytes(b"wdth"), 1.0);
 
-                let units = face.units_per_em() as f32;
-                let scale = style.font_size / units;
+        let units = face.units_per_em() as f32;
+        let scale = style.font_size / units;
 
-                let is_vertical = matches!(
-                    buffer.direction(),
-                    Direction::TopToBottom | Direction::BottomToTop
-                );
-                let glyph_buffer = rustybuzz::shape(&face, &[], buffer);
-                let mut fill = vec![];
-                let mut outline = vec![];
+        let is_vertical = matches!(
+            buffer.direction(),
+            Direction::TopToBottom | Direction::BottomToTop
+        );
+        let glyph_buffer = rustybuzz::shape(&face, &[], buffer);
+        let mut fill = vec![];
+        let mut outline = vec![];
 
-                let (width, height) = if is_vertical {
-                    let width = face.units_per_em();
-                    let height = glyph_buffer
-                        .glyph_positions()
-                        .iter()
-                        .fold(0, |aggr, glyph| aggr + glyph.y_advance);
-                    (width as f32, height as f32)
-                } else {
-                    let width = glyph_buffer
-                        .glyph_positions()
-                        .iter()
-                        .fold(0, |aggr, glyph| aggr + glyph.x_advance);
-                    let height = face.ascender() + face.descender();
-                    (width as f32, height as f32)
-                };
+        let (width, height) = if is_vertical {
+            let width = face.units_per_em();
+            let height = glyph_buffer
+                .glyph_positions()
+                .iter()
+                .fold(0, |aggr, glyph| aggr + glyph.y_advance);
+            (width as f32, height as f32)
+        } else {
+            let width = glyph_buffer
+                .glyph_positions()
+                .iter()
+                .fold(0, |aggr, glyph| aggr + glyph.x_advance);
+            let height = face.ascender() + face.descender();
+            (width as f32, height as f32)
+        };
 
-                let width = width * scale;
-                let height = height * scale;
+        let width = width * scale;
+        let height = height * scale;
 
-                let offset_x = offset.dx()
-                    + match style.horizontal_alignment {
-                        super::HorizontalAlignment::Left => 0.0,
-                        super::HorizontalAlignment::Center => -width / 2.0,
-                        super::HorizontalAlignment::Right => -width,
-                    };
+        let offset_x = offset.dx()
+            + match style.horizontal_alignment {
+                super::HorizontalAlignment::Left => 0.0,
+                super::HorizontalAlignment::Center => -width / 2.0,
+                super::HorizontalAlignment::Right => -width,
+            };
 
-                let offset_y = offset.dy()
-                    + match style.vertical_alignment {
-                        super::VerticalAlignment::Top => -height,
-                        super::VerticalAlignment::Middle => -height / 2.0,
-                        super::VerticalAlignment::Bottom => 0.0,
-                    };
+        let offset_y = offset.dy()
+            + match style.vertical_alignment {
+                super::VerticalAlignment::Top => -height,
+                super::VerticalAlignment::Middle => -height / 2.0,
+                super::VerticalAlignment::Bottom => 0.0,
+            };
 
-                let mut advance_x = 0.0;
-                let mut advance_y = 0.0;
+        let mut advance_x = 0.0;
+        let mut advance_y = 0.0;
 
-                for index in 0..glyph_buffer.len() {
-                    let position = glyph_buffer.glyph_positions()[index];
-                    let glyph_info = glyph_buffer.glyph_infos()[index];
+        for index in 0..glyph_buffer.len() {
+            let position = glyph_buffer.glyph_positions()[index];
+            let glyph_info = glyph_buffer.glyph_infos()[index];
 
-                    let mut path_builder = GlyphPathBuilder::new(scale);
-                    face.outline_glyph(GlyphId(glyph_info.glyph_id as u16), &mut path_builder);
+            let mut path_builder = GlyphPathBuilder::new(scale);
+            face.outline_glyph(GlyphId(glyph_info.glyph_id as u16), &mut path_builder);
 
-                    let snapped_x =
-                        (position.x_offset as f32 * scale + advance_x + offset_x).round();
-                    let snapped_y =
-                        (position.y_offset as f32 * scale + advance_y + offset_y).round();
+            let snapped_x = (position.x_offset as f32 * scale + advance_x + offset_x).round();
+            let snapped_y = (position.y_offset as f32 * scale + advance_y + offset_y).round();
 
-                    let glyph_position = Vector2::new(snapped_x, snapped_y);
+            let glyph_position = Vector2::new(snapped_x, snapped_y);
 
-                    if style.outline_width > 0.0 && !style.outline_color.is_transparent() {
-                        outline.push(path_builder.clone().tessellate_outline(
-                            glyph_position,
-                            style.outline_width,
-                            style.outline_color,
-                        ));
-                    }
-
-                    fill.push(path_builder.tessellate_fill(glyph_position, style.font_color));
-
-                    advance_x += position.x_advance as f32 * scale;
-                    advance_y += position.y_advance as f32 * scale;
-                }
-
-                outline.append(&mut fill);
-                Some(outline)
-            })
-            .flatten()
-            .ok_or(FontServiceError::FontNotFound)?;
-
-        Ok(TextShaping::Tessellation {
-            glyphs: tessellations,
-        })
-    }
-
-    fn load_fonts(&mut self, fonts_data: Bytes) -> Result<(), FontServiceError> {
-        for id in self.font_db.load_font_data(fonts_data.to_vec()) {
-            if let Some(font) = self.font_db.face(id) {
-                log::debug!("Loaded font {:?}", font.families);
+            if style.outline_width > 0.0 && !style.outline_color.is_transparent() {
+                outline.push(path_builder.clone().tessellate_outline(
+                    glyph_position,
+                    style.outline_width,
+                    style.outline_color,
+                ));
             }
+
+            fill.push(path_builder.tessellate_fill(glyph_position, style.font_color));
+
+            advance_x += position.x_advance as f32 * scale;
+            advance_y += position.y_advance as f32 * scale;
         }
 
-        #[cfg(target_arch = "wasm32")]
-        crate::async_runtime::spawn(async move {
-            WebWorkerService::instance().load_font(fonts_data).await;
-        });
+        outline.append(&mut fill);
 
-        Ok(())
+        Ok(TextShaping::Tessellation { glyphs: outline })
     }
 }
 

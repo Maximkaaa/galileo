@@ -1,10 +1,7 @@
 //! Labels in feature layers
 
-use std::fs::File;
-use std::io::Read;
 use std::sync::Arc;
 
-use bytes::Bytes;
 use eframe::CreationContext;
 use egui::Color32;
 use galileo::layer::feature_layer::Feature;
@@ -14,8 +11,7 @@ use galileo::render::point_paint::PointPaint;
 use galileo::render::render_bundle::RenderBundle;
 use galileo::render::text::text_service::TextService;
 use galileo::render::text::{
-    TextRasterizer, FontStyle, FontWeight, HorizontalAlignment, RustybuzzRasterizer,
-    TextStyle, VerticalAlignment,
+    FontStyle, FontWeight, HorizontalAlignment, RustybuzzRasterizer, TextStyle, VerticalAlignment,
 };
 use galileo::symbol::Symbol;
 use galileo::{Color, Map, MapBuilder};
@@ -249,30 +245,8 @@ pub(crate) fn run() {
 }
 
 fn initialize_font_service() {
-    const FONTS: [&str; 7] = [
-        "galileo/examples/data/fonts/NotoSans.ttf",
-        "galileo/examples/data/fonts/NotoSans-Italic.ttf",
-        "galileo/examples/data/fonts/NotoSansArabic.ttf",
-        "galileo/examples/data/fonts/NotoSansHebrew.ttf",
-        "galileo/examples/data/fonts/NotoSansJP.ttf",
-        "galileo/examples/data/fonts/NotoSansKR.ttf",
-        "galileo/examples/data/fonts/NotoSansSC.ttf",
-    ];
-    let mut provider = RustybuzzRasterizer::default();
-
-    for font_path in FONTS {
-        let mut font_data = vec![];
-        File::open(font_path)
-            .unwrap_or_else(|e| panic!("failed to open font file {font_path}: {e}"))
-            .read_to_end(&mut font_data)
-            .expect("failed to read font file");
-
-        provider
-            .load_fonts(Bytes::from_owner(font_data))
-            .expect("failed to load font");
-    }
-
-    TextService::initialize(provider);
+    let rasterizer = RustybuzzRasterizer::default();
+    TextService::initialize(rasterizer).load_fonts("galileo/examples/data/fonts");
 }
 
 fn create_map() -> Map {
@@ -344,12 +318,12 @@ impl LabeledSymbol {
         Self {
             style: TextStyle {
                 font_family: vec![
+                    "DejaVu Sans".to_string(),
+                    "Noto Sans CJK KR".to_string(),
+                    "Noto Sans CJK JP".to_string(),
+                    "Noto Sans CJK HK".to_string(),
+                    "Noto Sans CJK SC".to_string(),
                     "Noto Sans".to_string(),
-                    "Noto Sans Arabic".to_string(),
-                    "Noto Sans Hebrew".to_string(),
-                    "Noto Sans SC".to_string(),
-                    "Noto Sans KR".to_string(),
-                    "Noto Sans JP".to_string(),
                 ],
                 font_size: 20.0,
                 font_color: Color::BLACK,

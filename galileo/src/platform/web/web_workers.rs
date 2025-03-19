@@ -170,18 +170,20 @@ impl WebWorkerService {
     }
 
     /// Loads font data to the font service in web workers.
-    pub async fn load_font(&self, font_data: Bytes) {
+    pub async fn load_font(&self, font_data: Arc<Vec<u8>>) {
+        let mut futures = vec![];
         for worker in &self.worker_pool {
-            if let Err(err) = self
-                .request_operation(
-                    WebWorkerRequestPayload::LoadFont {
-                        font_data: font_data.clone(),
-                    },
-                    &worker.worker,
-                )
-                .await
-            {
-                log::error!("Failed to send font data to the web worker: {err:?}");
+            futures.push(self.request_operation(
+                WebWorkerRequestPayload::LoadFont {
+                    font_data: (*font_data).clone().into(),
+                },
+                &worker.worker,
+            ));
+        }
+
+        for result in futures::future::join_all(futures).await {
+            if let Err(err) = result {
+                log::error!("Failed to send font to web worker: {err:?}");
             }
         }
     }
@@ -332,6 +334,8 @@ impl WebWorkerService {
 }
 
 mod worker {
+    use std::sync::Arc;
+
     use bytes::Bytes;
     use galileo_mvt::MvtTile;
     use serde_bytes::ByteBuf;
@@ -344,7 +348,7 @@ mod worker {
     use crate::layer::vector_tile_layer::tile_provider::VtProcessor;
     use crate::platform::web::web_workers::WebWorkerResponsePayload;
     use crate::render::render_bundle::RenderBundle;
-    use crate::render::text::{TextService, RustybuzzRasterizer};
+    use crate::render::text::{RustybuzzRasterizer, TextService};
     use crate::tile_schema::TileIndex;
     use crate::TileSchema;
 
@@ -449,12 +453,8 @@ mod worker {
         }
 
         if let Some(instance) = TextService::instance() {
-            match instance.load_fonts(font_data) {
-                Err(err) => {
-                    log::error!("Failed to load font: {err:?}");
-                }
-                _ => {}
-            };
+            let font_data = Arc::new(font_data.to_vec());
+            instance.load_font_internal(font_data, false);
         }
 
         WebWorkerResponsePayload::LoadFont

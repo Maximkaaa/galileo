@@ -530,8 +530,13 @@ impl WorldRenderSet {
         self.buffer_size += size_of::<PointInstance>();
     }
 
-    pub fn add_label<N, P>(&mut self, position: &P, text: &str, style: &TextStyle, offset: Vector2<f32>)
-    where
+    pub fn add_label<N, P>(
+        &mut self,
+        position: &P,
+        text: &str,
+        style: &TextStyle,
+        offset: Vector2<f32>,
+    ) where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
