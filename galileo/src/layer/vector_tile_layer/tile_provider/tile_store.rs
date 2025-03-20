@@ -12,9 +12,8 @@ use crate::render::render_bundle::RenderBundle;
 use crate::render::PackedBundle;
 use crate::tile_schema::TileIndex;
 
-const DEFAULT_CACHE_CAPACITY: usize = 100_000_000;
-const AVG_TILE_SIZE: usize = 100_000;
-const EMPTY_CELL_SIZE: u32 = 1024;
+const DEFAULT_CACHE_CAPACITY: usize = 50 * 2usize.pow(20);
+const AVG_TILE_SIZE: usize = 2 * 2usize.pow(20);
 
 #[derive(Debug, Clone)]
 pub enum MvtTileState {
@@ -78,7 +77,7 @@ impl Weighter<(TileIndex, VtStyleId), TileStoreEntry> for TileWeighter {
     fn weight(&self, _key: &(TileIndex, VtStyleId), val: &TileStoreEntry) -> u32 {
         match &val.prepared_tile {
             PreparedTileState::Loaded(v) => v.world_set.approx_buffer_size() as u32,
-            _ => EMPTY_CELL_SIZE,
+            _ => AVG_TILE_SIZE as u32,
         }
     }
 }
