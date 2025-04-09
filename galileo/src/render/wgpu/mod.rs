@@ -152,15 +152,10 @@ impl WgpuRenderer {
     /// Creates a new wgpu renderer that renders the map to an image buffer on the given device of the given size.
     ///
     /// Returns `None` if a device adapter cannot be acquired.
-    pub fn new_with_device_and_texture_rt(
-        device: Device,
-        queue: Queue,
-        size: Size<u32>,
-    ) -> Option<Self> {
+    pub fn new_with_device_and_texture_rt(device: Device, queue: Queue, size: Size<u32>) -> Self {
         let mut renderer = Self::new_with_device(device, queue);
         renderer.init_target_texture(size);
-
-        Some(renderer)
+        renderer
     }
 
     /// Re-initializes the renderer with a target texture of the given size.
