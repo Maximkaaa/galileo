@@ -4,21 +4,20 @@
 //! # Quick start
 //!
 //! **Cargo.toml:**
-//!```toml
-//! 
+//! ```toml
 //! [package]
 //! name = "map-view"
 //! version = "0.1.0"
 //! edition = "2024"
-//! 
+//!
 //! [dependencies]
 //! galileo = {git = "https://github.com/maximkaaa/galileo"}
 //! galileo-types = {git = "https://github.com/maximkaaa/galileo"}
 //! galileo-egui = {git = "https://github.com/maximkaaa/galileo"}
-//!```
+//! ```
 //!
 //! **src/main.rs:**
-//! ```rust
+//! ```no_run
 //! use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 //! use galileo::{Map, MapBuilder};
 //! use galileo::layer::FeatureLayer;
@@ -26,20 +25,17 @@
 //! use galileo::galileo_types::latlon;
 //! use galileo_types::geo::Crs;
 //! use galileo::Color;
-//! 
-//! mod app;
-//! use app::MapApp;
-//! 
+//!
 //! fn main() {
 //!     run()
 //! }
-//! 
+//!
 //! // Creates the window and starts the egui event loop.
 //! pub(crate) fn run() {
-//!     galileo_egui::init_with_app(Box::new(|cc| Ok(Box::new(MapApp::new(create_map(),cc,[])))))
+//!     galileo_egui::init(create_map(), [])
 //!         .expect("Couldn't create window");
 //! }
-//! 
+//!
 //! // build a map showing the Open Street Map raster data for Seoul, South Korea
 //! fn create_map()->Map {
 //!     MapBuilder::default()
@@ -52,15 +48,15 @@
 //!         // Add a blue dot at the coordinates specified
 //!         .with_layer(FeatureLayer::new(
 //!             // the position of the marker we're going to add, in the WGS84 CRS
-//!             vec![latlon!(37.566, 126.9784)], 
+//!             vec![latlon!(37.566, 126.9784)],
 //!             // a blue circle with fixed size of 5.0 pixels
-//!             CirclePointSymbol::new(Color::BLUE, 5.0), 
+//!             CirclePointSymbol::new(Color::BLUE, 5.0),
 //!             // WGS84 is the coordinate reference system that's based on latitude/longitude pairs.
-//!             Crs::WGS84, 
+//!             Crs::WGS84,
 //!         ))
 //!         .build()
 //! }
-//!```
+//! ```
 //!
 //! # Main components of Galileo
 //!
