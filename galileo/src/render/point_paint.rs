@@ -157,7 +157,7 @@ pub(crate) enum PointShape<'a> {
         shape: Cow<'a, ClosedContour<Point2<f32>>>,
     },
     Label {
-        text: Cow<'a, String>,
+        text: Cow<'a, str>,
         style: Cow<'a, TextStyle>,
     },
 }
