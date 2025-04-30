@@ -176,7 +176,7 @@ impl VtProcessor {
                 .map(|v| v.to_string())
                 .unwrap_or_default();
 
-            text = text.replace(&format!("{{{}}}", prop_name), &prop);
+            text = text.replace(&format!("{{{prop_name}}}"), &prop);
         }
         Some(PointPaint::label_owned(
             text,
