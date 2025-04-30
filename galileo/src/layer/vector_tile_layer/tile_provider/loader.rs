@@ -70,7 +70,7 @@ impl WebVtLoader {
 
         if let Some(cache) = &self.cache {
             if let Err(error) = cache.insert(url, &bytes) {
-                log::warn!("Failed to write persistent cache entry: {:?}", error);
+                log::warn!("Failed to write persistent cache entry: {error:?}");
             }
         }
 

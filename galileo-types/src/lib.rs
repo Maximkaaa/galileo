@@ -55,7 +55,7 @@
 //!
 //! A subset of OGC geometry types are supported at the moment:
 //! * [`GeoPoint`](geo::GeoPoint), [`CartesianPoint2d`](cartesian::CartesianPoint2d), [`CartesianPoint3d`](cartesian::CartesianPoint2d)
-//!    (correspond to OGC *Point* geometry)
+//!   (correspond to OGC *Point* geometry)
 //! * [`MultiPoint`]
 //! * [`Contour`] (corresponds to OGC *LineString* geometry with slight difference, check the trait's documentation)
 //! * [`MultiContour`] (corresponds to OGC *MultiLineString* geometry)
