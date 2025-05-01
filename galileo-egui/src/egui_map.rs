@@ -136,7 +136,7 @@ impl<'a> EguiMapState {
     }
 
     pub fn render(&mut self, ui: &mut egui::Ui) {
-        let available_size = ui.available_size();
+        let available_size = ui.available_size().floor();
         let map_size = self.renderer.size().cast::<f32>();
 
         let (rect, response) = ui.allocate_exact_size(available_size, Sense::click_and_drag());
