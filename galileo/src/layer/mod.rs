@@ -4,7 +4,6 @@ use std::any::Any;
 use std::sync::Arc;
 
 use maybe_sync::{MaybeSend, MaybeSync};
-use parking_lot::RwLock;
 
 use crate::layer::attribution::Attribution;
 use crate::messenger::Messenger;
@@ -50,7 +49,41 @@ pub trait Layer: MaybeSend + MaybeSync {
     fn attribution(&self) -> Option<Attribution>;
 }
 
-impl<T: Layer + 'static> Layer for Arc<RwLock<T>> {
+impl<T: Layer + 'static> Layer for Arc<std::sync::RwLock<T>> {
+    fn render(&self, position: &MapView, canvas: &mut dyn Canvas) {
+        self.read()
+            .expect("poisoned layer")
+            .render(position, canvas)
+    }
+
+    fn prepare(&self, view: &MapView) {
+        self.read().expect("poisoned layer").prepare(view)
+    }
+
+    fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
+        self.write()
+            .expect("poisoned layer")
+            .set_messenger(messenger)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn tile_schema(&self) -> Option<TileSchema> {
+        self.read().expect("poisoned layer").tile_schema()
+    }
+
+    fn attribution(&self) -> Option<Attribution> {
+        self.read().expect("poisoned layer").attribution()
+    }
+}
+
+impl<T: Layer + 'static> Layer for Arc<parking_lot::RwLock<T>> {
     fn render(&self, position: &MapView, canvas: &mut dyn Canvas) {
         self.read().render(position, canvas)
     }
