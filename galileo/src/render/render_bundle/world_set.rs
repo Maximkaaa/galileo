@@ -9,7 +9,9 @@ use lyon::lyon_tessellation::{
     BuffersBuilder, FillOptions, FillTessellator, FillVertex, FillVertexConstructor, LineJoin,
     Side, StrokeOptions, StrokeTessellator, StrokeVertex, StrokeVertexConstructor, VertexBuffers,
 };
-use lyon::math::point;
+fn point(x: f64, y: f64) -> lyon::math::Point {
+    lyon::math::Point::new(x as _, y as _)
+}
 use lyon::path::builder::PathBuilder;
 use lyon::path::path::BuilderWithAttributes;
 use lyon::path::{EndpointId, Path};
@@ -72,7 +74,7 @@ impl WorldRenderSet {
 
     pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly)
     where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         Poly: Polygon,
         Poly::Contour: Contour<Point = P>,
@@ -189,7 +191,7 @@ impl WorldRenderSet {
 
     pub fn add_line<N, P, C>(&mut self, line: &C, paint: &LinePaint, min_resolution: f64)
     where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         C: Contour<Point = P>,
     {
@@ -198,7 +200,7 @@ impl WorldRenderSet {
 
     fn add_line_lod<N, P, C>(&mut self, line: &C, paint: LinePaint, min_resolution: f64)
     where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         C: Contour<Point = P>,
     {
@@ -210,21 +212,25 @@ impl WorldRenderSet {
             return;
         };
 
-        let _ = path_builder.begin(
-            point(
-                first_point.x().as_() / min_resolution as f32,
-                first_point.y().as_() / min_resolution as f32,
-            ),
-            &[first_point.z().as_()],
+        let ([cx, cy], ln) = line
+            .iter_points()
+            .fold(([0.0, 0.0], 0usize), |([x, y], i), p| {
+                ([x + p.x().as_(), y + p.y().as_()], i + 1)
+            });
+        let [cx, cy] = [cx / ln as f64, cy / ln as f64];
+        let at = point(
+            (first_point.x().as_() - cx) / min_resolution,
+            (first_point.y().as_() - cy) / min_resolution,
         );
+        let _ = path_builder.begin(at, &[first_point.z().as_() as f32]);
 
         for p in iterator {
             let _ = path_builder.line_to(
                 point(
-                    p.x().as_() / min_resolution as f32,
-                    p.y().as_() / min_resolution as f32,
+                    (p.x().as_() - cx) / min_resolution,
+                    (p.y().as_() - cy) / min_resolution,
                 ),
-                &[p.z().as_()],
+                &[p.z().as_() as f32],
             );
         }
 
@@ -237,6 +243,7 @@ impl WorldRenderSet {
             color: paint.color.to_f32_array(),
             resolution: min_resolution as f32,
             path: &path,
+            centroid: [cx, cy],
         };
 
         let mut tesselator = StrokeTessellator::new();
@@ -269,7 +276,7 @@ impl WorldRenderSet {
         paint: &PolygonPaint,
         min_resolution: f64,
     ) where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         Poly: Polygon,
         Poly::Contour: Contour<Point = P>,
@@ -283,7 +290,7 @@ impl WorldRenderSet {
         paint: &PolygonPaint,
         _min_resolution: f32,
     ) where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         Poly: Polygon,
         Poly::Contour: Contour<Point = P>,
@@ -306,26 +313,36 @@ impl WorldRenderSet {
         paint: &PolygonPaint,
         tessellation: &mut VertexBuffers<PolyVertex, u32>,
     ) where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         Poly: Polygon,
         Poly::Contour: Contour<Point = P>,
     {
+        let ([cx, cy], ln) = polygon
+            .iter_contours()
+            .flat_map(|c| c.iter_points())
+            .fold(([0.0, 0.0], 0), |([x, y], i), p| {
+                ([x + p.x().as_(), y + p.y().as_()], i + 1)
+            });
+        let [cx, cy] = [cx / ln as f64, cy / ln as f64];
         let mut path_builder = BuilderWithAttributes::new(1);
         for contour in polygon.iter_contours() {
             let mut iterator = contour.iter_points();
 
             if let Some(first_point) = iterator.next() {
                 let _ = path_builder.begin(
-                    point(first_point.x().as_(), first_point.y().as_()),
-                    &[first_point.z().as_()],
+                    point(first_point.x().as_() - cx, first_point.y().as_() - cy),
+                    &[first_point.z().as_() as _],
                 );
             } else {
                 return;
             }
 
             for p in iterator {
-                let _ = path_builder.line_to(point(p.x().as_(), p.y().as_()), &[p.z().as_()]);
+                let _ = path_builder.line_to(
+                    point(p.x().as_() - cx, p.y().as_() - cy),
+                    &[p.z().as_() as _],
+                );
             }
 
             path_builder.end(true);
@@ -335,6 +352,7 @@ impl WorldRenderSet {
 
         let vertex_constructor = PolygonVertexConstructor {
             color: paint.color.to_f32_array(),
+            centroid: [cx, cy],
         };
         let mut tesselator = FillTessellator::new();
 
@@ -371,7 +389,11 @@ impl WorldRenderSet {
         if let Some(outline) = outline {
             let vertex_constructor = ScreenRefVertexConstructor {
                 color: outline.color.to_f32_array(),
-                position: [position.x().as_(), position.y().as_(), position.z().as_()],
+                position: [
+                    position.x().as_() as _,
+                    position.y().as_() as _,
+                    position.z().as_() as _,
+                ],
                 offset,
             };
 
@@ -388,7 +410,11 @@ impl WorldRenderSet {
         if !fill.is_transparent() {
             let vertex_constructor = ScreenRefVertexConstructor {
                 color: fill.to_f32_array(),
-                position: [position.x().as_(), position.y().as_(), position.z().as_()],
+                position: [
+                    position.x().as_() as _,
+                    position.y().as_() as _,
+                    position.z().as_() as _,
+                ],
                 offset,
             };
 
@@ -453,7 +479,11 @@ impl WorldRenderSet {
             .min(std::f32::consts::PI * 2.0);
 
         let center = PolyVertex {
-            position: [position.x().as_(), position.y().as_(), position.z().as_()],
+            position: [
+                position.x().as_() as _,
+                position.y().as_() as _,
+                position.z().as_() as _,
+            ],
             normal: [offset.dx(), offset.dy()],
             color: fill.center_color.to_f32_array(),
             norm_limit: f32::MAX,
@@ -477,7 +507,11 @@ impl WorldRenderSet {
             }
 
             vertices.push(PolyVertex {
-                position: [position.x().as_(), position.y().as_(), position.z().as_()],
+                position: [
+                    position.x().as_() as _,
+                    position.y().as_() as _,
+                    position.z().as_() as _,
+                ],
                 normal: (*point + offset).coords(),
                 color: fill.side_color.to_f32_array(),
                 norm_limit: f32::MAX,
@@ -546,7 +580,11 @@ impl WorldRenderSet {
                     let vertices_start = self.poly_tessellation.vertices.len() as u32;
                     for vertex in glyph.vertices {
                         self.poly_tessellation.vertices.push(PolyVertex {
-                            position: [position.x().as_(), position.y().as_(), position.z().as_()],
+                            position: [
+                                position.x().as_() as _,
+                                position.y().as_() as _,
+                                position.z().as_() as _,
+                            ],
                             normal: vertex.position,
                             color: vertex.color.to_f32_array(),
                             norm_limit: f32::MAX,
@@ -611,16 +649,23 @@ fn build_contour_path(
     contour: &impl Contour<Point = Point2<f32>>,
     scale: f32,
 ) -> Option<()> {
+    // TODO: centroid this maybe
     let mut iterator = contour.iter_points();
 
     if let Some(first_point) = iterator.next() {
-        let _ = path_builder.begin(point(first_point.x() * scale, first_point.y() * scale), &[]);
+        let _ = path_builder.begin(
+            point(
+                (first_point.x() * scale) as f64,
+                (first_point.y() * scale) as f64,
+            ),
+            &[],
+        );
     } else {
         return None;
     }
 
     for p in iterator {
-        let _ = path_builder.line_to(point(p.x() * scale, p.y() * scale), &[]);
+        let _ = path_builder.line_to(point((p.x() * scale) as f64, (p.y() * scale) as f64), &[]);
     }
 
     path_builder.end(contour.is_closed());
@@ -635,10 +680,12 @@ struct LineVertexConstructor<'a> {
     color: [f32; 4],
     resolution: f32,
     path: &'a Path,
+    centroid: [f64; 2],
 }
 
 impl StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'_> {
     fn new_vertex(&mut self, mut vertex: StrokeVertex) -> PolyVertex {
+        let [cx, cy] = self.centroid;
         let position = vertex.position_on_path();
         let offset = match vertex.side() {
             Side::Negative => -self.offset,
@@ -672,8 +719,8 @@ impl StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'_> {
 
         PolyVertex {
             position: [
-                position.x * self.resolution,
-                position.y * self.resolution,
+                ((position.x * self.resolution) as f64 + cx) as _,
+                ((position.y * self.resolution) as f64 + cy) as _,
                 vertex.interpolated_attributes()[0],
             ],
             color: self.color,
@@ -685,12 +732,18 @@ impl StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'_> {
 
 struct PolygonVertexConstructor {
     color: [f32; 4],
+    centroid: [f64; 2],
 }
 
 impl FillVertexConstructor<PolyVertex> for PolygonVertexConstructor {
     fn new_vertex(&mut self, vertex: FillVertex) -> PolyVertex {
+        let [cx, cy] = self.centroid;
         PolyVertex {
-            position: [vertex.position().x, vertex.position().y, 0.0],
+            position: [
+                (vertex.position().x as f64 + cx) as _,
+                (vertex.position().y as f64 + cy) as _,
+                0.0,
+            ],
             color: self.color,
             normal: Default::default(),
             norm_limit: 1.0,

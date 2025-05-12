@@ -42,7 +42,7 @@ impl RenderBundle {
     /// Adds a line to the bundle.
     pub fn add_line<N, P, C>(&mut self, line: &C, paint: &LinePaint, min_resolution: f64)
     where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         C: Contour<Point = P>,
     {
@@ -56,7 +56,7 @@ impl RenderBundle {
         paint: &PolygonPaint,
         min_resolution: f64,
     ) where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         Poly: Polygon,
         Poly::Contour: Contour<Point = P>,
