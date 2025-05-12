@@ -53,6 +53,57 @@ impl<F> Symbol<F> for CirclePointSymbol {
     }
 }
 
+/// Renders a point as an outlined circle of fixed size.
+#[derive(Debug, Copy, Clone)]
+pub struct OutlinedCirclePointSymbol {
+    /// Color of the circle.
+    pub color: Color,
+    /// Color of the outline.
+    pub outline: Color,
+    /// Diameter of the circle.
+    pub size: f64,
+    /// Diameter of the outline.
+    pub thickness: f64,
+}
+
+impl OutlinedCirclePointSymbol {
+    /// Create a new instance.
+    pub fn new(inner: Color, outline: Color, size: f64, thickness: f64) -> Self {
+        Self {
+            color: inner,
+            outline,
+            size,
+            thickness,
+        }
+    }
+}
+
+impl<F> Symbol<F> for OutlinedCirclePointSymbol {
+    fn render(
+        &self,
+        _feature: &F,
+        geometry: &Geom<Point3>,
+        min_resolution: f64,
+        bundle: &mut RenderBundle,
+    ) {
+        let inner = PointPaint::circle(self.color, self.size as f32);
+        let outer = PointPaint::circle(self.outline, (self.size + self.thickness) as f32);
+        match geometry {
+            Geom::Point(point) => {
+                bundle.add_point(point, &outer, min_resolution);
+                bundle.add_point(point, &inner, min_resolution);
+            }
+            Geom::MultiPoint(points) => {
+                points.iter_points().for_each(|p| {
+                    bundle.add_point(p, &outer, min_resolution);
+                    bundle.add_point(p, &inner, min_resolution);
+                });
+            }
+            _ => {}
+        }
+    }
+}
+
 /// Symbol that renders a point with an image. The image size is fixed on the screen and does not depend on map
 /// resolution.
 pub struct ImagePointSymbol {

@@ -11,7 +11,7 @@ pub use arbitrary::ArbitraryGeometrySymbol;
 pub use contour::SimpleContourSymbol;
 use galileo_types::cartesian::Point3;
 use galileo_types::geometry::Geom;
-pub use point::{CirclePointSymbol, ImagePointSymbol};
+pub use point::{CirclePointSymbol, ImagePointSymbol, OutlinedCirclePointSymbol};
 pub use polygon::SimplePolygonSymbol;
 
 use crate::render::render_bundle::RenderBundle;
