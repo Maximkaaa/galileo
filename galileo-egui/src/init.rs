@@ -101,22 +101,7 @@ impl InitBuilder {
 
         let native_options = self.native_options.unwrap_or_default();
 
-        let app_creator: AppCreator<'_> = Box::new(move |cc| {
-            let ctx = cc.egui_ctx.clone();
-            let render_state = cc
-                .wgpu_render_state
-                .clone()
-                .expect("failed to get wgpu context");
-            let egui_map_state = EguiMapState::new(self.map, ctx, render_state, handlers);
-            let app = self.app_builder.unwrap_or_else(|| {
-                Box::new(|egui_map_state: EguiMapState| {
-                    Box::new(MapApp {
-                        map: egui_map_state,
-                    })
-                })
-            })(egui_map_state);
-            Ok(app)
-        });
+        let app_creator: AppCreator<'static> = app_creator(self.map, handlers, self.app_builder);
 
         eframe::run_native("Galileo Dev Map", native_options, app_creator)
     }
@@ -145,10 +130,10 @@ impl InitBuilder {
                 .expect("the_canvas_id was not a HtmlCanvasElement");
 
             let app_creator: AppCreator<'static> =
-                Box::new(move |cc| Ok(Box::new(MapApp::new(self.map, cc, handlers))));
+                app_creator(self.map, handlers, self.app_builder);
 
             let start_result = eframe::WebRunner::new()
-                .start(canvas, canvas, web_options, app_creator)
+                .start(canvas, web_options, app_creator)
                 .await;
 
             // Remove the loading text and spinner:
@@ -169,4 +154,33 @@ impl InitBuilder {
 
         Ok(())
     }
+}
+
+fn app_creator<'app>(
+    map: Map,
+    handlers: Vec<Box<dyn UserEventHandler>>,
+    app_builder: Option<Box<dyn FnOnce(EguiMapState) -> Box<dyn eframe::App>>>,
+) -> Box<
+    dyn 'app
+        + FnOnce(
+            &eframe::CreationContext<'_>,
+        )
+            -> Result<Box<dyn 'app + eframe::App>, Box<dyn std::error::Error + Send + Sync>>,
+> {
+    Box::new(move |cc: &eframe::CreationContext<'_>| {
+        let ctx = cc.egui_ctx.clone();
+        let render_state = cc
+            .wgpu_render_state
+            .clone()
+            .expect("failed to get wgpu context");
+        let egui_map_state = EguiMapState::new(map, ctx, render_state, handlers);
+        let app = app_builder.unwrap_or_else(|| {
+            Box::new(|egui_map_state: EguiMapState| {
+                Box::new(MapApp {
+                    map: egui_map_state,
+                })
+            })
+        })(egui_map_state);
+        Ok(app)
+    })
 }
