@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use eframe::CreationContext;
 use egui::Color32;
 use galileo::layer::feature_layer::Feature;
 use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
@@ -38,19 +37,14 @@ struct EguiMapApp {
 }
 
 impl EguiMapApp {
-    fn new(mut map: Map, cc: &CreationContext) -> Self {
+    fn new(mut egui_map_state: EguiMapState) -> Self {
         let layer = FeatureLayer::new(points(), LabeledSymbol::new(), Crs::EPSG3857);
         let layer = Arc::new(RwLock::new(layer));
 
-        map.layers_mut().push(layer.clone());
+        egui_map_state.map_mut().layers_mut().push(layer.clone());
 
         Self {
-            map: EguiMapState::new(
-                map,
-                cc.egui_ctx.clone(),
-                cc.wgpu_render_state.clone().expect("no render state"),
-                [],
-            ),
+            map: egui_map_state,
             feature_layer: layer,
             font_size: 20.0,
             horizontal_align: HorizontalAlignment::Center,
@@ -240,7 +234,9 @@ fn main() {
 pub(crate) fn run() {
     initialize_font_service();
     let map = create_map();
-    galileo_egui::init_with_app(Box::new(|cc| Ok(Box::new(EguiMapApp::new(map, cc)))))
+    galileo_egui::InitBuilder::new(map)
+        .with_app_builder(|egui_map_state| Box::new(EguiMapApp::new(egui_map_state)))
+        .init()
         .expect("failed to initialize");
 }
 

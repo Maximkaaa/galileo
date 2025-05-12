@@ -82,7 +82,9 @@ pub(crate) fn run() {
         .with_layer(label_layer)
         .build();
 
-    galileo_egui::init(map, []).expect("failed to initialize");
+    galileo_egui::InitBuilder::new(map)
+        .init()
+        .expect("failed to initialize");
 }
 
 fn initialize_font_service() {

@@ -29,7 +29,9 @@ pub(crate) fn run() {
     let map = create_map(countries_layer.clone());
     let handler = create_mouse_handler(countries_layer);
 
-    galileo_egui::init(map, [Box::new(handler) as Box<dyn UserEventHandler>])
+    galileo_egui::InitBuilder::new(map)
+        .with_handlers([Box::new(handler) as Box<dyn UserEventHandler>])
+        .init()
         .expect("failed to initialize");
 }
 
