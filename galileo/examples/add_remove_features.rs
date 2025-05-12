@@ -25,11 +25,10 @@ pub(crate) fn run() {
     );
     let layer = Arc::new(RwLock::new(layer));
     let handler = create_mouse_handler(layer.clone());
-    galileo_egui::init(
-        create_map(layer),
-        [Box::new(handler) as Box<dyn UserEventHandler>],
-    )
-    .expect("failed to initialize");
+    galileo_egui::InitBuilder::new(create_map(layer))
+        .with_handlers([Box::new(handler) as Box<dyn UserEventHandler>])
+        .init()
+        .expect("failed to initialize");
 }
 
 fn create_mouse_handler(

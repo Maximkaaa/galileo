@@ -1,6 +1,5 @@
 //! Example showing how to integrate Galileo map into your egui application.
 
-use eframe::CreationContext;
 use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::{Map, MapBuilder};
 use galileo_egui::{EguiMap, EguiMapState};
@@ -14,17 +13,16 @@ struct EguiMapApp {
 }
 
 impl EguiMapApp {
-    fn new(map: Map, cc: &CreationContext) -> Self {
-        let position = map.view().position().expect("invalid map position");
-        let resolution = map.view().resolution();
+    fn new(egui_map_state: EguiMapState) -> Self {
+        let position = egui_map_state
+            .map()
+            .view()
+            .position()
+            .expect("invalid map position");
+        let resolution = egui_map_state.map().view().resolution();
 
         Self {
-            map: EguiMapState::new(
-                map,
-                cc.egui_ctx.clone(),
-                cc.wgpu_render_state.clone().expect("no render state"),
-                [],
-            ),
+            map: egui_map_state,
             position,
             resolution,
         }
@@ -62,7 +60,9 @@ fn main() {
 
 pub(crate) fn run() {
     let map = create_map();
-    galileo_egui::init_with_app(Box::new(|cc| Ok(Box::new(EguiMapApp::new(map, cc)))))
+    galileo_egui::InitBuilder::new(map)
+        .with_app_builder(|egui_map_state| Box::new(EguiMapApp::new(egui_map_state)))
+        .init()
         .expect("failed to initialize");
 }
 

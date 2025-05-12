@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use eframe::CreationContext;
 use egui::FontDefinitions;
 use galileo::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
@@ -49,12 +48,7 @@ impl eframe::App for App {
 }
 
 impl App {
-    fn new(
-        map: Map,
-        layer: Arc<RwLock<VectorTileLayer>>,
-        cc: &CreationContext,
-        handler: impl UserEventHandler + 'static,
-    ) -> Self {
+    fn new(egui_map_state: EguiMapState, layer: Arc<RwLock<VectorTileLayer>>) -> Self {
         let fonts = FontDefinitions::default();
         let provider = RustybuzzRasterizer::default();
 
@@ -64,12 +58,7 @@ impl App {
         }
 
         Self {
-            map: EguiMapState::new(
-                map,
-                cc.egui_ctx.clone(),
-                cc.wgpu_render_state.clone().expect("no render state"),
-                [Box::new(handler) as Box<dyn UserEventHandler>],
-            ),
+            map: egui_map_state,
             layer,
         }
     }
@@ -130,10 +119,11 @@ pub(crate) fn run() {
     };
 
     let map = MapBuilder::default().with_layer(layer.clone()).build();
-    galileo_egui::init_with_app(Box::new(|cc| {
-        Ok(Box::new(App::new(map, layer, cc, handler)))
-    }))
-    .expect("failed to initialize");
+    galileo_egui::InitBuilder::new(map)
+        .with_handlers([Box::new(handler) as Box<dyn UserEventHandler>])
+        .with_app_builder(|egui_map_state| Box::new(App::new(egui_map_state, layer)))
+        .init()
+        .expect("failed to initialize");
 }
 
 fn default_style() -> VectorTileStyle {

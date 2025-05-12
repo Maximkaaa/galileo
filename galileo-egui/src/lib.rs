@@ -4,4 +4,4 @@ pub use egui_map::{EguiMap, EguiMapState};
 #[cfg(feature = "init")]
 mod init;
 #[cfg(feature = "init")]
-pub use init::{init, init_with_app};
+pub use init::InitBuilder;
