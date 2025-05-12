@@ -35,7 +35,7 @@ pub trait GeoPointExt: GeoPoint {
         )
     }
     fn distance<G: GeoPoint<Num = Self::Num>>(&self, other: &G) -> f64 {
-        const EARTH_RADIUS: f64 = 6371.0088; // WGS84 mean radius in kilometers
+        const EARTH_RADIUS: f64 = 6371008.8; // WGS84 mean radius in meters
 
         let lat1 = self.lat_rad().to_f64().expect("convertible to f64");
         let lon1 = self.lon_rad().to_f64().expect("Convertible to f64");
