@@ -87,6 +87,10 @@ impl MapView {
         })
     }
 
+    pub fn projected_center(&self) -> Option<Point3<f64>> {
+        self.projected_position
+    }
+
     /// Creates a new view same as the current one but with the given position.
     pub fn with_position(&self, position: &impl GeoPoint<Num = f64>) -> Self {
         let projected_position = self

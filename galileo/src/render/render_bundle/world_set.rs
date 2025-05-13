@@ -235,12 +235,10 @@ impl WorldRenderSet {
             return;
         };
 
-        let ([cx, cy], ln) = line
-            .iter_points()
-            .fold(([0.0, 0.0], 0usize), |([x, y], i), p| {
-                ([x + p.x().as_(), y + p.y().as_()], i + 1)
-            });
-        let [cx, cy] = [cx / ln as f64, cy / ln as f64];
+        let [cx, cy] = view
+            .projected_center()
+            .map(|p| [p.x(), p.y()])
+            .unwrap_or([first_point.x().as_(), first_point.y().as_()]);
         let at = point(
             (first_point.x().as_() - cx) / min_resolution,
             (first_point.y().as_() - cy) / min_resolution,
