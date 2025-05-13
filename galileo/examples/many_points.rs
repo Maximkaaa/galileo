@@ -40,9 +40,10 @@ impl Symbol<ColoredPoint> for ColoredPointSymbol {
         geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
+        view: &MapView,
     ) {
         if let Geom::Point(point) = geometry {
-            bundle.add_point(point, &PointPaint::dot(feature.color), min_resolution);
+            bundle.add_point(point, &PointPaint::dot(feature.color), min_resolution, view);
         }
     }
 }

@@ -199,7 +199,12 @@ impl RasterTileLayer {
         substitute_tiles
     }
 
-    fn prepare_tile_renders(&self, tiles: &[(TileIndex, Arc<TileState>)], canvas: &mut dyn Canvas) {
+    fn prepare_tile_renders(
+        &self,
+        tiles: &[(TileIndex, Arc<TileState>)],
+        canvas: &mut dyn Canvas,
+        view: &MapView,
+    ) {
         let mut requires_redraw = false;
 
         let now = SystemTime::now();
@@ -253,6 +258,7 @@ impl RasterTileLayer {
                         owned,
                         tile_bbox.into_quadrangle(),
                         ImagePaint { opacity: 255 },
+                        view,
                     );
                     let packed = canvas.pack_bundle(&bundle);
                     self.tiles.insert(
@@ -336,7 +342,7 @@ impl RasterTileLayer {
 impl Layer for RasterTileLayer {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
         let tiles = self.get_tiles_to_draw(view);
-        self.prepare_tile_renders(&tiles, canvas);
+        self.prepare_tile_renders(&tiles, canvas, view);
 
         let updated_tiles: Vec<_> = tiles
             .iter()

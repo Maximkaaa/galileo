@@ -181,10 +181,11 @@ impl Symbol<Country> for CountrySymbol {
         geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
+        view: &MapView,
     ) {
         if !feature.is_hidden {
             self.get_polygon_symbol(feature)
-                .render(&(), geometry, min_resolution, bundle)
+                .render(&(), geometry, min_resolution, bundle, view)
         }
     }
 }
@@ -198,6 +199,7 @@ impl Symbol<City> for CitySymbol {
         geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
+        view: &MapView,
     ) {
         let size = (feature.population / 1000.0).log2() as f32;
         let Geom::Point(point) = geometry else {
@@ -210,6 +212,7 @@ impl Symbol<City> for CitySymbol {
                     point,
                     &PointPaint::circle(Color::BLACK, size * 2.0 + 4.0),
                     min_resolution,
+                    view,
                 );
                 bundle.add_point(
                     point,
@@ -220,6 +223,7 @@ impl Symbol<City> for CitySymbol {
                         135f32.to_radians(),
                     ),
                     min_resolution,
+                    view,
                 );
                 bundle.add_point(
                     point,
@@ -230,6 +234,7 @@ impl Symbol<City> for CitySymbol {
                         270f32.to_radians(),
                     ),
                     min_resolution,
+                    view,
                 );
                 bundle.add_point(
                     point,
@@ -240,23 +245,27 @@ impl Symbol<City> for CitySymbol {
                         360f32.to_radians(),
                     ),
                     min_resolution,
+                    view,
                 )
             }
             "admin" => bundle.add_point(
                 point,
                 &PointPaint::circle(Color::from_hex("#f5009b"), size),
                 min_resolution,
+                view,
             ),
             "minor" => bundle.add_point(
                 point,
                 &PointPaint::square(Color::from_hex("#0a85ed"), size)
                     .with_outline(Color::from_hex("#0d4101"), 2.0),
                 min_resolution,
+                view,
             ),
             _ => bundle.add_point(
                 point,
                 &PointPaint::circle(Color::from_hex("#4e00de"), size),
                 min_resolution,
+                view,
             ),
         };
     }

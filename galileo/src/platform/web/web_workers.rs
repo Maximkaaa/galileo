@@ -21,7 +21,7 @@ use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::layer::vector_tile_layer::tile_provider::processor::TileProcessingError;
 use crate::render::render_bundle::RenderBundle;
 use crate::tile_schema::TileIndex;
-use crate::TileSchema;
+use crate::{MapView, TileSchema};
 
 const WORKER_URL: &str = "./vt_worker.js";
 const WORKER_COUNT: usize = 4;
@@ -82,6 +82,7 @@ enum WebWorkerRequestPayload {
         index: TileIndex,
         style: VectorTileStyle,
         tile_schema: TileSchema,
+        view: MapView,
     },
     LoadFont {
         font_data: Bytes,
@@ -153,7 +154,9 @@ impl WebWorkerService {
         index: TileIndex,
         style: Arc<VectorTileStyle>,
         tile_schema: TileSchema,
+        view: &MapView,
     ) -> Result<RenderBundle, TileProcessingError> {
+        let view = view.clone();
         let response = self
             .request_operation(
                 WebWorkerRequestPayload::ProcessVtTile {
@@ -161,6 +164,7 @@ impl WebWorkerService {
                     index,
                     style: (*style).clone(),
                     tile_schema,
+                    view,
                 },
                 self.next_worker(),
             )
@@ -432,14 +436,18 @@ mod worker {
         result
     }
 
-    fn process_request(request: WebWorkerRequestPayload) -> WebWorkerResponsePayload {
+    fn process_request(
+        request: WebWorkerRequestPayload,
+        view: &MapView,
+    ) -> WebWorkerResponsePayload {
         match request {
             WebWorkerRequestPayload::ProcessVtTile {
                 tile,
                 index,
                 style,
                 tile_schema,
-            } => process_vt_tile(tile, index, style, tile_schema),
+                view,
+            } => process_vt_tile(tile, index, style, tile_schema, view),
             WebWorkerRequestPayload::LoadFont { font_data } => load_font(font_data),
         }
     }
@@ -465,9 +473,10 @@ mod worker {
         index: TileIndex,
         style: VectorTileStyle,
         tile_schema: TileSchema,
+        view: MapView,
     ) -> WebWorkerResponsePayload {
         let mut bundle = RenderBundle::default();
-        let result = match VtProcessor::prepare(&tile, &mut bundle, index, &style, &tile_schema) {
+        let result = match VtProcessor::prepare(&tile, &mut bundle, index, &style, &tile_schema, view) {
             Ok(()) => Ok(bundle),
             Err(_) => Err(TileProcessingError::Rendering),
         };

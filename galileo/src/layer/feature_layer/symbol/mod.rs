@@ -15,6 +15,7 @@ pub use point::{CirclePointSymbol, ImagePointSymbol, OutlinedCirclePointSymbol};
 pub use polygon::SimplePolygonSymbol;
 
 use crate::render::render_bundle::RenderBundle;
+use crate::view::MapView;
 
 /// Symbol is used to draw a feature `F` to the map.
 pub trait Symbol<F> {
@@ -34,5 +35,6 @@ pub trait Symbol<F> {
         geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
+        view: &MapView,
     );
 }

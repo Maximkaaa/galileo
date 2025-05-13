@@ -5,6 +5,7 @@ use galileo_types::{MultiPolygon, Polygon};
 use crate::layer::feature_layer::symbol::Symbol;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{LineCap, LinePaint, PolygonPaint};
+use crate::view::MapView;
 use crate::Color;
 
 /// Renders a polygon geometry as a filled polygon with an outline.
@@ -61,6 +62,7 @@ impl SimplePolygonSymbol {
         polygon: &galileo_types::impls::Polygon<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
+        view: &MapView,
     ) {
         if !self.fill_color.is_transparent() {
             bundle.add_polygon(
@@ -69,6 +71,7 @@ impl SimplePolygonSymbol {
                     color: self.fill_color,
                 },
                 min_resolution,
+                view,
             );
         }
 
@@ -81,7 +84,7 @@ impl SimplePolygonSymbol {
             };
 
             for contour in polygon.iter_contours() {
-                bundle.add_line(contour, &line_paint, min_resolution);
+                bundle.add_line(contour, &line_paint, min_resolution, view);
             }
         }
     }
@@ -94,12 +97,13 @@ impl<F> Symbol<F> for SimplePolygonSymbol {
         geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
+        view: &MapView,
     ) {
         match geometry {
-            Geom::Polygon(poly) => self.render_poly(poly, min_resolution, bundle),
-            Geom::MultiPolygon(polygons) => polygons
-                .polygons()
-                .for_each(|polygon| self.render_poly(polygon, min_resolution, bundle)),
+            Geom::Polygon(poly) => self.render_poly(poly, min_resolution, bundle, view),
+            Geom::MultiPolygon(polygons) => polygons.polygons().for_each(|polygon| {
+                self.render_poly(polygon, min_resolution, bundle, view)
+            }),
             _ => {}
         }
     }

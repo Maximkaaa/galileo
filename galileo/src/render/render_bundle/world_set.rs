@@ -23,7 +23,7 @@ use crate::decoded_image::DecodedImage;
 use crate::render::point_paint::{CircleFill, PointPaint, PointShape, SectorParameters};
 use crate::render::text::{TextService, TextShaping, TextStyle};
 use crate::render::{ImagePaint, LinePaint, PolygonPaint};
-use crate::Color;
+use crate::{Color, MapView};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct WorldRenderSet {
@@ -94,12 +94,18 @@ impl WorldRenderSet {
         self.clip_area = Some(tessellation);
     }
 
-    pub fn add_image(&mut self, image: DecodedImage, vertices: [Point2; 4], paint: ImagePaint) {
+    pub fn add_image(
+        &mut self,
+        image: DecodedImage,
+        vertices: [Point2; 4],
+        paint: ImagePaint,
+        view: &MapView,
+    ) {
         let opacity = paint.opacity as f32 / 255.0;
 
         self.buffer_size += image.byte_size() + std::mem::size_of::<ImageVertex>() * 4;
 
-        let index = self.add_image_to_store(Arc::new(image));
+        let index = self.add_image_to_store(Arc::new(image), view);
         let vertices = [
             ImageVertex {
                 position: [vertices[0].x() as f32, vertices[0].y() as f32],
@@ -127,10 +133,15 @@ impl WorldRenderSet {
             },
         ];
 
-        self.add_image_info(index, vertices);
+        self.add_image_info(index, vertices, view);
     }
 
-    fn add_image_info(&mut self, image_store_index: usize, vertices: [ImageVertex; 4]) -> usize {
+    fn add_image_info(
+        &mut self,
+        image_store_index: usize,
+        vertices: [ImageVertex; 4],
+        view: &MapView,
+    ) -> usize {
         let index = self.images.len();
         self.images.push(ImageInfo {
             store_index: image_store_index,
@@ -139,7 +150,7 @@ impl WorldRenderSet {
         index
     }
 
-    fn add_image_to_store(&mut self, image: Arc<DecodedImage>) -> usize {
+    fn add_image_to_store(&mut self, image: Arc<DecodedImage>, view: &MapView) -> usize {
         for (i, stored) in self.image_store.iter().enumerate() {
             if Arc::ptr_eq(stored, &image) {
                 return i;
@@ -151,14 +162,14 @@ impl WorldRenderSet {
         index
     }
 
-    pub fn add_point<N, P>(&mut self, point: &P, paint: &PointPaint)
+    pub fn add_point<N, P>(&mut self, point: &P, paint: &PointPaint, view: &MapView)
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
         match &paint.shape {
             PointShape::Dot { color } => {
-                self.add_dot(point, *color, paint.offset);
+                self.add_dot(point, *color, paint.offset, view);
             }
             PointShape::Circle {
                 fill,
@@ -185,21 +196,33 @@ impl WorldRenderSet {
             } => {
                 self.add_shape(point, *fill, *scale, *outline, shape, paint.offset);
             }
-            PointShape::Label { text, style } => self.add_label(point, text, style, paint.offset),
+            PointShape::Label { text, style } => {
+                self.add_label(point, text, style, paint.offset, view)
+            }
         };
     }
 
-    pub fn add_line<N, P, C>(&mut self, line: &C, paint: &LinePaint, min_resolution: f64)
-    where
+    pub fn add_line<N, P, C>(
+        &mut self,
+        line: &C,
+        paint: &LinePaint,
+        min_resolution: f64,
+        view: &MapView,
+    ) where
         N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         C: Contour<Point = P>,
     {
-        self.add_line_lod(line, *paint, min_resolution);
+        self.add_line_lod(line, *paint, min_resolution, view);
     }
 
-    fn add_line_lod<N, P, C>(&mut self, line: &C, paint: LinePaint, min_resolution: f64)
-    where
+    fn add_line_lod<N, P, C>(
+        &mut self,
+        line: &C,
+        paint: LinePaint,
+        min_resolution: f64,
+        view: &MapView,
+    ) where
         N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         C: Contour<Point = P>,
@@ -275,20 +298,22 @@ impl WorldRenderSet {
         polygon: &Poly,
         paint: &PolygonPaint,
         min_resolution: f64,
+        view: &MapView,
     ) where
         N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         Poly: Polygon,
         Poly::Contour: Contour<Point = P>,
     {
-        self.add_polygon_lod(polygon, paint, min_resolution as f32);
+        self.add_polygon_lod(polygon, paint, min_resolution, view);
     }
 
     fn add_polygon_lod<N, P, Poly>(
         &mut self,
         polygon: &Poly,
         paint: &PolygonPaint,
-        _min_resolution: f32,
+        _min_resolution: f64,
+        view: &MapView,
     ) where
         N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
@@ -478,16 +503,16 @@ impl WorldRenderSet {
             .abs()
             .min(std::f32::consts::PI * 2.0);
 
-        let center = PolyVertex {
-            position: [
+        let center = PolyVertex::new(
+            [
                 position.x().as_() as _,
                 position.y().as_() as _,
                 position.z().as_() as _,
             ],
-            normal: [offset.dx(), offset.dy()],
-            color: fill.center_color.to_f32_array(),
-            norm_limit: f32::MAX,
-        };
+            fill.center_color.to_f32_array(),
+            [offset.dx(), offset.dy()],
+            f32::MAX,
+        );
 
         let is_full_circle = (dr - std::f32::consts::PI * 2.0).abs() < TOLERANCE;
 
@@ -506,16 +531,16 @@ impl WorldRenderSet {
                 indices.push(vertices.len() as u32 + first_index);
             }
 
-            vertices.push(PolyVertex {
-                position: [
+            vertices.push(PolyVertex::new(
+                [
                     position.x().as_() as _,
                     position.y().as_() as _,
                     position.z().as_() as _,
                 ],
-                normal: (*point + offset).coords(),
-                color: fill.side_color.to_f32_array(),
-                norm_limit: f32::MAX,
-            });
+                fill.side_color.to_f32_array(),
+                (*point + offset).coords(),
+                f32::MAX,
+            ));
         }
 
         if is_full_circle {
@@ -547,7 +572,7 @@ impl WorldRenderSet {
             (self.poly_tessellation.indices.len() - start_index_count) * std::mem::size_of::<u32>();
     }
 
-    fn add_dot<P, N>(&mut self, point: &P, color: Color, offset: Vector2<f32>)
+    fn add_dot<P, N>(&mut self, point: &P, color: Color, offset: Vector2<f32>, view: &MapView)
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
@@ -570,6 +595,7 @@ impl WorldRenderSet {
         text: &str,
         style: &TextStyle,
         offset: Vector2<f32>,
+        view: &MapView,
     ) where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
@@ -579,16 +605,16 @@ impl WorldRenderSet {
                 for glyph in glyphs {
                     let vertices_start = self.poly_tessellation.vertices.len() as u32;
                     for vertex in glyph.vertices {
-                        self.poly_tessellation.vertices.push(PolyVertex {
-                            position: [
+                        self.poly_tessellation.vertices.push(PolyVertex::new(
+                            [
                                 position.x().as_() as _,
                                 position.y().as_() as _,
                                 position.z().as_() as _,
                             ],
-                            normal: vertex.position,
-                            color: vertex.color.to_f32_array(),
-                            norm_limit: f32::MAX,
-                        });
+                            vertex.color.to_f32_array(),
+                            vertex.position,
+                            f32::MAX,
+                        ));
                     }
                     for index in glyph.indices {
                         self.poly_tessellation.indices.push(index + vertices_start);
@@ -717,16 +743,16 @@ impl StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'_> {
             f32::MAX
         };
 
-        PolyVertex {
-            position: [
-                ((position.x * self.resolution) as f64 + cx) as _,
-                ((position.y * self.resolution) as f64 + cy) as _,
-                vertex.interpolated_attributes()[0],
+        PolyVertex::new(
+            [
+                ((position.x * self.resolution) as f64 + cx),
+                ((position.y * self.resolution) as f64 + cy),
+                vertex.interpolated_attributes()[0] as _,
             ],
-            color: self.color,
+            self.color,
             normal,
             norm_limit,
-        }
+        )
     }
 }
 
@@ -738,16 +764,16 @@ struct PolygonVertexConstructor {
 impl FillVertexConstructor<PolyVertex> for PolygonVertexConstructor {
     fn new_vertex(&mut self, vertex: FillVertex) -> PolyVertex {
         let [cx, cy] = self.centroid;
-        PolyVertex {
-            position: [
+        PolyVertex::new(
+            [
                 (vertex.position().x as f64 + cx) as _,
                 (vertex.position().y as f64 + cy) as _,
                 0.0,
             ],
-            color: self.color,
-            normal: Default::default(),
-            norm_limit: 1.0,
-        }
+            self.color,
+            Default::default(),
+            1.0,
+        )
     }
 }
 
@@ -758,13 +784,11 @@ struct ScreenRefVertexConstructor {
 }
 
 impl ScreenRefVertexConstructor {
-    fn create_vertex(&self, position: lyon::math::Point) -> PolyVertex {
-        PolyVertex {
-            position: self.position,
-            normal: [position.x + self.offset.dx(), position.y + self.offset.dy()],
-            color: self.color,
-            norm_limit: f32::MAX,
-        }
+    fn create_vertex(&self, vertex: lyon::math::Point) -> PolyVertex {
+        let normal = [vertex.x + self.offset.dx(), vertex.y + self.offset.dy()];
+        let [x, y, z] = self.position;
+        let position = [x as f64, y as f64, z as f64];
+        PolyVertex::new(position, self.color, normal, f32::MAX)
     }
 }
 
@@ -781,12 +805,31 @@ impl FillVertexConstructor<PolyVertex> for ScreenRefVertexConstructor {
 }
 
 #[repr(C)]
+// #[derive(Copy, Clone, Debug, bytemuck::Zeroable, Serialize, Deserialize)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
 pub(crate) struct PolyVertex {
-    pub position: [f32; 3],
+    pub position: [f64; 4],
     pub color: [f32; 4],
     pub normal: [f32; 2],
     pub norm_limit: f32,
+    _padding: u32,
+}
+
+impl PolyVertex {
+    pub(crate) fn new(
+        [x, y, z]: [f64; 3],
+        color: [f32; 4],
+        normal: [f32; 2],
+        norm_limit: f32,
+    ) -> Self {
+        Self {
+            position: [x, y, z, 0.],
+            color,
+            normal,
+            norm_limit,
+            _padding: 0,
+        }
+    }
 }
 
 #[repr(C)]

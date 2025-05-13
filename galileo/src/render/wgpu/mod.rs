@@ -1248,7 +1248,7 @@ impl WgpuPackedBundle {
         renderer: &WgpuRenderer,
     ) -> WgpuVertexBuffers {
         let index_bytes = bytemuck::cast_slice(&tessellation.indices);
-        let bytes = bytemuck::cast_slice(&tessellation.vertices);
+        let vertex_bytes = bytemuck::cast_slice(&tessellation.vertices);
 
         let index = renderer
             .device
@@ -1263,7 +1263,7 @@ impl WgpuPackedBundle {
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: None,
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                contents: bytes,
+                contents: vertex_bytes,
             });
 
         WgpuVertexBuffers {

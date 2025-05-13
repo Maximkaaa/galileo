@@ -12,6 +12,7 @@ use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, PackedBundle};
 use crate::tile_schema::TileIndex;
+use crate::MapView;
 
 pub mod loader;
 pub mod processor;
@@ -86,7 +87,7 @@ impl VectorTileProvider {
     /// Load and pre-render the tile with given index using given style.
     ///
     /// A style with given id must first be registered in the provider.
-    pub fn load_tile(&self, index: TileIndex, style_id: VtStyleId) {
+    pub fn load_tile(&self, index: TileIndex, style_id: VtStyleId, view: &MapView) {
         if !self.processor.has_style(style_id) {
             log::warn!("Requested tile loading with non-existing style");
             return;
@@ -103,6 +104,7 @@ impl VectorTileProvider {
         let data_provider = self.loader.clone();
         let messenger = self.messenger.clone();
 
+        let view = view.clone();
         crate::async_runtime::spawn(async move {
             let cell = {
                 let mut store = tile_store.write();
@@ -119,7 +121,8 @@ impl VectorTileProvider {
 
             log::debug!("Tile {index:?} is loaded. Preparing.");
 
-            let tile_state = Self::prepare_tile(tile_state, index, style_id, processor).await;
+            let tile_state =
+                Self::prepare_tile(tile_state, index, style_id, processor, &view).await;
 
             log::debug!("tile {index:?} is prepared.");
 
@@ -189,11 +192,12 @@ impl VectorTileProvider {
         index: TileIndex,
         style_id: VtStyleId,
         processor: Arc<dyn VectorTileProcessor>,
+        view: &MapView,
     ) -> PreparedTileState {
         match mvt_tile_state {
             MvtTileState::Loaded(mvt_tile) => {
                 match processor
-                    .process_tile(mvt_tile.clone(), index, style_id)
+                    .process_tile(mvt_tile.clone(), index, style_id, &view.clone())
                     .await
                 {
                     Ok(render_bundle) => PreparedTileState::Loaded(Arc::new(render_bundle)),

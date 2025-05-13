@@ -238,8 +238,13 @@ where
                 for (id, feature) in self.features.iter() {
                     store.with_bundle(|bundle| {
                         if let Some(projected) = feature.geometry().project(&*projection) {
-                            self.symbol
-                                .render(feature, &projected, lod.min_resolution, bundle);
+                            self.symbol.render(
+                                feature,
+                                &projected,
+                                lod.min_resolution,
+                                bundle,
+                                view,
+                            );
                         }
 
                         id
@@ -253,8 +258,13 @@ where
                     };
                     store.with_bundle(|bundle| {
                         if let Some(projected) = feature.geometry().project(&*projection) {
-                            self.symbol
-                                .render(feature, &projected, lod.min_resolution, bundle);
+                            self.symbol.render(
+                                feature,
+                                &projected,
+                                lod.min_resolution,
+                                bundle,
+                                view,
+                            );
                         }
 
                         id

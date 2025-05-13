@@ -14,7 +14,7 @@ use crate::layer::vector_tile_layer::tile_provider::processor::{
 use crate::layer::vector_tile_layer::tile_provider::{VtProcessor, VtStyleId};
 use crate::render::render_bundle::RenderBundle;
 use crate::tile_schema::TileIndex;
-use crate::TileSchema;
+use crate::{MapView, TileSchema};
 
 /// Vector tile processor that uses a thread pool to run vector tile tessellation in parallel.
 pub struct ThreadVtProcessor {
@@ -55,6 +55,7 @@ impl VectorTileProcessor for ThreadVtProcessor {
         tile: Arc<MvtTile>,
         index: TileIndex,
         style_id: VtStyleId,
+        view: &MapView,
     ) -> Result<RenderBundle, TileProcessingError> {
         // todo: remove clone here
         let Some(style) = self.styles.read().get(&style_id).cloned() else {
@@ -66,13 +67,20 @@ impl VectorTileProcessor for ThreadVtProcessor {
 
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+        let view = view.clone();
         tokio::task::spawn_blocking(move || {
             log::debug!(
                 "Added worker: {}",
                 COUNTER.fetch_add(1, Ordering::Relaxed) + 1
             );
-            let result = match VtProcessor::prepare(&tile, &mut bundle, index, &style, &tile_schema)
-            {
+            let result = match VtProcessor::prepare(
+                &tile,
+                &mut bundle,
+                index,
+                &style,
+                &tile_schema,
+                &view,
+            ) {
                 Ok(()) => Ok(bundle),
                 Err(_) => Err(TileProcessingError::Rendering),
             };

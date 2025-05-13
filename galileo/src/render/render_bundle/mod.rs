@@ -13,6 +13,7 @@ use crate::decoded_image::DecodedImage;
 use crate::render::point_paint::PointPaint;
 use crate::render::render_bundle::world_set::WorldRenderSet;
 use crate::render::{ImagePaint, LinePaint, PolygonPaint};
+use crate::MapView;
 
 pub(crate) mod screen_set;
 pub(crate) mod world_set;
@@ -26,27 +27,43 @@ pub struct RenderBundle {
 
 impl RenderBundle {
     /// Adds an image to the bundle.
-    pub fn add_image(&mut self, image: DecodedImage, vertices: [Point2; 4], paint: ImagePaint) {
-        self.world_set.add_image(image, vertices, paint);
+    pub fn add_image(
+        &mut self,
+        image: DecodedImage,
+        vertices: [Point2; 4],
+        paint: ImagePaint,
+        view: &MapView,
+    ) {
+        self.world_set.add_image(image, vertices, paint, view);
     }
 
     /// Adds a point to the bundle.
-    pub fn add_point<N, P>(&mut self, point: &P, paint: &PointPaint, _min_resolution: f64)
-    where
+    pub fn add_point<N, P>(
+        &mut self,
+        point: &P,
+        paint: &PointPaint,
+        _min_resolution: f64,
+        view: &MapView,
+    ) where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
-        self.world_set.add_point(point, paint);
+        self.world_set.add_point(point, paint, view);
     }
 
     /// Adds a line to the bundle.
-    pub fn add_line<N, P, C>(&mut self, line: &C, paint: &LinePaint, min_resolution: f64)
-    where
+    pub fn add_line<N, P, C>(
+        &mut self,
+        line: &C,
+        paint: &LinePaint,
+        min_resolution: f64,
+        view: &MapView,
+    ) where
         N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         C: Contour<Point = P>,
     {
-        self.world_set.add_line(line, paint, min_resolution);
+        self.world_set.add_line(line, paint, min_resolution, view);
     }
 
     /// Adds a polygon to the bundle.
@@ -55,13 +72,15 @@ impl RenderBundle {
         polygon: &Poly,
         paint: &PolygonPaint,
         min_resolution: f64,
+        view: &MapView,
     ) where
         N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         Poly: Polygon,
         Poly::Contour: Contour<Point = P>,
     {
-        self.world_set.add_polygon(polygon, paint, min_resolution);
+        self.world_set
+            .add_polygon(polygon, paint, min_resolution, view);
     }
 
     /// Adds a label to the bundle.
@@ -72,24 +91,32 @@ impl RenderBundle {
         style: &TextStyle,
         offset: Vector2<f32>,
         attach_to_map: bool,
+        view: &MapView,
     ) where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
         if attach_to_map {
-            self.world_set.add_label(position, text, style, offset);
-        } else if let Some(set) = ScreenRenderSet::new_from_label(position, text, style, offset) {
+            self.world_set
+                .add_label(position, text, style, offset, view);
+        } else if let Some(set) =
+            ScreenRenderSet::new_from_label(position, text, style, offset, view)
+        {
             self.screen_sets.push(set);
         }
     }
 
     /// Adds a marker to the bundle.
-    pub fn add_marker<N, P>(&mut self, position: &P, style: &MarkerStyle)
-    where
+    pub fn add_marker<N, P>(
+        &mut self,
+        position: &P,
+        style: &MarkerStyle,
+        view: &crate::view::MapView,
+    ) where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
-        if let Some(set) = ScreenRenderSet::new_from_marker(position, style) {
+        if let Some(set) = ScreenRenderSet::new_from_marker(position, style, view) {
             self.screen_sets.push(set);
         }
     }

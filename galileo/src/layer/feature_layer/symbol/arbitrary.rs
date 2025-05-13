@@ -3,6 +3,7 @@ use galileo_types::geometry::Geom;
 
 use crate::render::render_bundle::RenderBundle;
 use crate::symbol::{CirclePointSymbol, SimpleContourSymbol, SimplePolygonSymbol, Symbol};
+use crate::view::MapView;
 use crate::Color;
 
 /// Renders any type of the geometry with the set inner symbols.
@@ -45,22 +46,27 @@ impl<F> Symbol<F> for ArbitraryGeometrySymbol {
         geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
+        view: &MapView,
     ) {
         match geometry {
-            Geom::Point(_) => self.point.render(feature, geometry, min_resolution, bundle),
-            Geom::MultiPoint(_) => self.point.render(feature, geometry, min_resolution, bundle),
+            Geom::Point(_) => self
+                .point
+                .render(feature, geometry, min_resolution, bundle, view),
+            Geom::MultiPoint(_) => self
+                .point
+                .render(feature, geometry, min_resolution, bundle, view),
             Geom::Contour(_) => self
                 .contour
-                .render(feature, geometry, min_resolution, bundle),
+                .render(feature, geometry, min_resolution, bundle, view),
             Geom::MultiContour(_) => self
                 .contour
-                .render(feature, geometry, min_resolution, bundle),
+                .render(feature, geometry, min_resolution, bundle, view),
             Geom::Polygon(_) => self
                 .polygon
-                .render(feature, geometry, min_resolution, bundle),
+                .render(feature, geometry, min_resolution, bundle, view),
             Geom::MultiPolygon(_) => self
                 .polygon
-                .render(feature, geometry, min_resolution, bundle),
+                .render(feature, geometry, min_resolution, bundle, view),
         }
     }
 }

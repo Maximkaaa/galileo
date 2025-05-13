@@ -91,7 +91,7 @@ impl Layer for VectorTileLayer {
     fn prepare(&self, view: &MapView) {
         if let Some(iter) = self.tile_schema.iter_tiles(view) {
             for index in iter {
-                self.tile_provider.load_tile(index, self.style_id);
+                self.tile_provider.load_tile(index, self.style_id, view);
             }
         }
     }
@@ -346,7 +346,7 @@ impl VectorTileLayer {
             None => style.background,
         };
 
-        bundle.add_polygon(&bounds, &PolygonPaint { color }, view.resolution());
+        bundle.add_polygon(&bounds, &PolygonPaint { color }, view.resolution(), view);
 
         Some(canvas.pack_bundle(&bundle))
     }

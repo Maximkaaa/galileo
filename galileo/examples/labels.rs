@@ -346,6 +346,7 @@ impl Symbol<LabeledPoint> for LabeledSymbol {
         geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
+        view: &MapView,
     ) {
         let Geom::Point(point) = geometry else {
             return;
@@ -355,6 +356,7 @@ impl Symbol<LabeledPoint> for LabeledSymbol {
             point,
             &PointPaint::circle(Color::BLUE, 10.0),
             min_resolution,
+            view,
         );
         bundle.add_label(
             point,
@@ -362,6 +364,7 @@ impl Symbol<LabeledPoint> for LabeledSymbol {
             &self.style,
             Vector2::new(0.0, 0.0),
             self.attach_to_map,
+            view,
         );
     }
 }

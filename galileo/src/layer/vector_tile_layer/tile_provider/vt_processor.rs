@@ -11,7 +11,7 @@ use crate::render::point_paint::{PointPaint, PointShape};
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{LinePaint, PolygonPaint};
 use crate::tile_schema::TileIndex;
-use crate::TileSchema;
+use crate::{MapView, TileSchema};
 
 /// Data processor that decodes vector tiles.
 pub struct VtProcessor {}
@@ -36,6 +36,7 @@ impl VtProcessor {
         index: TileIndex,
         style: &VectorTileStyle,
         tile_schema: &TileSchema,
+        view: &MapView,
     ) -> Result<(), GalileoError> {
         let bbox = tile_schema
             .tile_bbox(index)
@@ -82,10 +83,11 @@ impl VtProcessor {
                                         style,
                                         Vector2::default(),
                                         false,
+                                        view,
                                     );
                                 }
                                 _ => {
-                                    bundle.add_point(&position, &paint, lod_resolution);
+                                    bundle.add_point(&position, &paint, lod_resolution, view);
                                 }
                             }
                         }
@@ -105,6 +107,7 @@ impl VtProcessor {
                                     ),
                                     &paint,
                                     lod_resolution,
+                                    view,
                                 );
                             }
                         }
@@ -118,6 +121,7 @@ impl VtProcessor {
                                     }),
                                     &paint,
                                     lod_resolution,
+                                    view,
                                 );
                             }
                         }

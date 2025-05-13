@@ -9,6 +9,7 @@ use web_time::{Duration, Instant};
 use crate::decoded_image::DecodedImage;
 use crate::render::point_paint::MarkerStyle;
 use crate::render::text::{TextService, TextShaping, TextStyle};
+use crate::view::MapView;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ScreenRenderSet {
@@ -62,6 +63,7 @@ impl ScreenRenderSet {
         text: &str,
         style: &TextStyle,
         offset: Vector2<f32>,
+        _view: &MapView,
     ) -> Option<Self>
     where
         N: AsPrimitive<f32>,
@@ -121,7 +123,7 @@ impl ScreenRenderSet {
         }
     }
 
-    pub(crate) fn new_from_marker<N, P>(position: &P, style: &MarkerStyle) -> Option<Self>
+    pub(crate) fn new_from_marker<N, P>(position: &P, style: &MarkerStyle, _view: &MapView) -> Option<Self>
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,

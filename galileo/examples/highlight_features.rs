@@ -170,6 +170,7 @@ impl Symbol<PointMarker> for ColoredPointSymbol {
         geometry: &Geom<Point3>,
         _min_resolution: f64,
         bundle: &mut RenderBundle,
+        view: &MapView,
     ) {
         if let Geom::Point(point) = geometry {
             let image = if feature.highlighted {
@@ -184,6 +185,7 @@ impl Symbol<PointMarker> for ColoredPointSymbol {
                     anchor: Vector2::new(0.5, 1.0),
                     size: None,
                 },
+                view
             );
         }
     }

@@ -5,6 +5,7 @@ use galileo_types::MultiContour;
 use crate::layer::feature_layer::symbol::Symbol;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{LineCap, LinePaint};
+use crate::view::MapView;
 use crate::Color;
 
 /// Renders a contour as a line of fixed width.
@@ -30,6 +31,7 @@ impl<F> Symbol<F> for SimpleContourSymbol {
         geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
+        view: &MapView,
     ) {
         let paint = LinePaint {
             color: self.color,
@@ -40,11 +42,11 @@ impl<F> Symbol<F> for SimpleContourSymbol {
 
         match geometry {
             Geom::Contour(contour) => {
-                bundle.add_line(contour, &paint, min_resolution);
+                bundle.add_line(contour, &paint, min_resolution, view);
             }
             Geom::MultiContour(contours) => {
                 contours.contours().for_each(|contour| {
-                    bundle.add_line(contour, &paint, min_resolution);
+                    bundle.add_line(contour, &paint, min_resolution, view);
                 });
             }
             _ => {}

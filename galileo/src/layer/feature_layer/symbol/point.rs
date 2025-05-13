@@ -12,6 +12,7 @@ use crate::error::GalileoError;
 use crate::layer::feature_layer::symbol::Symbol;
 use crate::render::point_paint::{MarkerStyle, PointPaint};
 use crate::render::render_bundle::RenderBundle;
+use crate::view::MapView;
 use crate::Color;
 
 /// Renders a point as a circle of fixes size.
@@ -37,15 +38,16 @@ impl<F> Symbol<F> for CirclePointSymbol {
         geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
+        view: &MapView,
     ) {
         let paint = PointPaint::circle(self.color, self.size as f32);
         match geometry {
             Geom::Point(point) => {
-                bundle.add_point(point, &paint, min_resolution);
+                bundle.add_point(point, &paint, min_resolution, view);
             }
             Geom::MultiPoint(points) => {
                 points.iter_points().for_each(|p| {
-                    bundle.add_point(p, &paint, min_resolution);
+                    bundle.add_point(p, &paint, min_resolution, view);
                 });
             }
             _ => {}
@@ -85,18 +87,19 @@ impl<F> Symbol<F> for OutlinedCirclePointSymbol {
         geometry: &Geom<Point3>,
         min_resolution: f64,
         bundle: &mut RenderBundle,
+        view: &MapView,
     ) {
         let inner = PointPaint::circle(self.color, self.size as f32);
         let outer = PointPaint::circle(self.outline, (self.size + self.thickness) as f32);
         match geometry {
             Geom::Point(point) => {
-                bundle.add_point(point, &outer, min_resolution);
-                bundle.add_point(point, &inner, min_resolution);
+                bundle.add_point(point, &outer, min_resolution, view);
+                bundle.add_point(point, &inner, min_resolution, view);
             }
             Geom::MultiPoint(points) => {
                 points.iter_points().for_each(|p| {
-                    bundle.add_point(p, &outer, min_resolution);
-                    bundle.add_point(p, &inner, min_resolution);
+                    bundle.add_point(p, &outer, min_resolution, view);
+                    bundle.add_point(p, &inner, min_resolution, view);
                 });
             }
             _ => {}
@@ -158,8 +161,9 @@ impl<F> Symbol<F> for ImagePointSymbol {
         geometry: &Geom<Point3>,
         _min_resolution: f64,
         bundle: &mut RenderBundle,
+        view: &MapView,
     ) {
-        let add_marker = |point: &Point3, bundle: &mut RenderBundle| {
+        let add_marker = |point: &Point3, bundle: &mut RenderBundle, view: &MapView| {
             bundle.add_marker(
                 point,
                 &MarkerStyle::Image {
@@ -167,13 +171,14 @@ impl<F> Symbol<F> for ImagePointSymbol {
                     anchor: self.offset,
                     size: Some((self.image.size().cast::<f32>() * self.scale).cast()),
                 },
+                view,
             );
         };
 
         match geometry {
-            Geom::Point(point) => add_marker(point, bundle),
+            Geom::Point(point) => add_marker(point, bundle, view),
             Geom::MultiPoint(points) => points.iter_points().for_each(|point| {
-                add_marker(point, bundle);
+                add_marker(point, bundle, view);
             }),
             _ => {}
         }
