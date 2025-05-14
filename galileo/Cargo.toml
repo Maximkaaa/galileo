@@ -29,7 +29,7 @@ base64 = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 bytes = { workspace = true }
 cfg-if = { workspace = true }
-futures-intrusive = { workspace = true }
+futures-intrusive = { workspace = true}
 galileo-mvt = { workspace = true }
 galileo-types = { workspace = true }
 geojson = { workspace = true, optional = true }
@@ -97,7 +97,7 @@ serde_bytes = { workspace = true }
 bincode = { workspace = true, features = ["serde"] }
 serde-wasm-bindgen = { workspace = true }
 maybe-sync = { workspace = true, features = [] }
-getrandom = { workspace = true, features = ["js"] }
+getrandom = { workspace = true, features = ["wasm_js"] }
 tokio = { workspace = true, default-features = false, features = ["sync"] }
 web-sys = { workspace = true, features = [
     "Document",
