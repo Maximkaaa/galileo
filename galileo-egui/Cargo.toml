@@ -30,3 +30,5 @@ tokio = { workspace = true, optional = true }
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = { workspace = true }
 web-sys = { workspace = true }
+getrandom = { workspace = true, features = ["wasm_js"] }
+
