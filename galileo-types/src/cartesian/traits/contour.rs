@@ -26,7 +26,7 @@ pub trait CartesianClosedContour {
 
 impl<P, T> CartesianClosedContour for T
 where
-    P: CartesianPoint2d,
+    P: CartesianPoint2d + Copy,
     T: ClosedContour<Point = P>,
 {
     type Point = P;
@@ -75,7 +75,7 @@ pub enum Winding {
 }
 
 /// Methods for contours in 2d cartesian space. This trait is auto-implemented if applicable.
-pub trait CartesianContour<P: CartesianPoint2d>: Contour<Point = P> {
+pub trait CartesianContour<P: CartesianPoint2d + Copy>: Contour<Point = P> {
     /// Squared distance from the point to the closest segment of the contour.
     fn distance_to_point_sq<Point>(&self, point: &Point) -> Option<P::Num>
     where
@@ -88,7 +88,7 @@ pub trait CartesianContour<P: CartesianPoint2d>: Contour<Point = P> {
     }
 }
 
-impl<T: Contour<Point = P>, P: CartesianPoint2d> CartesianContour<P> for T {}
+impl<T: Contour<Point = P>, P: CartesianPoint2d + Copy> CartesianContour<P> for T {}
 
 #[cfg(test)]
 mod tests {
@@ -104,7 +104,7 @@ mod tests {
             crate::impls::Contour::open(vec![Point2::new(0.0, 0.0), Point2::new(1.0, 1.0)]);
         assert_eq!(contour.iter_points_closing().count(), 2);
         assert_eq!(
-            *contour.iter_points_closing().last().unwrap(),
+            contour.iter_points_closing().last().unwrap(),
             Point2::new(1.0, 1.0)
         );
 
@@ -113,7 +113,7 @@ mod tests {
         };
         assert_eq!(contour.iter_points_closing().count(), 3);
         assert_eq!(
-            *contour.iter_points_closing().last().unwrap(),
+            contour.iter_points_closing().last().unwrap(),
             Point2::new(0.0, 0.0)
         );
     }
@@ -128,7 +128,7 @@ mod tests {
         assert_eq!(contour.iter_segments().count(), 1);
         assert_eq!(
             contour.iter_segments().last().unwrap(),
-            Segment(&Point2::new(0.0, 0.0), &Point2::new(1.0, 1.0))
+            Segment(Point2::new(0.0, 0.0), Point2::new(1.0, 1.0))
         );
 
         let contour = ClosedContour {
@@ -137,7 +137,7 @@ mod tests {
         assert_eq!(contour.iter_segments().count(), 2);
         assert_eq!(
             contour.iter_segments().last().unwrap(),
-            Segment(&Point2::new(1.0, 1.0), &Point2::new(0.0, 0.0))
+            Segment(Point2::new(1.0, 1.0), Point2::new(0.0, 0.0))
         );
     }
 

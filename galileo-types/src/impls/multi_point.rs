@@ -6,11 +6,11 @@ use crate::geometry_type::{GeometryType, MultiPointGeometryType};
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]
 pub struct MultiPoint<P>(Vec<P>);
 
-impl<P> crate::multi_point::MultiPoint for MultiPoint<P> {
+impl<P: Copy> crate::multi_point::MultiPoint for MultiPoint<P> {
     type Point = P;
 
-    fn iter_points(&self) -> impl Iterator<Item = &'_ Self::Point> {
-        self.0.iter()
+    fn iter_points(&self) -> impl Iterator<Item = Self::Point> {
+        self.0.iter().copied()
     }
 }
 

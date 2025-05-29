@@ -125,7 +125,7 @@ where
 
 impl<P> CartesianGeometry2dSpecialization<P, PointGeometryType> for P
 where
-    P: CartesianPoint2d + GeometryType<Type = PointGeometryType, Space = CartesianSpace2d>,
+    P: CartesianPoint2d + GeometryType<Type = PointGeometryType, Space = CartesianSpace2d> + Copy,
 {
     fn is_point_inside_spec<Other: CartesianPoint2d<Num = P::Num>>(
         &self,

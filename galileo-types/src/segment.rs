@@ -4,9 +4,9 @@ use crate::cartesian::{CartesianPoint2d, Orientation};
 
 /// A strait line segment between two points.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub struct Segment<'a, Point>(pub &'a Point, pub &'a Point);
+pub struct Segment<Point>(pub Point, pub Point);
 
-impl<P: CartesianPoint2d> Segment<'_, P> {
+impl<P: CartesianPoint2d> Segment<P> {
     /// Shortest euclidean distance (squared) between a point and the segment:
     ///
     /// * if the normal from the point to the segment ends inside the segment, the returned value is the squared length
@@ -17,12 +17,12 @@ impl<P: CartesianPoint2d> Segment<'_, P> {
         &self,
         point: &Point,
     ) -> P::Num {
-        if self.0.equal(self.1) {
+        if self.0.equal(&self.1) {
             return self.0.distance_sq(point);
         }
 
-        let ds = self.1.sub(self.0);
-        let dp = point.sub(self.0);
+        let ds = self.1.sub(&self.0);
+        let dp = point.sub(&self.0);
         let ds_len = ds.magnitude_sq();
 
         let r = dp.magnitude_sq() / ds_len;
@@ -54,25 +54,25 @@ impl<P: CartesianPoint2d> Segment<'_, P> {
             q.x() <= x_max && q.x() >= x_min && q.y() <= y_max && q.y() >= y_min
         }
 
-        let o1 = Orientation::triplet(self.0, other.0, self.1);
-        let o2 = Orientation::triplet(self.0, other.1, self.1);
-        let o3 = Orientation::triplet(other.0, self.0, other.1);
-        let o4 = Orientation::triplet(other.0, self.1, other.1);
+        let o1 = Orientation::triplet(&self.0, &other.0, &self.1);
+        let o2 = Orientation::triplet(&self.0, &other.1, &self.1);
+        let o3 = Orientation::triplet(&other.0, &self.0, &other.1);
+        let o4 = Orientation::triplet(&other.0, &self.1, &other.1);
 
         if o1 != o2 && o3 != o4 {
             return true;
         }
 
-        if o1 == Orientation::Collinear && on_segment(self.0, other.0, self.1) {
+        if o1 == Orientation::Collinear && on_segment(&self.0, &other.0, &self.1) {
             return true;
         }
-        if o2 == Orientation::Collinear && on_segment(self.0, other.1, self.1) {
+        if o2 == Orientation::Collinear && on_segment(&self.0, &other.1, &self.1) {
             return true;
         }
-        if o3 == Orientation::Collinear && on_segment(other.0, self.0, other.1) {
+        if o3 == Orientation::Collinear && on_segment(&other.0, &self.0, &other.1) {
             return true;
         }
-        if o4 == Orientation::Collinear && on_segment(other.0, self.1, other.1) {
+        if o4 == Orientation::Collinear && on_segment(&other.0, &self.1, &other.1) {
             return true;
         }
 

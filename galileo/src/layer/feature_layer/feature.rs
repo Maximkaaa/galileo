@@ -24,7 +24,9 @@ macro_rules! impl_feature {
     };
 
     ($geom:ident, $generic:ident) => {
-        impl<$generic: ::galileo_types::geometry_type::GeometryType> Feature for $geom<$generic> {
+        impl<$generic: ::galileo_types::geometry_type::GeometryType + Copy> Feature
+            for $geom<$generic>
+        {
             type Geom = Self;
             fn geometry(&self) -> &Self::Geom {
                 self

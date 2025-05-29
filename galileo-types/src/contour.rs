@@ -41,10 +41,13 @@ pub trait Contour {
     /// Note, that the last point shall not be the same as the first one even for the closed contours. If you want to
     /// include the first point at the end of iterator for closed contours, use [`Contour::iter_points_closing`]
     /// instead.
-    fn iter_points(&self) -> impl Iterator<Item = &'_ Self::Point>;
+    fn iter_points(&self) -> impl Iterator<Item = Self::Point>;
 
     /// Same as [`Contour::iter_points`] but for closed contours repeats the first point again at the end of the iterator.
-    fn iter_points_closing(&self) -> impl Iterator<Item = &Self::Point> {
+    fn iter_points_closing(&self) -> impl Iterator<Item = Self::Point>
+    where
+        Self::Point: Copy,
+    {
         Box::new(ContourPointsIterator::new(
             self.iter_points(),
             self.is_closed(),
@@ -53,7 +56,10 @@ pub trait Contour {
 
     /// Iterates over segments of the contour. For closed contours this includes the segment between the last and the
     /// first points of the contour.
-    fn iter_segments(&self) -> impl Iterator<Item = Segment<'_, Self::Point>> {
+    fn iter_segments(&self) -> impl Iterator<Item = Segment<Self::Point>>
+    where
+        Self::Point: Copy,
+    {
         ContourSegmentIterator::new(ContourPointsIterator::new(
             self.iter_points(),
             self.is_closed(),
@@ -70,7 +76,7 @@ pub trait Contour {
     {
         Some(crate::impls::Contour::new(
             self.iter_points()
-                .map(|p| projection.project(p))
+                .map(|p| projection.project(&p))
                 .collect::<Option<Vec<Proj::OutPoint>>>()?,
             self.is_closed(),
         ))
@@ -87,7 +93,7 @@ pub trait ClosedContour {
     /// Note, that the last point shall not be the same as the first one even for the closed contours. If you want to
     /// include the first point at the end of iterator for closed contours, use [`Contour::iter_points_closing`]
     /// instead.
-    fn iter_points(&self) -> impl Iterator<Item = &'_ Self::Point>;
+    fn iter_points(&self) -> impl Iterator<Item = Self::Point>;
 }
 
 impl<P, T: ClosedContour<Point = P>> Contour for T {
@@ -97,25 +103,25 @@ impl<P, T: ClosedContour<Point = P>> Contour for T {
         true
     }
 
-    fn iter_points(&self) -> impl Iterator<Item = &'_ Self::Point> {
+    fn iter_points(&self) -> impl Iterator<Item = Self::Point> {
         self.iter_points()
     }
 }
 
 /// Iterator of contour points.
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub struct ContourPointsIterator<'a, P, Iter>
+pub struct ContourPointsIterator<P, Iter>
 where
-    Iter: Iterator<Item = &'a P>,
+    Iter: Iterator<Item = P>,
 {
     points_iter: Iter,
     is_closed: bool,
-    first_point: Option<&'a P>,
+    first_point: Option<P>,
 }
 
-impl<'a, P: 'a, Iter> ContourPointsIterator<'a, P, Iter>
+impl<P, Iter> ContourPointsIterator<P, Iter>
 where
-    Iter: Iterator<Item = &'a P>,
+    Iter: Iterator<Item = P>,
 {
     fn new(points_iter: Iter, is_closed: bool) -> Self {
         Self {
@@ -126,11 +132,12 @@ where
     }
 }
 
-impl<'a, P, Iter> Iterator for ContourPointsIterator<'a, P, Iter>
+impl<P, Iter> Iterator for ContourPointsIterator<P, Iter>
 where
-    Iter: Iterator<Item = &'a P>,
+    P: Copy,
+    Iter: Iterator<Item = P>,
 {
-    type Item = &'a P;
+    type Item = P;
 
     fn next(&mut self) -> Option<Self::Item> {
         let next = self.points_iter.next();
@@ -148,19 +155,19 @@ where
 
 /// Iterator of contour segments.
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub struct ContourSegmentIterator<'a, P: 'a, Iter>
+pub struct ContourSegmentIterator<P, Iter>
 where
-    Iter: Iterator<Item = &'a P>,
+    Iter: Iterator<Item = P>,
 {
-    points_iter: ContourPointsIterator<'a, P, Iter>,
-    prev_point: Option<&'a P>,
+    points_iter: ContourPointsIterator<P, Iter>,
+    prev_point: Option<P>,
 }
 
-impl<'a, P, Iter> ContourSegmentIterator<'a, P, Iter>
+impl<P, Iter> ContourSegmentIterator<P, Iter>
 where
-    Iter: Iterator<Item = &'a P>,
+    Iter: Iterator<Item = P>,
 {
-    fn new(points_iter: ContourPointsIterator<'a, P, Iter>) -> Self {
+    fn new(points_iter: ContourPointsIterator<P, Iter>) -> Self {
         Self {
             points_iter,
             prev_point: None,
@@ -168,11 +175,12 @@ where
     }
 }
 
-impl<'a, P, Iter> Iterator for ContourSegmentIterator<'a, P, Iter>
+impl<P, Iter> Iterator for ContourSegmentIterator<P, Iter>
 where
-    Iter: Iterator<Item = &'a P>,
+    P: Copy,
+    Iter: Iterator<Item = P>,
 {
-    type Item = Segment<'a, P>;
+    type Item = Segment<P>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let next_point = self.points_iter.next()?;
@@ -197,7 +205,7 @@ where
     {
         let points = self
             .iter_points()
-            .map(|p| projection.project(p))
+            .map(|p| projection.project(&p))
             .collect::<Option<Vec<Proj::OutPoint>>>()?;
         Some(Geom::Contour(crate::impls::Contour::new(
             points,
@@ -208,7 +216,7 @@ where
 
 impl<P, C> CartesianGeometry2dSpecialization<P, ContourGeometryType> for C
 where
-    P: CartesianPoint2d,
+    P: CartesianPoint2d + Copy,
     C: Contour<Point = P>
         + GeometryType<Type = ContourGeometryType, Space = CartesianSpace2d>
         + Geometry<Point = P>,

@@ -36,7 +36,7 @@ impl<P> Polygon<P> {
     }
 }
 
-impl<P> crate::polygon::Polygon for Polygon<P> {
+impl<P: Copy> crate::polygon::Polygon for Polygon<P> {
     type Contour = ClosedContour<P>;
 
     fn outer_contour(&self) -> &Self::Contour {

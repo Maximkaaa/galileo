@@ -41,7 +41,7 @@ where
 
 impl<P, C> CartesianGeometry2dSpecialization<P, MultiContourGeometryType> for C
 where
-    P: CartesianPoint2d,
+    P: CartesianPoint2d + Copy,
     C: MultiContour
         + GeometryType<Type = MultiContourGeometryType, Space = CartesianSpace2d>
         + Geometry<Point = P>,
@@ -49,10 +49,10 @@ where
 {
     fn is_point_inside_spec<Other: CartesianPoint2d<Num = P::Num>>(
         &self,
-        _point: &Other,
-        _tolerance: P::Num,
+        point: &Other,
+        tolerance: P::Num,
     ) -> bool {
-        todo!()
+        self.contours().any(|c| c.is_point_inside(point, tolerance))
     }
 
     fn bounding_rectangle_spec(&self) -> Option<Rect<P::Num>> {

@@ -28,7 +28,7 @@ pub enum Geom<P> {
     MultiPolygon(MultiPolygon<P>),
 }
 
-impl<P: GeometryType> Geometry for Geom<P> {
+impl<P: GeometryType + Copy> Geometry for Geom<P> {
     type Point = P;
 
     fn project<Proj>(&self, projection: &Proj) -> Option<Geom<Proj::OutPoint>>
@@ -48,7 +48,7 @@ impl<P: GeometryType> Geometry for Geom<P> {
 
 impl<P> CartesianGeometry2d<P> for Geom<P>
 where
-    P: CartesianPoint2d + GeometryType<Type = PointGeometryType, Space = CartesianSpace2d>,
+    P: CartesianPoint2d + GeometryType<Type = PointGeometryType, Space = CartesianSpace2d> + Copy,
 {
     fn is_point_inside<Other: CartesianPoint2d<Num = P::Num>>(
         &self,
@@ -162,7 +162,7 @@ where
 }
 
 /// This trait is used to automatically implement the [`CartesianGeometry2d`] trait using [`GeometryType`] trait.
-pub trait CartesianGeometry2dSpecialization<P: CartesianPoint2d, GT>:
+pub trait CartesianGeometry2dSpecialization<P: CartesianPoint2d + Copy, GT>:
     GeometryType<Space = CartesianSpace2d> + Geometry<Point = P>
 {
     /// See [`CartesianGeometry2d::is_point_inside`].
@@ -177,7 +177,7 @@ pub trait CartesianGeometry2dSpecialization<P: CartesianPoint2d, GT>:
 
 impl<P, T> CartesianGeometry2d<P> for T
 where
-    P: CartesianPoint2d,
+    P: CartesianPoint2d + Copy,
     T: CartesianGeometry2dSpecialization<P, <Self as GeometryType>::Type>,
 {
     fn is_point_inside<Other: CartesianPoint2d<Num = P::Num>>(
