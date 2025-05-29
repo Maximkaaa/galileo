@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::geo::traits::point::{GeoPoint, NewGeoPoint};
-use crate::geo::traits::projection::Projection;
-use crate::geometry::{Geom, Geometry};
+use crate::geometry_type::{GeoSpace2d, GeometryType, PointGeometryType};
 
 /// 2d point on the surface of a celestial body.
 #[derive(Debug, Clone, Copy, Default, PartialEq, PartialOrd, Deserialize, Serialize)]
@@ -42,15 +41,9 @@ impl GeoPoint2d {
     }
 }
 
-impl Geometry for GeoPoint2d {
-    type Point = Self;
-
-    fn project<P: Projection<InPoint = Self::Point> + ?Sized>(
-        &self,
-        projection: &P,
-    ) -> Option<Geom<P::OutPoint>> {
-        Some(Geom::Point(projection.project(self)?))
-    }
+impl GeometryType for GeoPoint2d {
+    type Type = PointGeometryType;
+    type Space = GeoSpace2d;
 }
 
 /// Creates a new GeoPoint2d from latitude and longitude values (in degrees).
