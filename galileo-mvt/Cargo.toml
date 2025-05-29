@@ -25,5 +25,8 @@ serde = { workspace = true, features = ["derive"] }
 strfmt = { workspace = true }
 thiserror = { workspace = true }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { workspace = true, features = ["wasm_js"] }
+
 [build-dependencies]
 prost-build = { workspace = true }
