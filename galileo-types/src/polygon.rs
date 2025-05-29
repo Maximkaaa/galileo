@@ -26,9 +26,10 @@ pub trait Polygon {
     }
 
     /// Iterates over all segments of the polygon contour lines.
-    fn iter_segments(
-        &self,
-    ) -> impl Iterator<Item = Segment<'_, <Self::Contour as Contour>::Point>> {
+    fn iter_segments(&self) -> impl Iterator<Item = Segment<<Self::Contour as Contour>::Point>>
+    where
+        <Self::Contour as Contour>::Point: Copy,
+    {
         Box::new(self.iter_contours().flat_map(Self::Contour::iter_segments))
     }
 }
@@ -65,7 +66,7 @@ where
 
 impl<P, Poly> CartesianGeometry2dSpecialization<P, PolygonGeometryType> for Poly
 where
-    P: CartesianPoint2d,
+    P: CartesianPoint2d + Copy,
     Poly: Polygon
         + CartesianPolygon<Point = P>
         + GeometryType<Type = PolygonGeometryType, Space = CartesianSpace2d>

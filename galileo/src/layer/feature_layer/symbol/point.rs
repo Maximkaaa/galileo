@@ -45,7 +45,7 @@ impl<F> Symbol<F> for CirclePointSymbol {
             }
             Geom::MultiPoint(points) => {
                 points.iter_points().for_each(|p| {
-                    bundle.add_point(p, &paint, min_resolution);
+                    bundle.add_point(&p, &paint, min_resolution);
                 });
             }
             _ => {}
@@ -122,7 +122,7 @@ impl<F> Symbol<F> for ImagePointSymbol {
         match geometry {
             Geom::Point(point) => add_marker(point, bundle),
             Geom::MultiPoint(points) => points.iter_points().for_each(|point| {
-                add_marker(point, bundle);
+                add_marker(&point, bundle);
             }),
             _ => {}
         }

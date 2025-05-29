@@ -1,7 +1,7 @@
-use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
+use galileo_mvt::{MvtFeature, MvtGeometry, MvtPolygon, MvtTile};
 use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d, Point2, Point3, Rect, Vector2};
 use galileo_types::impls::{ClosedContour, Polygon};
-use galileo_types::Contour;
+use galileo_types::{Contour, MultiContour, Polygon as PolygonTrait};
 use num_traits::ToPrimitive;
 use regex::Regex;
 
@@ -92,13 +92,13 @@ impl VtProcessor {
                     }
                     MvtGeometry::LineString(contours) => {
                         if let Some(paint) = Self::get_line_symbol(style, &layer.name, feature) {
-                            for contour in contours {
+                            for contour in contours.contours() {
                                 bundle.add_line(
                                     &galileo_types::impls::Contour::new(
                                         contour
                                             .iter_points()
                                             .map(|p| {
-                                                Self::transform_point(p, bbox, tile_resolution)
+                                                Self::transform_point(&p, bbox, tile_resolution)
                                             })
                                             .collect(),
                                         false,
@@ -113,9 +113,7 @@ impl VtProcessor {
                         if let Some(paint) = Self::get_polygon_symbol(style, &layer.name, feature) {
                             for polygon in polygons {
                                 bundle.add_polygon(
-                                    &polygon.cast_points(|p| {
-                                        Self::transform_point(p, bbox, tile_resolution)
-                                    }),
+                                    &Self::transform_polygon(polygon, bbox, tile_resolution),
                                     &paint,
                                     lod_resolution,
                                 );
@@ -206,6 +204,28 @@ impl VtProcessor {
             .and_then(|rule| rule.symbol.polygon().copied())
             .or(style.default_symbol.polygon)
             .map(|symbol| symbol.into())
+    }
+
+    fn transform_polygon(
+        mvt_polygon: &MvtPolygon,
+        bbox: Rect,
+        tile_resolution: f64,
+    ) -> Polygon<Point3> {
+        let cast = |p| Self::transform_point(&p, bbox, tile_resolution);
+
+        Polygon {
+            outer_contour: ClosedContour::new(
+                mvt_polygon
+                    .outer_contour()
+                    .iter_points()
+                    .map(&cast)
+                    .collect(),
+            ),
+            inner_contours: mvt_polygon
+                .inner_contours()
+                .map(|c| ClosedContour::new(c.iter_points().map(&cast).collect()))
+                .collect(),
+        }
     }
 
     fn transform_point<Num: num_traits::Float + ToPrimitive>(

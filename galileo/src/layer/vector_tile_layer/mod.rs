@@ -281,10 +281,7 @@ impl VectorTileLayer {
                                     }
                                 }
                                 MvtGeometry::LineString(contours) => {
-                                    if contours
-                                        .iter()
-                                        .any(|c| c.is_point_inside(&tile_point, tolerance))
-                                    {
+                                    if contours.is_point_inside(&tile_point, tolerance) {
                                         features.push((layer.name.clone(), feature.clone()));
                                     }
                                 }

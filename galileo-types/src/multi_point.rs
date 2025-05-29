@@ -11,7 +11,7 @@ pub trait MultiPoint {
     type Point;
 
     /// Iterates over points.
-    fn iter_points(&self) -> impl Iterator<Item = &'_ Self::Point>;
+    fn iter_points(&self) -> impl Iterator<Item = Self::Point>;
 }
 
 impl<P, Space> GeometrySpecialization<MultiPointGeometryType, Space> for P
@@ -26,7 +26,7 @@ where
     {
         let points = self
             .iter_points()
-            .map(|p| projection.project(p))
+            .map(|p| projection.project(&p))
             .collect::<Option<Vec<Proj::OutPoint>>>()?;
         Some(Geom::MultiPoint(points.into()))
     }
@@ -35,7 +35,7 @@ where
 impl<P> CartesianGeometry2dSpecialization<P::Point, MultiPointGeometryType> for P
 where
     P: MultiPoint + GeometryType<Type = MultiPointGeometryType, Space = CartesianSpace2d>,
-    P::Point: CartesianPoint2d + CartesianGeometry2d<P::Point>,
+    P::Point: CartesianPoint2d + CartesianGeometry2d<P::Point> + Copy,
 {
     fn is_point_inside_spec<Other: CartesianPoint2d<Num = <P::Point as CartesianPoint2d>::Num>>(
         &self,

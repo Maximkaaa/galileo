@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use nalgebra::Scalar;
 use num_traits::{FromPrimitive, Num};
 use serde::{Deserialize, Serialize};
@@ -158,8 +156,8 @@ where
     /// Returns a minimum rectangle that contains all the points in the iterator.
     ///
     /// Returns `None` if the iterator is empty.
-    pub fn from_points<'a, P: CartesianPoint2d<Num = N> + 'a, T: Deref<Target = P> + 'a>(
-        points: impl IntoIterator<Item = T>,
+    pub fn from_points<'a, P: CartesianPoint2d<Num = N> + 'a>(
+        points: impl IntoIterator<Item = P>,
     ) -> Option<Self> {
         let mut iterator = points.into_iter();
         let first = iterator.next()?;

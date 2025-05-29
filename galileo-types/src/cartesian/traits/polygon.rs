@@ -17,7 +17,7 @@ pub trait CartesianPolygon {
 
 impl<P, C, T> CartesianPolygon for T
 where
-    P: CartesianPoint2d,
+    P: CartesianPoint2d + Copy,
     C: ClosedContour<Point = P>,
     T: Polygon<Contour = C>,
 {
@@ -41,7 +41,7 @@ where
                 };
                 let ray_p1 = Point2::new(x, y);
                 let ray_p2 = Point2::new(x_max, y);
-                let ray = Segment(&ray_p1, &ray_p2);
+                let ray = Segment(ray_p1, ray_p2);
 
                 segment.intersects(&ray)
             };

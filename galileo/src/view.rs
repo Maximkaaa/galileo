@@ -151,7 +151,7 @@ impl MapView {
             .map(|p| self.screen_to_map(p))
             .collect::<Option<Vec<Point2<f64>>>>()
         {
-            let bbox = Rect::from_points(points.iter())?;
+            let bbox = Rect::from_points(points)?;
             Some(bbox.limit(max_bbox))
         } else {
             Some(max_bbox)
