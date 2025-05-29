@@ -163,16 +163,11 @@ impl MapView {
         }
     }
 
-    fn map_to_screen_center_transform(&self) -> Option<OMatrix<f64, U4, U4>> {
+    fn map_center_to_screen_center_transform(&self) -> Option<OMatrix<f64, U4, U4>> {
         if self.size.is_zero() {
             return None;
         }
 
-        let position = self.projected_position?;
-        let x = (position.x() / self.resolution).round() * self.resolution;
-        let y = (position.y() / self.resolution).round() * self.resolution;
-        let z = (position.z() / self.resolution).round() * self.resolution;
-        let translate = Translation3::new(-x, -y, -z).to_homogeneous();
         let rotation_x =
             Rotation3::new(nalgebra::Vector3::new(-self.rotation_x, 0.0, 0.0)).to_homogeneous();
         let rotation_z =
@@ -187,7 +182,19 @@ impl MapView {
 
         let translate_z = Translation3::new(0.0, 0.0, -self.size.height() / 2.0).to_homogeneous();
         let perspective = self.perspective();
-        Some(perspective * translate_z * scale * rotation_x * rotation_z * translate)
+        Some(perspective * translate_z * scale * rotation_x * rotation_z)
+    }
+
+    fn map_to_screen_center_transform(&self) -> Option<OMatrix<f64, U4, U4>> {
+        Some(
+            self.map_center_to_screen_center_transform()? * {
+                let position = self.projected_position?;
+                let x = (position.x() / self.resolution).round() * self.resolution;
+                let y = (position.y() / self.resolution).round() * self.resolution;
+                let z = (position.z() / self.resolution).round() * self.resolution;
+                Translation3::new(-x, -y, -z).to_homogeneous()
+            },
+        )
     }
 
     fn perspective(&self) -> Matrix4<f64> {
@@ -208,11 +215,26 @@ impl MapView {
         Some(scale * self.map_to_screen_center_transform()?)
     }
 
+    /// Returns transformation matrix that transforms map-center coordinates to scene coordinates.
+    ///
+    /// Scene coordinates are `[-1.0, 1.0]` coordinates of the render area with *Y* going from bottom to top.
+    pub fn map_center_to_scene_transform(&self) -> Option<OMatrix<f64, U4, U4>> {
+        let scale = Scale3::new(1.0, 1.0, 0.5).to_homogeneous();
+        Some(scale * self.map_center_to_screen_center_transform()?)
+    }
+
     /// Returns transformation matrix that transforms map coordinates to scene coordinates.
     ///
     /// Scene coordinates are `[-1.0, 1.0]` coordinates of the render area with *Y* going from bottom to top.
     pub fn map_to_scene_mtx(&self) -> Option<[[f32; 4]; 4]> {
         Some(self.map_to_scene_transform()?.cast::<f32>().data.0)
+    }
+
+    /// Returns transformation matrix that transforms map-center coordinates to scene coordinates.
+    ///
+    /// Scene coordinates are `[-1.0, 1.0]` coordinates of the render area with *Y* going from bottom to top.
+    pub fn map_center_to_scene_mtx(&self) -> Option<[[f32; 4]; 4]> {
+        Some(self.map_center_to_scene_transform()?.cast::<f32>().data.0)
     }
 
     /// Rotation angle around *X* axis in radians (tilt).

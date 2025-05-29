@@ -254,6 +254,7 @@ impl RasterTileLayer {
                         continue;
                     };
 
+                    // FIXME: doesn't interact well with map_center_to_scene_mtx
                     bundle.add_image(
                         owned,
                         tile_bbox.into_quadrangle(),

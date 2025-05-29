@@ -55,7 +55,7 @@ impl VtProcessor {
             ]),
             vec![],
         );
-        bundle.world_set.clip_area(&bounds);
+        bundle.world_set.clip_area(&bounds, view);
 
         for layer in mvt_tile.layers.iter().rev() {
             for feature in &layer.features {
@@ -82,7 +82,6 @@ impl VtProcessor {
                                         text,
                                         style,
                                         Vector2::default(),
-                                        false,
                                         view,
                                     );
                                 }

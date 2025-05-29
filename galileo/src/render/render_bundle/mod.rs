@@ -45,7 +45,7 @@ impl RenderBundle {
         _min_resolution: f64,
         view: &MapView,
     ) where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
     {
         self.world_set.add_point(point, paint, view);
@@ -84,24 +84,32 @@ impl RenderBundle {
     }
 
     /// Adds a label to the bundle.
+    pub fn add_label_to_map<N, P>(
+        &mut self,
+        position: &P,
+        text: &str,
+        style: &TextStyle,
+        offset: Vector2<f32>,
+        view: &MapView,
+    ) where
+        N: AsPrimitive<f64>,
+        P: CartesianPoint3d<Num = N>,
+    {
+        self.world_set
+            .add_label(position, text, style, offset, view);
+    }
     pub fn add_label<N, P>(
         &mut self,
         position: &P,
         text: &str,
         style: &TextStyle,
         offset: Vector2<f32>,
-        attach_to_map: bool,
         view: &MapView,
     ) where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
     {
-        if attach_to_map {
-            self.world_set
-                .add_label(position, text, style, offset, view);
-        } else if let Some(set) =
-            ScreenRenderSet::new_from_label(position, text, style, offset, view)
-        {
+        if let Some(set) = ScreenRenderSet::new_from_label(position, text, style, offset, view) {
             self.screen_sets.push(set);
         }
     }
@@ -113,7 +121,7 @@ impl RenderBundle {
         style: &MarkerStyle,
         view: &crate::view::MapView,
     ) where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
     {
         if let Some(set) = ScreenRenderSet::new_from_marker(position, style, view) {

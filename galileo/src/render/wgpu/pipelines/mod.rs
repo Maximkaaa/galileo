@@ -29,6 +29,7 @@ mod screen_set_vertex;
 pub struct Pipelines {
     map_view_binding: BindGroup,
     map_view_buffer: Buffer,
+    map_view_binding_size: u64,
     texture_bind_group_layout: BindGroupLayout,
 
     image: ImagePipeline,
@@ -41,35 +42,79 @@ pub struct Pipelines {
 
 impl Pipelines {
     pub fn create(device: &Device, format: TextureFormat) -> Self {
+        let alignment = wgpu::Limits::default().min_uniform_buffer_offset_alignment as u64;
+        let view_uniform_size = size_of::<ViewUniform>() as wgpu::BufferAddress;
+        let padded_size = u64::div_ceil(view_uniform_size, alignment) * alignment;
+
         let map_view_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Map view buffer"),
-            size: size_of::<ViewUniform>() as wgpu::BufferAddress,
+            size: padded_size * 2, // Accommodate two ViewUniforms with alignment
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
         let map_view_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: Some(
+                                std::num::NonZeroU64::new(view_uniform_size)
+                                    .expect("ViewUniform size cannot be zero"),
+                            ),
+                        },
+                        count: None,
                     },
-                    count: None,
-                }],
-                label: None,
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: Some(
+                                std::num::NonZeroU64::new(view_uniform_size)
+                                    .expect("ViewUniform size cannot be zero"),
+                            ),
+                        },
+                        count: None,
+                    },
+                ],
+                label: Some("map_view_bind_group_layout"),
             });
 
         let map_view_binding = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &map_view_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: map_view_buffer.as_entire_binding(),
-            }],
-            label: Some("view_bind_group"),
+            entries: &[
+                wgpu::BindGroupEntry {
+                    // First uniform
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &map_view_buffer,
+                        offset: 0,
+                        size: Some(
+                            std::num::NonZeroU64::new(view_uniform_size)
+                                .expect("ViewUniform size cannot be zero"),
+                        ),
+                    }),
+                },
+                wgpu::BindGroupEntry {
+                    // Second uniform
+                    binding: 1,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &map_view_buffer,
+                        offset: padded_size * 1,
+                        size: Some(
+                            std::num::NonZeroU64::new(view_uniform_size)
+                                .expect("ViewUniform size cannot be zero"),
+                        ),
+                    }),
+                },
+            ],
+            label: Some("map_view_bind_group"),
         });
 
         let texture_bind_group_layout =
@@ -97,6 +142,7 @@ impl Pipelines {
 
         Self {
             map_view_binding,
+            map_view_binding_size: padded_size,
             map_view_buffer,
             texture_bind_group_layout: texture_bind_group_layout.clone(),
             image: ImagePipeline::create(
@@ -157,6 +203,10 @@ impl Pipelines {
 
     pub fn map_view_buffer(&self) -> &Buffer {
         &self.map_view_buffer
+    }
+
+    pub fn map_view_binding_size(&self) -> u64 {
+        self.map_view_binding_size
     }
 
     pub fn image_pipeline(&self) -> &ImagePipeline {

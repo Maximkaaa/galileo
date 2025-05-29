@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cfg_if::cfg_if;
-use galileo_types::cartesian::{Rect, Size};
+use galileo_types::cartesian::{Point3, Rect, Size};
 use lyon::tessellation::VertexBuffers;
 use nalgebra::{Point4, Rotation3, Vector3};
 use parking_lot::Mutex;
@@ -742,7 +742,21 @@ impl<'a> WgpuCanvas<'a> {
                     1.0 / renderer.size().height() as f32,
                 ],
                 resolution: map_view.resolution() as f32,
-                _padding: [0.0; 1],
+                _padding: [0.0],
+            }]),
+        );
+        renderer.queue.write_buffer(
+            renderer_targets.pipelines.map_view_buffer(),
+            renderer_targets.pipelines.map_view_binding_size(),
+            bytemuck::cast_slice(&[ViewUniform {
+                view_proj: map_view.map_center_to_scene_mtx()?,
+                view_rotation: rotation_mtx.cast::<f32>().data.0,
+                inv_screen_size: [
+                    1.0 / renderer.size().width() as f32,
+                    1.0 / renderer.size().height() as f32,
+                ],
+                resolution: map_view.resolution() as f32,
+                _padding: [0.0],
             }]),
         );
 
@@ -1042,10 +1056,14 @@ impl Canvas for WgpuCanvas<'_> {
                             opacity
                         }
                     };
-                    ScreenSetInstance {
-                        anchor: set.anchor_point,
-                        opacity,
-                    }
+                    let [ax, ay, az] = set.anchor_point;
+                    let [cx, cy, cz] = self
+                        .map_view
+                        .projected_center()
+                        .expect("Rendering requires a valid projection")
+                        .array();
+                    let anchor = [(ax - cx) as f32, (ay - cy) as f32, (az - cz) as f32];
+                    ScreenSetInstance { anchor, opacity }
                 })
                 .collect();
 
@@ -1089,7 +1107,7 @@ struct WgpuPackedBundle {
 struct WgpuScreenSet {
     state: RenderSetState,
     animation_duration: Duration,
-    anchor_point: [f32; 3],
+    anchor_point: [f64; 3],
     bbox: Rect<f32>,
     hide_on_overlay: bool,
     data: WgpuScreenSetData,
@@ -1287,7 +1305,7 @@ struct ViewUniform {
     view_rotation: [[f32; 4]; 4],
     inv_screen_size: [f32; 2],
     resolution: f32,
-    _padding: [f32; 1],
+    _padding: [f32; 1], // For alignment
 }
 
 impl PointInstance {

@@ -14,7 +14,7 @@ use crate::view::MapView;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ScreenRenderSet {
     pub(crate) animation_duration: Duration,
-    pub(crate) anchor_point: [f32; 3],
+    pub(crate) anchor_point: [f64; 3],
     pub(crate) bbox: Rect<f32>,
     pub(crate) hide_on_overlay: bool,
     pub(crate) data: ScreenSetData,
@@ -66,7 +66,7 @@ impl ScreenRenderSet {
         _view: &MapView,
     ) -> Option<Self>
     where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
     {
         match TextService::shape(text, style, offset) {
@@ -123,9 +123,13 @@ impl ScreenRenderSet {
         }
     }
 
-    pub(crate) fn new_from_marker<N, P>(position: &P, style: &MarkerStyle, _view: &MapView) -> Option<Self>
+    pub(crate) fn new_from_marker<N, P>(
+        position: &P,
+        style: &MarkerStyle,
+        _view: &MapView,
+    ) -> Option<Self>
     where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
     {
         match style {

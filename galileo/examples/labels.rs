@@ -358,13 +358,22 @@ impl Symbol<LabeledPoint> for LabeledSymbol {
             min_resolution,
             view,
         );
-        bundle.add_label(
-            point,
-            feature.label,
-            &self.style,
-            Vector2::new(0.0, 0.0),
-            self.attach_to_map,
-            view,
-        );
+        if self.attach_to_map {
+            bundle.add_label_to_map(
+                point,
+                feature.label,
+                &self.style,
+                Vector2::new(0.0, 0.0),
+                view,
+            );
+        } else {
+            bundle.add_label(
+                point,
+                feature.label,
+                &self.style,
+                Vector2::new(0.0, 0.0),
+                view,
+            );
+        }
     }
 }

@@ -1,7 +1,7 @@
 use std::mem::size_of;
 use std::sync::Arc;
 
-use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d, Point2, Vector2};
+use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d, Point2, Point3, Vector2};
 use galileo_types::contour::Contour;
 use galileo_types::impls::ClosedContour;
 use galileo_types::Polygon;
@@ -50,6 +50,14 @@ pub(crate) struct ScreenRefVertex {
     color: [u8; 4],
 }
 
+pub struct ShapeArguments<'a> {
+    fill: Color,
+    scale: f32,
+    outline: Option<LinePaint>,
+    shape: &'a ClosedContour<Point2<f32>>,
+    offset: Vector2<f32>,
+}
+
 impl Default for WorldRenderSet {
     fn default() -> Self {
         Self::new()
@@ -72,7 +80,8 @@ impl WorldRenderSet {
         self.buffer_size
     }
 
-    pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly)
+    pub fn clip_area<N, P, Poly>(&mut self, polygon: &Poly, view: &MapView)
+    // Added view
     where
         N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
@@ -86,6 +95,7 @@ impl WorldRenderSet {
                 color: Color::BLACK,
             },
             &mut tessellation,
+            view, // Pass view
         );
 
         self.buffer_size += tessellation.vertices.len() * std::mem::size_of::<PolyVertex>()
@@ -106,34 +116,38 @@ impl WorldRenderSet {
         self.buffer_size += image.byte_size() + std::mem::size_of::<ImageVertex>() * 4;
 
         let index = self.add_image_to_store(Arc::new(image), view);
-        let vertices = [
+
+        // let [cx, cy, _] = view.projected_center().expect("Invalid MapView").array();
+        let [cx, cy] = [0.0, 0.0];
+
+        let relative_vertices = [
             ImageVertex {
-                position: [vertices[0].x() as f32, vertices[0].y() as f32],
+                position: [(vertices[0].x() - cx) as f32, (vertices[0].y() - cy) as f32],
                 opacity,
                 tex_coords: [0.0, 1.0],
                 offset: [0.0, 0.0],
             },
             ImageVertex {
-                position: [vertices[1].x() as f32, vertices[1].y() as f32],
+                position: [(vertices[1].x() - cx) as f32, (vertices[1].y() - cy) as f32],
                 opacity,
                 tex_coords: [0.0, 0.0],
                 offset: [0.0, 0.0],
             },
             ImageVertex {
-                position: [vertices[3].x() as f32, vertices[3].y() as f32],
+                position: [(vertices[3].x() - cx) as f32, (vertices[3].y() - cy) as f32],
                 opacity,
                 tex_coords: [1.0, 1.0],
                 offset: [0.0, 0.0],
             },
             ImageVertex {
-                position: [vertices[2].x() as f32, vertices[2].y() as f32],
+                position: [(vertices[2].x() - cx) as f32, (vertices[2].y() - cy) as f32],
                 opacity,
                 tex_coords: [1.0, 0.0],
                 offset: [0.0, 0.0],
             },
         ];
 
-        self.add_image_info(index, vertices, view);
+        self.add_image_info(index, relative_vertices, view);
     }
 
     fn add_image_info(
@@ -164,7 +178,7 @@ impl WorldRenderSet {
 
     pub fn add_point<N, P>(&mut self, point: &P, paint: &PointPaint, view: &MapView)
     where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
     {
         match &paint.shape {
@@ -176,17 +190,24 @@ impl WorldRenderSet {
                 radius,
                 outline,
             } => {
-                self.add_circle(point, *fill, *radius, *outline, paint.offset);
+                self.add_circle(point, *fill, *radius, *outline, paint.offset, view);
             }
             PointShape::Sector(parameters) => {
-                self.add_circle_sector(point, *parameters, paint.offset);
+                self.add_circle_sector(point, *parameters, paint.offset, view);
             }
             PointShape::Square {
                 fill,
                 size,
                 outline,
             } => {
-                self.add_shape(point, *fill, *size, *outline, &square_shape(), paint.offset);
+                let shape = ShapeArguments {
+                    fill: *fill,
+                    scale: *size,
+                    outline: *outline,
+                    shape: &square_shape(),
+                    offset: paint.offset,
+                };
+                self.add_shape(point, shape, view);
             }
             PointShape::FreeShape {
                 fill,
@@ -194,7 +215,14 @@ impl WorldRenderSet {
                 outline,
                 shape,
             } => {
-                self.add_shape(point, *fill, *scale, *outline, shape, paint.offset);
+                let shape = ShapeArguments {
+                    fill: *fill,
+                    scale: *scale,
+                    outline: *outline,
+                    shape,
+                    offset: paint.offset,
+                };
+                self.add_shape(point, shape, view);
             }
             PointShape::Label { text, style } => {
                 self.add_label(point, text, style, paint.offset, view)
@@ -235,15 +263,17 @@ impl WorldRenderSet {
             return;
         };
 
-        let [cx, cy] = view
-            .projected_center()
-            .map(|p| [p.x(), p.y()])
-            .unwrap_or([first_point.x().as_(), first_point.y().as_()]);
+        let view_center = view.projected_center().unwrap();
+        let cx = view_center.x();
+        let cy = view_center.y();
+        let cz = view_center.z(); // Assuming Z=0 if not otherwise set
+
         let at = point(
             (first_point.x().as_() - cx) / min_resolution,
             (first_point.y().as_() - cy) / min_resolution,
         );
-        let _ = path_builder.begin(at, &[first_point.z().as_() as f32]);
+        // Make Z coordinate relative to view center's Z
+        let _ = path_builder.begin(at, &[(first_point.z().as_() - cz) as f32]);
 
         for p in iterator {
             let _ = path_builder.line_to(
@@ -251,7 +281,8 @@ impl WorldRenderSet {
                     (p.x().as_() - cx) / min_resolution,
                     (p.y().as_() - cy) / min_resolution,
                 ),
-                &[p.z().as_() as f32],
+                // Make Z coordinate relative to view center's Z
+                &[(p.z().as_() - cz) as f32],
             );
         }
 
@@ -264,7 +295,6 @@ impl WorldRenderSet {
             color: paint.color.to_f32_array(),
             resolution: min_resolution as f32,
             path: &path,
-            centroid: [cx, cy],
         };
 
         let mut tesselator = StrokeTessellator::new();
@@ -322,7 +352,7 @@ impl WorldRenderSet {
         let start_index = lod.vertices.len();
         let start_index_count = lod.indices.len();
 
-        Self::tessellate_polygon(polygon, paint, lod);
+        Self::tessellate_polygon(polygon, paint, lod, view); // Pass view
 
         let end_index = self.poly_tessellation.vertices.len();
 
@@ -335,47 +365,49 @@ impl WorldRenderSet {
         polygon: &Poly,
         paint: &PolygonPaint,
         tessellation: &mut VertexBuffers<PolyVertex, u32>,
+        view: &MapView, // Added view parameter
     ) where
         N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
         Poly: Polygon,
         Poly::Contour: Contour<Point = P>,
     {
-        let ([cx, cy], ln) = polygon
-            .iter_contours()
-            .flat_map(|c| c.iter_points())
-            .fold(([0.0, 0.0], 0), |([x, y], i), p| {
-                ([x + p.x().as_(), y + p.y().as_()], i + 1)
-            });
-        let [cx, cy] = [cx / ln as f64, cy / ln as f64];
-        let mut path_builder = BuilderWithAttributes::new(1);
+        // Use the MapView's projected center as the reference for relative coordinates
+        // Get the first point to use as a fallback if view center is not available (though it should be)
+        let view_center = view.projected_center().unwrap();
+        let v_cx = view_center.x();
+        let v_cy = view_center.y();
+        let v_cz = view_center.z();
+
+        let mut path_builder = BuilderWithAttributes::new(1); // 1 attribute for Z
         for contour in polygon.iter_contours() {
             let mut iterator = contour.iter_points();
 
             if let Some(first_point) = iterator.next() {
                 let _ = path_builder.begin(
-                    point(first_point.x().as_() - cx, first_point.y().as_() - cy),
-                    &[first_point.z().as_() as _],
+                    point(first_point.x().as_() - v_cx, first_point.y().as_() - v_cy),
+                    &[(first_point.z().as_() - v_cz) as f32], // Z made relative
                 );
             } else {
-                return;
+                // If a contour is empty, skip it. If all contours are empty, path_builder will be empty.
+                continue;
             }
 
             for p in iterator {
                 let _ = path_builder.line_to(
-                    point(p.x().as_() - cx, p.y().as_() - cy),
-                    &[p.z().as_() as _],
+                    point(p.x().as_() - v_cx, p.y().as_() - v_cy),
+                    &[(p.z().as_() - v_cz) as f32], // Z made relative
                 );
             }
 
-            path_builder.end(true);
+            path_builder.end(true); // Polygons are closed contours
         }
 
         let path = path_builder.build();
 
         let vertex_constructor = PolygonVertexConstructor {
             color: paint.color.to_f32_array(),
-            centroid: [cx, cy],
+            // centroid field is removed
         };
         let mut tesselator = FillTessellator::new();
 
@@ -388,18 +420,28 @@ impl WorldRenderSet {
         }
     }
 
-    pub fn add_shape<N, P>(
-        &mut self,
-        position: &P,
-        fill: Color,
-        scale: f32,
-        outline: Option<LinePaint>,
-        shape: &ClosedContour<Point2<f32>>,
-        offset: Vector2<f32>,
-    ) where
-        N: AsPrimitive<f32>,
+    pub fn add_shape<N, P>(&mut self, position: &P, shape: ShapeArguments, view: &MapView)
+    where
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
     {
+        let ShapeArguments {
+            fill,
+            scale,
+            outline,
+            shape,
+            offset,
+        } = shape;
+        let view_center = view.projected_center().unwrap();
+        let rel_anchor_x = position.x().as_() - view_center.x();
+        let rel_anchor_y = position.y().as_() - view_center.y();
+        let rel_anchor_z = position.z().as_() - view_center.z();
+        let relative_anchor_pos_f32 = [
+            rel_anchor_x as f32,
+            rel_anchor_y as f32,
+            rel_anchor_z as f32,
+        ];
+
         let mut path_builder = BuilderWithAttributes::new(0);
         build_contour_path(&mut path_builder, shape, scale);
         let path = path_builder.build();
@@ -412,11 +454,7 @@ impl WorldRenderSet {
         if let Some(outline) = outline {
             let vertex_constructor = ScreenRefVertexConstructor {
                 color: outline.color.to_f32_array(),
-                position: [
-                    position.x().as_() as _,
-                    position.y().as_() as _,
-                    position.z().as_() as _,
-                ],
+                position: relative_anchor_pos_f32,
                 offset,
             };
 
@@ -433,11 +471,7 @@ impl WorldRenderSet {
         if !fill.is_transparent() {
             let vertex_constructor = ScreenRefVertexConstructor {
                 color: fill.to_f32_array(),
-                position: [
-                    position.x().as_() as _,
-                    position.y().as_() as _,
-                    position.z().as_() as _,
-                ],
+                position: relative_anchor_pos_f32,
                 offset,
             };
 
@@ -463,8 +497,9 @@ impl WorldRenderSet {
         radius: f32,
         outline: Option<LinePaint>,
         offset: Vector2<f32>,
+        view: &MapView,
     ) where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
     {
         self.add_circle_sector(
@@ -477,6 +512,7 @@ impl WorldRenderSet {
                 outline,
             },
             offset,
+            view,
         )
     }
 
@@ -485,10 +521,16 @@ impl WorldRenderSet {
         position: &P,
         parameters: SectorParameters,
         offset: Vector2<f32>,
+        view: &MapView,
     ) where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
     {
+        let view_center = view.projected_center().unwrap();
+        let rel_anchor_x = position.x().as_() - view_center.x();
+        let rel_anchor_y = position.y().as_() - view_center.y();
+        let rel_anchor_z = position.z().as_() - view_center.z();
+
         let SectorParameters {
             fill,
             radius,
@@ -502,11 +544,7 @@ impl WorldRenderSet {
             .min(std::f32::consts::PI * 2.0);
 
         let center = PolyVertex::new(
-            [
-                position.x().as_() as _,
-                position.y().as_() as _,
-                position.z().as_() as _,
-            ],
+            [rel_anchor_x, rel_anchor_y, rel_anchor_z],
             fill.center_color.to_f32_array(),
             [offset.dx(), offset.dy()],
             f32::MAX,
@@ -530,11 +568,7 @@ impl WorldRenderSet {
             }
 
             vertices.push(PolyVertex::new(
-                [
-                    position.x().as_() as _,
-                    position.y().as_() as _,
-                    position.z().as_() as _,
-                ],
+                [rel_anchor_x, rel_anchor_y, rel_anchor_z],
                 fill.side_color.to_f32_array(),
                 (*point + offset).coords(),
                 f32::MAX,
@@ -554,14 +588,14 @@ impl WorldRenderSet {
             if !is_full_circle {
                 contour.push(Point2::new(0.0, 0.0));
             }
-            self.add_shape(
-                position,
-                Color::TRANSPARENT,
-                radius,
+            let shape = ShapeArguments {
+                fill: Color::TRANSPARENT,
+                scale: radius,
                 outline,
-                &ClosedContour::new(contour),
+                shape: &ClosedContour::new(contour),
                 offset,
-            );
+            };
+            self.add_shape(position, shape, view);
         }
 
         self.buffer_size += (self.poly_tessellation.vertices.len() - start_vertex_count)
@@ -572,16 +606,25 @@ impl WorldRenderSet {
 
     fn add_dot<P, N>(&mut self, point: &P, color: Color, offset: Vector2<f32>, view: &MapView)
     where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
     {
-        let position = [
-            point.x().as_() + offset.dx(),
-            point.y().as_() + offset.dy(),
-            point.z().as_(),
-        ];
+        let view_center = view.projected_center().unwrap();
+        let vc_x = view_center.x();
+        let vc_y = view_center.y();
+        let vc_z = view_center.z();
+
+        // Assuming offset is in world units for Dot, applied before making relative to view center
+        let world_x_with_offset = point.x().as_() + offset.dx() as f64;
+        let world_y_with_offset = point.y().as_() + offset.dy() as f64;
+        let world_z = point.z().as_();
+
         self.points.push(PointInstance {
-            position,
+            position: [
+                (world_x_with_offset - vc_x) as f32,
+                (world_y_with_offset - vc_y) as f32,
+                (world_z - vc_z) as f32,
+            ],
             color: color.to_u8_array(),
         });
         self.buffer_size += size_of::<PointInstance>();
@@ -595,22 +638,23 @@ impl WorldRenderSet {
         offset: Vector2<f32>,
         view: &MapView,
     ) where
-        N: AsPrimitive<f32>,
+        N: AsPrimitive<f64>,
         P: CartesianPoint3d<Num = N>,
     {
+        let view_center = view.projected_center().unwrap();
+        let rel_anchor_x = position.x().as_() - view_center.x();
+        let rel_anchor_y = position.y().as_() - view_center.y();
+        let rel_anchor_z = position.z().as_() - view_center.z();
+
         match TextService::shape(text, style, offset) {
             Ok(TextShaping::Tessellation { glyphs, .. }) => {
                 for glyph in glyphs {
                     let vertices_start = self.poly_tessellation.vertices.len() as u32;
                     for vertex in glyph.vertices {
                         self.poly_tessellation.vertices.push(PolyVertex::new(
-                            [
-                                position.x().as_() as _,
-                                position.y().as_() as _,
-                                position.z().as_() as _,
-                            ],
+                            [rel_anchor_x, rel_anchor_y, rel_anchor_z],
                             vertex.color.to_f32_array(),
-                            vertex.position,
+                            vertex.position, // vertex.position is glyph's local offset + paint.offset
                             f32::MAX,
                         ));
                     }
@@ -673,7 +717,6 @@ fn build_contour_path(
     contour: &impl Contour<Point = Point2<f32>>,
     scale: f32,
 ) -> Option<()> {
-    // TODO: centroid this maybe
     let mut iterator = contour.iter_points();
 
     if let Some(first_point) = iterator.next() {
@@ -704,21 +747,29 @@ struct LineVertexConstructor<'a> {
     color: [f32; 4],
     resolution: f32,
     path: &'a Path,
-    centroid: [f64; 2],
 }
 
 impl StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'_> {
     fn new_vertex(&mut self, mut vertex: StrokeVertex) -> PolyVertex {
-        let [cx, cy] = self.centroid;
-        let position = vertex.position_on_path();
-        let offset = match vertex.side() {
+        // position_on_path() gives coordinates relative to the (0,0) of the path builder,
+        // which were (world_coord - view_center_coord) / resolution.
+        // So, multiplying by self.resolution gives (world_coord - view_center_coord).
+        let pos_x_relative_to_view_center = (vertex.position_on_path().x * self.resolution) as f64;
+        let pos_y_relative_to_view_center = (vertex.position_on_path().y * self.resolution) as f64;
+
+        // Z coordinate was also made relative: (world_z - view_center_z)
+        // It was passed as an attribute to Lyon, so interpolated_attributes()[0] contains this relative Z.
+        let pos_z_relative_to_view_center = vertex.interpolated_attributes()[0] as f64;
+
+        let screen_offset_val = match vertex.side() {
             Side::Negative => -self.offset,
             Side::Positive => self.offset,
         };
 
-        let normal = [
-            vertex.normal().x * (vertex.line_width() / 2.0 + offset),
-            vertex.normal().y * (vertex.line_width() / 2.0 + offset),
+        let normal_for_shader = [
+            // This is the screen-space style offset vector
+            vertex.normal().x * (vertex.line_width() / 2.0 + screen_offset_val),
+            vertex.normal().y * (vertex.line_width() / 2.0 + screen_offset_val),
         ];
 
         let norm_limit = if let VertexSource::Endpoint { id } = vertex.source() {
@@ -729,10 +780,13 @@ impl StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'_> {
 
             if prev_id != 0 {
                 let prev_id = EndpointId(prev_id);
-                let from = self.path[prev_id];
-                let to = self.path[id];
-                let dx = from.x - to.x;
-                let dy = from.y - to.y;
+                let from = self.path[prev_id]; // Lyon path point: (world-center)/res
+                let to = self.path[id]; // Lyon path point: (world-center)/res
+                let dx = from.x - to.x; // Diff in (world-center)/res units
+                let dy = from.y - to.y; // Diff in (world-center)/res units
+                                        // norm_limit should be in world units.
+                                        // (dx*dx + dy*dy).sqrt() is length in (world-center)/res units.
+                                        // Multiply by self.resolution to get world length.
                 (dx * dx + dy * dy).sqrt() * 2.0 * self.resolution
             } else {
                 f32::MAX
@@ -743,12 +797,12 @@ impl StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'_> {
 
         PolyVertex::new(
             [
-                ((position.x * self.resolution) as f64 + cx),
-                ((position.y * self.resolution) as f64 + cy),
-                vertex.interpolated_attributes()[0] as _,
+                pos_x_relative_to_view_center,
+                pos_y_relative_to_view_center,
+                pos_z_relative_to_view_center,
             ],
             self.color,
-            normal,
+            normal_for_shader,
             norm_limit,
         )
     }
@@ -756,21 +810,29 @@ impl StrokeVertexConstructor<PolyVertex> for LineVertexConstructor<'_> {
 
 struct PolygonVertexConstructor {
     color: [f32; 4],
-    centroid: [f64; 2],
 }
 
 impl FillVertexConstructor<PolyVertex> for PolygonVertexConstructor {
-    fn new_vertex(&mut self, vertex: FillVertex) -> PolyVertex {
-        let [cx, cy] = self.centroid;
+    fn new_vertex(&mut self, mut vertex: FillVertex) -> PolyVertex {
+        // vertex.position() is from Lyon, relative to (0,0) in the space Lyon processed.
+        // Path points given to Lyon were (world_coord - view_center_coord).
+        // So, vertex.position() is already (world_coord - view_center_coord).
+        // Z was also made relative.
+        let pos_x_relative_to_view_center = vertex.position().x as f64;
+        let pos_y_relative_to_view_center = vertex.position().y as f64;
+        // Assuming interpolated_attributes()[0] for Z if used, or 0.0 if Z is constant for polygons.
+        // The path builder for polygons was using first_point.z().as_() - cz.
+        let pos_z_relative_to_view_center = vertex.interpolated_attributes()[0] as f64;
+
         PolyVertex::new(
             [
-                (vertex.position().x as f64 + cx) as _,
-                (vertex.position().y as f64 + cy) as _,
-                0.0,
+                pos_x_relative_to_view_center,
+                pos_y_relative_to_view_center,
+                pos_z_relative_to_view_center,
             ],
             self.color,
-            Default::default(),
-            1.0,
+            Default::default(), // Polygons usually don't have screen-space normals like lines
+            1.0,                // norm_limit, typically not used for filled polygons this way
         )
     }
 }
@@ -803,14 +865,12 @@ impl FillVertexConstructor<PolyVertex> for ScreenRefVertexConstructor {
 }
 
 #[repr(C)]
-// #[derive(Copy, Clone, Debug, bytemuck::Zeroable, Serialize, Deserialize)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
 pub(crate) struct PolyVertex {
-    pub position: [f64; 4],
+    pub position: [f32; 3],
     pub color: [f32; 4],
     pub normal: [f32; 2],
     pub norm_limit: f32,
-    _padding: u32,
 }
 
 impl PolyVertex {
@@ -821,11 +881,10 @@ impl PolyVertex {
         norm_limit: f32,
     ) -> Self {
         Self {
-            position: [x, y, z, 0.],
+            position: [x as f32, y as f32, z as f32],
             color,
             normal,
             norm_limit,
-            _padding: 0,
         }
     }
 }
@@ -833,6 +892,7 @@ impl PolyVertex {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
 pub(crate) struct PointInstance {
+    // TODO: could be f64
     pub position: [f32; 3],
     pub color: [u8; 4],
 }
@@ -840,6 +900,7 @@ pub(crate) struct PointInstance {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Serialize, Deserialize)]
 pub(crate) struct ImageVertex {
+    // TODO: make it f64
     pub position: [f32; 2],
     pub opacity: f32,
     pub tex_coords: [f32; 2],

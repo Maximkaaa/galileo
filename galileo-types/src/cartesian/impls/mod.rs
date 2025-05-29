@@ -181,6 +181,22 @@ impl<Num> Point3<Num> {
     pub const fn new(x: Num, y: Num, z: Num) -> Self {
         Self { x, y, z }
     }
+
+    pub fn array(self) -> [Num; 3] {
+        [self.x, self.y, self.z]
+    }
+}
+
+impl Point3<f64> {
+    pub const fn origin() -> Self {
+        Self::new(0.0, 0.0, 0.0)
+    }
+}
+
+impl Point3<f32> {
+    pub const fn origin() -> Self {
+        Self::new(0.0, 0.0, 0.0)
+    }
 }
 
 /// Vector between two points in 3-dimensional cartesian coordinate space.
