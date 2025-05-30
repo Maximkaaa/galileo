@@ -124,6 +124,10 @@ impl MvtContours {
             }
         }
 
+        if let Some(contour) = curr_contour {
+            contours.push(contour);
+        }
+
         Ok(Self {
             commands,
             extent,
@@ -239,6 +243,7 @@ impl Contour for MvtContour {
 struct MvtContourIterator<'a> {
     command_iterator: CommandIterator<'a, Skip<Iter<'a, u32>>>,
     start_point: Point,
+    started: bool,
 }
 
 impl<'a> MvtContourIterator<'a> {
@@ -257,6 +262,7 @@ impl<'a> MvtContourIterator<'a> {
                 cursor: contour.start_point,
             },
             start_point: contour.start_point,
+            started: false,
         }
     }
 }
@@ -265,6 +271,11 @@ impl Iterator for MvtContourIterator<'_> {
     type Item = Point;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if !self.started {
+            self.started = true;
+            return Some(self.start_point);
+        }
+
         match self.command_iterator.next()?.ok()?.0 {
             MvtGeomCommand::LineTo(point) => Some(point),
             MvtGeomCommand::ClosePath => Some(self.start_point),
