@@ -463,6 +463,8 @@ enum MvtGeomCommand {
 mod tests {
     use std::io::Cursor;
 
+    use galileo_types::{Contour, MultiContour};
+
     use super::*;
 
     #[test]
@@ -478,6 +480,29 @@ mod tests {
     #[test]
     fn test_protobuf() {
         let vt = include_bytes!("../test-data/vt.mvt");
-        let _tile = MvtTile::decode(&mut Cursor::new(&vt), false).unwrap();
+        let tile = MvtTile::decode(&mut Cursor::new(&vt), false).unwrap();
+
+        let layer = tile.layers.iter().find(|l| l.name == "boundary").unwrap();
+
+        let feature205 = layer.features.iter().find(|f| f.id == Some(205)).unwrap();
+        let MvtGeometry::LineString(contours) = &feature205.geometry else {
+            panic!("invalid geometry type");
+        };
+        assert_eq!(contours.contours().count(), 1);
+        assert_eq!(contours.contours().next().unwrap().iter_points().count(), 2);
+
+        let feature681247437 = layer
+            .features
+            .iter()
+            .find(|f| f.id == Some(681247437))
+            .unwrap();
+        let MvtGeometry::LineString(contours) = &feature681247437.geometry else {
+            panic!("invalid geometry type");
+        };
+        assert_eq!(contours.contours().count(), 461);
+        let points = contours
+            .contours()
+            .fold(0, |acc, c| acc + c.iter_points().count());
+        assert_eq!(points, 6608);
     }
 }

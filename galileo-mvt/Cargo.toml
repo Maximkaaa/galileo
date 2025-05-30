@@ -21,7 +21,7 @@ geozero = { workspace = true, features = ["with-mvt"] }
 log = { workspace = true }
 nalgebra = { workspace = true, features = ["serde-serialize"] }
 prost = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive", "rc"] }
 strfmt = { workspace = true }
 thiserror = { workspace = true }
 
