@@ -463,7 +463,7 @@ enum MvtGeomCommand {
 mod tests {
     use std::io::Cursor;
 
-    use galileo_types::{Contour, MultiContour};
+    use galileo_types::{Contour, MultiContour, Polygon};
 
     use super::*;
 
@@ -504,5 +504,23 @@ mod tests {
             .contours()
             .fold(0, |acc, c| acc + c.iter_points().count());
         assert_eq!(points, 6608);
+
+        let layer = tile.layers.iter().find(|l| l.name == "water").unwrap();
+        let feature342914 = layer
+            .features
+            .iter()
+            .find(|f| f.id == Some(342914))
+            .unwrap();
+        let MvtGeometry::Polygon(polygons) = &feature342914.geometry else {
+            panic!("invalid geometry type");
+        };
+        assert_eq!(polygons.len(), 4);
+        let points = polygons
+            .iter()
+            .flat_map(|p| p.iter_contours())
+            .fold((0, 0), |acc, c| {
+                (acc.0 + 1, acc.1 + c.iter_points_closing().count())
+            });
+        assert_eq!(points, (37, 1092));
     }
 }
