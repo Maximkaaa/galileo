@@ -244,6 +244,7 @@ struct MvtContourIterator<'a> {
     command_iterator: CommandIterator<'a, Skip<Iter<'a, u32>>>,
     start_point: Point,
     started: bool,
+    finished: bool,
 }
 
 impl<'a> MvtContourIterator<'a> {
@@ -263,6 +264,7 @@ impl<'a> MvtContourIterator<'a> {
             },
             start_point: contour.start_point,
             started: false,
+            finished: false,
         }
     }
 }
@@ -271,6 +273,10 @@ impl Iterator for MvtContourIterator<'_> {
     type Item = Point;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.finished {
+            return None;
+        }
+
         if !self.started {
             self.started = true;
             return Some(self.start_point);
@@ -278,8 +284,10 @@ impl Iterator for MvtContourIterator<'_> {
 
         match self.command_iterator.next()?.ok()?.0 {
             MvtGeomCommand::LineTo(point) => Some(point),
-            MvtGeomCommand::ClosePath => Some(self.start_point),
-            _ => None,
+            _ => {
+                self.finished = true;
+                None
+            }
         }
     }
 }
