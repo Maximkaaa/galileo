@@ -62,7 +62,9 @@ pub(crate) fn run() {
     let mut map = create_map();
     map.layers_mut().push(feature_layer);
 
-    galileo_egui::init(map, [Box::new(handler) as Box<dyn UserEventHandler>])
+    galileo_egui::InitBuilder::new(map)
+        .with_handlers([Box::new(handler) as Box<dyn UserEventHandler>])
+        .init()
         .expect("failed to initialize");
 }
 

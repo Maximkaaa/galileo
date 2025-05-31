@@ -211,6 +211,10 @@ impl<'a> EguiMapState {
         }
     }
 
+    pub fn map(&'a self) -> &'a Map {
+        &self.map
+    }
+
     pub fn map_mut(&'a mut self) -> &'a mut Map {
         &mut self.map
     }

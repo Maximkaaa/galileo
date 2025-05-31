@@ -16,7 +16,9 @@ fn main() {
 }
 
 pub(crate) fn run() {
-    galileo_egui::init(create_map(), []).expect("failed to initialize");
+    galileo_egui::InitBuilder::new(create_map())
+        .init()
+        .expect("failed to initialize");
 }
 
 struct ColoredPoint {
