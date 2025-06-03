@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use galileo_mvt::MvtFeature;
+use galileo_mvt::{MvtFeature, MvtGeometry};
 use serde::{Deserialize, Serialize};
 
 use crate::render::point_paint::PointPaint;
@@ -19,33 +19,36 @@ pub struct VectorTileStyle {
     /// is found, and that rule is used for drawing. If no rule corresponds to the feature, default symbol is used.
     pub rules: Vec<StyleRule>,
 
-    /// Default symbol that is used for features, for which other rules don't apply.
-    pub default_symbol: VectorTileDefaultSymbol,
-
     /// Background color of tiles.
     pub background: Color,
-}
-
-/// Default symbol of the vector tile.
-///
-/// These symbols are applied to the features in the tile if no of the style rules are selected for
-/// this feature.
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
-pub struct VectorTileDefaultSymbol {
-    /// Symbol for point objects.
-    pub point: Option<VectorTilePointSymbol>,
-    /// Symbol for line objects.
-    pub line: Option<VectorTileLineSymbol>,
-    /// Symbol for polygon objects.
-    pub polygon: Option<VectorTilePolygonSymbol>,
-    /// Symbol for point objects that should have text labels.
-    pub label: Option<VectorTileLabelSymbol>,
 }
 
 impl VectorTileStyle {
     /// Get a rule for the given feature.
     pub fn get_style_rule(&self, layer_name: &str, feature: &MvtFeature) -> Option<&StyleRule> {
         self.rules.iter().find(|&rule| {
+            let correct_geometry_type = match feature.geometry {
+                MvtGeometry::Point(_)
+                    if matches!(
+                        rule.symbol,
+                        VectorTileSymbol::Point(_) | VectorTileSymbol::Label(_)
+                    ) =>
+                {
+                    true
+                }
+                MvtGeometry::LineString(_) if matches!(rule.symbol, VectorTileSymbol::Line(_)) => {
+                    true
+                }
+                MvtGeometry::Polygon(_) if matches!(rule.symbol, VectorTileSymbol::Polygon(_)) => {
+                    true
+                }
+                _ => false,
+            };
+
+            if !correct_geometry_type {
+                return false;
+            }
+
             let layer_name_check_passed = match &rule.layer_name {
                 Some(name) => name == layer_name,
                 None => true,
