@@ -1,7 +1,7 @@
 //! This examples shows how to render labels for vector tile points.
 
 use galileo::layer::vector_tile_layer::style::{
-    VectorTileDefaultSymbol, VectorTileLabelSymbol, VectorTileStyle,
+    StyleRule, VectorTileLabelSymbol, VectorTileStyle, VectorTileSymbol,
 };
 use galileo::layer::vector_tile_layer::{VectorTileLayer, VectorTileLayerBuilder};
 use galileo::render::text::text_service::TextService;
@@ -42,10 +42,11 @@ pub(crate) fn run() {
     .expect("failed to create layer");
 
     let labels_style = VectorTileStyle {
-        rules: vec![],
-        default_symbol: VectorTileDefaultSymbol {
-            label: Some(VectorTileLabelSymbol {
-                pattern: "{name}".into(),
+        rules: vec![StyleRule {
+            layer_name: None,
+            properties: Default::default(),
+            symbol: VectorTileSymbol::Label(VectorTileLabelSymbol {
+                pattern: String::from("{name}"),
                 text_style: TextStyle {
                     font_family: vec![
                         "Noto Sans".to_string(),
@@ -65,8 +66,7 @@ pub(crate) fn run() {
                     outline_color: Color::WHITE,
                 },
             }),
-            ..Default::default()
-        },
+        }],
         background: Default::default(),
     };
 

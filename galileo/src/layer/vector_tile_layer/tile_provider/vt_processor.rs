@@ -6,7 +6,7 @@ use num_traits::ToPrimitive;
 use regex::Regex;
 
 use crate::error::GalileoError;
-use crate::layer::vector_tile_layer::style::{VectorTileLabelSymbol, VectorTileStyle};
+use crate::layer::vector_tile_layer::style::{StyleRule, VectorTileLabelSymbol, VectorTileStyle};
 use crate::render::point_paint::{PointPaint, PointShape};
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{LinePaint, PolygonPaint};
@@ -58,10 +58,13 @@ impl VtProcessor {
 
         for layer in mvt_tile.layers.iter().rev() {
             for feature in &layer.features {
+                let Some(rule) = style.get_style_rule(&layer.name, feature) else {
+                    continue;
+                };
+
                 match &feature.geometry {
                     MvtGeometry::Point(points) => {
-                        let Some(paint) = Self::get_point_symbol(style, &layer.name, feature)
-                        else {
+                        let Some(paint) = Self::get_point_symbol(rule, feature) else {
                             continue;
                         };
 
@@ -91,7 +94,7 @@ impl VtProcessor {
                         }
                     }
                     MvtGeometry::LineString(contours) => {
-                        if let Some(paint) = Self::get_line_symbol(style, &layer.name, feature) {
+                        if let Some(paint) = Self::get_line_symbol(rule, feature) {
                             for contour in contours.contours() {
                                 bundle.add_line(
                                     &galileo_types::impls::Contour::new(
@@ -110,7 +113,7 @@ impl VtProcessor {
                         }
                     }
                     MvtGeometry::Polygon(polygons) => {
-                        if let Some(paint) = Self::get_polygon_symbol(style, &layer.name, feature) {
+                        if let Some(paint) = Self::get_polygon_symbol(rule, feature) {
                             for polygon in polygons {
                                 bundle.add_polygon(
                                     &Self::transform_polygon(polygon, bbox, tile_resolution),
@@ -127,36 +130,15 @@ impl VtProcessor {
         Ok(())
     }
 
-    fn get_point_symbol<'a>(
-        style: &'a VectorTileStyle,
-        layer_name: &str,
-        feature: &MvtFeature,
-    ) -> Option<PointPaint<'a>> {
-        style
-            .get_style_rule(layer_name, feature)
-            .and_then(|rule| {
-                rule.symbol
-                    .point()
-                    .copied()
-                    .map(|symbol| symbol.into())
-                    .or_else(|| {
-                        rule.symbol
-                            .label()
-                            .and_then(|symbol| Self::format_label(symbol, feature))
-                    })
-            })
+    fn get_point_symbol<'a>(rule: &'a StyleRule, feature: &MvtFeature) -> Option<PointPaint<'a>> {
+        rule.symbol
+            .point()
+            .copied()
+            .map(|symbol| symbol.into())
             .or_else(|| {
-                style
-                    .default_symbol
-                    .point
-                    .map(|symbol| symbol.into())
-                    .or_else(|| {
-                        style
-                            .default_symbol
-                            .label
-                            .as_ref()
-                            .and_then(|symbol| Self::format_label(symbol, feature))
-                    })
+                rule.symbol
+                    .label()
+                    .and_then(|symbol| Self::format_label(symbol, feature))
             })
     }
 
@@ -182,28 +164,12 @@ impl VtProcessor {
         ))
     }
 
-    fn get_line_symbol(
-        style: &VectorTileStyle,
-        layer_name: &str,
-        feature: &MvtFeature,
-    ) -> Option<LinePaint> {
-        style
-            .get_style_rule(layer_name, feature)
-            .and_then(|rule| rule.symbol.line().copied())
-            .or(style.default_symbol.line)
-            .map(|symbol| symbol.into())
+    fn get_line_symbol(rule: &StyleRule, _feature: &MvtFeature) -> Option<LinePaint> {
+        rule.symbol.line().map(|&s| s.into())
     }
 
-    fn get_polygon_symbol(
-        style: &VectorTileStyle,
-        layer_name: &str,
-        feature: &MvtFeature,
-    ) -> Option<PolygonPaint> {
-        style
-            .get_style_rule(layer_name, feature)
-            .and_then(|rule| rule.symbol.polygon().copied())
-            .or(style.default_symbol.polygon)
-            .map(|symbol| symbol.into())
+    fn get_polygon_symbol(rule: &StyleRule, _feature: &MvtFeature) -> Option<PolygonPaint> {
+        rule.symbol.polygon().map(|&s| s.into())
     }
 
     fn transform_polygon(

@@ -210,20 +210,30 @@
           }
         }
       }
+    },
+    {
+      "symbol": {
+        "line": {
+          "stroke_color": "#e0e0e0ff",
+          "width": 1.5
+        }
+      }
+    },
+    {
+      "symbol": {
+        "polygon": {
+          "fill_color": "#e0e0e0ff"
+        }
+      }
+    },
+    {
+      "symbol": {
+        "point": {
+          "size": 2.4,
+          "color": "#ff0000ff"
+        }
+      }
     }
   ],
-  "default_symbol": {
-    "line": {
-      "stroke_color": "#e0e0e0ff",
-      "width": 1.0
-    },
-    "polygon": {
-      "fill_color": "#e0e0e0ff"
-    },
-    "point": {
-      "size": 2.4,
-      "color": "#ff0000ff"
-    }
-  },
   "background": "#fff3e4"
 }
