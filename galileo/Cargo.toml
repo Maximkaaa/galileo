@@ -97,7 +97,7 @@ serde_bytes = { workspace = true }
 bincode = { workspace = true, features = ["serde"] }
 serde-wasm-bindgen = { workspace = true }
 maybe-sync = { workspace = true, features = [] }
-getrandom = { workspace = true, features = ["js"] }
+getrandom = { workspace = true, features = ["wasm_js"] }
 tokio = { workspace = true, default-features = false, features = ["sync"] }
 web-sys = { workspace = true, features = [
     "Document",

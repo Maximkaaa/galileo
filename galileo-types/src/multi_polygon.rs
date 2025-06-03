@@ -42,7 +42,7 @@ where
 
 impl<P, Poly> CartesianGeometry2dSpecialization<P, MultiPolygonGeometryType> for Poly
 where
-    P: CartesianPoint2d,
+    P: CartesianPoint2d + Copy,
     Poly: MultiPolygon
         + GeometryType<Type = MultiPolygonGeometryType, Space = CartesianSpace2d>
         + Geometry<Point = P>,

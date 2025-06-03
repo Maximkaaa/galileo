@@ -7,7 +7,7 @@ use crate::impls::contour::Contour;
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash, Deserialize, Serialize)]
 pub struct MultiContour<P>(Vec<Contour<P>>);
 
-impl<P> crate::multi_contour::MultiContour for MultiContour<P> {
+impl<P: Copy> crate::multi_contour::MultiContour for MultiContour<P> {
     type Contour = Contour<P>;
 
     fn contours(&self) -> impl Iterator<Item = &Self::Contour> {

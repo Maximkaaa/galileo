@@ -10,11 +10,11 @@ impl<T: CoordNum> Contour for LineString<T> {
         LineString::is_closed(self)
     }
 
-    fn iter_points(&self) -> impl Iterator<Item = &'_ Self::Point> {
+    fn iter_points(&self) -> impl Iterator<Item = Self::Point> {
         if self.is_closed() {
-            self.0[..(self.0.len().max(1) - 1)].iter()
+            self.0[..(self.0.len().max(1) - 1)].iter().copied()
         } else {
-            self.0.iter()
+            self.0.iter().copied()
         }
     }
 }

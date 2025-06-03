@@ -97,23 +97,23 @@ impl<P> From<ClosedContour<P>> for Contour<P> {
     }
 }
 
-impl<P> crate::contour::ClosedContour for ClosedContour<P> {
+impl<P: Copy> crate::contour::ClosedContour for ClosedContour<P> {
     type Point = P;
 
-    fn iter_points(&self) -> impl Iterator<Item = &'_ P> {
-        self.points.iter()
+    fn iter_points(&self) -> impl Iterator<Item = P> {
+        self.points.iter().copied()
     }
 }
 
-impl<P> crate::contour::Contour for Contour<P> {
+impl<P: Copy> crate::contour::Contour for Contour<P> {
     type Point = P;
 
     fn is_closed(&self) -> bool {
         self.is_closed
     }
 
-    fn iter_points(&self) -> impl Iterator<Item = &P> {
-        self.points.iter()
+    fn iter_points(&self) -> impl Iterator<Item = P> {
+        self.points.iter().copied()
     }
 }
 

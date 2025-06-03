@@ -45,7 +45,7 @@ jobs:
       steps:
         - uses: actions/checkout@v3
         - run: rustup target add wasm32-unknown-unknown
-        - run: cargo check --target wasm32-unknown-unknown --all-features
+        - run: RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo check --target wasm32-unknown-unknown --all-features
   spelling:
     name: Spell Check with Typos
     runs-on: ubuntu-latest

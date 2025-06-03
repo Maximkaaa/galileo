@@ -4,7 +4,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 
 use super::style::{
-    VectorTileDefaultSymbol, VectorTileLineSymbol, VectorTilePolygonSymbol, VectorTileStyle,
+    StyleRule, VectorTileLineSymbol, VectorTilePolygonSymbol, VectorTileStyle, VectorTileSymbol,
 };
 use super::tile_provider::loader::WebVtLoader;
 use super::tile_provider::processor::VectorTileProcessor;
@@ -417,18 +417,23 @@ impl VectorTileLayerBuilder {
 
     fn default_style() -> VectorTileStyle {
         VectorTileStyle {
-            rules: vec![],
-            default_symbol: VectorTileDefaultSymbol {
-                point: None,
-                line: Some(VectorTileLineSymbol {
-                    width: 1.0,
-                    stroke_color: Color::BLACK,
-                }),
-                polygon: Some(VectorTilePolygonSymbol {
-                    fill_color: Color::GRAY,
-                }),
-                label: None,
-            },
+            rules: vec![
+                StyleRule {
+                    layer_name: None,
+                    properties: Default::default(),
+                    symbol: VectorTileSymbol::Line(VectorTileLineSymbol {
+                        width: 1.0,
+                        stroke_color: Color::BLACK,
+                    }),
+                },
+                StyleRule {
+                    layer_name: None,
+                    properties: Default::default(),
+                    symbol: VectorTileSymbol::Polygon(VectorTilePolygonSymbol {
+                        fill_color: Color::GRAY,
+                    }),
+                },
+            ],
             background: Color::WHITE,
         }
     }

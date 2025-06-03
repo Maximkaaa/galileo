@@ -23,7 +23,7 @@ impl<P> MultiPolygon<P> {
     }
 }
 
-impl<P> crate::multi_polygon::MultiPolygon for MultiPolygon<P> {
+impl<P: Copy> crate::multi_polygon::MultiPolygon for MultiPolygon<P> {
     type Polygon = Polygon<P>;
 
     fn polygons(&self) -> impl Iterator<Item = &Self::Polygon> {

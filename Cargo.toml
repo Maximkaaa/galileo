@@ -67,11 +67,11 @@ galileo-egui = { path = "galileo-egui", version = "0.1.1" }
 galileo-mvt = { path = "galileo-mvt", version = "0.1.1" }
 galileo-types = { path = "galileo-types", version = "0.1.1" }
 geo = "0.27"
-geodesy = "0.12"
+geodesy = "0.13"
 geojson = "0.24"
 geozero = "0.13"
 geo-types = "0.7"
-getrandom = "0.2"
+getrandom = "0.3"
 image = { version = "0.24", default-features = false }
 insta = "1.41"
 js-sys = "0.3"
@@ -99,7 +99,7 @@ thiserror = "1"
 tokio = { version = "1.39", default-features = false }
 tokio-test = "0.4"
 # Fix the version of uuid to prevent build breaking
-uuid = "=1.12.1"
+uuid = "1.17"
 wasm-bindgen = "0.2"
 wasm-bindgen-derive = "0.2"
 wasm-bindgen-futures = "0.4"

@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::iter::Enumerate;
 
 use bytes::Buf;
-use galileo_types::cartesian::{CartesianClosedContour, CartesianPoint2d, Point2, Winding};
-use galileo_types::impls::{ClosedContour, Contour, Polygon};
+pub use contour::{MvtContours, MvtPolygon};
+use galileo_types::cartesian::{CartesianPoint2d, Point2};
 use geozero::mvt::tile::GeomType;
 use geozero::mvt::{Message as GeozeroMessage, Tile};
 use serde::{Deserialize, Serialize};
@@ -11,6 +12,7 @@ use strfmt::DisplayStr;
 
 use crate::error::GalileoMvtError;
 
+mod contour;
 pub mod error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,8 +73,8 @@ pub type Point = Point2<f32>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MvtGeometry {
     Point(Vec<Point>),
-    LineString(Vec<Contour<Point>>),
-    Polygon(Vec<Polygon<Point>>),
+    LineString(MvtContours),
+    Polygon(Vec<MvtPolygon>),
 }
 
 impl MvtTile {
@@ -298,14 +300,14 @@ impl MvtFeature {
                 return Err(GalileoMvtError::Generic("Unknown geometry type".into()))
             }
             GeomType::Point => MvtGeometry::Point(Self::decode_point(commands, extent)?),
-            GeomType::Linestring => MvtGeometry::LineString(Self::decode_line(commands, extent)?),
-            GeomType::Polygon => MvtGeometry::Polygon(Self::decode_polygon(commands, extent)?),
+            GeomType::Linestring => MvtGeometry::LineString(MvtContours::new(commands, extent)?),
+            GeomType::Polygon => MvtGeometry::Polygon(MvtPolygon::new(commands, extent)?),
         })
     }
 
     fn decode_point(commands: Vec<u32>, extent: u32) -> Result<Vec<Point>, GalileoMvtError> {
         let mut points = Vec::with_capacity(commands.len() / 2);
-        for command in Self::decode_commands(commands, extent) {
+        for command in Self::decode_commands(&commands, extent) {
             match command? {
                 MvtGeomCommand::MoveTo(p) => points.push(p),
                 _ => {
@@ -319,172 +321,26 @@ impl MvtFeature {
         Ok(points)
     }
 
-    fn decode_line(
-        commands: Vec<u32>,
-        extent: u32,
-    ) -> Result<Vec<Contour<Point>>, GalileoMvtError> {
-        let mut contours = Vec::with_capacity(64);
-        let mut current_contour: Option<Vec<Point>> = None;
-        let mut first_point = None;
-
-        for command in Self::decode_commands(commands, extent) {
-            match command? {
-                MvtGeomCommand::MoveTo(p) => {
-                    if let Some(curr) = current_contour.take() {
-                        if curr.len() < 2 {
-                            return Err(GalileoMvtError::Generic(
-                                "A line cannot have less then 1 point".into(),
-                            ));
-                        }
-
-                        contours.push(Contour::open(curr));
-                    }
-
-                    first_point = Some(p);
-                }
-                MvtGeomCommand::LineTo(p, count) => {
-                    if let Some(curr) = &mut current_contour {
-                        // todo: make this less hacky
-                        if curr[curr.len() - 1].taxicab_distance(&p) < 1.0 / 1024.0 {
-                            continue;
-                        }
-
-                        curr.push(p);
-                    } else if let Some(first) = first_point {
-                        let mut curr = Vec::with_capacity(count);
-                        curr.push(first);
-                        curr.push(p);
-                        current_contour = Some(curr);
-                    } else {
-                        return Err(GalileoMvtError::Generic(
-                            "First command in the line cannot be MoveTo".into(),
-                        ));
-                    }
-                }
-                _ => {
-                    return Err(GalileoMvtError::Generic(
-                        "Linestring geometry cannot have {:?} command".into(),
-                    ))
-                }
-            }
-        }
-
-        if let Some(contour) = current_contour {
-            if contour.len() < 2 {
-                return Err(GalileoMvtError::Generic(
-                    "A line cannot have less then 1 point".into(),
-                ));
-            }
-
-            contours.push(Contour::open(contour));
-        }
-
-        Ok(contours)
-    }
-
-    fn decode_polygon(
-        commands: Vec<u32>,
-        extent: u32,
-    ) -> Result<Vec<Polygon<Point>>, GalileoMvtError> {
-        let mut polygons = Vec::with_capacity(64);
-        let mut curr_polygon = None;
-        let mut curr_contour: Option<Vec<Point>> = None;
-        let mut first_point = None;
-
-        for command in Self::decode_commands(commands, extent) {
-            match command? {
-                MvtGeomCommand::MoveTo(p) => {
-                    if curr_contour.is_some() {
-                        return Err(GalileoMvtError::Generic(
-                            "Polygon cannot have unclosed contours".into(),
-                        ));
-                    }
-
-                    first_point = Some(p);
-                }
-                MvtGeomCommand::LineTo(p, count) => {
-                    if let Some(curr) = &mut curr_contour {
-                        curr.push(p)
-                    } else if let Some(first) = first_point {
-                        let mut curr = Vec::with_capacity(count);
-                        curr.push(first);
-                        curr.push(p);
-                        curr_contour = Some(curr);
-                    } else {
-                        return Err(GalileoMvtError::Generic(
-                            "Contour must start with move to command".into(),
-                        ));
-                    }
-                }
-                MvtGeomCommand::ClosePath => {
-                    let Some(curr) = curr_contour.take() else {
-                        return Err(GalileoMvtError::Generic(
-                            "No opened polygon, cannot close path".into(),
-                        ));
-                    };
-
-                    let curr = ClosedContour::new(curr);
-
-                    // Since tile vectors have y axis pointing down, clockwiseness is also reversed
-                    // here.
-                    if let Some(mut polygon) = curr_polygon.take() {
-                        match curr.winding() {
-                            Winding::CounterClockwise => {
-                                curr_polygon = Some(Polygon {
-                                    outer_contour: curr,
-                                    inner_contours: vec![],
-                                });
-                                polygons.push(polygon);
-                            }
-                            Winding::Clockwise => {
-                                polygon.inner_contours.push(curr);
-                                curr_polygon = Some(polygon);
-                            }
-                        }
-                    } else {
-                        if curr.winding() == Winding::Clockwise {
-                            return Err(GalileoMvtError::Generic(
-                                "Outer contour of polygon cannot have counterclockwise winding"
-                                    .into(),
-                            ));
-                        }
-
-                        curr_polygon = Some(Polygon {
-                            outer_contour: curr,
-                            inner_contours: vec![],
-                        });
-                    }
-                }
-            }
-        }
-
-        if let Some(polygon) = curr_polygon {
-            polygons.push(polygon);
-        }
-
-        Ok(polygons)
-    }
-
     fn decode_commands(
-        commands: Vec<u32>,
+        commands: &[u32],
         extent: u32,
-    ) -> impl Iterator<Item = Result<MvtGeomCommand, GalileoMvtError>> {
-        CommandIterator::new(commands.into_iter(), extent)
+    ) -> impl Iterator<Item = Result<MvtGeomCommand, GalileoMvtError>> + use<'_> {
+        CommandIterator::new(commands.iter(), extent).map(|res| res.map(|(command, _)| command))
     }
 }
 
-struct CommandIterator<T: Iterator<Item = u32>> {
-    inner: T,
+struct CommandIterator<'a, T: Iterator<Item = &'a u32>> {
+    inner: Enumerate<T>,
     extent: u32,
-    current_command: Option<(u32, u32)>,
+    current_command: Option<(u32, u32, usize)>,
     can_continue: bool,
     cursor: Point,
 }
 
-impl<T: Iterator<Item = u32>> CommandIterator<T> {
+impl<'a, T: Iterator<Item = &'a u32>> CommandIterator<'a, T> {
     fn new(inner: T, extent: u32) -> Self {
         Self {
-            inner,
+            inner: inner.enumerate(),
             extent,
             current_command: None,
             can_continue: true,
@@ -497,12 +353,9 @@ impl<T: Iterator<Item = u32>> CommandIterator<T> {
         Ok(MvtGeomCommand::MoveTo(self.cursor))
     }
 
-    fn read_line_to(&mut self, command_count: u32) -> Result<MvtGeomCommand, GalileoMvtError> {
+    fn read_line_to(&mut self) -> Result<MvtGeomCommand, GalileoMvtError> {
         self.cursor = self.read_point()?;
-        Ok(MvtGeomCommand::LineTo(
-            self.cursor,
-            command_count as usize + 1,
-        ))
+        Ok(MvtGeomCommand::LineTo(self.cursor))
     }
 
     fn read_point(&mut self) -> Result<Point, GalileoMvtError> {
@@ -521,7 +374,7 @@ impl<T: Iterator<Item = u32>> CommandIterator<T> {
         let mut result = [0; COUNT];
         for val in result.iter_mut() {
             *val = match self.inner.next() {
-                Some(v) => v,
+                Some((_, v)) => *v,
                 None => {
                     return Err(GalileoMvtError::Generic(
                         "Expected value to be present, but found end of data".into(),
@@ -547,22 +400,22 @@ fn sint_to_int(sint: u32) -> i32 {
     }
 }
 
-impl<T: Iterator<Item = u32>> Iterator for CommandIterator<T> {
-    type Item = Result<MvtGeomCommand, GalileoMvtError>;
+impl<'a, T: Iterator<Item = &'a u32>> Iterator for CommandIterator<'a, T> {
+    type Item = Result<(MvtGeomCommand, usize), GalileoMvtError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if !self.can_continue {
             return None;
         }
 
-        let (command_id, command_count) = match self.current_command {
-            Some((id, count)) => (id, count),
+        let (command_id, command_count, index) = match self.current_command {
+            Some((id, count, index)) => (id, count, index),
             None => {
-                let command_integer = self.inner.next()?;
+                let (index, command_integer) = self.inner.next()?;
                 let command_id = command_integer & 0x7;
                 let command_count = command_integer >> 3;
 
-                (command_id, command_count)
+                (command_id, command_count, index)
             }
         };
 
@@ -574,12 +427,12 @@ impl<T: Iterator<Item = u32>> Iterator for CommandIterator<T> {
                 )));
             }
             1 => None,
-            v => Some((command_id, v - 1)),
+            v => Some((command_id, v - 1, index)),
         };
 
         Some(match command_id {
-            1 => self.read_move_to(),
-            2 => self.read_line_to(command_count),
+            1 => self.read_move_to().map(|command| (command, index)),
+            2 => self.read_line_to().map(|command| (command, index)),
             7 => {
                 if command_count != 1 {
                     self.can_continue = false;
@@ -587,7 +440,7 @@ impl<T: Iterator<Item = u32>> Iterator for CommandIterator<T> {
                         "ClosePath command must have count 0, but has {command_count}"
                     )))
                 } else {
-                    Ok(MvtGeomCommand::ClosePath)
+                    Ok((MvtGeomCommand::ClosePath, index))
                 }
             }
             _ => {
@@ -602,13 +455,15 @@ impl<T: Iterator<Item = u32>> Iterator for CommandIterator<T> {
 
 enum MvtGeomCommand {
     MoveTo(Point),
-    LineTo(Point, usize),
+    LineTo(Point),
     ClosePath,
 }
 
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
+
+    use galileo_types::{Contour, MultiContour, Polygon};
 
     use super::*;
 
@@ -625,6 +480,47 @@ mod tests {
     #[test]
     fn test_protobuf() {
         let vt = include_bytes!("../test-data/vt.mvt");
-        let _tile = MvtTile::decode(&mut Cursor::new(&vt), false).unwrap();
+        let tile = MvtTile::decode(&mut Cursor::new(&vt), false).unwrap();
+
+        let layer = tile.layers.iter().find(|l| l.name == "boundary").unwrap();
+
+        let feature205 = layer.features.iter().find(|f| f.id == Some(205)).unwrap();
+        let MvtGeometry::LineString(contours) = &feature205.geometry else {
+            panic!("invalid geometry type");
+        };
+        assert_eq!(contours.contours().count(), 1);
+        assert_eq!(contours.contours().next().unwrap().iter_points().count(), 2);
+
+        let feature681247437 = layer
+            .features
+            .iter()
+            .find(|f| f.id == Some(681247437))
+            .unwrap();
+        let MvtGeometry::LineString(contours) = &feature681247437.geometry else {
+            panic!("invalid geometry type");
+        };
+        assert_eq!(contours.contours().count(), 461);
+        let points = contours
+            .contours()
+            .fold(0, |acc, c| acc + c.iter_points().count());
+        assert_eq!(points, 6608);
+
+        let layer = tile.layers.iter().find(|l| l.name == "water").unwrap();
+        let feature342914 = layer
+            .features
+            .iter()
+            .find(|f| f.id == Some(342914))
+            .unwrap();
+        let MvtGeometry::Polygon(polygons) = &feature342914.geometry else {
+            panic!("invalid geometry type");
+        };
+        assert_eq!(polygons.len(), 4);
+        let points = polygons
+            .iter()
+            .flat_map(|p| p.iter_contours())
+            .fold((0, 0), |acc, c| {
+                (acc.0 + 1, acc.1 + c.iter_points_closing().count())
+            });
+        assert_eq!(points, (37, 1092));
     }
 }

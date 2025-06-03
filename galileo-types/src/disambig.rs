@@ -84,7 +84,7 @@ impl<T: Contour, Space> Contour for Disambig<T, Space> {
         self.inner.is_closed()
     }
 
-    fn iter_points(&self) -> impl Iterator<Item = &'_ Self::Point> {
+    fn iter_points(&self) -> impl Iterator<Item = Self::Point> {
         self.inner.iter_points()
     }
 }
@@ -104,7 +104,7 @@ impl<T: Polygon, Space> Polygon for Disambig<T, Space> {
 impl<T: MultiPoint, Space> MultiPoint for Disambig<T, Space> {
     type Point = T::Point;
 
-    fn iter_points(&self) -> impl Iterator<Item = &'_ Self::Point> {
+    fn iter_points(&self) -> impl Iterator<Item = Self::Point> {
         self.inner.iter_points()
     }
 }

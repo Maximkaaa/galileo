@@ -1,12 +1,12 @@
-use galileo_mvt::{MvtFeature, MvtGeometry, MvtTile};
+use galileo_mvt::{MvtFeature, MvtGeometry, MvtPolygon, MvtTile};
 use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d, Point2, Point3, Rect, Vector2};
 use galileo_types::impls::{ClosedContour, Polygon};
-use galileo_types::Contour;
+use galileo_types::{Contour, MultiContour, Polygon as PolygonTrait};
 use num_traits::ToPrimitive;
 use regex::Regex;
 
 use crate::error::GalileoError;
-use crate::layer::vector_tile_layer::style::{VectorTileLabelSymbol, VectorTileStyle};
+use crate::layer::vector_tile_layer::style::{StyleRule, VectorTileLabelSymbol, VectorTileStyle};
 use crate::render::point_paint::{PointPaint, PointShape};
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{LinePaint, PolygonPaint};
@@ -58,10 +58,13 @@ impl VtProcessor {
 
         for layer in mvt_tile.layers.iter().rev() {
             for feature in &layer.features {
+                let Some(rule) = style.get_style_rule(&layer.name, feature) else {
+                    continue;
+                };
+
                 match &feature.geometry {
                     MvtGeometry::Point(points) => {
-                        let Some(paint) = Self::get_point_symbol(style, &layer.name, feature)
-                        else {
+                        let Some(paint) = Self::get_point_symbol(rule, feature) else {
                             continue;
                         };
 
@@ -91,14 +94,14 @@ impl VtProcessor {
                         }
                     }
                     MvtGeometry::LineString(contours) => {
-                        if let Some(paint) = Self::get_line_symbol(style, &layer.name, feature) {
-                            for contour in contours {
+                        if let Some(paint) = Self::get_line_symbol(rule, feature) {
+                            for contour in contours.contours() {
                                 bundle.add_line(
                                     &galileo_types::impls::Contour::new(
                                         contour
                                             .iter_points()
                                             .map(|p| {
-                                                Self::transform_point(p, bbox, tile_resolution)
+                                                Self::transform_point(&p, bbox, tile_resolution)
                                             })
                                             .collect(),
                                         false,
@@ -110,12 +113,10 @@ impl VtProcessor {
                         }
                     }
                     MvtGeometry::Polygon(polygons) => {
-                        if let Some(paint) = Self::get_polygon_symbol(style, &layer.name, feature) {
+                        if let Some(paint) = Self::get_polygon_symbol(rule, feature) {
                             for polygon in polygons {
                                 bundle.add_polygon(
-                                    &polygon.cast_points(|p| {
-                                        Self::transform_point(p, bbox, tile_resolution)
-                                    }),
+                                    &Self::transform_polygon(polygon, bbox, tile_resolution),
                                     &paint,
                                     lod_resolution,
                                 );
@@ -129,36 +130,15 @@ impl VtProcessor {
         Ok(())
     }
 
-    fn get_point_symbol<'a>(
-        style: &'a VectorTileStyle,
-        layer_name: &str,
-        feature: &MvtFeature,
-    ) -> Option<PointPaint<'a>> {
-        style
-            .get_style_rule(layer_name, feature)
-            .and_then(|rule| {
-                rule.symbol
-                    .point()
-                    .copied()
-                    .map(|symbol| symbol.into())
-                    .or_else(|| {
-                        rule.symbol
-                            .label()
-                            .and_then(|symbol| Self::format_label(symbol, feature))
-                    })
-            })
+    fn get_point_symbol<'a>(rule: &'a StyleRule, feature: &MvtFeature) -> Option<PointPaint<'a>> {
+        rule.symbol
+            .point()
+            .copied()
+            .map(|symbol| symbol.into())
             .or_else(|| {
-                style
-                    .default_symbol
-                    .point
-                    .map(|symbol| symbol.into())
-                    .or_else(|| {
-                        style
-                            .default_symbol
-                            .label
-                            .as_ref()
-                            .and_then(|symbol| Self::format_label(symbol, feature))
-                    })
+                rule.symbol
+                    .label()
+                    .and_then(|symbol| Self::format_label(symbol, feature))
             })
     }
 
@@ -184,28 +164,34 @@ impl VtProcessor {
         ))
     }
 
-    fn get_line_symbol(
-        style: &VectorTileStyle,
-        layer_name: &str,
-        feature: &MvtFeature,
-    ) -> Option<LinePaint> {
-        style
-            .get_style_rule(layer_name, feature)
-            .and_then(|rule| rule.symbol.line().copied())
-            .or(style.default_symbol.line)
-            .map(|symbol| symbol.into())
+    fn get_line_symbol(rule: &StyleRule, _feature: &MvtFeature) -> Option<LinePaint> {
+        rule.symbol.line().map(|&s| s.into())
     }
 
-    fn get_polygon_symbol(
-        style: &VectorTileStyle,
-        layer_name: &str,
-        feature: &MvtFeature,
-    ) -> Option<PolygonPaint> {
-        style
-            .get_style_rule(layer_name, feature)
-            .and_then(|rule| rule.symbol.polygon().copied())
-            .or(style.default_symbol.polygon)
-            .map(|symbol| symbol.into())
+    fn get_polygon_symbol(rule: &StyleRule, _feature: &MvtFeature) -> Option<PolygonPaint> {
+        rule.symbol.polygon().map(|&s| s.into())
+    }
+
+    fn transform_polygon(
+        mvt_polygon: &MvtPolygon,
+        bbox: Rect,
+        tile_resolution: f64,
+    ) -> Polygon<Point3> {
+        let cast = |p| Self::transform_point(&p, bbox, tile_resolution);
+
+        Polygon {
+            outer_contour: ClosedContour::new(
+                mvt_polygon
+                    .outer_contour()
+                    .iter_points()
+                    .map(&cast)
+                    .collect(),
+            ),
+            inner_contours: mvt_polygon
+                .inner_contours()
+                .map(|c| ClosedContour::new(c.iter_points().map(&cast).collect()))
+                .collect(),
+        }
     }
 
     fn transform_point<Num: num_traits::Float + ToPrimitive>(
