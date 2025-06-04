@@ -16,6 +16,8 @@ impl eframe::App for MapApp {
     }
 }
 
+type AppBuilder = Box<dyn FnOnce(EguiMapState) -> Box<dyn eframe::App>>;
+
 pub struct InitBuilder {
     map: Map,
     handlers: Vec<Box<dyn UserEventHandler>>,
@@ -23,7 +25,7 @@ pub struct InitBuilder {
     native_options: Option<eframe::NativeOptions>,
     #[cfg(target_arch = "wasm32")]
     web_options: Option<eframe::WebOptions>,
-    app_builder: Option<Box<dyn FnOnce(EguiMapState) -> Box<dyn eframe::App>>>,
+    app_builder: Option<AppBuilder>,
 }
 
 impl InitBuilder {
@@ -159,14 +161,8 @@ impl InitBuilder {
 fn app_creator<'app>(
     map: Map,
     handlers: Vec<Box<dyn UserEventHandler>>,
-    app_builder: Option<Box<dyn FnOnce(EguiMapState) -> Box<dyn eframe::App>>>,
-) -> Box<
-    dyn 'app
-        + FnOnce(
-            &eframe::CreationContext<'_>,
-        )
-            -> Result<Box<dyn 'app + eframe::App>, Box<dyn std::error::Error + Send + Sync>>,
-> {
+    app_builder: Option<AppBuilder>,
+) -> eframe::AppCreator<'app> {
     Box::new(move |cc: &eframe::CreationContext<'_>| {
         let ctx = cc.egui_ctx.clone();
         let render_state = cc
