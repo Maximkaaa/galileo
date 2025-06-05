@@ -151,7 +151,7 @@ impl EventProcessor {
                     self.last_click_time = now;
                 }
 
-                if self.drag_target.take().is_some() {
+                if self.drag_target.is_some() {
                     events.push(UserEvent::DragEnded(button, self.get_mouse_event()));
                 }
 
