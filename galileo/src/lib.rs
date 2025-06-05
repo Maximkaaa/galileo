@@ -32,7 +32,8 @@
 //!
 //! // Creates the window and starts the egui event loop.
 //! pub(crate) fn run() {
-//!     galileo_egui::init(create_map(), [])
+//!     galileo_egui::InitBuilder::new(create_map())
+//!         .init()
 //!         .expect("Couldn't create window");
 //! }
 //!
