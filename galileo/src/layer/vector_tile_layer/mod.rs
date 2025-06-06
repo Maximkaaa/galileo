@@ -249,12 +249,21 @@ impl VectorTileLayer {
         point: &impl CartesianPoint2d<Num = f64>,
         view: &MapView,
     ) -> Vec<(String, MvtFeature)> {
+        const PIXEL_TOLERANCE: f64 = 2.0;
+        let view_resolution = view.resolution();
+        let res_tolerance = view_resolution * PIXEL_TOLERANCE;
+
         let mut features = vec![];
         if let Some(iter) = self.tile_schema.iter_tiles(view) {
             for index in iter {
                 let Some(tile_bbox) = self.tile_schema.tile_bbox(index) else {
                     continue;
                 };
+
+                if !tile_bbox.shrink(-res_tolerance).contains(point) {
+                    continue;
+                }
+
                 let Some(lod_resolution) = self.tile_schema.lod_resolution(index.z) else {
                     continue;
                 };
@@ -266,7 +275,7 @@ impl VectorTileLayer {
                     ((tile_bbox.y_max() - point.y()) / tile_resolution) as f32,
                 );
 
-                let tolerance = (view.resolution() / tile_resolution) as f32 * 2.0;
+                let tolerance = ((view.resolution() / tile_resolution) * PIXEL_TOLERANCE) as f32;
 
                 if let Some(mvt_tile) = self.tile_provider.get_mvt_tile(index) {
                     for layer in &mvt_tile.layers {
