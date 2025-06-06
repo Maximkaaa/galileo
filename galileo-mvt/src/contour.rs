@@ -2,7 +2,7 @@ use std::iter::Skip;
 use std::slice::Iter;
 use std::sync::Arc;
 
-use galileo_types::cartesian::{CartesianClosedContour, Winding};
+use galileo_types::cartesian::{CartesianClosedContour, CartesianPoint2d, Winding};
 use galileo_types::geometry_type::{
     CartesianSpace2d, ContourGeometryType, GeometryType, MultiContourGeometryType,
     PolygonGeometryType,
@@ -14,11 +14,20 @@ use serde::{Deserialize, Serialize};
 use crate::error::GalileoMvtError;
 use crate::{CommandIterator, MvtGeomCommand, Point};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MvtPolygon {
     commands: Arc<Vec<u32>>,
     extent: u32,
     contours: Vec<ClosedMvtContour>,
+}
+
+impl std::fmt::Debug for MvtPolygon {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MvtPolygon")
+            .field("extent", &self.extent)
+            .field("contours", &self.contours)
+            .finish()
+    }
 }
 
 impl MvtPolygon {
@@ -76,11 +85,20 @@ impl Polygon for MvtPolygon {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MvtContours {
     commands: Arc<Vec<u32>>,
     extent: u32,
     contours: Vec<MvtContour>,
+}
+
+impl std::fmt::Debug for MvtContours {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MvtContours")
+            .field("extent", &self.extent)
+            .field("contours", &self.contours)
+            .finish()
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -219,13 +237,35 @@ impl GeometryType for MvtPolygon {
     type Space = CartesianSpace2d;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MvtContour {
     commands: Arc<Vec<u32>>,
     start_index: usize,
     start_point: super::Point,
     scale: u32,
     is_closed: bool,
+}
+
+impl std::fmt::Debug for MvtContour {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // todo: refactor this to use `f.debug_struct()` when `DebugStruct::field_with` is stabilized
+
+        write!(
+            f,
+            "MvtContour {{ start_index: {}, start_point: {:?}, scale: {}, is_closed: {}, points: [",
+            self.start_index, self.start_point, self.scale, self.is_closed
+        )?;
+        let mut is_first = true;
+        for point in self.iter_points() {
+            if !is_first {
+                write!(f, ", ")?;
+            }
+
+            write!(f, "[{}, {}]", point.x(), point.y())?;
+            is_first = false;
+        }
+        write!(f, "] }}")
+    }
 }
 
 impl Contour for MvtContour {
@@ -292,9 +332,17 @@ impl Iterator for MvtContourIterator<'_> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ClosedMvtContour {
     inner: MvtContour,
+}
+
+impl std::fmt::Debug for ClosedMvtContour {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClosedMvtContour")
+            .field("inner", &self.inner)
+            .finish()
+    }
 }
 
 impl ClosedContour for ClosedMvtContour {
