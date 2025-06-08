@@ -68,6 +68,20 @@ impl DisplayStr for MvtValue {
     }
 }
 
+impl MvtValue {
+    pub fn eq_str(&self, str_value: &str) -> bool {
+        match &self {
+            MvtValue::String(s) => s == str_value,
+            MvtValue::Float(v) => str_value.parse::<f32>() == Ok(*v),
+            MvtValue::Double(v) => str_value.parse::<f64>() == Ok(*v),
+            MvtValue::Int64(v) => str_value.parse::<i64>() == Ok(*v),
+            MvtValue::Uint64(v) => str_value.parse::<u64>() == Ok(*v),
+            MvtValue::Bool(v) => str_value.parse::<bool>() == Ok(*v),
+            MvtValue::Unknown => false,
+        }
+    }
+}
+
 pub type Point = Point2<f32>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

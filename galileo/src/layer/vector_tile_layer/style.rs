@@ -49,16 +49,16 @@ impl VectorTileStyle {
                 return false;
             }
 
-            let layer_name_check_passed = match &rule.layer_name {
-                Some(name) => name == layer_name,
-                None => true,
-            };
-            layer_name_check_passed
-                && (rule.properties.is_empty()
-                    || rule.properties.iter().all(|(key, value)| {
-                        feature.properties.get(key).map(|v| v.to_string())
-                            == Some(value.to_string())
-                    }))
+            if rule.layer_name.as_ref().is_some_and(|v| v != layer_name) {
+                return false;
+            }
+
+            let filter_check_passed = rule
+                .properties
+                .iter()
+                .all(|(key, value)| feature.properties.get(key).is_some_and(|v| v.eq_str(value)));
+
+            filter_check_passed
         })
     }
 }
