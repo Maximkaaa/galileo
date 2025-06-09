@@ -205,5 +205,7 @@ at your option.
 Feature requests, pull requests, bug reports, comments, questions and discussion are welcome. Please, follow the code
 of conduct when contributing.
 
+Before pusing your changes, use `just check` command to make sure your code will pass CI checks.
+
 Note, that since the library is still in early stages of development, any part may change at any moment. So before
 starting any major undertaking with it or within it, open a discussion to sync your ideas with others' ideas.
