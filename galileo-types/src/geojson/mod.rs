@@ -2,8 +2,7 @@ use geojson::{LineStringType, PolygonType, Position, Value};
 
 use crate::error::GalileoTypesError;
 use crate::geo::impls::GeoPoint2d;
-use crate::geo::NewGeoPoint;
-use crate::geo::Projection;
+use crate::geo::{NewGeoPoint, Projection};
 use crate::geometry::{Geom, Geometry};
 use crate::impls::{Contour, MultiContour, MultiPoint, MultiPolygon, Polygon};
 

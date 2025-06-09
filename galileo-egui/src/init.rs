@@ -84,6 +84,7 @@ impl InitBuilder {
     #[cfg(not(target_arch = "wasm32"))]
     fn init_not_wasm(self) -> eframe::Result {
         use std::time::Duration;
+
         use tokio::runtime::Runtime;
 
         env_logger::init();
