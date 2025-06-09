@@ -42,5 +42,5 @@ serde_json = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true }
 
 # Specify dependency features specific for wasm target
-getrandom = { workspace = true, feature = ["wasm_js"] }
+getrandom = { workspace = true, features = ["wasm_js"] }
 uuid = { workspace = true, features = ["js"] }
