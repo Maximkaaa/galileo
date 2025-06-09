@@ -27,8 +27,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - run: rustup toolchain install nightly
+      - run: rustup component add --toolchain nightly rustfmt
       - name: Rustfmt check
-        run: cargo fmt --all -- --check
+        run: cargo +nightly fmt --all -- --check
 
   clippy:
     name: Clippy
