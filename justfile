@@ -18,6 +18,7 @@ check:
   just fmt
   just check_clippy
   just check_wasm
+  just check_typos
   just test
 
 # Formats code according to the code style of the project
@@ -45,3 +46,6 @@ unit_tests:
 doc_tests:
   cargo test --doc --features geojson,fontconfig-dlopen
 
+# Checks the source code for typos
+check_typos:
+  typos

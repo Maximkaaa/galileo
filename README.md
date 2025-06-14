@@ -124,7 +124,10 @@ them all done at the same time. So here's our current plan and priorities:
 
 * [ ] Testing, documentation and examples
 
-\* Stabiliaing before v1.0 doesn't mean that API won't have any breaking changes at all, but rather that the API will be well thought through and tested and all the changes will be tracked, and if anything breaking is introduced, there will be clear instructions how to upgrade.
+\* Stabiliaing before v1.0 doesn't mean that API won't have any breaking
+changes at all, but rather that the API will be well thought through and tested
+and all the changes will be tracked, and if anything breaking is introduced,
+there will be clear instructions how to upgrade.
 
 # Running examples
 
@@ -205,7 +208,9 @@ at your option.
 Feature requests, pull requests, bug reports, comments, questions and discussion are welcome. Please, follow the code
 of conduct when contributing.
 
-Before pusing your changes, use `just check` command to make sure your code will pass CI checks.
+Before pushing your changes, use `just check` command to make sure your code
+will pass CI checks. You will need `wasm32` target installed, rust nightly
+toolchain and `typos-cli` (`cargo install typos-cli`) tool.
 
 Note, that since the library is still in early stages of development, any part may change at any moment. So before
 starting any major undertaking with it or within it, open a discussion to sync your ideas with others' ideas.
