@@ -33,7 +33,7 @@ build_all_web_examples:
   just build_web_example add_remove_features
 
 # Performs code formatting and all code checks that are done by CI
-[group('Cheks')]
+[group('Checks')]
 check:
   just fmt
   just check_clippy
@@ -42,38 +42,38 @@ check:
   just test
 
 # Formats code according to the code style of the project
-[group('Cheks')]
+[group('Checks')]
 fmt:
   cargo +nightly fmt --all
   
 # Runs clippy checks
-[group('Cheks')]
+[group('Checks')]
 check_clippy:
   cargo +stable clippy --all-targets --features geojson --features fontconfig-dlopen -- -D warnings
 
 # Checks if wasm compilation works as expected
-[group('Cheks')]
+[group('Checks')]
 check_wasm:
   RUSTFLAGS='--cfg getrandom_backend="wasm_js"' cargo check --target wasm32-unknown-unknown --all-features
 
 # Runs all tests
-[group('Cheks')]
+[group('Checks')]
 test:
   just unit_tests
   just doc_tests
 
 # Runs unit tests
-[group('Cheks')]
+[group('Checks')]
 unit_tests:
   cargo test --features _tests,geojson,fontconfig-dlopen
 
 # Runs doc tests
-[group('Cheks')]
+[group('Checks')]
 doc_tests:
   cargo test --doc --features geojson,fontconfig-dlopen
 
 # Checks the source code for typos
-[group('Cheks')]
+[group('Checks')]
 check_typos:
   typos
 
