@@ -219,7 +219,7 @@ impl Pipelines {
                 bytes,
             ),
             #[cfg(target_arch = "wasm32")]
-            DecodedImageType::JsImageBitmap(image) => {
+            DecodedImageType::JsImageBitmap { js_image, .. } => {
                 use wgpu::{CopyExternalImageSourceInfo, ExternalImageSource, Origin2d};
 
                 let texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -235,12 +235,12 @@ impl Pipelines {
                     view_formats: &[],
                 });
                 let texture_size = wgpu::Extent3d {
-                    width: image.width(),
-                    height: image.height(),
+                    width: js_image.width(),
+                    height: js_image.height(),
                     depth_or_array_layers: 1,
                 };
                 let image = CopyExternalImageSourceInfo {
-                    source: ExternalImageSource::ImageBitmap(image.clone()),
+                    source: ExternalImageSource::ImageBitmap(js_image.clone()),
                     origin: Origin2d::ZERO,
                     flip_y: false,
                 };

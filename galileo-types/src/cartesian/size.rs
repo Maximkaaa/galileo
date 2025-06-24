@@ -11,6 +11,8 @@ pub struct Size<Num = f64> {
     height: Num,
 }
 
+impl<T: Eq> Eq for Size<T> {}
+
 impl<Num: num_traits::Num + Copy> Size<Num> {
     /// Creates a new instance.
     pub fn new(width: Num, height: Num) -> Self {

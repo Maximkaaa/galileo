@@ -9,17 +9,37 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::error::GalileoError;
 
 /// An image that has been loaded into memory.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct DecodedImage(pub(crate) DecodedImageType);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) enum DecodedImageType {
     Bitmap {
         bytes: Vec<u8>,
         dimensions: Size<u32>,
     },
     #[cfg(target_arch = "wasm32")]
-    JsImageBitmap(web_sys::ImageBitmap),
+    JsImageBitmap {
+        js_image: web_sys::ImageBitmap,
+        hash: u64,
+    },
+}
+
+impl std::hash::Hash for DecodedImageType {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            DecodedImageType::Bitmap { bytes, dimensions } => {
+                state.write_u32(0);
+                bytes.hash(state);
+                dimensions.hash(state);
+            }
+            #[cfg(target_arch = "wasm32")]
+            DecodedImageType::JsImageBitmap { hash, .. } => {
+                state.write_u32(1);
+                state.write_u64(*hash);
+            }
+        }
+    }
 }
 
 impl DecodedImage {
@@ -83,7 +103,7 @@ impl DecodedImageType {
         match self {
             DecodedImageType::Bitmap { dimensions, .. } => dimensions.width(),
             #[cfg(target_arch = "wasm32")]
-            DecodedImageType::JsImageBitmap(image_bitmap) => image_bitmap.width(),
+            DecodedImageType::JsImageBitmap { js_image, .. } => js_image.width(),
         }
     }
 
@@ -91,7 +111,7 @@ impl DecodedImageType {
         match self {
             DecodedImageType::Bitmap { dimensions, .. } => dimensions.height(),
             #[cfg(target_arch = "wasm32")]
-            DecodedImageType::JsImageBitmap(image_bitmap) => image_bitmap.height(),
+            DecodedImageType::JsImageBitmap { js_image, .. } => js_image.height(),
         }
     }
 }
