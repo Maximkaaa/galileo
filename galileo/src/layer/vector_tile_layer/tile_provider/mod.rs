@@ -8,6 +8,7 @@ use loader::VectorTileLoader;
 use parking_lot::RwLock;
 use processor::VectorTileProcessor;
 
+use crate::layer::tiles::TileProvider;
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, PackedBundle};
@@ -51,6 +52,12 @@ impl Clone for VectorTileProvider {
             processor: self.processor.clone(),
             messenger: self.messenger.clone(),
         }
+    }
+}
+
+impl TileProvider<VtStyleId> for VectorTileProvider {
+    fn get_tile(&self, index: TileIndex, style_id: VtStyleId) -> Option<Arc<dyn PackedBundle>> {
+        VectorTileProvider::get_tile(self, index, style_id)
     }
 }
 

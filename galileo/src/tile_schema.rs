@@ -162,31 +162,6 @@ impl TileSchema {
         }))
     }
 
-    pub(crate) fn get_substitutes(
-        &self,
-        index: TileIndex,
-    ) -> Option<impl Iterator<Item = TileIndex>> {
-        let lod = self.lod_over(index.z)?;
-        // todo: we don't really need shrink here, but .iter_tiles_over_bbox return extra tiles
-        // when borders of tiles are exactly on bbox border.
-        self.iter_tiles_over_bbox(
-            lod.resolution(),
-            self.tile_bbox(index)?.shrink(lod.resolution()),
-        )
-    }
-
-    /// Returns lod one z-level over the given.
-    fn lod_over(&self, z: u32) -> Option<&Lod> {
-        let mut lod_iter = self.lods.iter();
-        for lod in lod_iter.by_ref() {
-            if lod.z_index() == z {
-                break;
-            }
-        }
-
-        lod_iter.next()
-    }
-
     fn x_adj(&self, x: f64) -> f64 {
         x - self.origin.x()
     }
@@ -431,14 +406,5 @@ mod tests {
         assert_eq!(schema.iter_tiles(&view).unwrap().count(), 1);
         let view = get_view(2.0, bbox);
         assert_eq!(schema.iter_tiles(&view).unwrap().count(), 16);
-    }
-
-    #[test]
-    fn lod_over() {
-        let schema = simple_schema();
-        assert_eq!(schema.lod_over(0), None);
-        assert_eq!(schema.lod_over(1).unwrap().z_index(), 0);
-        assert_eq!(schema.lod_over(2).unwrap().z_index(), 1);
-        assert_eq!(schema.lod_over(3), None);
     }
 }

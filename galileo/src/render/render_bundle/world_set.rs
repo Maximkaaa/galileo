@@ -92,12 +92,26 @@ impl WorldRenderSet {
         self.clip_area = Some(tessellation);
     }
 
-    pub fn add_image(&mut self, image: DecodedImage, vertices: [Point2; 4], paint: ImagePaint) {
+    pub fn add_image_owned(
+        &mut self,
+        image: DecodedImage,
+        vertices: [Point2; 4],
+        paint: ImagePaint,
+    ) {
+        self.add_image(Arc::new(image), vertices, paint)
+    }
+
+    pub fn add_image(
+        &mut self,
+        image: Arc<DecodedImage>,
+        vertices: [Point2; 4],
+        paint: ImagePaint,
+    ) {
         let opacity = paint.opacity as f32 / 255.0;
 
         self.buffer_size += image.byte_size() + std::mem::size_of::<ImageVertex>() * 4;
 
-        let index = self.add_image_to_store(Arc::new(image));
+        let index = self.add_image_to_store(image);
         let vertices = [
             ImageVertex {
                 position: [vertices[0].x() as f32, vertices[0].y() as f32],

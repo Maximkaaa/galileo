@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use bytes::Bytes;
 
-use super::{RasterTileLayer, RasterTileProvider, RestTileProvider};
+use super::{RasterTileLayer, RasterTileLoader, RestTileLoader};
 use crate::error::GalileoError;
 use crate::layer::attribution::Attribution;
 use crate::layer::data_provider::{FileCacheController, PersistentCacheController, UrlSource};
@@ -26,7 +26,7 @@ use crate::{Messenger, TileSchema};
 /// # Ok::<(), galileo::error::GalileoError>(())
 /// ```
 pub struct RasterTileLayerBuilder {
-    provider_type: ProviderType,
+    loader_type: LoaderType,
     tile_schema: Option<TileSchema>,
     messenger: Option<Box<dyn Messenger>>,
     cache: CacheType,
@@ -34,9 +34,9 @@ pub struct RasterTileLayerBuilder {
     attribution: Option<Attribution>,
 }
 
-enum ProviderType {
+enum LoaderType {
     Rest(Box<dyn UrlSource<TileIndex>>),
-    Custom(Box<dyn RasterTileProvider>),
+    Custom(Box<dyn RasterTileLoader>),
 }
 
 enum CacheType {
@@ -62,7 +62,7 @@ impl RasterTileLayerBuilder {
     /// ```
     pub fn new_rest(tile_source: impl UrlSource<TileIndex> + 'static) -> Self {
         Self {
-            provider_type: ProviderType::Rest(Box::new(tile_source)),
+            loader_type: LoaderType::Rest(Box::new(tile_source)),
             tile_schema: None,
             messenger: None,
             cache: CacheType::None,
@@ -85,7 +85,7 @@ impl RasterTileLayerBuilder {
     /// ```
     pub fn new_osm() -> Self {
         Self {
-            provider_type: ProviderType::Rest(Box::new(|index| {
+            loader_type: LoaderType::Rest(Box::new(|index| {
                 format!(
                     "https://tile.openstreetmap.org/{}/{}/{}.png",
                     index.z, index.x, index.y
@@ -102,12 +102,12 @@ impl RasterTileLayerBuilder {
         }
     }
 
-    /// Initializes a builder for a lyer with the given tile provider.
+    /// Initializes a builder for a lyer with the given tile loader.
     ///
     /// ```
-    /// use galileo::layer::raster_tile_layer::{RestTileProvider, RasterTileLayerBuilder};
+    /// use galileo::layer::raster_tile_layer::{RestTileLoader, RasterTileLayerBuilder};
     ///
-    /// let provider = RestTileProvider::new(
+    /// let loader = RestTileLoader::new(
     ///     |index| {
     ///         format!(
     ///             "https://tile.openstreetmap.org/{}/{}/{}.png",
@@ -117,13 +117,13 @@ impl RasterTileLayerBuilder {
     ///     None,
     ///     false,
     /// );
-    /// let layer = RasterTileLayerBuilder::new_with_provider(provider)
+    /// let layer = RasterTileLayerBuilder::new_with_loader(loader)
     ///     .build()?;
     /// # Ok::<(), galileo::error::GalileoError>(())
     /// ```
-    pub fn new_with_provider(provider: impl RasterTileProvider + 'static) -> Self {
+    pub fn new_with_loader(loader: impl RasterTileLoader + 'static) -> Self {
         Self {
-            provider_type: ProviderType::Custom(Box::new(provider)),
+            loader_type: LoaderType::Custom(Box::new(loader)),
             tile_schema: None,
             messenger: None,
             cache: CacheType::None,
@@ -325,7 +325,7 @@ impl RasterTileLayerBuilder {
     /// fails to initialize.
     pub fn build(self) -> Result<RasterTileLayer, GalileoError> {
         let Self {
-            provider_type,
+            loader_type: provider_type,
             tile_schema,
             messenger,
             cache,
@@ -347,13 +347,13 @@ impl RasterTileLayerBuilder {
             ));
         }
 
-        let provider: Box<dyn RasterTileProvider> = match provider_type {
-            ProviderType::Rest(url_source) => Box::new(RestTileProvider::new(
+        let provider: Box<dyn RasterTileLoader> = match provider_type {
+            LoaderType::Rest(url_source) => Box::new(RestTileLoader::new(
                 url_source,
                 cache_controller,
                 offline_mode,
             )),
-            ProviderType::Custom(raster_tile_provider) => {
+            LoaderType::Custom(raster_tile_provider) => {
                 if cache_controller.is_some() {
                     return Err(GalileoError::Configuration(
                         "custom tile provider cannot be used together with a cache controller"
@@ -402,7 +402,7 @@ mod tests {
 
     #[test]
     fn with_file_cache_fails_build_if_custom_provider() {
-        let provider = RestTileProvider::new(|_| unimplemented!(), None, false);
+        let provider = RestTileLoader::new(|_| unimplemented!(), None, false);
         let result = RasterTileLayerBuilder::new_with_provider(provider)
             .with_file_cache("target")
             .build();
@@ -423,7 +423,7 @@ mod tests {
 
     #[test]
     fn with_cache_controller_fails_build_if_custom_provider() {
-        let provider = RestTileProvider::new(|_| unimplemented!(), None, false);
+        let provider = RestTileLoader::new(|_| unimplemented!(), None, false);
         let cache = FileCacheController::new("target").unwrap();
         let result = RasterTileLayerBuilder::new_with_provider(provider)
             .with_cache_controller(cache)
@@ -435,7 +435,7 @@ mod tests {
 
     #[test]
     fn with_offline_mode_incompatible_with_custom_provider() {
-        let provider = RestTileProvider::new(|_| unimplemented!(), None, false);
+        let provider = RestTileLoader::new(|_| unimplemented!(), None, false);
         let result = RasterTileLayerBuilder::new_with_provider(provider)
             .with_file_cache("target")
             .with_offline_mode()

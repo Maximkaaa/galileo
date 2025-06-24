@@ -1,36 +1,31 @@
 //! Raster tile layer and its providers
 
 use std::any::Any;
-use std::collections::HashSet;
 use std::sync::Arc;
 
-use galileo_types::cartesian::Size;
-use parking_lot::Mutex;
-use quick_cache::sync::Cache;
-use web_time::{Duration, SystemTime};
+use provider::RasterTileProvider;
+use web_time::Duration;
 
+use super::tiles::TilesContainer;
 use super::Layer;
-use crate::decoded_image::DecodedImage;
 use crate::layer::attribution::Attribution;
 use crate::messenger::Messenger;
-use crate::render::render_bundle::RenderBundle;
-use crate::render::{Canvas, ImagePaint, PackedBundle, RenderOptions};
+use crate::render::{Canvas, RenderOptions};
 use crate::tile_schema::{TileIndex, TileSchema};
 use crate::view::MapView;
 
 mod provider;
-pub use provider::{RasterTileProvider, RestTileProvider};
+pub use provider::{RasterTileLoader, RestTileLoader};
 
 mod builder;
 pub use builder::RasterTileLayerBuilder;
 
 /// Raster tile layers load prerendered tile sets using [tile provider](RasterTileProvider) and render them to the map.
 pub struct RasterTileLayer {
-    tile_provider: Arc<dyn RasterTileProvider>,
+    tile_loader: Arc<dyn RasterTileLoader>,
+    tile_container: Arc<TilesContainer<(), RasterTileProvider>>,
     tile_schema: TileSchema,
     fade_in_duration: Duration,
-    tiles: Arc<Cache<TileIndex, Arc<TileState>>>,
-    prev_drawn_tiles: Mutex<Vec<TileIndex>>,
     messenger: Option<Arc<dyn Messenger>>,
     attribution: Option<Attribution>,
 }
@@ -44,55 +39,40 @@ impl std::fmt::Debug for RasterTileLayer {
     }
 }
 
-enum TileState {
-    Loading,
-    Loaded(Mutex<DecodedImage>),
-    Rendered(Box<Mutex<RenderedTile>>),
-    Error,
-}
-
-struct RenderedTile {
-    packed_bundle: Box<dyn PackedBundle>,
-    first_drawn: SystemTime,
-    opacity: f32,
-}
-
-impl RenderedTile {
-    fn is_opaque(&self) -> bool {
-        self.opacity > 0.999
-    }
-}
-
 impl RasterTileLayer {
     /// Creates anew layer.
     pub fn new(
         tile_schema: TileSchema,
-        tile_provider: impl RasterTileProvider + 'static,
+        tile_loader: impl RasterTileLoader + 'static,
         messenger: Option<Arc<dyn Messenger>>,
     ) -> Self {
         Self {
-            tile_provider: Arc::new(tile_provider),
+            tile_loader: Arc::new(tile_loader),
+            tile_container: Arc::new(TilesContainer::new(
+                tile_schema.clone(),
+                RasterTileProvider::new(tile_schema.clone()),
+            )),
             tile_schema,
-            prev_drawn_tiles: Mutex::new(vec![]),
             fade_in_duration: Duration::from_millis(300),
-            tiles: Arc::new(Cache::new(5000)),
             messenger,
             attribution: None,
         }
     }
 
     fn new_raw(
-        tile_provider: Box<dyn RasterTileProvider>,
+        tile_loader: Box<dyn RasterTileLoader>,
         tile_schema: TileSchema,
         messenger: Option<Box<dyn Messenger>>,
         attribution: Option<Attribution>,
     ) -> Self {
         Self {
-            tile_provider: tile_provider.into(),
+            tile_loader: tile_loader.into(),
+            tile_container: Arc::new(TilesContainer::new(
+                tile_schema.clone(),
+                RasterTileProvider::new(tile_schema.clone()),
+            )),
             tile_schema,
-            prev_drawn_tiles: Mutex::new(vec![]),
             fade_in_duration: Duration::from_millis(300),
-            tiles: Arc::new(Cache::new(5000)),
             messenger: messenger.map(|m| m.into()),
             attribution,
         }
@@ -103,172 +83,18 @@ impl RasterTileLayer {
         self.fade_in_duration = duration;
     }
 
-    fn get_tiles_to_draw(&self, view: &MapView) -> Vec<(TileIndex, Arc<TileState>)> {
-        let mut tiles = vec![];
+    fn update_displayed_tiles(&self, view: &MapView, canvas: &dyn Canvas) {
         let Some(tile_iter) = self.tile_schema.iter_tiles(view) else {
-            return vec![];
+            return;
         };
 
-        let mut to_substitute = vec![];
-        for index in tile_iter {
-            self.tiles.get(&index);
-
-            match self.tiles.get(&index) {
-                None => to_substitute.push(index),
-                Some(tile_state) => match &*tile_state.clone() {
-                    TileState::Rendered(tile) => {
-                        if !tile.lock().is_opaque() {
-                            to_substitute.push(index);
-                        }
-
-                        tiles.push((index, tile_state));
-                    }
-                    TileState::Loaded(_) => {
-                        to_substitute.push(index);
-                        tiles.push((index, tile_state));
-                    }
-                    _ => to_substitute.push(index),
-                },
-            }
-        }
-
-        let prev_drawn = self.prev_drawn_tiles.lock();
-        let mut substitute_indices: HashSet<_> = tiles.iter().map(|(index, _)| *index).collect();
-        let mut substitute_tiles = vec![];
-        for index in to_substitute {
-            let mut next_level = index;
-            let mut substituted = false;
-
-            while let Some(subst) = self.tile_schema.get_substitutes(next_level) {
-                let mut need_more = false;
-                for substitute_index in subst {
-                    // todo: this will not work correctly if a tile is substituted by more then 1 tile
-                    next_level = substitute_index;
-
-                    if let Some(tile) = self.tiles.get(&substitute_index) {
-                        if matches!(*tile, TileState::Rendered(_))
-                            && !substitute_indices.contains(&substitute_index)
-                        {
-                            substitute_tiles.push((substitute_index, tile));
-                            substitute_indices.insert(substitute_index);
-                        }
-
-                        if let Some(TileState::Rendered(rendered)) = self
-                            .tiles
-                            .get(&substitute_index)
-                            .as_ref()
-                            .map(|v| v.as_ref())
-                        {
-                            if !rendered.lock().is_opaque() {
-                                need_more = true;
-                            }
-                        }
-                    } else {
-                        need_more = true;
-                    }
-                }
-
-                if !need_more {
-                    substituted = true;
-                    break;
-                }
-            }
-
-            if !substituted {
-                let Some(required_bbox) = self.tile_schema.tile_bbox(index) else {
-                    continue;
-                };
-                for prev in prev_drawn.iter() {
-                    let Some(prev_bbox) = self.tile_schema.tile_bbox(*prev) else {
-                        continue;
-                    };
-                    if !substitute_indices.contains(prev) && prev_bbox.intersects(required_bbox) {
-                        substitute_indices.insert(*prev);
-                        let Some(tile) = self.tiles.get(prev) else {
-                            continue;
-                        };
-                        substitute_tiles.push((*prev, tile));
-                    }
-                }
-            }
-        }
-
-        substitute_tiles.sort_unstable_by(|(index_a, _), (index_b, _)| index_a.z.cmp(&index_b.z));
-        substitute_tiles.append(&mut tiles);
-        substitute_tiles.dedup_by(|a, b| a.0 == b.0);
-        substitute_tiles
-    }
-
-    fn prepare_tile_renders(&self, tiles: &[(TileIndex, Arc<TileState>)], canvas: &mut dyn Canvas) {
-        let mut requires_redraw = false;
-
-        let now = SystemTime::now();
-        for (index, tile) in tiles {
-            match &**tile {
-                TileState::Rendered(rendered) => {
-                    let mut rendered = rendered.lock();
-                    if rendered.is_opaque() {
-                        continue;
-                    }
-
-                    let first_drawn = rendered.first_drawn;
-
-                    let since_drawn = now
-                        .duration_since(first_drawn)
-                        .unwrap_or(Duration::from_millis(0));
-                    let opacity = if self.fade_in_duration.is_zero() {
-                        0.0
-                    } else {
-                        (since_drawn.as_secs_f64() / self.fade_in_duration.as_secs_f64()).min(1.0)
-                            as f32
-                    };
-
-                    rendered.opacity = opacity;
-                    if !rendered.is_opaque() {
-                        requires_redraw = true;
-                    }
-                }
-                TileState::Loaded(decoded_image) => {
-                    let mut bundle = RenderBundle::default();
-                    let mut decoded_image = decoded_image.lock();
-
-                    let owned = std::mem::replace(
-                        &mut *decoded_image,
-                        DecodedImage::from_raw(vec![], Size::new(0, 0))
-                            .expect("empty image is always ok"),
-                    );
-
-                    let opacity = if self.fade_in_duration.is_zero() {
-                        1.0
-                    } else {
-                        0.0
-                    };
-
-                    let Some(tile_bbox) = self.tile_schema.tile_bbox(*index) else {
-                        log::warn!("Failed to get bbox for tile {index:?}");
-                        continue;
-                    };
-
-                    bundle.add_image(
-                        owned,
-                        tile_bbox.into_quadrangle(),
-                        ImagePaint { opacity: 255 },
-                    );
-                    let packed = canvas.pack_bundle(&bundle);
-                    self.tiles.insert(
-                        *index,
-                        Arc::new(TileState::Rendered(Box::new(Mutex::new(RenderedTile {
-                            packed_bundle: packed,
-                            first_drawn: now,
-                            opacity,
-                        })))),
-                    );
-
-                    requires_redraw = true;
-                }
-                _ => {}
-            }
-        }
+        let needed_indices: Vec<_> = tile_iter.collect();
+        self.tile_container
+            .tile_provider
+            .pack_tiles(&needed_indices, canvas);
+        let requires_redraw = self
+            .tile_container
+            .update_displayed_tiles(needed_indices, ());
 
         if requires_redraw {
             if let Some(messenger) = &self.messenger {
@@ -279,38 +105,28 @@ impl RasterTileLayer {
 
     async fn load_tile(
         index: TileIndex,
-        tile_provider: Arc<dyn RasterTileProvider>,
-        tiles: &Cache<TileIndex, Arc<TileState>>,
+        tile_loader: Arc<dyn RasterTileLoader>,
+        tiles: Arc<TilesContainer<(), RasterTileProvider>>,
         messenger: Option<Arc<dyn Messenger>>,
     ) {
-        match tiles.get_value_or_guard_async(&index).await {
-            Ok(_) => {}
-            Err(guard) => {
-                let _ = guard.insert(Arc::new(TileState::Loading));
-                let load_result = tile_provider.load(index).await;
+        if tiles.tile_provider.set_loading(index) {
+            // Already loading
+            return;
+        }
 
-                match load_result {
-                    Ok(decoded_image) => {
-                        if let Some(v) = tiles.get(&index) {
-                            if matches!(*v, TileState::Rendered(_)) {
-                                log::error!("This should not happen to {index:?}");
-                            }
-                        }
+        let load_result = tile_loader.load(index).await;
 
-                        tiles.insert(
-                            index,
-                            Arc::new(TileState::Loaded(Mutex::new(decoded_image))),
-                        );
+        match load_result {
+            Ok(decoded_image) => {
+                tiles.tile_provider.set_loaded(index, decoded_image);
 
-                        if let Some(messenger) = messenger {
-                            messenger.request_redraw();
-                        }
-                    }
-                    Err(err) => {
-                        log::debug!("Failed to load tile: {err}");
-                        tiles.insert(index, Arc::new(TileState::Error))
-                    }
+                if let Some(messenger) = messenger {
+                    messenger.request_redraw();
                 }
+            }
+            Err(err) => {
+                log::debug!("Failed to load tile: {err}");
+                tiles.tile_provider.set_error(index);
             }
         }
     }
@@ -319,10 +135,9 @@ impl RasterTileLayer {
     pub async fn load_tiles(&self, view: &MapView) {
         if let Some(iter) = self.tile_schema.iter_tiles(view) {
             for index in iter {
-                let tile_provider = self.tile_provider.clone();
-                let tiles = self.tiles.clone();
+                let tile_provider = self.tile_loader.clone();
                 let messenger = self.messenger.clone();
-                Self::load_tile(index, tile_provider, &tiles, messenger).await;
+                Self::load_tile(index, tile_provider, self.tile_container.clone(), messenger).await;
             }
         }
     }
@@ -335,38 +150,25 @@ impl RasterTileLayer {
 
 impl Layer for RasterTileLayer {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas) {
-        let tiles = self.get_tiles_to_draw(view);
-        self.prepare_tile_renders(&tiles, canvas);
+        self.update_displayed_tiles(view, canvas);
 
-        let updated_tiles: Vec<_> = tiles
+        let displayed_tiles = self.tile_container.tiles.lock();
+        let to_render: Vec<_> = displayed_tiles
             .iter()
-            .filter_map(|(index, _)| self.tiles.get(index))
+            .map(|v| (&*v.bundle, v.opacity))
             .collect();
-        let mut to_draw = Vec::new();
-        for tile in &updated_tiles {
-            if let TileState::Rendered(rendered) = tile.as_ref() {
-                to_draw.push(rendered.lock());
-            }
-        }
 
-        canvas.draw_bundles_with_opacity(
-            &to_draw
-                .iter()
-                .map(|guard| (&*guard.packed_bundle, guard.opacity))
-                .collect::<Vec<_>>(),
-            RenderOptions::default(),
-        );
-        *self.prev_drawn_tiles.lock() = tiles.iter().map(|(index, _)| *index).collect();
+        canvas.draw_bundles_with_opacity(&to_render, RenderOptions::default());
     }
 
     fn prepare(&self, view: &MapView) {
         if let Some(iter) = self.tile_schema.iter_tiles(view) {
             for index in iter {
-                let tile_provider = self.tile_provider.clone();
-                let tiles = self.tiles.clone();
+                let tile_provider = self.tile_loader.clone();
+                let container = self.tile_container.clone();
                 let messenger = self.messenger.clone();
                 crate::async_runtime::spawn(async move {
-                    Self::load_tile(index, tile_provider, &tiles, messenger).await;
+                    Self::load_tile(index, tile_provider, container, messenger).await;
                 });
             }
         }

@@ -246,7 +246,7 @@ mod tests {
     use galileo_types::latlon;
 
     use super::*;
-    use crate::layer::raster_tile_layer::RestTileProvider;
+    use crate::layer::raster_tile_layer::RestTileLoader;
     use crate::layer::RasterTileLayer;
     use crate::TileSchema;
 
@@ -256,7 +256,7 @@ mod tests {
 
     fn test_tile_layer() -> RasterTileLayer {
         let tile_schema = test_tile_schema();
-        let tile_provider = RestTileProvider::new(|_| unimplemented!(), None, false);
+        let tile_provider = RestTileLoader::new(|_| unimplemented!(), None, false);
         RasterTileLayer::new(tile_schema, tile_provider, None)
     }
 

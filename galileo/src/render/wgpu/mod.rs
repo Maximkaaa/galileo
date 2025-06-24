@@ -81,7 +81,7 @@ impl RenderTargetTexture<'_> {
 }
 
 impl RenderTarget {
-    fn texture(&self) -> Result<RenderTargetTexture, SurfaceError> {
+    fn texture(&self) -> Result<RenderTargetTexture<'_>, SurfaceError> {
         match &self {
             RenderTarget::Surface { surface, .. } => {
                 Ok(RenderTargetTexture::Surface(surface.get_current_texture()?))

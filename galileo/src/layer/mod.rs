@@ -16,6 +16,7 @@ pub mod attribution;
 pub mod data_provider;
 pub mod feature_layer;
 pub mod raster_tile_layer;
+pub(crate) mod tiles;
 pub mod vector_tile_layer;
 
 pub use feature_layer::{FeatureId, FeatureLayer};
