@@ -2,6 +2,7 @@
 
 use std::cell::Cell;
 use std::future::Future;
+use std::hash::{Hash, Hasher};
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
@@ -39,7 +40,10 @@ impl PlatformService for WebPlatformService {
         let image_bitmap_promise = window.create_image_bitmap_with_html_image_element(&image)?;
         let image_bitmap = JsFuture::from(image_bitmap_promise).await?.dyn_into()?;
 
-        Ok(DecodedImage(DecodedImageType::JsImageBitmap(image_bitmap)))
+        Ok(DecodedImage(DecodedImageType::JsImageBitmap {
+            js_image: image_bitmap,
+            hash: get_hash(url),
+        }))
     }
 
     async fn decode_image(&self, image_data: Bytes) -> Result<DecodedImage, GalileoError> {
@@ -52,7 +56,10 @@ impl PlatformService for WebPlatformService {
         let image_bitmap_promise = window.create_image_bitmap_with_blob(&blob)?;
         let image_bitmap = JsFuture::from(image_bitmap_promise).await?.dyn_into()?;
 
-        Ok(DecodedImage(DecodedImageType::JsImageBitmap(image_bitmap)))
+        Ok(DecodedImage(DecodedImageType::JsImageBitmap {
+            js_image: image_bitmap,
+            hash: get_hash(&image_data),
+        }))
     }
 
     async fn load_bytes_from_url(&self, url: &str) -> Result<bytes::Bytes, GalileoError> {
@@ -144,4 +151,10 @@ impl Future for ImageFuture {
             _ => Poll::Ready(Err(GalileoError::IO)),
         }
     }
+}
+
+fn get_hash(object: &(impl Hash + ?Sized)) -> u64 {
+    let mut hasher = ahash::AHasher::default();
+    object.hash(&mut hasher);
+    hasher.finish()
 }

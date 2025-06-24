@@ -1,9 +1,11 @@
 use std::any::Any;
 use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 use std::mem::size_of;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 
+use ahash::HashMap;
 use cfg_if::cfg_if;
 use galileo_types::cartesian::{Rect, Size};
 use lyon::tessellation::VertexBuffers;
@@ -11,15 +13,16 @@ use nalgebra::{Point4, Rotation3, Vector3};
 use parking_lot::Mutex;
 use wgpu::util::DeviceExt;
 use wgpu::{
-    Adapter, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Extent3d, Origin3d,
-    Queue, RenderPassDepthStencilAttachment, StoreOp, Surface, SurfaceConfiguration, SurfaceError,
-    SurfaceTexture, TexelCopyBufferInfo, TexelCopyBufferLayout, TexelCopyTextureInfo, Texture,
-    TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
-    TextureViewDescriptor, WasmNotSendSync,
+    Adapter, BindGroup, Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Extent3d,
+    Origin3d, Queue, RenderPassDepthStencilAttachment, StoreOp, Surface, SurfaceConfiguration,
+    SurfaceError, SurfaceTexture, TexelCopyBufferInfo, TexelCopyBufferLayout, TexelCopyTextureInfo,
+    Texture, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+    TextureView, TextureViewDescriptor, WasmNotSendSync,
 };
 
 use super::render_bundle::screen_set::{RenderSetState, ScreenSetData};
 use super::{Canvas, PackedBundle, RenderOptions};
+use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::map::Map;
 use crate::render::render_bundle::world_set::{PointInstance, PolyVertex, WorldRenderSet};
@@ -35,12 +38,15 @@ const DEFAULT_BACKGROUND: Color = Color::WHITE;
 const DEPTH_FORMAT: TextureFormat = TextureFormat::Depth24PlusStencil8;
 const TARGET_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
 
+type TexturesMap = HashMap<u64, (Weak<DecodedImage>, Arc<BindGroup>)>;
+
 /// Render backend that uses `wgpu` crate to render the map.
 pub struct WgpuRenderer {
     device: Device,
     queue: Queue,
     renderer_targets: Option<RendererTargets>,
     background: Color,
+    textures: Mutex<TexturesMap>,
 }
 
 struct RendererTargets {
@@ -126,6 +132,7 @@ impl WgpuRenderer {
             queue,
             renderer_targets: None,
             background: DEFAULT_BACKGROUND,
+            textures: Default::default(),
         })
     }
 
@@ -303,6 +310,7 @@ impl WgpuRenderer {
             queue,
             renderer_targets: None,
             background: DEFAULT_BACKGROUND,
+            textures: Default::default(),
         };
         renderer.init_renderer_targets(render_target);
 
@@ -317,6 +325,7 @@ impl WgpuRenderer {
             queue,
             renderer_targets: None,
             background: DEFAULT_BACKGROUND,
+            textures: Default::default(),
         };
 
         renderer.init_target_texture(size);
@@ -624,6 +633,8 @@ impl WgpuRenderer {
             return Ok(());
         };
 
+        self.trim_textures();
+
         let texture = renderer_targets.render_target.texture()?;
         let view = texture.view();
 
@@ -664,6 +675,38 @@ impl WgpuRenderer {
         };
 
         Size::new(size.width() as f64, size.height() as f64)
+    }
+
+    /// Deallocates all unneeded textures.
+    ///
+    /// A texture is considered unneeded if there are no rereferences left to the underlying image.
+    pub fn trim_textures(&self) {
+        self.textures
+            .lock()
+            .retain(|_, (image_ref, _)| image_ref.strong_count() > 0);
+    }
+
+    fn get_or_create_image_texture(&self, image: &Arc<DecodedImage>) -> Arc<BindGroup> {
+        let mut hasher = ahash::AHasher::default();
+        image.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        if let Some((_, texture)) = self.textures.lock().get(&hash) {
+            return texture.clone();
+        }
+
+        let texture = self
+            .renderer_targets
+            .as_ref()
+            .expect("trying to use pipelines of uninitialized renderer")
+            .pipelines
+            .create_image_texture(&self.device, &self.queue, image);
+
+        self.textures
+            .lock()
+            .insert(hash, (Arc::downgrade(image), texture.clone()));
+
+        texture
     }
 }
 
@@ -1115,13 +1158,7 @@ impl WgpuPackedBundle {
 
         let textures: Vec<_> = image_store
             .iter()
-            .map(|decoded_image| {
-                Some(renderer_targets.pipelines.create_image_texture(
-                    &renderer.device,
-                    &renderer.queue,
-                    decoded_image,
-                ))
-            })
+            .map(|decoded_image| renderer.get_or_create_image_texture(decoded_image))
             .collect();
 
         let mut image_buffers = vec![];
@@ -1131,8 +1168,6 @@ impl WgpuPackedBundle {
                 textures
                     .get(image_info.store_index)
                     .expect("texture at index must exist")
-                    .clone()
-                    .expect("image texture must not be None")
                     .clone(),
                 &image_info.vertices,
             );
@@ -1170,11 +1205,7 @@ impl WgpuPackedBundle {
                     WgpuScreenSetData::Vertex(buffers)
                 }
                 ScreenSetData::Image { vertices, bitmap } => {
-                    let bind_group = renderer_targets.pipelines.create_image_texture(
-                        &renderer.device,
-                        &renderer.queue,
-                        bitmap,
-                    );
+                    let bind_group = renderer.get_or_create_image_texture(bitmap);
                     let image = renderer_targets
                         .pipelines
                         .screen_set_image_pipeline()
