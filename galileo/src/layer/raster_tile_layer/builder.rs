@@ -403,7 +403,7 @@ mod tests {
     #[test]
     fn with_file_cache_fails_build_if_custom_provider() {
         let provider = RestTileLoader::new(|_| unimplemented!(), None, false);
-        let result = RasterTileLayerBuilder::new_with_provider(provider)
+        let result = RasterTileLayerBuilder::new_with_loader(provider)
             .with_file_cache("target")
             .build();
 
@@ -425,7 +425,7 @@ mod tests {
     fn with_cache_controller_fails_build_if_custom_provider() {
         let provider = RestTileLoader::new(|_| unimplemented!(), None, false);
         let cache = FileCacheController::new("target").unwrap();
-        let result = RasterTileLayerBuilder::new_with_provider(provider)
+        let result = RasterTileLayerBuilder::new_with_loader(provider)
             .with_cache_controller(cache)
             .build();
 
@@ -436,7 +436,7 @@ mod tests {
     #[test]
     fn with_offline_mode_incompatible_with_custom_provider() {
         let provider = RestTileLoader::new(|_| unimplemented!(), None, false);
-        let result = RasterTileLayerBuilder::new_with_provider(provider)
+        let result = RasterTileLayerBuilder::new_with_loader(provider)
             .with_file_cache("target")
             .with_offline_mode()
             .build();
