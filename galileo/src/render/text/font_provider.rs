@@ -41,7 +41,7 @@ pub trait FontProvider {
                 .chars()
                 .filter(|c| font.glyph_index(*c).is_some())
                 .count();
-            if contains_chars > 0 && candidate.is_none()
+            if candidate.is_none()
                 || matches!(candidate, Some((_, _, chars_count)) if chars_count < contains_chars)
             {
                 log::trace!(
