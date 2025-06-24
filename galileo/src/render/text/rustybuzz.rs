@@ -44,6 +44,10 @@ impl TextRasterizer for RustybuzzRasterizer {
         offset: Vector2<f32>,
         font_provider: &dyn FontProvider,
     ) -> Result<TextShaping, FontServiceError> {
+        if text.is_empty() {
+            return Ok(TextShaping::Tessellation { glyphs: vec![] });
+        }
+
         let mut buffer = UnicodeBuffer::new();
         buffer.push_str(text);
         buffer.guess_segment_properties();
