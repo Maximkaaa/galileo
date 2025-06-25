@@ -290,8 +290,29 @@ impl<'a> EguiMapState {
                 );
                 Some(RawUserEvent::PointerMoved(pointer_position))
             }
+            #[cfg(not(target_arch = "wasm32"))]
             Event::MouseWheel { delta, .. } => {
                 let zoom = delta[1] as f64;
+
+                if zoom.abs() < 0.0001 {
+                    return None;
+                }
+
+                Some(RawUserEvent::Scroll(zoom))
+            }
+            #[cfg(target_arch = "wasm32")]
+            Event::MouseWheel { delta, unit, .. } => {
+                // Winit produces different values in different browsers and they are all different
+                // from native platforms. See ttps://github.com/rust-windowing/winit/issues/22
+                //
+                // This hack is based on manual tests and might break in future. But this is the
+                // best I could come up with to mitigate the issue.
+                let zoom = match unit {
+                    egui::MouseWheelUnit::Point => delta[1] as f64 / 120.0,
+                    egui::MouseWheelUnit::Line => delta[1] as f64 / 6.0,
+                    egui::MouseWheelUnit::Page => delta[1] as f64,
+                };
+
                 if zoom.abs() < 0.0001 {
                     return None;
                 }
