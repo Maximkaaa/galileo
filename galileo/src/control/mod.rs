@@ -20,7 +20,7 @@ mod event_processor;
 mod map;
 
 pub use event_processor::EventProcessor;
-pub use map::MapController;
+pub use map::{MapController, MapControllerConfiguration};
 
 /// User input handler.
 pub trait UserEventHandler {
