@@ -6,6 +6,7 @@ authors.workspace = true
 repository.workspace = true
 license.workspace = true
 keywords.workspace = true
+description = "Browser examples for Galileo"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
