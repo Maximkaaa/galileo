@@ -3,4 +3,4 @@ lod = "lod"
 wdth = "wdth"
 
 [files]
-extend-exclude = ["galileo/examples/data/*.*"]
+extend-exclude = ["galileo/examples/data/*.*", "CHANGELOG.md"]
