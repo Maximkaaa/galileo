@@ -10,8 +10,8 @@
 ![Feature layers](https://maximkaaa.github.io/galileo/countries_sm.png)
 ![Many points](https://maximkaaa.github.io/galileo/many_points.gif)
 
-* [Raster tile layer (OSM)](https://maximkaaa.github.io/galileo/raster_tiles/)
-* [Vector tile layer (Maplibre)](https://maximkaaa.github.io/galileo/vector_tiles/)
+* [Raster tile layer (OSM)](https://maximkaaa.github.io/galileo/web_examples/raster_tiles/)
+* [Vector tile layer (Maplibre)](https://maximkaaa.github.io/galileo/web_examples/vector_tiles/)
   * Use buttons at the top to change the style of the map
   * Click on any object to get information about it
 * [Feature layer](https://maximkaaa.github.io/galileo/feature_layers/)
