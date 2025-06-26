@@ -7,17 +7,17 @@ default:
 
 # Compiles the web example and serves it using python dev server
 [group('Web Examples')]
-run_web_example NAME:
-  just build_web_example {{NAME}}
+run_web_example NAME profile="release":
+  just build_web_example {{NAME}} {{profile}}
   cd target/web_examples/{{NAME}} && python3 -m http.server
 
 # Compiles given web example into the folder `target/web_examples/<NAME>`
 [group('Web Examples')]
-build_web_example NAME $VT_API_KEY=`echo $VT_API_KEY`:
+build_web_example NAME profile="release" $VT_API_KEY=`echo $VT_API_KEY`:
   @ echo {{ if VT_API_KEY == "" { "WARNING: VT_API_KEY is not set. Vector tile layers will not work." } else { "VT_API_KEY is set" } }}
 
   rm -rf target/web_examples/{{NAME}}
-  RUSTFLAGS='--cfg getrandom_backend="wasm_js"' wasm-pack build web-example --release --target no-modules --target-dir target --features {{NAME}}
+  RUSTFLAGS='--cfg getrandom_backend="wasm_js"' wasm-pack build web-example --{{profile}} --target no-modules --target-dir target --features {{NAME}}
   mkdir -p target/web_examples/{{NAME}}
   cp web-example/index.html target/web_examples/{{NAME}}
   cp web-example/vt_worker.js target/web_examples/{{NAME}}
@@ -40,7 +40,7 @@ build_all_web_examples api_key=`echo $VT_API_KEY`:
 [private]
 [group('Web Examples')]
 publish_web_examples:
-  # VT_API_KEY=$PUBLIC_VT_API_KEY just build_all_web_examples
+  VT_API_KEY=$PUBLIC_VT_API_KEY just build_all_web_examples
   yes | cp -rf target/web_examples ../Maximkaaa.github.io/galileo
   cd ../Maximkaaa.github.io/galileo && git checkout master && git pull && git add . && git commit -m "Update Galileo web examples" && git push
 

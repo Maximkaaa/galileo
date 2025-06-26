@@ -3,6 +3,7 @@ use std::fmt::{Display, Formatter};
 use std::iter::Enumerate;
 
 use bytes::Buf;
+use contour::MvtMultiPolygon;
 pub use contour::{MvtContours, MvtPolygon};
 use galileo_types::cartesian::{CartesianPoint2d, Point2};
 use geozero::mvt::tile::GeomType;
@@ -84,11 +85,11 @@ impl MvtValue {
 
 pub type Point = Point2<f32>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MvtGeometry {
     Point(Vec<Point>),
     LineString(MvtContours),
-    Polygon(Vec<MvtPolygon>),
+    Polygon(MvtMultiPolygon),
 }
 
 impl MvtTile {
@@ -315,7 +316,7 @@ impl MvtFeature {
             }
             GeomType::Point => MvtGeometry::Point(Self::decode_point(commands, extent)?),
             GeomType::Linestring => MvtGeometry::LineString(MvtContours::new(commands, extent)?),
-            GeomType::Polygon => MvtGeometry::Polygon(MvtPolygon::new(commands, extent)?),
+            GeomType::Polygon => MvtGeometry::Polygon(MvtMultiPolygon::new(commands, extent)?),
         })
     }
 
@@ -477,7 +478,7 @@ enum MvtGeomCommand {
 mod tests {
     use std::io::Cursor;
 
-    use galileo_types::{Contour, MultiContour, Polygon};
+    use galileo_types::{Contour, MultiContour, MultiPolygon, Polygon};
 
     use super::*;
 
@@ -528,9 +529,9 @@ mod tests {
         let MvtGeometry::Polygon(polygons) = &feature342914.geometry else {
             panic!("invalid geometry type");
         };
-        assert_eq!(polygons.len(), 4);
+        assert_eq!(polygons.polygons().count(), 4);
         let points = polygons
-            .iter()
+            .polygons()
             .flat_map(|p| p.iter_contours())
             .fold((0, 0), |acc, c| {
                 (acc.0 + 1, acc.1 + c.iter_points_closing().count())

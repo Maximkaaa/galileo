@@ -25,6 +25,9 @@ serde = { workspace = true, features = ["derive", "rc"] }
 strfmt = { workspace = true }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+bincode = { workspace = true, features = ["serde"] }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { workspace = true, features = ["wasm_js"] }
 
