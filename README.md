@@ -14,13 +14,13 @@
 * [Vector tile layer (Maplibre)](https://maximkaaa.github.io/galileo/web_examples/vector_tiles/)
   * Use buttons at the top to change the style of the map
   * Click on any object to get information about it
-* [Feature layer](https://maximkaaa.github.io/galileo/feature_layers/)
+* [Feature layer](https://maximkaaa.github.io/galileo/web_examples/feature_layers/)
   * NOTE! Contains large dataset (~16 MB), might take some time to load
   * Draws 250 countries' borders, consisting of ~4000 polygons with ~500K vertices, plus 40K city points
   * Move mouse pointer to highlight any country, click on a country to write its name into console
-* [Map in Lambert Equal Area projection](https://maximkaaa.github.io/galileo/lambert/)
+* [Map in Lambert Equal Area projection](https://maximkaaa.github.io/galileo/web_examples/lambert/)
   * Takes data set (country borders) in Mercator projection and draws it to the map in LAEA projection
-* [Very many points](https://maximkaaa.github.io/galileo/many_points/)
+* [Very many points](https://maximkaaa.github.io/galileo/web_examples/many_points/)
   * Enjoy 3.6 million points heat up your room with GPU.
 
 # Overview
