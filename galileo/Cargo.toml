@@ -9,7 +9,7 @@ keywords.workspace = true
 documentation = "https://docs.rs/galileo"
 description = "Cross-platform general purpose map rendering engine"
 readme = "../README.md"
-exclude = ["examples/data"]
+exclude = ["examples"]
 
 [features]
 default = ["wgpu", "serde", "winit", "_tests", "rustybuzz", "image"]
