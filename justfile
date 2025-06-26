@@ -1,3 +1,6 @@
+set dotenv-load := true
+export VT_API_KEY := env('VT_API_KEY', "")
+
 [private]
 default:
   @just --list
@@ -10,8 +13,8 @@ run_web_example NAME:
 
 # Compiles given web example into the folder `target/web_examples/<NAME>`
 [group('Web Examples')]
-build_web_example NAME:
-  set dotenv-load := true
+build_web_example NAME $VT_API_KEY=`echo $VT_API_KEY`:
+  @ echo {{ if VT_API_KEY == "" { "WARNING: VT_API_KEY is not set. Vector tile layers will not work." } else { "VT_API_KEY is set" } }}
 
   rm -rf target/web_examples/{{NAME}}
   RUSTFLAGS='--cfg getrandom_backend="wasm_js"' wasm-pack build web-example --release --target no-modules --target-dir target --features {{NAME}}
@@ -19,9 +22,11 @@ build_web_example NAME:
   cp web-example/index.html target/web_examples/{{NAME}}
   cp web-example/vt_worker.js target/web_examples/{{NAME}}
   cp -r web-example/pkg target/web_examples/{{NAME}}
+  rm -f target/web_examples/{{NAME}}/pkg/.gitignore
 
+# Build all web examples into `target/web_examples`
 [group('Web Examples')]
-build_all_web_examples:
+build_all_web_examples api_key=`echo $VT_API_KEY`:
   just build_web_example raster_tiles
   just build_web_example feature_layers
   just build_web_example egui_app
@@ -31,6 +36,13 @@ build_all_web_examples:
   just build_web_example many_points
   just build_web_example vector_tiles
   just build_web_example add_remove_features
+
+[private]
+[group('Web Examples')]
+publish_web_examples:
+  # VT_API_KEY=$PUBLIC_VT_API_KEY just build_all_web_examples
+  yes | cp -rf target/web_examples ../Maximkaaa.github.io/galileo
+  cd ../Maximkaaa.github.io/galileo && git checkout master && git pull && git add . && git commit -m "Update Galileo web examples" && git push
 
 # Performs code formatting and all code checks that are done by CI
 [group('Checks')]
