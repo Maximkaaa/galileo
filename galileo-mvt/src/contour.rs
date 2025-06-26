@@ -7,14 +7,34 @@ use galileo_types::geometry_type::{
     CartesianSpace2d, ContourGeometryType, GeometryType, MultiContourGeometryType,
     PolygonGeometryType,
 };
-use galileo_types::{ClosedContour, Contour, MultiContour, Polygon};
+use galileo_types::{ClosedContour, Contour, MultiContour, MultiPolygon, Polygon};
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
 
 use crate::error::GalileoMvtError;
 use crate::{CommandIterator, MvtGeomCommand, Point};
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
+pub struct MvtMultiPolygon {
+    polygons: Vec<MvtPolygon>,
+}
+
+impl MultiPolygon for MvtMultiPolygon {
+    type Polygon = MvtPolygon;
+
+    fn polygons(&self) -> impl Iterator<Item = &Self::Polygon> {
+        self.polygons.iter()
+    }
+}
+
+impl MvtMultiPolygon {
+    pub fn new(commands: Vec<u32>, extent: u32) -> Result<MvtMultiPolygon, GalileoMvtError> {
+        let polygons = MvtPolygon::new(commands, extent)?;
+        Ok(Self { polygons })
+    }
+}
+
+#[derive(Clone, PartialEq)]
 pub struct MvtPolygon {
     commands: Arc<Vec<u32>>,
     extent: u32,
@@ -85,7 +105,7 @@ impl Polygon for MvtPolygon {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct MvtContours {
     commands: Arc<Vec<u32>>,
     extent: u32,
@@ -154,32 +174,29 @@ impl MvtContours {
     }
 }
 
-impl Serialize for MvtPolygon {
+impl Serialize for MvtMultiPolygon {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         let ser = MvtContoursSer {
-            commands: self.commands.clone(),
-            extent: self.extent,
+            commands: self.polygons[0].commands.clone(),
+            extent: self.polygons[0].extent,
         };
         ser.serialize(serializer)
     }
 }
 
-impl<'de> Deserialize<'de> for MvtPolygon {
+impl<'de> Deserialize<'de> for MvtMultiPolygon {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let MvtContoursSer { commands, extent } = MvtContoursSer::deserialize(deserializer)?;
 
-        let value = Self::new_with_arc(commands, extent)
+        let polygons = MvtPolygon::new_with_arc(commands, extent)
             .map_err(|e| D::Error::custom(format!("failed to deserialize mvt contours: {e}")))?;
-        value
-            .into_iter()
-            .next()
-            .ok_or_else(|| D::Error::custom("cannot deserialize mvt polygon without contours"))
+        Ok(Self { polygons })
     }
 }
 
@@ -237,7 +254,7 @@ impl GeometryType for MvtPolygon {
     type Space = CartesianSpace2d;
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct MvtContour {
     commands: Arc<Vec<u32>>,
     start_index: usize,
@@ -332,7 +349,7 @@ impl Iterator for MvtContourIterator<'_> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct ClosedMvtContour {
     inner: MvtContour,
 }
@@ -350,5 +367,29 @@ impl ClosedContour for ClosedMvtContour {
 
     fn iter_points(&self) -> impl Iterator<Item = Self::Point> {
         self.inner.iter_points()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use crate::{MvtGeometry, MvtTile};
+
+    #[test]
+    fn polygon_serialization() {
+        let vt = include_bytes!("../test-data/vt.mvt");
+        let tile = MvtTile::decode(&mut Cursor::new(&vt), false).unwrap();
+
+        let layer = tile.layers.iter().find(|l| l.name == "water").unwrap();
+        for feature in &layer.features {
+            let geometry = &feature.geometry;
+            let bytes =
+                bincode::serde::encode_to_vec(geometry, bincode::config::standard()).unwrap();
+            let (deserialized, _): (MvtGeometry, _) =
+                bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+
+            assert_eq!(&deserialized, geometry);
+        }
     }
 }

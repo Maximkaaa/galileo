@@ -1,7 +1,7 @@
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtPolygon, MvtTile};
 use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d, Point2, Point3, Rect, Vector2};
 use galileo_types::impls::{ClosedContour, Polygon};
-use galileo_types::{Contour, MultiContour, Polygon as PolygonTrait};
+use galileo_types::{Contour, MultiContour, MultiPolygon, Polygon as PolygonTrait};
 use num_traits::ToPrimitive;
 use regex::Regex;
 
@@ -116,7 +116,7 @@ impl VtProcessor {
                     }
                     MvtGeometry::Polygon(polygons) => {
                         if let Some(paint) = Self::get_polygon_symbol(rule, feature) {
-                            for polygon in polygons {
+                            for polygon in polygons.polygons() {
                                 bundle.add_polygon(
                                     &Self::transform_polygon(polygon, bbox, tile_resolution),
                                     &paint,

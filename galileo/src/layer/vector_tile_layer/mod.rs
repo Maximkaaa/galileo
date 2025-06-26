@@ -10,6 +10,7 @@ use galileo_mvt::{MvtFeature, MvtGeometry};
 use galileo_types::cartesian::{CartesianPoint2d, Point2, Point3};
 use galileo_types::geometry::CartesianGeometry2d;
 use galileo_types::impls::{ClosedContour, Polygon};
+use galileo_types::MultiPolygon;
 use parking_lot::Mutex;
 pub use vector_tile::VectorTile;
 
@@ -217,7 +218,7 @@ impl VectorTileLayer {
                                 }
                                 MvtGeometry::Polygon(polygons) => {
                                     if polygons
-                                        .iter()
+                                        .polygons()
                                         .any(|p| p.is_point_inside(&tile_point, tolerance))
                                     {
                                         features.push((layer.name.clone(), feature.clone()));
