@@ -141,7 +141,7 @@ impl RasterTileLayerBuilder {
     /// fails, building the tile layer will return an error.
     ///
     /// Cannot be used with custom tile provider given by
-    /// [`RasterTileLayerBuilder::new_with_provider()`] method as the provider must have already be
+    /// [`RasterTileLayerBuilder::new_with_loader()`] method as the provider must have already be
     /// created with the cache configured. So in this case building will also return an error.
     ///
     /// Replaces the value set by the [`RasterTileLayerBuilder::with_cache_controller()`] method.
@@ -208,7 +208,7 @@ impl RasterTileLayerBuilder {
     /// Adds the given persistent cache for the tiles.
     ///
     /// Cannot be used with custom tile provider given by
-    /// [`RasterTileLayerBuilder::new_with_provider()`] method as the provider must have already be
+    /// [`RasterTileLayerBuilder::new_with_loader()`] method as the provider must have already be
     /// created with the cache configured. So in this case building will also return an error.
     ///
     /// Replaces the value set by the [`RasterTileLayerBuilder::with_file_cache()`] method.
@@ -243,7 +243,7 @@ impl RasterTileLayerBuilder {
     /// to identify tiles in the cache.
     ///
     /// Cannot be used with custom tile provider given by
-    /// [`RasterTileLayerBuilder::new_with_provider()`] method as the provider must have already be
+    /// [`RasterTileLayerBuilder::new_with_loader()`] method as the provider must have already be
     /// created with the offline mode. So in this case building will also return an error.
     ///
     /// If the layer is set to offline mode but there is no cache configured, building it will
