@@ -203,6 +203,46 @@ impl MapView {
         Some(scale * self.map_to_screen_center_transform()?)
     }
 
+    /// Returns screen point from translating the map position
+    pub fn map_to_screen(&self, map_pos: Point2) -> Option<Point2> {
+        // Get the map to scene transformation matrix
+        let transform = self.map_to_scene_transform()?;
+
+        // Convert 2D map position to homogeneous coordinates (add z=0, w=1)
+        let map_point_homogeneous =
+            nalgebra::Point3::new(map_pos.x(), map_pos.y(), 0.0).to_homogeneous();
+
+        // Transform map coordinates to scene coordinates
+        let scene_point = transform * map_point_homogeneous;
+
+        // Convert from homogeneous coordinates
+        let scene_point = scene_point.unscale(scene_point.w);
+
+        // Convert from scene coordinates [-1, 1] to screen coordinates [0, size]
+        // Scene coordinates have Y going from bottom to top, screen coordinates from top to bottom
+        let screen_x = (scene_point.x + 1.0) * self.size.width() / 2.0;
+        let screen_y = (1.0 - scene_point.y) * self.size.height() / 2.0;
+
+        Some(Point2::new(screen_x, screen_y))
+    }
+
+    /// Returns screen point from translating the map position
+    /// Clipping out of bounds to `None`
+    pub fn map_to_screen_clipped(&self, map_pos: Point2) -> Option<Point2> {
+        let screen = self.map_to_screen(map_pos)?;
+
+        // Check if the screen coordinates are within bounds
+        if screen.x() < 0.0
+            || screen.x() > self.size.width()
+            || screen.y() < 0.0
+            || screen.y() > self.size.height()
+        {
+            return None;
+        }
+
+        Some(screen)
+    }
+
     /// Returns transformation matrix that transforms map coordinates to scene coordinates.
     ///
     /// Scene coordinates are `[-1.0, 1.0]` coordinates of the render area with *Y* going from bottom to top.
@@ -506,5 +546,53 @@ mod tests {
             nalgebra::Point3::new(0.0, 0.0, 0.3888).to_homogeneous(),
             epsilon = 0.01
         );
+    }
+
+    #[test]
+    fn map_to_screen() {
+        let view = test_view().with_size(Size::new(100.0, 100.0));
+
+        // Test center point (0, 0) should map to center of screen
+        let screen_point = view.map_to_screen(Point2::new(0.0, 0.0)).unwrap();
+        assert_abs_diff_eq!(screen_point, Point2::new(50.0, 50.0), epsilon = 0.01);
+
+        // Test round-trip: map -> screen -> map
+        let original_map_point = Point2::new(-25.0, 25.0);
+        let screen_point = view.map_to_screen(original_map_point).unwrap();
+        let recovered_map_point = view.screen_to_map(screen_point).unwrap();
+
+        assert_abs_diff_eq!(original_map_point, recovered_map_point, epsilon = 0.01);
+
+        // Test another round-trip with different point
+        let original_map_point = Point2::new(10.0, -15.0);
+        let screen_point = view.map_to_screen(original_map_point).unwrap();
+        let recovered_map_point = view.screen_to_map(screen_point).unwrap();
+
+        assert_abs_diff_eq!(original_map_point, recovered_map_point, epsilon = 0.01);
+    }
+
+    #[test]
+    fn map_to_screen_out_of_bounds() {
+        let view = test_view().with_size(Size::new(100.0, 100.0));
+
+        // Test point that should be outside screen bounds (far left)
+        let out_of_bounds_point = Point2::new(-200.0, 0.0);
+        let screen_point = view.map_to_screen_clipped(out_of_bounds_point);
+        assert!(screen_point.is_none());
+
+        // Test point that should be outside screen bounds (far right)
+        let out_of_bounds_point = Point2::new(200.0, 0.0);
+        let screen_point = view.map_to_screen_clipped(out_of_bounds_point);
+        assert!(screen_point.is_none());
+
+        // Test point that should be outside screen bounds (far up)
+        let out_of_bounds_point = Point2::new(0.0, 200.0);
+        let screen_point = view.map_to_screen_clipped(out_of_bounds_point);
+        assert!(screen_point.is_none());
+
+        // Test point that should be outside screen bounds (far down)
+        let out_of_bounds_point = Point2::new(0.0, -200.0);
+        let screen_point = view.map_to_screen_clipped(out_of_bounds_point);
+        assert!(screen_point.is_none());
     }
 }
