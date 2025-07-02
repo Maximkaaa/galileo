@@ -26,6 +26,7 @@ pub struct InitBuilder {
     #[cfg(target_arch = "wasm32")]
     web_options: Option<eframe::WebOptions>,
     app_builder: Option<AppBuilder>,
+    logging: bool,
 }
 
 impl InitBuilder {
@@ -38,6 +39,7 @@ impl InitBuilder {
             #[cfg(target_arch = "wasm32")]
             web_options: None,
             app_builder: None,
+            logging: true,
         }
     }
 
@@ -69,6 +71,11 @@ impl InitBuilder {
         self
     }
 
+    pub fn with_logging(mut self, logging: bool) -> Self {
+        self.logging = logging;
+        self
+    }
+
     pub fn init(self) -> eframe::Result {
         #[cfg(not(target_arch = "wasm32"))]
         {
@@ -87,7 +94,9 @@ impl InitBuilder {
 
         use tokio::runtime::Runtime;
 
-        env_logger::init();
+        if self.logging {
+            env_logger::init();
+        }
 
         let handlers = self.handlers;
 
@@ -115,8 +124,10 @@ impl InitBuilder {
 
         let handlers = self.handlers;
 
-        // Redirect `log` message to `console.log` and friends:
-        eframe::WebLogger::init(log::LevelFilter::Info).ok();
+        if self.logging {
+            // Redirect `log` message to `console.log` and friends:
+            eframe::WebLogger::init(log::LevelFilter::Info).ok();
+        }
 
         let web_options = self.web_options.unwrap_or_default();
 
