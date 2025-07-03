@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use galileo_types::cartesian::Vector2;
 
+use super::MouseEvent;
 use crate::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
 use crate::map::Map;
 use crate::view::MapView;
@@ -320,6 +321,18 @@ impl UserEventHandler for MapController {
                 map.set_view(adjusted);
 
                 EventPropagation::Stop
+            }
+            UserEvent::Click(
+                _,
+                MouseEvent {
+                    screen_pointer_position,
+                    ..
+                },
+            ) => {
+                let map_position = map.view().screen_to_map(*screen_pointer_position);
+                log::debug!("Map click position: {map_position:?}");
+
+                EventPropagation::Propagate
             }
             _ => EventPropagation::Propagate,
         }

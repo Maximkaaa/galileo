@@ -71,19 +71,9 @@ impl EventProcessor {
     pub fn handle(&mut self, event: RawUserEvent, map: &mut Map) {
         if let Some(user_events) = self.process(event) {
             for user_event in user_events {
-                let mut drag_start_target = None;
+                log::trace!("Handling user event: {user_event:?}");
 
-                if let UserEvent::Click(
-                    _,
-                    MouseEvent {
-                        screen_pointer_position,
-                        ..
-                    },
-                ) = user_event
-                {
-                    let map_position = map.view().screen_to_map(screen_pointer_position);
-                    log::info!("click position: {map_position:?}");
-                }
+                let mut drag_start_target = None;
 
                 for (index, handler) in self.handlers.iter_mut().enumerate() {
                     if matches!(user_event, UserEvent::Drag(..) | UserEvent::DragEnded(..)) {
@@ -139,7 +129,6 @@ impl EventProcessor {
 
                 if (now.duration_since(self.last_pressed_time)).unwrap_or_default() < CLICK_TIMEOUT
                 {
-                    log::info!("click position: {:?}", self.pointer_position);
                     events.push(UserEvent::Click(button, self.get_mouse_event()));
 
                     if (now.duration_since(self.last_click_time)).unwrap_or_default()
