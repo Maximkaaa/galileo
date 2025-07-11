@@ -128,14 +128,14 @@ impl TileSchema {
         let tile_w = lod.resolution() * self.tile_width as f64;
         let tile_h = lod.resolution() * self.tile_height as f64;
 
-        let x_min = (self.x_adj(bounding_box.x_min()) / tile_w) as i32;
-        let x_min = x_min.max(self.min_x_index(lod.resolution()));
+        let x_min = (self.x_adj(bounding_box.x_min()) / tile_w).floor() as i32;
+        let x_min = x_min.max(self.min_x_displayed_index(lod.resolution()));
 
         let x_max_adj = self.x_adj(bounding_box.x_max());
         let x_add_one = if (x_max_adj % tile_w) < 0.001 { -1 } else { 0 };
 
         let x_max = (x_max_adj / tile_w) as i32 + x_add_one;
-        let x_max = x_max.min(self.max_x_index(lod.resolution()));
+        let x_max = x_max.min(self.max_x_displayed_index(lod.resolution()));
 
         let (top, bottom) = if self.y_direction == VerticalDirection::TopToBottom {
             (bounding_box.y_min(), bounding_box.y_max())
@@ -152,9 +152,16 @@ impl TileSchema {
         let y_max = (y_max_adj / tile_h) as i32 + y_add_one;
         let y_max = y_max.min(self.max_y_index(lod.resolution()));
 
+        let schema_x_min = self.min_x_index(lod.resolution());
+        let schema_x_max = self.max_x_index(lod.resolution());
+        let index_range = schema_x_max - schema_x_min + 1;
+
+        let actual_x =
+            move |display_x: i32| (display_x - schema_x_min).rem_euclid(index_range) + schema_x_min;
+
         Some((x_min..=x_max).flat_map(move |x| {
             (y_min..=y_max).map(move |y| TileIndex {
-                x,
+                x: actual_x(x),
                 y,
                 z: lod.z_index(),
                 display_x: x,
@@ -203,18 +210,21 @@ impl TileSchema {
     }
 
     pub(crate) fn tile_bbox(&self, index: TileIndex) -> Option<Rect> {
+        let x_index = index.display_x;
+        let y_index = index.y;
+
         let resolution = self
             .lods
             .iter()
             .find(|lod| lod.z_index() == index.z)?
             .resolution();
-        let x_min = self.origin.x() + (index.x as f64) * self.tile_width as f64 * resolution;
+        let x_min = self.origin.x() + (x_index as f64) * self.tile_width as f64 * resolution;
         let y_min = match self.y_direction {
             VerticalDirection::TopToBottom => {
-                self.origin.y() - (index.y + 1) as f64 * self.tile_height as f64 * resolution
+                self.origin.y() - (y_index + 1) as f64 * self.tile_height as f64 * resolution
             }
             VerticalDirection::BottomToTop => {
-                self.origin.y() + (index.y as f64) * self.tile_height as f64 * resolution
+                self.origin.y() + (y_index as f64) * self.tile_height as f64 * resolution
             }
         };
 
@@ -224,6 +234,27 @@ impl TileSchema {
             x_min + self.tile_width as f64 * resolution,
             y_min + self.tile_height as f64 * resolution,
         ))
+    }
+
+    fn wrap_x(&self) -> bool {
+        // TODO: https://github.com/Maximkaaa/galileo/issues/221
+        true
+    }
+
+    fn min_x_displayed_index(&self, resolution: f64) -> i32 {
+        if self.wrap_x() {
+            i32::MIN
+        } else {
+            self.min_x_index(resolution)
+        }
+    }
+
+    fn max_x_displayed_index(&self, resolution: f64) -> i32 {
+        if self.wrap_x() {
+            i32::MAX
+        } else {
+            self.max_x_index(resolution)
+        }
     }
 
     fn min_x_index(&self, resolution: f64) -> i32 {
@@ -389,22 +420,16 @@ mod tests {
 
         let bbox = Rect::new(2100.0, 0.0, 2500.0, 2048.0);
         let view = get_view(8.0, bbox);
-        assert_eq!(schema.iter_tiles(&view).unwrap().count(), 0);
-        let view = get_view(2.0, bbox);
-        assert_eq!(schema.iter_tiles(&view).unwrap().count(), 0);
-    }
-
-    #[test]
-    fn iter_tiles_does_not_include_tiles_outside_bbox() {
-        let schema = simple_schema();
-        let bbox = Rect::new(-2048.0, -2048.0, 4096.0, 4096.0);
-        let view = get_view(8.0, bbox);
-        for tile in schema.iter_tiles(&view).unwrap() {
-            println!("{tile:?}");
-        }
-
         assert_eq!(schema.iter_tiles(&view).unwrap().count(), 1);
+        assert_eq!(
+            schema.iter_tiles(&view).unwrap().next().unwrap().display_x,
+            1
+        );
         let view = get_view(2.0, bbox);
-        assert_eq!(schema.iter_tiles(&view).unwrap().count(), 16);
+        assert_eq!(schema.iter_tiles(&view).unwrap().count(), 4);
+        assert_eq!(
+            schema.iter_tiles(&view).unwrap().next().unwrap().display_x,
+            4
+        );
     }
 }
