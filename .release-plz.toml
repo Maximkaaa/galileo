@@ -2,6 +2,10 @@
 name = "galileo-web-example"
 release = false
 
+[[package]]
+name = "galileo"
+publish_features = ["geojson", "fontconfig-dlopen"]
+
 [changelog]
 header = """# Changelog
 
