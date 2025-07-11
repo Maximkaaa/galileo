@@ -13,6 +13,7 @@ readme = "../README.md"
 [features]
 default = ["init"]
 init = ["eframe", "tokio", "env_logger"]
+fontconfig-dlopen = ["galileo/fontconfig-dlopen"]
 
 [dependencies]
 egui = { workspace = true }

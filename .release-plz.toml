@@ -6,6 +6,10 @@ release = false
 name = "galileo"
 publish_features = ["geojson", "fontconfig-dlopen"]
 
+[[package]]
+name = "galileo-egui"
+publish_features = ["fontconfig-dlopen"]
+
 [changelog]
 header = """# Changelog
 
