@@ -98,12 +98,12 @@ fn default_style() -> VectorTileStyle {
 
 fn tile_schema() -> TileSchema {
     const ORIGIN: Point2 = Point2::new(-20037508.342787, 20037508.342787);
-    const TOP_RESOLUTION: f64 = 156543.03392800014 / 4.0;
+    const TOP_RESOLUTION: f64 = 156543.03392800014 / 16.0;
 
-    let mut lods = vec![Lod::new(TOP_RESOLUTION, 0).expect("invalid config")];
-    for i in 1..16 {
+    let mut lods = vec![Lod::new(TOP_RESOLUTION, 2).expect("invalid config")];
+    for i in 3..16 {
         lods.push(
-            Lod::new(lods[(i - 1) as usize].resolution() / 2.0, i).expect("invalid tile schema"),
+            Lod::new(lods[(i - 3) as usize].resolution() / 2.0, i).expect("invalid tile schema"),
         );
     }
 
