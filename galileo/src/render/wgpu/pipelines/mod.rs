@@ -29,6 +29,7 @@ mod screen_set_vertex;
 pub struct Pipelines {
     map_view_binding: BindGroup,
     map_view_buffer: Buffer,
+    pub(crate) map_view_bind_group_layout: BindGroupLayout,
     texture_bind_group_layout: BindGroupLayout,
 
     image: ImagePipeline,
@@ -98,6 +99,7 @@ impl Pipelines {
         Self {
             map_view_binding,
             map_view_buffer,
+            map_view_bind_group_layout: map_view_bind_group_layout.clone(),
             texture_bind_group_layout: texture_bind_group_layout.clone(),
             image: ImagePipeline::create(
                 device,
@@ -167,7 +169,7 @@ impl Pipelines {
         &self.screen_set_image
     }
 
-    fn set_bindings<'a>(&'a self, render_pass: &mut RenderPass<'a>) {
+    pub fn set_bindings<'a>(&'a self, render_pass: &mut RenderPass<'a>) {
         render_pass.set_bind_group(0, &self.map_view_binding, &[]);
     }
 
@@ -287,7 +289,7 @@ impl Pipelines {
     }
 }
 
-fn default_targets(format: TextureFormat) -> [Option<wgpu::ColorTargetState>; 1] {
+pub(crate) fn default_targets(format: TextureFormat) -> [Option<wgpu::ColorTargetState>; 1] {
     [Some(wgpu::ColorTargetState {
         format,
         blend: Some(wgpu::BlendState::ALPHA_BLENDING),
@@ -295,7 +297,7 @@ fn default_targets(format: TextureFormat) -> [Option<wgpu::ColorTargetState>; 1]
     })]
 }
 
-fn default_pipeline_descriptor<'a>(
+pub(crate) fn default_pipeline_descriptor<'a>(
     pipeline_layout: &'a PipelineLayout,
     shader: &'a ShaderModule,
     targets: &'a [Option<wgpu::ColorTargetState>],

@@ -1,5 +1,6 @@
 use eframe::AppCreator;
 use galileo::control::UserEventHandler;
+use galileo::render::HorizonOptions;
 use galileo::Map;
 
 use crate::EguiMapState;
@@ -27,6 +28,19 @@ pub struct InitBuilder {
     web_options: Option<eframe::WebOptions>,
     app_builder: Option<AppBuilder>,
     logging: bool,
+    options: EguiMapOptions,
+}
+
+pub struct EguiMapOptions {
+    pub horizon_options: Option<HorizonOptions>,
+}
+
+impl Default for EguiMapOptions {
+    fn default() -> Self {
+        Self {
+            horizon_options: Some(HorizonOptions::default()),
+        }
+    }
 }
 
 impl InitBuilder {
@@ -40,6 +54,7 @@ impl InitBuilder {
             web_options: None,
             app_builder: None,
             logging: true,
+            options: Default::default(),
         }
     }
 
@@ -73,6 +88,11 @@ impl InitBuilder {
 
     pub fn with_logging(mut self, logging: bool) -> Self {
         self.logging = logging;
+        self
+    }
+
+    pub fn with_horizon_options(mut self, options: Option<HorizonOptions>) -> Self {
+        self.options.horizon_options = options;
         self
     }
 
@@ -113,7 +133,8 @@ impl InitBuilder {
 
         let native_options = self.native_options.unwrap_or_default();
 
-        let app_creator: AppCreator<'static> = app_creator(self.map, handlers, self.app_builder);
+        let app_creator: AppCreator<'static> =
+            app_creator(self.map, handlers, self.app_builder, self.options);
 
         eframe::run_native("Galileo Dev Map", native_options, app_creator)
     }
@@ -144,7 +165,7 @@ impl InitBuilder {
                 .expect("the_canvas_id was not a HtmlCanvasElement");
 
             let app_creator: AppCreator<'static> =
-                app_creator(self.map, handlers, self.app_builder);
+                app_creator(self.map, handlers, self.app_builder, self.options);
 
             let start_result = eframe::WebRunner::new()
                 .start(canvas, web_options, app_creator)
@@ -174,6 +195,7 @@ fn app_creator<'app>(
     map: Map,
     handlers: Vec<Box<dyn UserEventHandler>>,
     app_builder: Option<AppBuilder>,
+    options: EguiMapOptions,
 ) -> eframe::AppCreator<'app> {
     Box::new(move |cc: &eframe::CreationContext<'_>| {
         let ctx = cc.egui_ctx.clone();
@@ -181,7 +203,7 @@ fn app_creator<'app>(
             .wgpu_render_state
             .clone()
             .expect("failed to get wgpu context");
-        let egui_map_state = EguiMapState::new(map, ctx, render_state, handlers);
+        let egui_map_state = EguiMapState::new(map, ctx, render_state, handlers, options);
         let app = app_builder.unwrap_or_else(|| {
             Box::new(|egui_map_state: EguiMapState| {
                 Box::new(MapApp {

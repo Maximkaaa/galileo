@@ -16,7 +16,7 @@ use crate::Color;
 #[cfg(feature = "wgpu")]
 mod wgpu;
 #[cfg(feature = "wgpu")]
-pub use wgpu::WgpuRenderer;
+pub use wgpu::{HorizonOptions, WgpuRenderer};
 
 pub mod point_paint;
 pub mod render_bundle;

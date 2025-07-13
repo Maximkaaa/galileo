@@ -14,6 +14,8 @@ use galileo::layer::attribution::Attribution;
 use galileo::render::WgpuRenderer;
 use galileo::{Map, Messenger};
 
+use crate::init::EguiMapOptions;
+
 pub struct EguiMap<'a> {
     state: &'a mut EguiMapState,
     position: Option<&'a mut GeoPoint2d>,
@@ -83,6 +85,7 @@ impl<'a> EguiMapState {
         ctx: egui::Context,
         render_state: RenderState,
         handlers: impl IntoIterator<Item = Box<dyn UserEventHandler>>,
+        options: EguiMapOptions,
     ) -> Self {
         let requires_redraw = Arc::new(AtomicBool::new(true));
         let messenger = MapStateMessenger {
@@ -100,11 +103,13 @@ impl<'a> EguiMapState {
         let size = Size::new(1, 1);
         map.set_size(size.cast());
 
-        let renderer = WgpuRenderer::new_with_device_and_texture(
+        let mut renderer = WgpuRenderer::new_with_device_and_texture(
             render_state.device.clone(),
             render_state.queue.clone(),
             size,
         );
+        renderer.set_horizon_options(options.horizon_options);
+
         let texture = renderer
             .get_target_texture_view()
             .expect("failed to get map texture");
