@@ -86,6 +86,14 @@ impl MapView {
         })
     }
 
+    /// Projected position of the center point of the map (screen).
+    ///
+    /// Returns `None` if the current set position for the map center is invalid with the view
+    /// projection.
+    pub fn projected_position(&self) -> Option<Point3<f64>> {
+        self.projected_position
+    }
+
     /// Creates a new view same as the current one but with the given position.
     pub fn with_position(&self, position: &impl GeoPoint<Num = f64>) -> Self {
         let projected_position = self
@@ -128,6 +136,10 @@ impl MapView {
         }
     }
 
+    pub(crate) fn horizon_k(&self) -> f64 {
+        4.0
+    }
+
     /// Returns bounding rectangle of the view (in projected coordinates).
     pub fn get_bbox(&self) -> Option<Rect> {
         let points = [
@@ -144,7 +156,7 @@ impl MapView {
             position.x() + self.size.half_width() * self.resolution,
             position.y() + self.size.half_height() * self.resolution,
         )
-        .magnify(4.0);
+        .magnify(self.horizon_k());
 
         if let Some(points) = points
             .into_iter()

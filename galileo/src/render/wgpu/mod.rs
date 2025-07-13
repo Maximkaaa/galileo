@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use ahash::HashMap;
 use cfg_if::cfg_if;
+use effects::horizon::HorizonPipeline;
 use galileo_types::cartesian::{Rect, Size};
 use lyon::tessellation::VertexBuffers;
 use nalgebra::{Point4, Rotation3, Vector3};
@@ -32,7 +33,10 @@ use crate::render::wgpu::pipelines::Pipelines;
 use crate::view::MapView;
 use crate::Color;
 
+mod effects;
 mod pipelines;
+
+pub use effects::horizon::HorizonOptions;
 
 const DEFAULT_BACKGROUND: Color = Color::WHITE;
 const DEPTH_FORMAT: TextureFormat = TextureFormat::Depth24PlusStencil8;
@@ -47,6 +51,7 @@ pub struct WgpuRenderer {
     renderer_targets: Option<RendererTargets>,
     background: Color,
     textures: Mutex<TexturesMap>,
+    horizon_options: Option<HorizonOptions>,
 }
 
 struct RendererTargets {
@@ -55,6 +60,7 @@ struct RendererTargets {
     multisampling_view: TextureView,
     stencil_view_multisample: TextureView,
     stencil_view: TextureView,
+    horizon_effect: Option<HorizonPipeline>,
 }
 
 enum RenderTarget {
@@ -133,6 +139,7 @@ impl WgpuRenderer {
             renderer_targets: None,
             background: DEFAULT_BACKGROUND,
             textures: Default::default(),
+            horizon_options: Some(HorizonOptions::default()),
         })
     }
 
@@ -180,6 +187,7 @@ impl WgpuRenderer {
                 multisampling_view,
                 stencil_view_multisample,
                 stencil_view,
+                horizon_effect,
             }) if new_target.size() == render_target.size() => {
                 let pipelines = if new_target.format() == render_target.format() {
                     pipelines
@@ -193,6 +201,7 @@ impl WgpuRenderer {
                     multisampling_view,
                     stencil_view_multisample,
                     stencil_view,
+                    horizon_effect,
                 })
             }
             _ => self.renderer_targets = Some(self.create_renderer_targets(new_target)),
@@ -209,12 +218,22 @@ impl WgpuRenderer {
 
         let pipelines = Pipelines::create(&self.device, format);
 
+        let horizon_effect = self.horizon_options.map(|options| {
+            HorizonPipeline::create(
+                &self.device,
+                format,
+                &pipelines.map_view_bind_group_layout,
+                options,
+            )
+        });
+
         RendererTargets {
             render_target,
             pipelines,
             multisampling_view,
             stencil_view_multisample,
             stencil_view,
+            horizon_effect,
         }
     }
 
@@ -311,6 +330,7 @@ impl WgpuRenderer {
             renderer_targets: None,
             background: DEFAULT_BACKGROUND,
             textures: Default::default(),
+            horizon_options: Some(HorizonOptions::default()),
         };
         renderer.init_renderer_targets(render_target);
 
@@ -326,6 +346,7 @@ impl WgpuRenderer {
             renderer_targets: None,
             background: DEFAULT_BACKGROUND,
             textures: Default::default(),
+            horizon_options: Some(HorizonOptions::default()),
         };
 
         renderer.init_target_texture(size);
@@ -665,6 +686,79 @@ impl WgpuRenderer {
         if needs_animation {
             map.redraw();
         }
+
+        self.draw_horizon(view, renderer_targets, texture_view);
+    }
+
+    /// Returns options of the horizon effect used by the renderer.
+    pub fn horizon_options(&self) -> &Option<HorizonOptions> {
+        &self.horizon_options
+    }
+
+    /// Updates the options of the horizon effect.
+    ///
+    /// If `None` is given, the effect will not be used.
+    pub fn set_horizon_options(&mut self, options: Option<HorizonOptions>) {
+        self.horizon_options = options;
+        if let Some(targets) = &mut self.renderer_targets {
+            targets.horizon_effect = options.map(|op| {
+                HorizonPipeline::create(
+                    &self.device,
+                    targets.render_target.format(),
+                    &targets.pipelines.map_view_bind_group_layout,
+                    op,
+                )
+            });
+        }
+    }
+
+    fn draw_horizon(
+        &self,
+        view: &MapView,
+        renderer_targets: &RendererTargets,
+        texture_view: &TextureView,
+    ) {
+        let Some(pipeline) = &renderer_targets.horizon_effect else {
+            return;
+        };
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Horizon Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: texture_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                    view: &renderer_targets.stencil_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: StoreOp::Discard,
+                    }),
+                    stencil_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(0),
+                        store: StoreOp::Discard,
+                    }),
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            renderer_targets.pipelines.set_bindings(&mut render_pass);
+            pipeline.render(view, &self.queue, &mut render_pass, 0);
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
     }
 
     /// Returns the size of the rendering area.
@@ -710,7 +804,6 @@ impl WgpuRenderer {
     }
 }
 
-#[allow(dead_code)]
 struct WgpuCanvas<'a> {
     renderer: &'a WgpuRenderer,
     renderer_targets: &'a RendererTargets,
