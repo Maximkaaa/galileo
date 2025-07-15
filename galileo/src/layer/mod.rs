@@ -35,7 +35,7 @@ pub trait Layer: MaybeSend + MaybeSync {
     fn render(&self, view: &MapView, canvas: &mut dyn Canvas);
     /// Prepares the layer for rendering with the given `view`. The preparation may include data downloading, decoding
     /// or other asynchronous operations which cannot be awaited for during render cycle..
-    fn prepare(&self, view: &MapView);
+    fn prepare(&self, view: &MapView, canvas: &mut dyn Canvas);
     /// Sets the messenger for the layer. Messenger is used to notify the application when the layer thinks it should
     /// be updated on the screen.
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>);
@@ -56,8 +56,8 @@ impl<T: Layer + 'static> Layer for Arc<RwLock<T>> {
         self.read().render(position, canvas)
     }
 
-    fn prepare(&self, view: &MapView) {
-        self.read().prepare(view)
+    fn prepare(&self, view: &MapView, canvas: &mut dyn Canvas) {
+        self.read().prepare(view, canvas)
     }
 
     fn set_messenger(&mut self, messenger: Box<dyn Messenger>) {
@@ -92,7 +92,7 @@ impl Layer for TestLayer {
         unimplemented!()
     }
 
-    fn prepare(&self, _view: &MapView) {
+    fn prepare(&self, _view: &MapView, _canvas: &mut dyn Canvas) {
         unimplemented!()
     }
 

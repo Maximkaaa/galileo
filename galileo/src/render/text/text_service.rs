@@ -64,15 +64,21 @@ impl TextService {
         text: &str,
         style: &TextStyle,
         offset: Vector2<f32>,
+        dpi_scale_factor: f32,
     ) -> Result<TextShaping, FontServiceError> {
         let Some(service) = Self::instance() else {
             return Err(FontServiceError::NotInitialized);
         };
 
-        service
-            .rasterizer
-            .read()
-            .shape(text, style, offset, &*service.font_provider)
+        let scaled_style = style.clone();
+
+        service.rasterizer.read().shape(
+            text,
+            &scaled_style,
+            offset,
+            &*service.font_provider,
+            dpi_scale_factor,
+        )
     }
 
     /// Load all fonts from the given directory (recursevly).
