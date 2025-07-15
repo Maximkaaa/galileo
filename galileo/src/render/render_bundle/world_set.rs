@@ -197,7 +197,9 @@ impl WorldRenderSet {
             } => {
                 self.add_shape(point, *fill, *scale, *outline, shape, paint.offset);
             }
-            PointShape::Label { text, style } => self.add_label(point, text, style, paint.offset),
+            PointShape::Label { text, style } => {
+                self.add_label(point, text, style, paint.offset, 1.0)
+            }
         };
     }
 
@@ -550,11 +552,12 @@ impl WorldRenderSet {
         text: &str,
         style: &TextStyle,
         offset: Vector2<f32>,
+        dpi_scale_factor: f32,
     ) where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
-        match TextService::shape(text, style, offset) {
+        match TextService::shape(text, style, offset, dpi_scale_factor) {
             Ok(TextShaping::Tessellation { glyphs, .. }) => {
                 for glyph in glyphs {
                     let vertices_start = self.poly_tessellation.vertices.len() as u32;

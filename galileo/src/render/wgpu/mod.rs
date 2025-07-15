@@ -676,13 +676,19 @@ impl WgpuRenderer {
             return;
         };
 
-        let Some(mut canvas) = WgpuCanvas::new(self, renderer_targets, texture_view, view.clone())
-        else {
+        let Some(mut canvas) = WgpuCanvas::new(
+            self,
+            renderer_targets,
+            texture_view,
+            view.clone(),
+            map.dpi_scale_factor,
+        ) else {
             log::warn!("Layer cannot be rendered to the map view.");
             return;
         };
 
         for layer in map.layers().iter_visible() {
+            layer.prepare(view, &mut canvas);
             layer.render(view, &mut canvas);
         }
 
@@ -813,6 +819,7 @@ struct WgpuCanvas<'a> {
     renderer_targets: &'a RendererTargets,
     view: &'a TextureView,
     map_view: MapView,
+    dpi_scale_factor: f32,
 
     screen_sets: Vec<Arc<Mutex<WgpuScreenSet>>>,
 }
@@ -823,6 +830,7 @@ impl<'a> WgpuCanvas<'a> {
         renderer_targets: &'a RendererTargets,
         view: &'a TextureView,
         map_view: MapView,
+        dpi_scale_factor: f32,
     ) -> Option<Self> {
         let rotation_mtx = Rotation3::new(Vector3::new(
             map_view.rotation_x(),
@@ -850,6 +858,7 @@ impl<'a> WgpuCanvas<'a> {
             renderer_targets,
             view,
             map_view,
+            dpi_scale_factor,
             screen_sets: vec![],
         })
     }
@@ -860,11 +869,16 @@ impl Canvas for WgpuCanvas<'_> {
         self.renderer.size()
     }
 
+    fn dpi_scale_factor(&self) -> f32 {
+        self.dpi_scale_factor
+    }
+
     fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle> {
         Box::new(WgpuPackedBundle::new(
             bundle,
             self.renderer,
             self.renderer_targets,
+            self.dpi_scale_factor,
         ))
     }
 
@@ -1215,10 +1229,12 @@ impl WgpuPackedBundle {
         bundle: &RenderBundle,
         renderer: &WgpuRenderer,
         renderer_targets: &RendererTargets,
+        _dpi_scale_factor: f32,
     ) -> Self {
         let RenderBundle {
             world_set,
             screen_sets: bundle_screen_sets,
+            dpi_scale_factor: _,
         } = bundle;
         let WorldRenderSet {
             poly_tessellation,

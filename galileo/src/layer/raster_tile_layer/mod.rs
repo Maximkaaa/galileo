@@ -161,7 +161,7 @@ impl Layer for RasterTileLayer {
         canvas.draw_bundles_with_opacity(&to_render, RenderOptions::default());
     }
 
-    fn prepare(&self, view: &MapView) {
+    fn prepare(&self, view: &MapView, _canvas: &mut dyn Canvas) {
         if let Some(iter) = self.tile_schema.iter_tiles(view) {
             for index in iter {
                 let tile_provider = self.tile_loader.clone();

@@ -232,6 +232,7 @@ where
     ) {
         let lod = self.select_lod(view.resolution());
         let mut store = lod.bundles.lock();
+        store.set_dpi_scale_factor(canvas.dpi_scale_factor());
 
         match store.required_update() {
             UpdateType::All => {
@@ -369,7 +370,7 @@ where
         self.render_with_projection(view, canvas, &projection);
     }
 
-    fn prepare(&self, _view: &MapView) {
+    fn prepare(&self, _view: &MapView, _canvas: &mut dyn Canvas) {
         // do nothing
     }
 
@@ -432,7 +433,7 @@ where
         self.render_with_projection(view, canvas, projection);
     }
 
-    fn prepare(&self, _view: &MapView) {
+    fn prepare(&self, _view: &MapView, _canvas: &mut dyn Canvas) {
         // do nothing
     }
 
@@ -484,7 +485,7 @@ where
         self.render_with_projection(view, canvas, &projection);
     }
 
-    fn prepare(&self, _view: &MapView) {
+    fn prepare(&self, _view: &MapView, _canvas: &mut dyn Canvas) {
         // do nothing
     }
 

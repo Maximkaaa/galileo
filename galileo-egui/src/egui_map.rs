@@ -225,6 +225,8 @@ impl<'a> EguiMapState {
 
         let (rect, response) = ui.allocate_exact_size(available_size, Sense::click_and_drag());
 
+        self.map.dpi_scale_factor = pixels_per_point;
+
         let attributions = self.collect_attributions();
         if attributions.is_some() {
             egui::Window::new("Attributions")
@@ -352,7 +354,6 @@ impl<'a> EguiMapState {
 
     fn draw(&mut self) {
         log::trace!("Redrawing the map");
-        self.map.load_layers();
         self.renderer
             .render_to_texture_view(&self.map, &self.texture_view);
     }

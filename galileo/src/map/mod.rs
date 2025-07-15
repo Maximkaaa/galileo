@@ -21,6 +21,8 @@ pub struct Map {
     layers: LayerCollection,
     messenger: Option<Box<dyn Messenger>>,
     animation: Option<AnimationParameters>,
+    /// DPI scale factor. Is used to adjust sizes of rendered features to be correctly displayed on HiDPI screens.
+    pub dpi_scale_factor: f32,
 }
 
 struct AnimationParameters {
@@ -42,6 +44,7 @@ impl Map {
             layers: layers.into(),
             messenger,
             animation: None,
+            dpi_scale_factor: 1.0,
         }
     }
 
@@ -65,14 +68,6 @@ impl Map {
         self.view = view;
         if let Some(messenger) = &self.messenger {
             messenger.request_redraw();
-        }
-    }
-
-    /// Calls [`Layer::prepare`] method on all the layers with the current map view. Used to preload layer data before
-    /// the map is rendered.
-    pub fn load_layers(&self) {
-        for layer in self.layers.iter_visible() {
-            layer.prepare(&self.view);
         }
     }
 

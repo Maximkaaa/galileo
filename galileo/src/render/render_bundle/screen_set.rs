@@ -62,12 +62,13 @@ impl ScreenRenderSet {
         text: &str,
         style: &TextStyle,
         offset: Vector2<f32>,
+        dpi_scale_factor: f32,
     ) -> Option<Self>
     where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
-        match TextService::shape(text, style, offset) {
+        match TextService::shape(text, style, offset, dpi_scale_factor) {
             Ok(TextShaping::Tessellation { glyphs, .. }) => {
                 let mut vertices = vec![];
                 let mut indices = vec![];

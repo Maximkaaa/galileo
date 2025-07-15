@@ -84,6 +84,12 @@ impl BundleStore {
         self.bundle_size_limit = limit;
     }
 
+    pub(super) fn set_dpi_scale_factor(&mut self, scale: f32) {
+        for (_, bundle) in &mut self.unpacked {
+            bundle.set_dpi_scale_factor(scale);
+        }
+    }
+
     pub(super) fn clear(&mut self) {
         self.unpacked.clear();
         self.packed.clear();
