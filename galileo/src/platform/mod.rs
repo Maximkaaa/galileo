@@ -1,7 +1,6 @@
 //! Provides platform specific logic and [`PlatformService`] to access it.
 
 use std::sync::LazyLock;
-
 use async_trait::async_trait;
 use bytes::Bytes;
 
@@ -43,7 +42,7 @@ pub mod web;
 /// Default implementation of the [`PlatformService`] for the current platform.
 pub type PlatformServiceImpl = web::WebPlatformService;
 
-static SERVICE: LazyLock<PlatformServiceImpl> = LazyLock::new(|| PlatformServiceImpl::new());
+static SERVICE: LazyLock<PlatformServiceImpl> = LazyLock::new(PlatformServiceImpl::new);
 
 /// Returns the singleton instance of the platform service
 pub fn instance() -> &'static PlatformServiceImpl {
