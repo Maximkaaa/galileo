@@ -35,7 +35,6 @@ galileo-types = { workspace = true }
 geojson = { workspace = true, optional = true }
 geozero = { workspace = true }
 image = { workspace = true, default-features = false, features = ["png", "jpeg"], optional = true }
-lazy_static = { workspace = true }
 log = { workspace = true }
 lyon = { workspace = true, features = ["serialization"] }
 nalgebra = { workspace = true }

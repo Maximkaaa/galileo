@@ -76,7 +76,6 @@ image = { version = "0.24", default-features = false }
 insta = "1.41"
 js-sys = "0.3"
 las = "0.8"
-lazy_static = "1.4"
 log = "0.4"
 lyon = "1"
 maybe-sync = "0.1"
