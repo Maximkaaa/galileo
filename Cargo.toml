@@ -66,7 +66,6 @@ galileo = { path = "galileo", version = "0.2.1" }
 galileo-egui = { path = "galileo-egui", version = "0.2.1" }
 galileo-mvt = { path = "galileo-mvt", version = "0.2.1" }
 galileo-types = { path = "galileo-types", version = "0.2.1" }
-geo = "0.27"
 geodesy = "0.13"
 geojson = "0.24"
 geozero = "0.13"
