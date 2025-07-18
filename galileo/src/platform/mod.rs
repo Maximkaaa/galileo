@@ -1,6 +1,7 @@
 //! Provides platform specific logic and [`PlatformService`] to access it.
 
 use std::sync::LazyLock;
+
 use async_trait::async_trait;
 use bytes::Bytes;
 
