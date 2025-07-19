@@ -61,7 +61,6 @@ eframe = { workspace = true }
 egui = { workspace = true }
 env_logger = { workspace = true }
 galileo-egui = { path = "../galileo-egui", features = ["init"] }
-geo = { workspace = true }
 geo-types = { workspace = true }
 geojson = { workspace = true }
 insta = { workspace = true }
