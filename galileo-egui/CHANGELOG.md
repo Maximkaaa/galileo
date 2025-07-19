@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/Maximkaaa/galileo/compare/galileo-egui-v0.2.1...galileo-egui-v0.3.0)
+
+### ⛰️ Features
+
+
+- Add horizon effect for the wgpu renderer - ([704b23b](https://github.com/Maximkaaa/galileo/commit/704b23b76531f5faa56b8e822c81043897cfae6f))
+
+
 ## [0.2.1](https://github.com/Maximkaaa/galileo/compare/galileo-egui-v0.2.0...galileo-egui-v0.2.1)
 
 ### ⛰️ Features
