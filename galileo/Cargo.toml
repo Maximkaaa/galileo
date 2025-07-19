@@ -53,7 +53,6 @@ winit = { workspace = true, default-features = true, features = ["rwh_06"], opti
 [dev-dependencies]
 anyhow = { workspace = true }
 approx = { workspace = true }
-assert_matches = { workspace = true }
 bincode = { workspace = true, features = ["serde"] }
 csv = { workspace = true }
 eframe = { workspace = true }
