@@ -129,7 +129,8 @@ impl WgpuRenderer {
                 compatible_surface: None,
                 force_fallback_adapter: false,
             })
-            .await?;
+            .await
+            .ok()?;
 
         let (device, queue) = Self::create_device(&adapter).await;
 
@@ -287,7 +288,8 @@ impl WgpuRenderer {
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })
-            .await?;
+            .await
+            .ok()?;
         Some((surface, adapter))
     }
 
@@ -381,22 +383,20 @@ impl WgpuRenderer {
 
     async fn create_device(adapter: &Adapter) -> (Device, Queue) {
         adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::empty(),
-                    required_limits: if cfg!(any(target_arch = "wasm32", target_os = "android")) {
-                        wgpu::Limits {
-                            max_texture_dimension_2d: 4096,
-                            ..wgpu::Limits::downlevel_webgl2_defaults()
-                        }
-                    } else {
-                        wgpu::Limits::default()
-                    },
-                    label: None,
-                    memory_hints: Default::default(),
+            .request_device(&wgpu::DeviceDescriptor {
+                required_features: wgpu::Features::empty(),
+                required_limits: if cfg!(any(target_arch = "wasm32", target_os = "android")) {
+                    wgpu::Limits {
+                        max_texture_dimension_2d: 4096,
+                        ..wgpu::Limits::downlevel_webgl2_defaults()
+                    }
+                } else {
+                    wgpu::Limits::default()
                 },
-                None,
-            )
+                label: None,
+                memory_hints: Default::default(),
+                trace: wgpu::Trace::Off,
+            })
             .await
             .expect("Failed to obtain WGPU device")
     }
@@ -589,7 +589,11 @@ impl WgpuRenderer {
                 log::error!("Failed to send by channel: {err:?}");
             }
         });
-        self.device.poll(wgpu::Maintain::Wait);
+
+        if let Err(err) = self.device.poll(wgpu::PollType::Wait) {
+            log::error!("polling device failed: {err:?}");
+        }
+
         match rx.receive().await {
             Some(result) => match result {
                 Ok(()) => {}
