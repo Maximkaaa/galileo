@@ -14,19 +14,35 @@ use super::text::TextStyle;
 use crate::decoded_image::DecodedImage;
 use crate::render::point_paint::PointPaint;
 use crate::render::render_bundle::world_set::WorldRenderSet;
+impl Default for RenderBundle {
+    fn default() -> Self {
+        Self {
+            world_set: WorldRenderSet::default(),
+            screen_sets: Vec::new(),
+            dpi_scale_factor: 1.0,
+        }
+    }
+}
 use crate::render::{ImagePaint, LinePaint, PolygonPaint};
 
 pub(crate) mod screen_set;
 pub(crate) mod world_set;
 
 /// Render bundle is used to store render primitives and prepare them to be rendered with the rendering backend.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RenderBundle {
     pub(crate) world_set: WorldRenderSet,
     pub(crate) screen_sets: Vec<ScreenRenderSet>,
+    /// DPI scale factor to be applied when packing the bundle
+    pub dpi_scale_factor: f32,
 }
 
 impl RenderBundle {
+    /// Sets the DPI scale factor for this bundle.
+    pub fn set_dpi_scale_factor(&mut self, scale: f32) {
+        self.dpi_scale_factor = scale;
+    }
+
     /// Adds an image to the bundle.
     pub fn add_image(
         &mut self,
@@ -63,7 +79,13 @@ impl RenderBundle {
         P: CartesianPoint3d<Num = N>,
         C: Contour<Point = P>,
     {
-        self.world_set.add_line(line, paint, min_resolution);
+        // Apply DPI scaling to line width if set
+        let mut scaled_paint = *paint;
+        if self.dpi_scale_factor > 0.0 && self.dpi_scale_factor != 1.0 {
+            scaled_paint.width *= self.dpi_scale_factor as f64;
+        }
+
+        self.world_set.add_line(line, &scaled_paint, min_resolution);
     }
 
     /// Adds a polygon to the bundle.
@@ -94,8 +116,16 @@ impl RenderBundle {
         P: CartesianPoint3d<Num = N>,
     {
         if attach_to_map {
-            self.world_set.add_label(position, text, style, offset);
-        } else if let Some(set) = ScreenRenderSet::new_from_label(position, text, style, offset) {
+            // Apply DPI scaling to font size if set
+            let mut scaled_style = style.clone();
+            if self.dpi_scale_factor > 0.0 && self.dpi_scale_factor != 1.0 {
+                scaled_style.font_size *= self.dpi_scale_factor;
+            }
+            self.world_set
+                .add_label(position, text, &scaled_style, offset, self.dpi_scale_factor);
+        } else if let Some(set) =
+            ScreenRenderSet::new_from_label(position, text, style, offset, self.dpi_scale_factor)
+        {
             self.screen_sets.push(set);
         }
     }
