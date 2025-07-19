@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/Maximkaaa/galileo/compare/galileo-v0.2.1...galileo-v0.3.0)
+
+### ⛰️ Features
+
+
+- Add horizon effect for the wgpu renderer - ([704b23b](https://github.com/Maximkaaa/galileo/commit/704b23b76531f5faa56b8e822c81043897cfae6f))
+
+### ⚙️ Miscellaneous Tasks
+
+
+- Remove unused assert_matches dependency - ([2d16acc](https://github.com/Maximkaaa/galileo/commit/2d16acc5f0867912f21da140144ad1c1a3bd90a5))
+- Remove unneeded lazy_static dependency - ([1426427](https://github.com/Maximkaaa/galileo/commit/1426427a0faf972fe313e23e931c97af532e32b6))
+- Remove unneeded geo dependency - ([4b83e3e](https://github.com/Maximkaaa/galileo/commit/4b83e3e18e41a8238803e066f52253faf4d3b0d4))
+
+
 ## [0.2.1](https://github.com/Maximkaaa/galileo/compare/galileo-v0.2.0...galileo-v0.2.1)
 
 ### ⛰️ Features
