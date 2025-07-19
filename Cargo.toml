@@ -68,7 +68,7 @@ galileo-mvt = { path = "galileo-mvt", version = "0.2.1" }
 galileo-types = { path = "galileo-types", version = "0.2.1" }
 geodesy = "0.13"
 geojson = "0.24"
-geozero = "0.13"
+geozero = { version = "0.13", default-features = false }
 geo-types = "0.7"
 getrandom = "0.3"
 image = { version = "0.24", default-features = false }
