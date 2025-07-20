@@ -238,17 +238,42 @@ impl MapView {
         Some(Point2::new(screen_x, screen_y))
     }
 
+    /// Returns whether the screen position is visible
+    pub fn screen_point_visible(&self, screen_pos: &Point2) -> bool {
+        screen_pos.x() < 0.0
+            || screen_pos.x() > self.size.width()
+            || screen_pos.y() < 0.0
+            || screen_pos.y() > self.size.height()
+    }
+
     /// Returns screen point from translating the map position
     /// Clipping out of bounds to `None`
     pub fn map_to_screen_clipped(&self, map_pos: Point2) -> Option<Point2> {
         let screen = self.map_to_screen(map_pos)?;
 
         // Check if the screen coordinates are within bounds
-        if screen.x() < 0.0
-            || screen.x() > self.size.width()
-            || screen.y() < 0.0
-            || screen.y() > self.size.height()
-        {
+        if self.screen_point_visible(&screen) {
+            return None;
+        }
+
+        Some(screen)
+    }
+
+    /// Converts geographic coordinates to screen coordinates.
+    pub fn map_geo_to_screen(&self, geo_position: &GeoPoint2d) -> Option<Point2> {
+        self.crs
+            .get_projection()
+            .and_then(|proj| proj.project(geo_position))
+            .and_then(|map_pos| self.map_to_screen(map_pos))
+    }
+
+    /// Returns screen point from translating the geographic map position
+    /// Clipping out of bounds to `None`
+    pub fn map_geo_to_screen_clipped(&self, geo_position: &GeoPoint2d) -> Option<Point2> {
+        let screen = self.map_geo_to_screen(geo_position)?;
+
+        // Check if the screen coordinates are within bounds
+        if self.screen_point_visible(&screen) {
             return None;
         }
 
@@ -431,6 +456,7 @@ impl MapView {
 #[cfg(test)]
 mod tests {
     use approx::assert_abs_diff_eq;
+    use galileo_types::latlon;
 
     use super::*;
 
@@ -606,5 +632,26 @@ mod tests {
         let out_of_bounds_point = Point2::new(0.0, -200.0);
         let screen_point = view.map_to_screen_clipped(out_of_bounds_point);
         assert!(screen_point.is_none());
+    }
+
+    #[test]
+    fn map_geo_to_screen() {
+        let view = MapView::new(&latlon!(0.0, 0.0), 1.0).with_size(Size::new(100.0, 100.0));
+
+        // Test round-trip: screen -> geo -> screen
+        let original_screen_point = Point2::new(25.0, 75.0);
+        let geo_point = view.screen_to_map_geo(original_screen_point).unwrap();
+        let recovered_screen_point = view.map_geo_to_screen(&geo_point).unwrap();
+        assert_abs_diff_eq!(
+            original_screen_point,
+            recovered_screen_point,
+            epsilon = 0.01
+        );
+
+        // Test round-trip: geo -> screen -> geo
+        let original_geo_point = latlon!(0.001, 0.001);
+        let screen_point = view.map_geo_to_screen(&original_geo_point).unwrap();
+        let recovered_geo_point = view.screen_to_map_geo(screen_point).unwrap();
+        assert_abs_diff_eq!(original_geo_point, recovered_geo_point, epsilon = 0.0001);
     }
 }
