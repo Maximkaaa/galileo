@@ -1,3 +1,4 @@
+use approx::AbsDiffEq;
 use serde::{Deserialize, Serialize};
 
 use crate::geo::traits::point::{GeoPoint, NewGeoPoint};
@@ -28,6 +29,18 @@ impl GeoPoint for GeoPoint2d {
 impl NewGeoPoint<f64> for GeoPoint2d {
     fn latlon(lat: f64, lon: f64) -> Self {
         Self { lat, lon }
+    }
+}
+
+impl AbsDiffEq for GeoPoint2d {
+    type Epsilon = f64;
+
+    fn default_epsilon() -> Self::Epsilon {
+        f64::default_epsilon()
+    }
+
+    fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
+        self.lat.abs_diff_eq(&other.lat, epsilon) && self.lon.abs_diff_eq(&other.lon, epsilon)
     }
 }
 
