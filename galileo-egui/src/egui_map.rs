@@ -158,7 +158,7 @@ impl<'a> EguiMapState {
                 });
         }
 
-        if self.event_processor.is_dragging() || response.contains_pointer() {
+        if self.event_processor.is_dragging() || response.hovered() {
             let events = ui.input(|input_state| input_state.events.clone());
             self.process_events(&events, [-rect.left(), -rect.top()]);
         }
