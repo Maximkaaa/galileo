@@ -198,5 +198,23 @@ You can generate an image yourself running this example
 
 </td>
 </tr>
+<tr>
+<td>
+
+[linestring](./linestring.rs)
+
+</td>
+<td>
+
+![i](https://maximkaaa.github.io/galileo/linestring.png)
+
+</td>
+<td>
+
+- Renders a `LineString` defined in a geojson `FeatureCollection` as a `Contour` in a `FeatureLayer`. Very similar to
+MapLibre GL example ['Add a GeoJSON line'](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-geojson-line/)
+
+</td>
+</tr>
 </tbody>
 </table>
