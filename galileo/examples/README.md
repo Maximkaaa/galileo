@@ -198,5 +198,23 @@ You can generate an image yourself running this example
 
 </td>
 </tr>
+<tr>
+<td>
+
+[linestring](./linestring.rs)
+
+</td>
+<td>
+
+![i](https://private-user-images.githubusercontent.com/47693/468604646-b2ea71c2-48e2-4108-aef9-d9b52d2c522f.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NTMxMjE5MTUsIm5iZiI6MTc1MzEyMTYxNSwicGF0aCI6Ii80NzY5My80Njg2MDQ2NDYtYjJlYTcxYzItNDhlMi00MTA4LWFlZjktZDliNTJkMmM1MjJmLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTA3MjElMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUwNzIxVDE4MTMzNVomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTlhYTE1N2Q2NWY4ZTg3ZmVhYTA5MTY0OWY1YjU5YjEyODY5NjA2YjEwMjMxYTEzZTcxNmM0Y2IyYTY2YjAzOTMmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.JvoXZIbkPuJ5Uu2L8Jx1p07gbVvmZpBrkmrOFqShTVg)
+
+</td>
+<td>
+
+- Renders a `LineString` defined in a geojson `FeatureCollection` as a `Contour` in a `FeatureLayer`. Very similar to
+MapLibre GL example ['Add a GeoJSON line'](https://maplibre.org/maplibre-gl-js/docs/examples/add-a-geojson-line/)
+
+</td>
+</tr>
 </tbody>
 </table>
