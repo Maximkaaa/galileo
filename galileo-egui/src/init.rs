@@ -144,7 +144,7 @@ impl InitBuilder {
         let app_creator: AppCreator<'static> =
             app_creator(self.map, handlers, self.app_builder, self.options);
 
-        let app_name: &str = self.app_name.as_deref().unwrap_or("Galileo Dev Map");
+        let app_name: &str = self.app_name.as_deref().unwrap_or("Galileo Map App");
 
         eframe::run_native(app_name, native_options, app_creator)
     }
