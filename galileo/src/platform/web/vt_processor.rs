@@ -59,20 +59,13 @@ impl VectorTileProcessor for WebWorkerVtProcessor {
         tile: Arc<MvtTile>,
         index: TileIndex,
         style_id: VtStyleId,
-        dpi_scale_factor: f32,
     ) -> Result<RenderBundle, TileProcessingError> {
         let Some(style) = self.get_style(style_id) else {
             return Err(TileProcessingError::InvalidStyle);
         };
 
         self.ww_service
-            .process_vt_tile(
-                tile,
-                index,
-                style,
-                self.tile_schema.clone(),
-                dpi_scale_factor,
-            )
+            .process_vt_tile(tile, index, style, self.tile_schema.clone())
             .await
     }
 }

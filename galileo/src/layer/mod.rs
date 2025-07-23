@@ -49,6 +49,8 @@ pub trait Layer: MaybeSend + MaybeSync {
     }
     /// Returns the attribution of the layer, if available.
     fn attribution(&self) -> Option<Attribution>;
+    /// Loads tiles for the layer.
+    fn load_tiles(&self) {}
 }
 
 impl<T: Layer + 'static> Layer for Arc<RwLock<T>> {

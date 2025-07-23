@@ -19,6 +19,7 @@ impl BundleId {
 
 pub(super) struct BundleStore {
     bundle_size_limit: usize,
+    dpi_scale_factor: f32,
     unpacked: Vec<(BundleId, RenderBundle)>,
     packed: HashMap<BundleId, Box<dyn PackedBundle>>,
     feature_to_bundle_map: HashMap<FeatureId, BundleId>,
@@ -61,6 +62,7 @@ impl BundleStore {
     pub(super) fn new(bundle_size_limit: usize) -> Self {
         Self {
             bundle_size_limit,
+            dpi_scale_factor: 1.0,
             unpacked: vec![],
             packed: HashMap::new(),
             feature_to_bundle_map: HashMap::new(),
@@ -68,7 +70,8 @@ impl BundleStore {
         }
     }
 
-    pub(super) fn pack(&mut self, canvas: &dyn Canvas) {
+    pub(super) fn pack(&mut self, canvas: &mut dyn Canvas) {
+        self.dpi_scale_factor = canvas.dpi_scale_factor();
         for (id, bundle) in std::mem::take(&mut self.unpacked) {
             self.packed.insert(id, canvas.pack_bundle(&bundle));
         }
@@ -82,12 +85,6 @@ impl BundleStore {
 
     pub(super) fn set_bundle_size_limit(&mut self, limit: usize) {
         self.bundle_size_limit = limit;
-    }
-
-    pub(super) fn set_dpi_scale_factor(&mut self, scale: f32) {
-        for (_, bundle) in &mut self.unpacked {
-            bundle.set_dpi_scale_factor(scale);
-        }
     }
 
     pub(super) fn clear(&mut self) {
@@ -113,7 +110,8 @@ impl BundleStore {
     fn curr_bundle(&mut self) -> &mut (BundleId, RenderBundle) {
         if self.last_bundle_is_full() {
             let new_id = BundleId::next();
-            self.unpacked.push((new_id, RenderBundle::default()));
+            self.unpacked
+                .push((new_id, RenderBundle::new(self.dpi_scale_factor)));
         }
 
         let idx = self.unpacked.len() - 1;

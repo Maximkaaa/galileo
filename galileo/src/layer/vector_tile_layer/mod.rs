@@ -76,11 +76,10 @@ impl Layer for VectorTileLayer {
         canvas.draw_bundles_with_opacity(&to_render, RenderOptions::default());
     }
 
-    fn prepare(&self, view: &MapView, canvas: &mut dyn Canvas) {
+    fn prepare(&self, view: &MapView, _canvas: &mut dyn Canvas) {
         if let Some(iter) = self.tile_schema.iter_tiles(view) {
             for index in iter {
-                self.tile_provider
-                    .load_tile(index, self.style_id, canvas.dpi_scale_factor());
+                self.tile_provider.load_tile(index, self.style_id);
             }
         }
     }
@@ -240,8 +239,7 @@ impl VectorTileLayer {
         view: &MapView,
         canvas: &mut dyn Canvas,
     ) -> Option<Box<dyn PackedBundle>> {
-        let mut bundle = RenderBundle::default();
-        bundle.set_dpi_scale_factor(canvas.dpi_scale_factor());
+        let mut bundle = RenderBundle::new(canvas.dpi_scale_factor());
         let bbox = view.get_bbox()?;
         let bounds = Polygon::new(
             ClosedContour::new(vec![

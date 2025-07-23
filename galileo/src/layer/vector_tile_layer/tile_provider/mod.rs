@@ -93,7 +93,7 @@ impl VectorTileProvider {
     /// Load and pre-render the tile with given index using given style.
     ///
     /// A style with given id must first be registered in the provider.
-    pub fn load_tile(&self, index: TileIndex, style_id: VtStyleId, dpi_scale_factor: f32) {
+    pub fn load_tile(&self, index: TileIndex, style_id: VtStyleId) {
         if !self.processor.has_style(style_id) {
             log::warn!("Requested tile loading with non-existing style");
             return;
@@ -126,8 +126,7 @@ impl VectorTileProvider {
 
             log::debug!("Tile {index:?} is loaded. Preparing.");
 
-            let tile_state =
-                Self::prepare_tile(tile_state, index, style_id, processor, dpi_scale_factor).await;
+            let tile_state = Self::prepare_tile(tile_state, index, style_id, processor).await;
 
             log::debug!("tile {index:?} is prepared.");
 
@@ -149,8 +148,7 @@ impl VectorTileProvider {
         let mut store = self.tiles.write();
         for index in indices {
             if let Some((tile, mvt_tile)) = store.get_prepared(*index, style_id) {
-                let mut bundle = (*tile).clone();
-                bundle.set_dpi_scale_factor(canvas.dpi_scale_factor());
+                let bundle = (*tile).clone();
                 let packed = canvas.pack_bundle(&bundle);
                 store.store_tile(
                     *index,
@@ -199,12 +197,11 @@ impl VectorTileProvider {
         index: TileIndex,
         style_id: VtStyleId,
         processor: Arc<dyn VectorTileProcessor>,
-        dpi_scale_factor: f32,
     ) -> PreparedTileState {
         match mvt_tile_state {
             MvtTileState::Loaded(mvt_tile) => {
                 match processor
-                    .process_tile(mvt_tile.clone(), index, style_id, dpi_scale_factor)
+                    .process_tile(mvt_tile.clone(), index, style_id)
                     .await
                 {
                     Ok(render_bundle) => PreparedTileState::Loaded(Arc::new(render_bundle)),

@@ -14,7 +14,7 @@ use crate::render::text::{TextRasterizer, TextShaping, TextStyle};
 static INSTANCE: OnceLock<TextService> = OnceLock::new();
 
 /// Error from a font service
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum FontServiceError {
     /// Error parsing font face file
     #[error(transparent)]
@@ -70,11 +70,9 @@ impl TextService {
             return Err(FontServiceError::NotInitialized);
         };
 
-        let scaled_style = style.clone();
-
         service.rasterizer.read().shape(
             text,
-            &scaled_style,
+            style,
             offset,
             &*service.font_provider,
             dpi_scale_factor,

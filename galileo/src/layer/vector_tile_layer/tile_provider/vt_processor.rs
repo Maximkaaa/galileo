@@ -36,9 +36,7 @@ impl VtProcessor {
         index: TileIndex,
         style: &VectorTileStyle,
         tile_schema: &TileSchema,
-        dpi_scale_factor: f32,
     ) -> Result<(), GalileoError> {
-        bundle.set_dpi_scale_factor(dpi_scale_factor);
         let bbox = tile_schema
             .tile_bbox(index)
             .ok_or_else(|| GalileoError::Generic("cannot get tile bbox".into()))?;

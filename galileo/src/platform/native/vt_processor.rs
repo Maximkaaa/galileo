@@ -55,7 +55,6 @@ impl VectorTileProcessor for ThreadVtProcessor {
         tile: Arc<MvtTile>,
         index: TileIndex,
         style_id: VtStyleId,
-        dpi_scale_factor: f32,
     ) -> Result<RenderBundle, TileProcessingError> {
         // todo: remove clone here
         let Some(style) = self.styles.read().get(&style_id).cloned() else {
@@ -72,14 +71,8 @@ impl VectorTileProcessor for ThreadVtProcessor {
                 "Added worker: {}",
                 COUNTER.fetch_add(1, Ordering::Relaxed) + 1
             );
-            let result = match VtProcessor::prepare(
-                &tile,
-                &mut bundle,
-                index,
-                &style,
-                &tile_schema,
-                dpi_scale_factor,
-            ) {
+            let result = match VtProcessor::prepare(&tile, &mut bundle, index, &style, &tile_schema)
+            {
                 Ok(()) => Ok(bundle),
                 Err(_) => Err(TileProcessingError::Rendering),
             };

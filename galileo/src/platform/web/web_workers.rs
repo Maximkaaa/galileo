@@ -82,7 +82,6 @@ enum WebWorkerRequestPayload {
         index: TileIndex,
         style: VectorTileStyle,
         tile_schema: TileSchema,
-        dpi_scale_factor: f32,
     },
     LoadFont {
         font_data: Bytes,
@@ -154,7 +153,6 @@ impl WebWorkerService {
         index: TileIndex,
         style: Arc<VectorTileStyle>,
         tile_schema: TileSchema,
-        dpi_scale_factor: f32,
     ) -> Result<RenderBundle, TileProcessingError> {
         let response = self
             .request_operation(
@@ -163,7 +161,6 @@ impl WebWorkerService {
                     index,
                     style: (*style).clone(),
                     tile_schema,
-                    dpi_scale_factor,
                 },
                 self.next_worker(),
             )
@@ -442,8 +439,7 @@ mod worker {
                 index,
                 style,
                 tile_schema,
-                dpi_scale_factor,
-            } => process_vt_tile(tile, index, style, tile_schema, dpi_scale_factor),
+            } => process_vt_tile(tile, index, style, tile_schema),
             WebWorkerRequestPayload::LoadFont { font_data } => load_font(font_data),
         }
     }
@@ -469,17 +465,9 @@ mod worker {
         index: TileIndex,
         style: VectorTileStyle,
         tile_schema: TileSchema,
-        dpi_scale_factor: f32,
     ) -> WebWorkerResponsePayload {
         let mut bundle = RenderBundle::default();
-        let result = match VtProcessor::prepare(
-            &tile,
-            &mut bundle,
-            index,
-            &style,
-            &tile_schema,
-            dpi_scale_factor,
-        ) {
+        let result = match VtProcessor::prepare(&tile, &mut bundle, index, &style, &tile_schema) {
             Ok(()) => Ok(bundle),
             Err(_) => Err(TileProcessingError::Rendering),
         };

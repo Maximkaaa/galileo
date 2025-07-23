@@ -31,6 +31,7 @@ pub(crate) struct WorldRenderSet {
     pub clip_area: Option<VertexBuffers<PolyVertex, u32>>,
     pub image_store: Vec<Arc<DecodedImage>>,
     pub buffer_size: usize,
+    dpi_scale_factor: f32,
 }
 
 #[repr(C)]
@@ -50,12 +51,12 @@ pub(crate) struct ScreenRefVertex {
 
 impl Default for WorldRenderSet {
     fn default() -> Self {
-        Self::new()
+        Self::new(1.0)
     }
 }
 
 impl WorldRenderSet {
-    pub fn new() -> Self {
+    pub fn new(dpi_scale_factor: f32) -> Self {
         Self {
             poly_tessellation: VertexBuffers::new(),
             points: Vec::new(),
@@ -63,6 +64,7 @@ impl WorldRenderSet {
             clip_area: None,
             image_store: Vec::new(),
             buffer_size: 0,
+            dpi_scale_factor,
         }
     }
 
@@ -197,9 +199,7 @@ impl WorldRenderSet {
             } => {
                 self.add_shape(point, *fill, *scale, *outline, shape, paint.offset);
             }
-            PointShape::Label { text, style } => {
-                self.add_label(point, text, style, paint.offset, 1.0)
-            }
+            PointShape::Label { text, style } => self.add_label(point, text, style, paint.offset),
         };
     }
 
@@ -248,7 +248,7 @@ impl WorldRenderSet {
         let path = path_builder.build();
 
         let vertex_constructor = LineVertexConstructor {
-            width: paint.width as f32,
+            width: paint.width as f32 * self.dpi_scale_factor,
             offset: paint.offset as f32,
             color: paint.color.to_f32_array(),
             resolution: min_resolution as f32,
@@ -376,7 +376,7 @@ impl WorldRenderSet {
         P: CartesianPoint3d<Num = N>,
     {
         let mut path_builder = BuilderWithAttributes::new(0);
-        build_contour_path(&mut path_builder, shape, scale);
+        build_contour_path(&mut path_builder, shape, scale * self.dpi_scale_factor);
         let path = path_builder.build();
 
         let start_vertex_count = self.poly_tessellation.vertices.len();
@@ -477,7 +477,7 @@ impl WorldRenderSet {
 
         let is_full_circle = (dr - std::f32::consts::PI * 2.0).abs() < TOLERANCE;
 
-        let mut contour = get_circle_sector(radius, start_angle, end_angle);
+        let mut contour = get_circle_sector(radius * self.dpi_scale_factor, start_angle, end_angle);
         let first_index = self.poly_tessellation.vertices.len() as u32;
 
         let start_vertex_count = self.poly_tessellation.vertices.len();
@@ -509,15 +509,16 @@ impl WorldRenderSet {
         self.poly_tessellation.vertices.append(&mut vertices);
         self.poly_tessellation.indices.append(&mut indices);
 
-        if outline.is_some() {
+        if let Some(mut outline) = outline {
             if !is_full_circle {
                 contour.push(Point2::new(0.0, 0.0));
             }
+            outline.width *= self.dpi_scale_factor as f64;
             self.add_shape(
                 position,
                 Color::TRANSPARENT,
                 radius,
-                outline,
+                Some(outline),
                 &ClosedContour::new(contour),
                 offset,
             );
@@ -552,12 +553,11 @@ impl WorldRenderSet {
         text: &str,
         style: &TextStyle,
         offset: Vector2<f32>,
-        dpi_scale_factor: f32,
     ) where
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
-        match TextService::shape(text, style, offset, dpi_scale_factor) {
+        match TextService::shape(text, style, offset, self.dpi_scale_factor) {
             Ok(TextShaping::Tessellation { glyphs, .. }) => {
                 for glyph in glyphs {
                     let vertices_start = self.poly_tessellation.vertices.len() as u32;
