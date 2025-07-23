@@ -29,6 +29,7 @@ pub struct InitBuilder {
     app_builder: Option<AppBuilder>,
     logging: bool,
     options: EguiMapOptions,
+    #[cfg(not(target_arch = "wasm32"))]
     app_name: Option<String>,
 }
 
@@ -56,6 +57,7 @@ impl InitBuilder {
             app_builder: None,
             logging: true,
             options: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
             app_name: None,
         }
     }
