@@ -140,7 +140,7 @@ Most of the Galileo examples can be run in browser. You will need to have `wasm_
 on your system:
 
 ```shell
-just web_example <example_name>
+just run_web_example <example_name>
 ```
 
 Then just open `localhost:8000` in your browser.
@@ -182,7 +182,7 @@ comes with additional advantages:
 * Increase development speed.
 * Make your needs our priority.
 * See your logo on the project's page.
-* 
+*
 
 ## Current sponsors
 

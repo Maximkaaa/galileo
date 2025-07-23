@@ -235,7 +235,7 @@ pub(crate) fn run() {
     initialize_font_service();
     let map = create_map();
     galileo_egui::InitBuilder::new(map)
-        .with_app_builder(|egui_map_state| Box::new(EguiMapApp::new(egui_map_state)))
+        .with_app_builder(|egui_map_state, _| Box::new(EguiMapApp::new(egui_map_state)))
         .init()
         .expect("failed to initialize");
 }

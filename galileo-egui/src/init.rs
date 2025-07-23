@@ -1,4 +1,4 @@
-use eframe::AppCreator;
+use eframe::{AppCreator, CreationContext};
 use galileo::control::UserEventHandler;
 use galileo::render::HorizonOptions;
 use galileo::Map;
@@ -17,7 +17,7 @@ impl eframe::App for MapApp {
     }
 }
 
-type AppBuilder = Box<dyn FnOnce(EguiMapState) -> Box<dyn eframe::App>>;
+type AppBuilder = Box<dyn FnOnce(EguiMapState, &CreationContext<'_>) -> Box<dyn eframe::App>>;
 
 pub struct InitBuilder {
     map: Map,
@@ -80,7 +80,7 @@ impl InitBuilder {
 
     pub fn with_app_builder(
         mut self,
-        app_builder: impl FnOnce(EguiMapState) -> Box<dyn eframe::App> + 'static,
+        app_builder: impl FnOnce(EguiMapState, &CreationContext<'_>) -> Box<dyn eframe::App> + 'static,
     ) -> Self {
         self.app_builder = Some(Box::new(app_builder));
         self
@@ -205,12 +205,12 @@ fn app_creator<'app>(
             .expect("failed to get wgpu context");
         let egui_map_state = EguiMapState::new(map, ctx, render_state, handlers, options);
         let app = app_builder.unwrap_or_else(|| {
-            Box::new(|egui_map_state: EguiMapState| {
+            Box::new(|egui_map_state: EguiMapState, _: &CreationContext<'_>| {
                 Box::new(MapApp {
                     map: egui_map_state,
                 })
             })
-        })(egui_map_state);
+        })(egui_map_state, cc);
         Ok(app)
     })
 }
