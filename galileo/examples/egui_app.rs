@@ -8,8 +8,7 @@ use galileo_types::geo::GeoPoint;
 
 const STORAGE_KEY: &str = "galileo_egui_app_example";
 
-#[derive(serde::Deserialize, serde::Serialize, Default)]
-#[serde(default)]
+#[derive(serde::Deserialize, serde::Serialize)]
 struct AppStorage {
     position: GeoPoint2d,
     resolution: f64,
