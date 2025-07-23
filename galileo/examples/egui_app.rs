@@ -62,6 +62,7 @@ pub(crate) fn run() {
     let map = create_map();
     galileo_egui::InitBuilder::new(map)
         .with_app_builder(|egui_map_state| Box::new(EguiMapApp::new(egui_map_state)))
+        .with_app_name("galileo egui app")
         .init()
         .expect("failed to initialize");
 }
