@@ -33,7 +33,7 @@ impl EguiMapApp {
         // get initial resolution from map
         let initial_resolution = egui_map_state.map().view().resolution();
 
-        // Try to get storaged values or use initial values
+        // Try to get stored values or use initial values
         let AppStorage {
             position,
             resolution,
