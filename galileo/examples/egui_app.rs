@@ -1,6 +1,5 @@
 //! Example showing how to integrate Galileo map into your egui application.
 
-use eframe::CreationContext;
 use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::{Map, MapBuilder};
 use galileo_egui::{EguiMap, EguiMapState};
@@ -23,7 +22,7 @@ struct EguiMapApp {
 }
 
 impl EguiMapApp {
-    fn new(egui_map_state: EguiMapState, cc: &CreationContext<'_>) -> Self {
+    fn new(egui_map_state: EguiMapState, cc: &eframe::CreationContext<'_>) -> Self {
         // get initial position from map
         let initial_position = egui_map_state
             .map()
