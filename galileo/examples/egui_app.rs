@@ -6,6 +6,14 @@ use galileo_egui::{EguiMap, EguiMapState};
 use galileo_types::geo::impls::GeoPoint2d;
 use galileo_types::geo::GeoPoint;
 
+const STORAGE_KEY: &str = "galileo_egui_app_example";
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct AppStorage {
+    position: GeoPoint2d,
+    resolution: f64,
+}
+
 struct EguiMapApp {
     map: EguiMapState,
     position: GeoPoint2d,
@@ -13,13 +21,27 @@ struct EguiMapApp {
 }
 
 impl EguiMapApp {
-    fn new(egui_map_state: EguiMapState) -> Self {
-        let position = egui_map_state
+    fn new(egui_map_state: EguiMapState, cc: &eframe::CreationContext<'_>) -> Self {
+        // get initial position from map
+        let initial_position = egui_map_state
             .map()
             .view()
             .position()
             .expect("invalid map position");
-        let resolution = egui_map_state.map().view().resolution();
+        // get initial resolution from map
+        let initial_resolution = egui_map_state.map().view().resolution();
+
+        // Try to get stored values or use initial values
+        let AppStorage {
+            position,
+            resolution,
+        } = cc
+            .storage
+            .and_then(|storage| eframe::get_value(storage, STORAGE_KEY))
+            .unwrap_or(AppStorage {
+                position: initial_position,
+                resolution: initial_resolution,
+            });
 
         Self {
             map: egui_map_state,
@@ -51,25 +73,39 @@ impl eframe::App for EguiMapApp {
             });
         });
     }
+
+    // Called by egui to save state before shutdown.
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(
+            storage,
+            STORAGE_KEY,
+            &AppStorage {
+                position: self.position,
+                resolution: self.resolution,
+            },
+        );
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    run()
+    let map = create_map();
+
+    galileo_egui::InitBuilder::new(map)
+        .with_app_builder(|egui_map_state, cc| Box::new(EguiMapApp::new(egui_map_state, cc)))
+        .with_app_name("galileo egui app")
+        .init()
+        .expect("failed to initialize");
 }
 
+#[cfg(target_arch = "wasm32")]
 pub(crate) fn run() {
     let map = create_map();
 
-    let mut builder = galileo_egui::InitBuilder::new(map)
-        .with_app_builder(|egui_map_state| Box::new(EguiMapApp::new(egui_map_state)));
-
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        builder = builder.with_app_name("galileo egui app")
-    }
-
-    builder.init().expect("failed to initialize");
+    galileo_egui::InitBuilder::new(map)
+        .with_app_builder(|egui_map_state, cc| Box::new(EguiMapApp::new(egui_map_state, cc)))
+        .init()
+        .expect("failed to initialize");
 }
 
 fn create_map() -> Map {

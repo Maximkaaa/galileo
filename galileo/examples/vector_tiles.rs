@@ -121,7 +121,7 @@ pub(crate) fn run() {
     let map = MapBuilder::default().with_layer(layer.clone()).build();
     galileo_egui::InitBuilder::new(map)
         .with_handlers([Box::new(handler) as Box<dyn UserEventHandler>])
-        .with_app_builder(|egui_map_state| Box::new(App::new(egui_map_state, layer)))
+        .with_app_builder(|egui_map_state, _| Box::new(App::new(egui_map_state, layer)))
         .init()
         .expect("failed to initialize");
 }
