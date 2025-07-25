@@ -32,6 +32,8 @@ pub struct InitBuilder {
     options: EguiMapOptions,
     #[cfg(not(target_arch = "wasm32"))]
     app_name: Option<String>,
+    #[cfg(target_arch = "wasm32")]
+    canvas_id: Option<String>,
 }
 
 pub struct EguiMapOptions {
@@ -60,6 +62,8 @@ impl InitBuilder {
             options: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             app_name: None,
+            #[cfg(target_arch = "wasm32")]
+            canvas_id: None,
         }
     }
 
@@ -105,6 +109,12 @@ impl InitBuilder {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn with_app_name(mut self, app_name: &str) -> Self {
         self.app_name = Some(app_name.to_owned());
+        self
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn with_canvas_id(mut self, canvas_id: &str) -> Self {
+        self.canvas_id = Some(canvas_id.to_owned());
         self
     }
 
@@ -172,11 +182,12 @@ impl InitBuilder {
                 .document()
                 .expect("No document");
 
+            let canvas_id = self.canvas_id.unwrap_or("the_canvas_id".to_owned());
             let canvas = document
-                .get_element_by_id("the_canvas_id")
-                .expect("Failed to find the_canvas_id")
+                .get_element_by_id(&canvas_id)
+                .expect("Failed to find canvas element by an id")
                 .dyn_into::<web_sys::HtmlCanvasElement>()
-                .expect("the_canvas_id was not a HtmlCanvasElement");
+                .expect("element found by an id was not an HtmlCanvasElement");
 
             let app_creator: AppCreator<'static> =
                 app_creator(self.map, handlers, self.app_builder, self.options);
