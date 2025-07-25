@@ -89,11 +89,19 @@ impl eframe::App for EguiMapApp {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    run()
+    let map = create_map();
+
+    galileo_egui::InitBuilder::new(map)
+        .with_app_builder(|egui_map_state, cc| Box::new(EguiMapApp::new(egui_map_state, cc)))
+        .with_app_name("galileo egui app")
+        .init()
+        .expect("failed to initialize");
 }
 
+#[cfg(target_arch = "wasm32")]
 pub(crate) fn run() {
     let map = create_map();
+
     galileo_egui::InitBuilder::new(map)
         .with_app_builder(|egui_map_state, cc| Box::new(EguiMapApp::new(egui_map_state, cc)))
         .init()

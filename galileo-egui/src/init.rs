@@ -30,6 +30,8 @@ pub struct InitBuilder {
     app_builder: Option<AppBuilder>,
     logging: bool,
     options: EguiMapOptions,
+    #[cfg(not(target_arch = "wasm32"))]
+    app_name: Option<String>,
 }
 
 pub struct EguiMapOptions {
@@ -56,6 +58,8 @@ impl InitBuilder {
             app_builder: None,
             logging: true,
             options: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            app_name: None,
         }
     }
 
@@ -95,6 +99,12 @@ impl InitBuilder {
 
     pub fn with_horizon_options(mut self, options: Option<HorizonOptions>) -> Self {
         self.options.horizon_options = options;
+        self
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn with_app_name(mut self, app_name: &str) -> Self {
+        self.app_name = Some(app_name.to_owned());
         self
     }
 
@@ -138,7 +148,9 @@ impl InitBuilder {
         let app_creator: AppCreator<'static> =
             app_creator(self.map, handlers, self.app_builder, self.options);
 
-        eframe::run_native("Galileo Dev Map", native_options, app_creator)
+        let app_name: &str = self.app_name.as_deref().unwrap_or("Galileo Map App");
+
+        eframe::run_native(app_name, native_options, app_creator)
     }
 
     #[cfg(target_arch = "wasm32")]
