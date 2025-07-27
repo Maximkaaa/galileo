@@ -1,3 +1,5 @@
+//! Galileo map widget for EGUI framework. See [`EguiMap`].
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -16,6 +18,60 @@ use galileo::{Map, Messenger};
 
 use crate::init::EguiMapOptions;
 
+/// Galileo map widget for EGUI framework.
+///
+/// # Example
+///
+/// ```no_run
+/// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+/// use galileo::MapBuilder;
+/// use galileo_egui::{EguiMap, EguiMapState, EguiMapOptions};
+/// use galileo::galileo_types::latlon;
+/// use galileo::galileo_types::geo::impls::GeoPoint2d;
+///
+/// struct MapApp {
+///     pub map: EguiMapState,
+///     pub position: GeoPoint2d,
+///     pub resolution: f64,
+/// }
+///
+/// impl eframe::App for MapApp {
+///     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+///         egui::CentralPanel::default().show(ctx, |ui| {
+///             EguiMap::new(&mut self.map)
+///                 .with_position(&mut self.position)
+///                 .with_resolution(&mut self.resolution)
+///                 .show_ui(ui);
+///         });
+///     }
+/// }
+///
+/// let raster_layer = RasterTileLayerBuilder::new_osm()
+///     .build()
+///     .expect("failed to create layer");
+///
+/// let map = MapBuilder::default()
+///     .with_layer(raster_layer)
+///     .build();
+///
+/// let app_creator = move |cc: &eframe::CreationContext<'_>| {
+///     let ctx = cc.egui_ctx.clone();
+///     let render_state = cc
+///         .wgpu_render_state
+///         .clone()
+///         .expect("failed to get wgpu context");
+///     let egui_map_state = EguiMapState::new(map, ctx, render_state, [], EguiMapOptions::default());
+///     let app: Box<dyn eframe::App> = Box::new(MapApp {
+///         map: egui_map_state,
+///         position: latlon!(55.0, 37.0),
+///         resolution: 15000.0,
+///     });
+///
+///     Ok(app)
+/// };
+///
+/// eframe::run_native("Galileo Map in EGUI", eframe::NativeOptions::default(), Box::new(app_creator));
+/// ```
 pub struct EguiMap<'a> {
     state: &'a mut EguiMapState,
     position: Option<&'a mut GeoPoint2d>,
@@ -23,6 +79,7 @@ pub struct EguiMap<'a> {
 }
 
 impl<'a> EguiMap<'a> {
+    /// Creates a new instance of widget.
     pub fn new(state: &'a mut EguiMapState) -> Self {
         Self {
             state,
@@ -31,6 +88,10 @@ impl<'a> EguiMap<'a> {
         }
     }
 
+    /// Sets the position of the center of the map.
+    ///
+    /// If not specified, the center position will be controlled by the widget itself through user
+    /// controls.
     pub fn with_position(&'a mut self, position: &'a mut GeoPoint2d) -> &'a mut Self {
         let curr_view = self.state.map.view();
         if curr_view.position() != Some(*position) {
@@ -41,6 +102,9 @@ impl<'a> EguiMap<'a> {
         self
     }
 
+    /// Sets the resolution of the map.
+    ///
+    /// If not set, resolution will be controller by the user input.
     pub fn with_resolution(&'a mut self, resolution: &'a mut f64) -> &'a mut Self {
         let curr_view = self.state.map.view();
         if curr_view.resolution() != *resolution {
@@ -53,6 +117,9 @@ impl<'a> EguiMap<'a> {
         self
     }
 
+    /// Renders the map into the ui.
+    ///
+    /// The map will occupy all available space in the current panel.
     pub fn show_ui(&mut self, ui: &mut Ui) {
         self.state.render(ui);
 
@@ -69,6 +136,7 @@ impl<'a> EguiMap<'a> {
     }
 }
 
+/// State of the map widget.
 pub struct EguiMapState {
     map: Map,
     egui_render_state: RenderState,
@@ -80,6 +148,12 @@ pub struct EguiMapState {
 }
 
 impl<'a> EguiMapState {
+    /// Creates a new instance of the state.
+    ///
+    /// Only one instance of the state should be created for the same map, as it controls internal
+    /// state of the map. Keep it inside your application state.
+    ///
+    /// You can add interactivity to the map by specifying event `handlers` the map will react to.
     pub fn new(
         mut map: Map,
         ctx: egui::Context,
@@ -136,10 +210,12 @@ impl<'a> EguiMapState {
         }
     }
 
+    /// Lets the map know that it should be rendered on the next render cycle.
     pub fn request_redraw(&self) {
         self.map.redraw();
     }
 
+    /// Renders the map into UI.
     pub fn render(&mut self, ui: &mut egui::Ui) {
         let available_size = ui.available_size().floor();
         let map_size = self.renderer.size().cast::<f32>();
@@ -180,7 +256,7 @@ impl<'a> EguiMapState {
         .paint_at(ui, rect);
     }
 
-    pub fn collect_attributions(&mut self) -> Option<Vec<Attribution>> {
+    fn collect_attributions(&mut self) -> Option<Vec<Attribution>> {
         let all_layer: Vec<Attribution> = self
             .map
             .layers()
@@ -201,7 +277,7 @@ impl<'a> EguiMapState {
         }
     }
 
-    pub fn show_attributions(&mut self, ui: &mut egui::Ui) {
+    fn show_attributions(&mut self, ui: &mut egui::Ui) {
         let attributions = self
             .collect_attributions()
             .expect("Failed to collect attributions");
@@ -216,10 +292,12 @@ impl<'a> EguiMapState {
         }
     }
 
+    /// Returns a reference to the Galileo map instance.
     pub fn map(&'a self) -> &'a Map {
         &self.map
     }
 
+    /// Returns a mutable reference to the Galileo map instance.
     pub fn map_mut(&'a mut self) -> &'a mut Map {
         &mut self.map
     }

@@ -1,3 +1,6 @@
+//! Helpers to initialize a simple egui application with a map. See documentation for
+//! [`InitBuilder`].
+
 use eframe::AppCreator;
 use galileo::control::UserEventHandler;
 use galileo::render::HorizonOptions;
@@ -20,6 +23,35 @@ impl eframe::App for MapApp {
 type AppBuilder =
     Box<dyn FnOnce(EguiMapState, &eframe::CreationContext<'_>) -> Box<dyn eframe::App>>;
 
+/// Helper constructor of a map application.
+///
+/// This structure is meant to be used primary for development purposes or in simple examples. If
+/// you need more customization to your `egui` setup, you should create [`EguiMap`] widget
+/// manually.
+///
+/// # Example
+///
+/// ```no_run
+/// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+/// use galileo::{Map, MapBuilder};
+///
+/// galileo_egui::InitBuilder::new(create_map())
+///     .init()
+///     .expect("failed to initialize");
+///
+/// fn create_map() -> Map {
+///     let raster_layer = RasterTileLayerBuilder::new_osm()
+///         .with_file_cache_checked(".tile_cache")
+///         .build()
+///         .expect("failed to create layer");
+///
+///     MapBuilder::default()
+///         .with_latlon(37.566, 128.9784)
+///         .with_z_level(8)
+///         .with_layer(raster_layer)
+///         .build()
+/// }
+/// ```
 pub struct InitBuilder {
     map: Map,
     handlers: Vec<Box<dyn UserEventHandler>>,
@@ -36,8 +68,9 @@ pub struct InitBuilder {
     canvas_id: Option<String>,
 }
 
+/// Options of the map
 pub struct EguiMapOptions {
-    pub horizon_options: Option<HorizonOptions>,
+    pub(crate) horizon_options: Option<HorizonOptions>,
 }
 
 impl Default for EguiMapOptions {
@@ -49,6 +82,7 @@ impl Default for EguiMapOptions {
 }
 
 impl InitBuilder {
+    /// Creates a new instance of the builder with the given Galileo map.
     pub fn new(map: Map) -> Self {
         Self {
             map,
@@ -67,18 +101,25 @@ impl InitBuilder {
         }
     }
 
+    /// Sets the native EGUI options.
+    ///
+    /// If not set, default options are used.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn with_native_options(mut self, options: eframe::NativeOptions) -> Self {
         self.native_options = Some(options);
         self
     }
 
+    /// Sets the web EGUI options.
+    ///
+    /// If not set, default options are used.
     #[cfg(target_arch = "wasm32")]
     pub fn with_web_options(mut self, options: eframe::WebOptions) -> Self {
         self.web_options = Some(options);
         self
     }
 
+    /// Adds the event handlers to the map.
     pub fn with_handlers(
         mut self,
         handlers: impl IntoIterator<Item = Box<dyn UserEventHandler>>,
@@ -87,6 +128,7 @@ impl InitBuilder {
         self
     }
 
+    /// Sets a custom app builder.
     pub fn with_app_builder(
         mut self,
         app_builder: impl FnOnce(EguiMapState, &eframe::CreationContext<'_>) -> Box<dyn eframe::App>
@@ -96,28 +138,38 @@ impl InitBuilder {
         self
     }
 
+    /// If `false` is set, `InitBuilder` will not initialize the logger.
+    ///
+    /// If not set or set to `true`, `env_logger` will be configured for native platforms or
+    /// `console_log` for web.
     pub fn with_logging(mut self, logging: bool) -> Self {
         self.logging = logging;
         self
     }
 
+    /// Sets the horizon options of the map.
     pub fn with_horizon_options(mut self, options: Option<HorizonOptions>) -> Self {
         self.options.horizon_options = options;
         self
     }
 
+    /// Sets the name of the application window.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn with_app_name(mut self, app_name: &str) -> Self {
         self.app_name = Some(app_name.to_owned());
         self
     }
 
+    /// Sets the `id` property of the canvas that the application will be rendered to.
     #[cfg(target_arch = "wasm32")]
     pub fn with_canvas_id(mut self, canvas_id: &str) -> Self {
         self.canvas_id = Some(canvas_id.to_owned());
         self
     }
 
+    /// Starts the application.
+    ///
+    /// This function will block until the application is exited.
     pub fn init(self) -> eframe::Result {
         #[cfg(not(target_arch = "wasm32"))]
         {
