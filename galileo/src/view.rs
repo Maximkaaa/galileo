@@ -25,6 +25,7 @@ pub struct MapView {
     rotation_z: f64,
     size: Size,
     crs: Crs,
+    dpi_scale_factor: f32,
 }
 
 impl MapView {
@@ -46,6 +47,7 @@ impl MapView {
             rotation_x: 0.0,
             size: Default::default(),
             crs,
+            dpi_scale_factor: 1.0,
         }
     }
 
@@ -67,6 +69,7 @@ impl MapView {
             rotation_x: 0.0,
             size: Default::default(),
             crs,
+            dpi_scale_factor: 1.0,
         }
     }
 
@@ -110,13 +113,13 @@ impl MapView {
 
     /// Resolution at the center of the map.
     pub fn resolution(&self) -> f64 {
-        self.resolution
+        self.resolution * self.dpi_scale_factor as f64
     }
 
     /// Creates a new view, same as the current one, but with the given resolution.
     pub fn with_resolution(&self, resolution: f64) -> Self {
         Self {
-            resolution,
+            resolution: resolution / self.dpi_scale_factor as f64,
             crs: self.crs.clone(),
             ..*self
         }
@@ -320,6 +323,20 @@ impl MapView {
         Self {
             rotation_x,
             rotation_z,
+            crs: self.crs.clone(),
+            ..*self
+        }
+    }
+
+    /// DPI scale factor.
+    pub fn dpi_scale_factor(&self) -> f32 {
+        self.dpi_scale_factor
+    }
+
+    /// Creates a new view, same as the current one, but with the given dpi_scale_factor.
+    pub fn with_dpi_scale_factor(&self, dpi_scale_factor: f32) -> Self {
+        Self {
+            dpi_scale_factor,
             crs: self.crs.clone(),
             ..*self
         }

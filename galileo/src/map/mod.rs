@@ -72,10 +72,9 @@ impl Map {
     /// the map is rendered.
     pub fn load_layers(&self) {
         for layer in self.layers.iter_visible() {
-            layer.prepare(&self.view);
+            layer.load_tiles();
         }
     }
-
     /// Request redraw of the map.
     pub fn redraw(&self) {
         if let Some(messenger) = &self.messenger {

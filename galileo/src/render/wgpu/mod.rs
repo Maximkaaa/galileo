@@ -683,6 +683,7 @@ impl WgpuRenderer {
         };
 
         for layer in map.layers().iter_visible() {
+            layer.prepare(view, &mut canvas);
             layer.render(view, &mut canvas);
         }
 
@@ -860,11 +861,16 @@ impl Canvas for WgpuCanvas<'_> {
         self.renderer.size()
     }
 
+    fn dpi_scale_factor(&self) -> f32 {
+        self.map_view.dpi_scale_factor()
+    }
+
     fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle> {
         Box::new(WgpuPackedBundle::new(
             bundle,
             self.renderer,
             self.renderer_targets,
+            self.map_view.dpi_scale_factor(),
         ))
     }
 
@@ -1215,6 +1221,7 @@ impl WgpuPackedBundle {
         bundle: &RenderBundle,
         renderer: &WgpuRenderer,
         renderer_targets: &RendererTargets,
+        _dpi_scale_factor: f32,
     ) -> Self {
         let RenderBundle {
             world_set,

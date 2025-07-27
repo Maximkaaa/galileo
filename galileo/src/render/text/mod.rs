@@ -119,6 +119,7 @@ pub trait TextRasterizer {
         style: &TextStyle,
         offset: Vector2<f32>,
         font_provider: &dyn FontProvider,
+        dpi_scale_factor: f32,
     ) -> Result<TextShaping, FontServiceError>;
 }
 

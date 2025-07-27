@@ -369,7 +369,7 @@ where
         self.render_with_projection(view, canvas, &projection);
     }
 
-    fn prepare(&self, _view: &MapView) {
+    fn prepare(&self, _view: &MapView, _canvas: &mut dyn Canvas) {
         // do nothing
     }
 
@@ -432,7 +432,7 @@ where
         self.render_with_projection(view, canvas, projection);
     }
 
-    fn prepare(&self, _view: &MapView) {
+    fn prepare(&self, _view: &MapView, _canvas: &mut dyn Canvas) {
         // do nothing
     }
 
@@ -484,7 +484,7 @@ where
         self.render_with_projection(view, canvas, &projection);
     }
 
-    fn prepare(&self, _view: &MapView) {
+    fn prepare(&self, _view: &MapView, _canvas: &mut dyn Canvas) {
         // do nothing
     }
 
