@@ -65,7 +65,15 @@ impl FileCacheController {
     }
 
     fn get_file_path(&self, url: &str) -> PathBuf {
-        let path = path_from_url(url);
+        // strip `http` or `https` from url
+        let path = ["http://", "https://"]
+            .iter()
+            .find_map(|prefix| url.strip_prefix(prefix))
+            .unwrap_or(url)
+            // strip query parameters if any
+            .split('?')
+            .next()
+            .unwrap_or(url);
         self.folder_path.join(path)
     }
 }
@@ -74,31 +82,19 @@ fn ensure_folder_exists(folder_path: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(folder_path)
 }
 
-fn path_from_url(url: &str) -> &Path {
-    // strip `http` or `https` from url
-    let path = ["http://", "https://"]
-        .iter()
-        .find_map(|prefix| url.strip_prefix(prefix))
-        .unwrap_or(url)
-        // strip query parameters if any
-        .split('?')
-        .next()
-        .unwrap_or(url);
-    Path::new(path)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn create_path_from_url() {
-        let path1 = path_from_url("http://api.maptiler.com/tiles/id/1/2/3.png");
-        let path2 = path_from_url("https://api.maptiler.com/tiles/id/1/2/3.png");
-        let path3 = path_from_url("http://api.maptiler.com/tiles/id/1/2/3.png?key=abc");
-        let path4 = path_from_url("https://api.maptiler.com/tiles/id/1/2/3.png?key=abc");
+        let cache = FileCacheController::new("target").unwrap();
+        let path1 = cache.get_file_path("http://api.maptiler.com/tiles/id/1/2/3.png");
+        let path2 = cache.get_file_path("https://api.maptiler.com/tiles/id/1/2/3.png");
+        let path3 = cache.get_file_path("http://api.maptiler.com/tiles/id/1/2/3.png?key=abc");
+        let path4 = cache.get_file_path("https://api.maptiler.com/tiles/id/1/2/3.png?key=abc");
 
-        let expected = Path::new("api.maptiler.com/tiles/id/1/2/3.png");
+        let expected = PathBuf::from("target/api.maptiler.com/tiles/id/1/2/3.png");
         assert_eq!(expected, path1);
         assert_eq!(expected, path2);
         assert_eq!(expected, path3);
