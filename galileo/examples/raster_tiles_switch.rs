@@ -3,7 +3,7 @@
 use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::layer::RasterTileLayer;
 use galileo::tile_schema::TileIndex;
-use galileo::MapBuilder;
+use galileo::{DummyMessenger, MapBuilder, Messenger};
 use galileo_egui::{EguiMap, EguiMapState};
 
 struct App {
@@ -18,13 +18,14 @@ impl App {
     }
 
     fn switch_layer(&mut self, tile_id: &str) {
+        // create a new layer
+        let new_layer = build_layer(tile_id, Some(self.map.messenger()));
+
         let layers = self.map.map_mut().layers_mut();
         // because we know to have one layer and at index 0 only, it's save to remove it using that index
         layers.remove(0);
-        // create a new layer
-        let layer = build_layer(tile_id);
-        // add that layer
-        layers.push(layer);
+        // add the new layer
+        layers.push(new_layer);
         // re-render the map
         self.map.request_redraw();
     }
@@ -57,7 +58,7 @@ fn main() {
 }
 
 pub(crate) fn run() {
-    let layer = build_layer("streets-v2");
+    let layer = build_layer("streets-v2", None::<DummyMessenger>);
 
     let map = MapBuilder::default()
         .with_latlon(37.566, 128.9784)
@@ -71,12 +72,12 @@ pub(crate) fn run() {
         .expect("failed to initialize");
 }
 
-fn build_layer(tile_id: &str) -> RasterTileLayer {
+fn build_layer(tile_id: &str, messenger: Option<impl Messenger + 'static>) -> RasterTileLayer {
     let Some(api_key) = std::option_env!("VT_API_KEY") else {
         panic!("Set the MapTiler API key into VT_API_KEY library when building this example");
     };
     let tile_id = tile_id.to_owned();
-    RasterTileLayerBuilder::new_rest(move |&index: &TileIndex| {
+    let mut builder = RasterTileLayerBuilder::new_rest(move |&index: &TileIndex| {
         format!(
             "https://api.maptiler.com/maps/{tile_id}/{z}/{x}/{y}.png?key={api_key}",
             z = index.z,
@@ -84,7 +85,11 @@ fn build_layer(tile_id: &str) -> RasterTileLayer {
             y = index.y
         )
     })
-    .with_file_cache_checked(".tile_cache")
-    .build()
-    .expect("failed to create layer")
+    .with_file_cache_checked(".tile_cache");
+
+    if let Some(messenger) = messenger {
+        builder = builder.with_messenger(messenger);
+    }
+
+    builder.build().expect("failed to create layer")
 }

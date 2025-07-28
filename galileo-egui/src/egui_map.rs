@@ -145,6 +145,7 @@ pub struct EguiMapState {
     texture_id: TextureId,
     texture_view: TextureView,
     event_processor: EventProcessor,
+    messenger: MapStateMessenger,
 }
 
 impl<'a> EguiMapState {
@@ -207,6 +208,7 @@ impl<'a> EguiMapState {
             texture_id,
             texture_view: texture,
             event_processor,
+            messenger,
         }
     }
 
@@ -300,6 +302,11 @@ impl<'a> EguiMapState {
     /// Returns a mutable reference to the Galileo map instance.
     pub fn map_mut(&'a mut self) -> &'a mut Map {
         &mut self.map
+    }
+
+    /// Returns event messenger that is used by the map.
+    pub fn messenger(&self) -> impl Messenger {
+        self.messenger.clone()
     }
 
     fn resize_map(&mut self, size: Vec2) {
