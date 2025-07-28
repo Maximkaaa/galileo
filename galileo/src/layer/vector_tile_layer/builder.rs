@@ -92,7 +92,7 @@ impl VectorTileLayerBuilder {
         }
     }
 
-    /// Initializes a builder for a lyer with the given tile provider.
+    /// Initializes a builder for a layer with the given tile provider.
     ///
     /// ```
     /// use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;

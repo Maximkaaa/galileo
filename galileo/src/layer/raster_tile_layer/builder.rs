@@ -104,7 +104,7 @@ impl RasterTileLayerBuilder {
         }
     }
 
-    /// Initializes a builder for a lyer with the given tile loader.
+    /// Initializes a builder for a layer with the given tile loader.
     ///
     /// ```
     /// use galileo::layer::raster_tile_layer::{RestTileLoader, RasterTileLayerBuilder};
@@ -185,7 +185,7 @@ impl RasterTileLayerBuilder {
         path: impl AsRef<Path>,
         modifier: Box<FileCachePathModifier>,
     ) -> Self {
-        // You would think that we don't need `with_file_cache_checked` method and can move its
+        // You would think that we don't need `with_file_cache_modifier_checked` method and can move its
         // logic here instead. But actually not all `wasm32` platforms don't have access to the FS,
         // and there is no simple way to detect if there is for the current target. So I'd rather
         // have both methods for future, when we want to add support for more platforms or have a
