@@ -249,7 +249,7 @@ impl RasterTileLayerBuilder {
     /// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
     /// use galileo::layer::data_provider::FileCacheController;
     ///
-    /// let cache_controller = FileCacheController::new("target")?;
+    /// let cache_controller = FileCacheController::new("target", None)?;
     /// let layer = RasterTileLayerBuilder::new_rest(
     ///     |index| {
     ///         format!(

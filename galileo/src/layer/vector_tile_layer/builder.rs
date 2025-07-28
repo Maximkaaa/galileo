@@ -221,7 +221,7 @@ impl VectorTileLayerBuilder {
     /// use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
     /// use galileo::layer::data_provider::FileCacheController;
     ///
-    /// let cache_controller = FileCacheController::new("target")?;
+    /// let cache_controller = FileCacheController::new("target", None)?;
     /// let layer = VectorTileLayerBuilder::new_rest(
     ///     |index| {
     ///         format!(
