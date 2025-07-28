@@ -138,17 +138,23 @@ fn gray_style() -> VectorTileStyle {
     let style_str = r##"
 {
   "rules": [
-  ],
-  "background": "#ffffffff",
-  "default_symbol": {
-    "line": {
-      "stroke_color": "#000000ff",
-      "width": 0.5
+    {
+      "symbol": {
+        "line": {
+          "stroke_color": "#000000ff",
+          "width": 0.5
+        }
+      }
     },
-    "polygon": {
-      "fill_color": "#999999ff"
+    {
+      "symbol": {
+        "polygon": {
+          "fill_color": "#999999ff"
+        }
+      }
     }
-  }
+  ],
+  "background": "#ffffffff"
 }"##;
     serde_json::from_str(style_str).expect("invalid style json")
 }
