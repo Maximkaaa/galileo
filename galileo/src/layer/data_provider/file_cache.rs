@@ -55,7 +55,9 @@ impl PersistentCacheController<str, Bytes> for FileCacheController {
 
 impl FileCacheController {
     /// Creates a new instance. The cache will be located in the given directory. If the directory doesn't exist,
-    /// it will be created on startup.
+    /// it will be created on startup. In this directory each tile will be stored in a nested folder
+    /// based on the original url of that tile. The structure of those nested folders can be modified
+    /// by `file_path_modifier`. Check [`FileCacheController::get_file_path`] for details.
     pub fn new(
         path: impl AsRef<Path>,
         file_path_modifier: Option<Box<FileCachePathModifier>>,
