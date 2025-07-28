@@ -165,6 +165,21 @@ impl VectorTileLayerBuilder {
         self
     }
 
+    /// Same as [`with_file_cache`], but also modifies the file path by given `modifier` function
+    pub fn with_file_cache_modifier(
+        mut self,
+        path: impl AsRef<Path>,
+        modifier: Box<FileCachePathModifier>,
+    ) -> Self {
+        // You would think that we don't need `with_file_cache_modifier_checked` method and can move its
+        // logic here instead. But actually not all `wasm32` platforms don't have access to the FS,
+        // and there is no simple way to detect if there is for the current target. So I'd rather
+        // have both methods for future, when we want to add support for more platforms or have a
+        // better way to check if the FS operations are available on the current target.
+        self.cache = CacheType::File(path.as_ref().into(), Some(modifier));
+        self
+    }
+
     /// Sets the attribution for the vector tile layer with the given text and URL.
     ///
     /// This method allows specifying an attribution, typically used for citing sources
@@ -205,6 +220,21 @@ impl VectorTileLayerBuilder {
         #[cfg(not(target_arch = "wasm32"))]
         {
             this = this.with_file_cache(_path);
+        }
+        this
+    }
+
+    /// Same as [`with_file_cache_checked`], but also modifies the file path by given `modifier` function
+    pub fn with_file_cache_modifier_checked(
+        self,
+        _path: impl AsRef<Path>,
+        _modifier: Box<FileCachePathModifier>,
+    ) -> Self {
+        #[allow(unused_mut)]
+        let mut this = self;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            this = this.with_file_cache_modifier(_path, _modifier);
         }
         this
     }
