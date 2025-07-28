@@ -12,7 +12,9 @@ use super::tile_provider::VectorTileProvider;
 use super::VectorTileLayer;
 use crate::error::GalileoError;
 use crate::layer::attribution::Attribution;
-use crate::layer::data_provider::{FileCacheController, PersistentCacheController, UrlSource};
+use crate::layer::data_provider::{
+    FileCacheController, FileCachePathModifier, PersistentCacheController, UrlSource,
+};
 use crate::layer::Layer;
 use crate::tile_schema::TileIndex;
 use crate::{Color, Messenger, TileSchema};
@@ -59,7 +61,7 @@ enum ProviderType {
 
 enum CacheType {
     None,
-    File(PathBuf),
+    File(PathBuf, Option<Box<FileCachePathModifier>>),
     Custom(Box<dyn PersistentCacheController<str, Bytes>>),
 }
 
@@ -159,7 +161,7 @@ impl VectorTileLayerBuilder {
         // and there is no simple way to detect if there is for the current target. So I'd rather
         // have both methods for future, when we want to add support for more platforms or have a
         // better way to check if the FS operations are available on the current target.
-        self.cache = CacheType::File(path.as_ref().into());
+        self.cache = CacheType::File(path.as_ref().into(), None);
         self
     }
 
@@ -360,7 +362,9 @@ impl VectorTileLayerBuilder {
 
         let cache_controller: Option<Box<dyn PersistentCacheController<str, Bytes>>> = match cache {
             CacheType::None => None,
-            CacheType::File(path_buf) => Some(Box::new(FileCacheController::new(&path_buf)?)),
+            CacheType::File(path_buf, modifier) => {
+                Some(Box::new(FileCacheController::new(&path_buf, modifier)?))
+            }
             CacheType::Custom(persistent_cache_controller) => Some(persistent_cache_controller),
         };
 
@@ -455,12 +459,12 @@ mod tests {
 
     #[test]
     fn with_file_cache_replaces_cache_controller() {
-        let cache = FileCacheController::new("target").unwrap();
+        let cache = FileCacheController::new("target", None).unwrap();
         let builder = VectorTileLayerBuilder::new_rest(|_| unimplemented!())
             .with_cache_controller(cache)
             .with_file_cache("target");
 
-        assert!(matches!(builder.cache, CacheType::File(_)));
+        assert!(matches!(builder.cache, CacheType::File(_, None)));
     }
 
     #[test]
@@ -486,7 +490,7 @@ mod tests {
 
     #[test]
     fn with_cache_controller_replaces_file_cache() {
-        let cache = FileCacheController::new("target").unwrap();
+        let cache = FileCacheController::new("target", None).unwrap();
         let builder = VectorTileLayerBuilder::new_rest(|_| unimplemented!())
             .with_file_cache("target")
             .with_cache_controller(cache);
@@ -497,7 +501,7 @@ mod tests {
     #[test]
     fn with_cache_controller_fails_build_if_custom_provider() {
         let provider = custom_provider();
-        let cache = FileCacheController::new("target").unwrap();
+        let cache = FileCacheController::new("target", None).unwrap();
         let result = VectorTileLayerBuilder::new_with_provider(provider)
             .with_cache_controller(cache)
             .build();
