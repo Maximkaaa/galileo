@@ -14,6 +14,7 @@ pub type FileCachePathModifier = dyn Fn(&str) -> String + Send + Sync;
 /// Currently, there is no eviction mechanism.
 pub struct FileCacheController {
     folder_path: PathBuf,
+    /// Function to modify the default file path of the cache (optional)
     file_path_modifier: Option<Box<FileCachePathModifier>>,
 }
 
