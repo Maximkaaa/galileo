@@ -6,12 +6,16 @@ use log::debug;
 use crate::error::GalileoError;
 use crate::layer::data_provider::PersistentCacheController;
 
+/// Function to modify the default file path of the cache
+pub type FileCachePathModifier = dyn Fn(&str) -> String + Send + Sync;
+
 /// Stores the cached data as a set of files in the specified folder. It generates file names from the given urls.
 ///
 /// Currently, there is no eviction mechanism.
-#[derive(Debug, Clone)]
 pub struct FileCacheController {
     folder_path: PathBuf,
+    /// Function to modify the default file path of the cache (optional)
+    file_path_modifier: Option<Box<FileCachePathModifier>>,
 }
 
 impl PersistentCacheController<str, Bytes> for FileCacheController {
@@ -51,8 +55,13 @@ impl PersistentCacheController<str, Bytes> for FileCacheController {
 
 impl FileCacheController {
     /// Creates a new instance. The cache will be located in the given directory. If the directory doesn't exist,
-    /// it will be created on startup.
-    pub fn new(path: impl AsRef<Path>) -> Result<Self, GalileoError> {
+    /// it will be created on startup. In this directory each tile will be stored in a nested folder
+    /// based on the original url of that tile. The structure of those nested folders can be modified
+    /// by `file_path_modifier`. Check [`FileCacheController::get_file_path`] for details.
+    pub fn new(
+        path: impl AsRef<Path>,
+        file_path_modifier: Option<Box<FileCachePathModifier>>,
+    ) -> Result<Self, GalileoError> {
         ensure_folder_exists(path.as_ref()).map_err(|err| {
             GalileoError::FsIo(format!(
                 "failed to initialize file cache folder {:?}: {err}",
@@ -61,6 +70,7 @@ impl FileCacheController {
         })?;
         Ok(Self {
             folder_path: path.as_ref().into(),
+            file_path_modifier,
         })
     }
 
@@ -73,7 +83,13 @@ impl FileCacheController {
             url
         };
 
-        self.folder_path.join(Path::new(stripped))
+        let path = if let Some(modifier) = &self.file_path_modifier {
+            modifier(stripped)
+        } else {
+            stripped.to_string()
+        };
+
+        self.folder_path.join(Path::new(&path))
     }
 }
 

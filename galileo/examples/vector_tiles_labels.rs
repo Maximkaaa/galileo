@@ -31,7 +31,11 @@ pub(crate) fn run() {
             y = index.y
         )
     })
-    .with_file_cache_checked(".tile_cache")
+    .with_file_cache_modifier(
+        ".tile_cache",
+        // Remove query parameters from path if they exist
+        Box::new(|path| path.split('?').next().unwrap_or(path).to_string()),
+    )
     .with_style(default_style())
     .with_tile_schema(tile_schema())
     .with_attribution(

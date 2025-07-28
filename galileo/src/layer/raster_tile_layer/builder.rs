@@ -5,7 +5,9 @@ use bytes::Bytes;
 use super::{RasterTileLayer, RasterTileLoader, RestTileLoader};
 use crate::error::GalileoError;
 use crate::layer::attribution::Attribution;
-use crate::layer::data_provider::{FileCacheController, PersistentCacheController, UrlSource};
+use crate::layer::data_provider::{
+    FileCacheController, FileCachePathModifier, PersistentCacheController, UrlSource,
+};
 use crate::tile_schema::TileIndex;
 use crate::{Messenger, TileSchema};
 
@@ -41,7 +43,7 @@ enum LoaderType {
 
 enum CacheType {
     None,
-    File(PathBuf),
+    File(PathBuf, Option<Box<FileCachePathModifier>>),
     Custom(Box<dyn PersistentCacheController<str, Bytes>>),
 }
 
@@ -102,7 +104,7 @@ impl RasterTileLayerBuilder {
         }
     }
 
-    /// Initializes a builder for a lyer with the given tile loader.
+    /// Initializes a builder for a layer with the given tile loader.
     ///
     /// ```
     /// use galileo::layer::raster_tile_layer::{RestTileLoader, RasterTileLayerBuilder};
@@ -173,7 +175,22 @@ impl RasterTileLayerBuilder {
         // and there is no simple way to detect if there is for the current target. So I'd rather
         // have both methods for future, when we want to add support for more platforms or have a
         // better way to check if the FS operations are available on the current target.
-        self.cache = CacheType::File(path.as_ref().into());
+        self.cache = CacheType::File(path.as_ref().into(), None);
+        self
+    }
+
+    /// Same as [`with_file_cache`], but also modifies the file path by given `modifier` function
+    pub fn with_file_cache_modifier(
+        mut self,
+        path: impl AsRef<Path>,
+        modifier: Box<FileCachePathModifier>,
+    ) -> Self {
+        // You would think that we don't need `with_file_cache_modifier_checked` method and can move its
+        // logic here instead. But actually not all `wasm32` platforms don't have access to the FS,
+        // and there is no simple way to detect if there is for the current target. So I'd rather
+        // have both methods for future, when we want to add support for more platforms or have a
+        // better way to check if the FS operations are available on the current target.
+        self.cache = CacheType::File(path.as_ref().into(), Some(modifier));
         self
     }
 
@@ -205,6 +222,21 @@ impl RasterTileLayerBuilder {
         this
     }
 
+    /// Same as [`with_file_cache_checked`], but also modifies the file path by given `modifier` function
+    pub fn with_file_cache_modifier_checked(
+        self,
+        _path: impl AsRef<Path>,
+        _modifier: Box<FileCachePathModifier>,
+    ) -> Self {
+        #[allow(unused_mut)]
+        let mut this = self;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            this = this.with_file_cache_modifier(_path, _modifier);
+        }
+        this
+    }
+
     /// Adds the given persistent cache for the tiles.
     ///
     /// Cannot be used with custom tile provider given by
@@ -217,7 +249,7 @@ impl RasterTileLayerBuilder {
     /// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
     /// use galileo::layer::data_provider::FileCacheController;
     ///
-    /// let cache_controller = FileCacheController::new("target")?;
+    /// let cache_controller = FileCacheController::new("target", None)?;
     /// let layer = RasterTileLayerBuilder::new_rest(
     ///     |index| {
     ///         format!(
@@ -337,7 +369,9 @@ impl RasterTileLayerBuilder {
 
         let cache_controller: Option<Box<dyn PersistentCacheController<str, Bytes>>> = match cache {
             CacheType::None => None,
-            CacheType::File(path_buf) => Some(Box::new(FileCacheController::new(&path_buf)?)),
+            CacheType::File(path_buf, modifier) => {
+                Some(Box::new(FileCacheController::new(&path_buf, modifier)?))
+            }
             CacheType::Custom(persistent_cache_controller) => Some(persistent_cache_controller),
         };
 
@@ -382,12 +416,12 @@ mod tests {
 
     #[test]
     fn with_file_cache_replaces_cache_controller() {
-        let cache = FileCacheController::new("target").unwrap();
+        let cache = FileCacheController::new("target", None).unwrap();
         let builder = RasterTileLayerBuilder::new_rest(|_| unimplemented!())
             .with_cache_controller(cache)
             .with_file_cache("target");
 
-        assert!(matches!(builder.cache, CacheType::File(_)));
+        assert!(matches!(builder.cache, CacheType::File(_, None)));
     }
 
     #[test]
@@ -413,7 +447,7 @@ mod tests {
 
     #[test]
     fn with_cache_controller_replaces_file_cache() {
-        let cache = FileCacheController::new("target").unwrap();
+        let cache = FileCacheController::new("target", None).unwrap();
         let builder = RasterTileLayerBuilder::new_rest(|_| unimplemented!())
             .with_file_cache("target")
             .with_cache_controller(cache);
@@ -424,7 +458,7 @@ mod tests {
     #[test]
     fn with_cache_controller_fails_build_if_custom_provider() {
         let provider = RestTileLoader::new(|_| unimplemented!(), None, false);
-        let cache = FileCacheController::new("target").unwrap();
+        let cache = FileCacheController::new("target", None).unwrap();
         let result = RasterTileLayerBuilder::new_with_loader(provider)
             .with_cache_controller(cache)
             .build();
