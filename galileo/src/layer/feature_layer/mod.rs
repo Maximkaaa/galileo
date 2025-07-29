@@ -232,18 +232,22 @@ where
     ) {
         let lod = self.select_lod(view.resolution());
         let mut store = lod.bundles.lock();
+        let dpi_scale_factor = view.dpi_scale_factor();
 
         match store.required_update() {
             UpdateType::All => {
                 for (id, feature) in self.features.iter() {
-                    store.with_bundle(|bundle| {
-                        if let Some(projected) = feature.geometry().project(&*projection) {
-                            self.symbol
-                                .render(feature, &projected, lod.min_resolution, bundle);
-                        }
+                    store.with_bundle(
+                        |bundle| {
+                            if let Some(projected) = feature.geometry().project(&*projection) {
+                                self.symbol
+                                    .render(feature, &projected, lod.min_resolution, bundle);
+                            }
 
-                        id
-                    });
+                            id
+                        },
+                        dpi_scale_factor,
+                    );
                 }
             }
             UpdateType::Selected(ids) => {
@@ -251,14 +255,17 @@ where
                     let Some(feature) = self.features.get(id) else {
                         continue;
                     };
-                    store.with_bundle(|bundle| {
-                        if let Some(projected) = feature.geometry().project(&*projection) {
-                            self.symbol
-                                .render(feature, &projected, lod.min_resolution, bundle);
-                        }
+                    store.with_bundle(
+                        |bundle| {
+                            if let Some(projected) = feature.geometry().project(&*projection) {
+                                self.symbol
+                                    .render(feature, &projected, lod.min_resolution, bundle);
+                            }
 
-                        id
-                    });
+                            id
+                        },
+                        dpi_scale_factor,
+                    );
                 }
             }
             UpdateType::None => {}

@@ -239,7 +239,7 @@ impl VectorTileLayer {
         view: &MapView,
         canvas: &mut dyn Canvas,
     ) -> Option<Box<dyn PackedBundle>> {
-        let mut bundle = RenderBundle::default();
+        let mut bundle = RenderBundle::new(view.dpi_scale_factor());
         let bbox = view.get_bbox()?;
         let bounds = Polygon::new(
             ClosedContour::new(vec![

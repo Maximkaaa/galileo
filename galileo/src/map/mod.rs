@@ -75,7 +75,6 @@ impl Map {
             layer.prepare(&self.view);
         }
     }
-
     /// Request redraw of the map.
     pub fn redraw(&self) {
         if let Some(messenger) = &self.messenger {

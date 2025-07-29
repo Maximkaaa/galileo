@@ -27,6 +27,14 @@ pub struct RenderBundle {
 }
 
 impl RenderBundle {
+    /// Creates a new render bundle with the given DPI scale factor.
+    pub fn new(dpi_scale_factor: f32) -> Self {
+        Self {
+            world_set: WorldRenderSet::new(dpi_scale_factor),
+            screen_sets: Vec::new(),
+        }
+    }
+
     /// Adds an image to the bundle.
     pub fn add_image(
         &mut self,

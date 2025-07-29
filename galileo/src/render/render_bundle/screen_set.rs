@@ -67,7 +67,7 @@ impl ScreenRenderSet {
         N: AsPrimitive<f32>,
         P: CartesianPoint3d<Num = N>,
     {
-        match TextService::shape(text, style, offset) {
+        match TextService::shape(text, style, offset, 1.0) {
             Ok(TextShaping::Tessellation { glyphs, .. }) => {
                 let mut vertices = vec![];
                 let mut indices = vec![];
