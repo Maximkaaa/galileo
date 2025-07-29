@@ -232,7 +232,7 @@ where
     ) {
         let lod = self.select_lod(view.resolution());
         let mut store = lod.bundles.lock();
-        let dpi_scale_factor = canvas.dpi_scale_factor();
+        let dpi_scale_factor = view.dpi_scale_factor();
 
         match store.required_update() {
             UpdateType::All => {

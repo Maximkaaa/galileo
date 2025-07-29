@@ -860,10 +860,6 @@ impl Canvas for WgpuCanvas<'_> {
         self.renderer.size()
     }
 
-    fn dpi_scale_factor(&self) -> f32 {
-        self.map_view.dpi_scale_factor()
-    }
-
     fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle> {
         Box::new(WgpuPackedBundle::new(
             bundle,
