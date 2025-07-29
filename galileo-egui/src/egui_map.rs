@@ -266,7 +266,7 @@ impl<'a> EguiMapState {
 
         Image::new(ImageSource::Texture(SizedTexture::new(
             self.texture_id,
-            Vec2::new(available_size[0], available_size[1]),
+            Vec2::new(renderer_size.width(), renderer_size.height()),
         )))
         .paint_at(ui, rect);
     }
@@ -367,6 +367,7 @@ impl<'a> EguiMapState {
 
     fn draw(&mut self) {
         log::trace!("Redrawing the map");
+        self.map.load_layers();
         self.renderer
             .render_to_texture_view(&self.map, &self.texture_view);
     }

@@ -14,7 +14,7 @@ use crate::render::text::{TextRasterizer, TextShaping, TextStyle};
 static INSTANCE: OnceLock<TextService> = OnceLock::new();
 
 /// Error from a font service
-#[derive(Debug, Error, Clone)]
+#[derive(Debug, Error)]
 pub enum FontServiceError {
     /// Error parsing font face file
     #[error(transparent)]

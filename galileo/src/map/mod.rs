@@ -72,7 +72,7 @@ impl Map {
     /// the map is rendered.
     pub fn load_layers(&self) {
         for layer in self.layers.iter_visible() {
-            layer.load_tiles();
+            layer.prepare(&self.view);
         }
     }
     /// Request redraw of the map.

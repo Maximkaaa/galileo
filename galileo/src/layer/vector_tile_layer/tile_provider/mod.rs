@@ -148,8 +148,7 @@ impl VectorTileProvider {
         let mut store = self.tiles.write();
         for index in indices {
             if let Some((tile, mvt_tile)) = store.get_prepared(*index, style_id) {
-                let bundle = (*tile).clone();
-                let packed = canvas.pack_bundle(&bundle);
+                let packed = canvas.pack_bundle(&tile);
                 store.store_tile(
                     *index,
                     style_id,
