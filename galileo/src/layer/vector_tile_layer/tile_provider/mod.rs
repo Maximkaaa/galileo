@@ -8,7 +8,7 @@ use loader::VectorTileLoader;
 use parking_lot::RwLock;
 use processor::VectorTileProcessor;
 
-use crate::layer::tiles::TileProvider;
+use crate::layer::tiles::{RenderedState, TileProvider};
 use crate::layer::vector_tile_layer::style::VectorTileStyle;
 use crate::messenger::Messenger;
 use crate::render::{Canvas, PackedBundle};
@@ -59,6 +59,16 @@ impl TileProvider<VtStyleId> for VectorTileProvider {
     fn get_tile(&self, index: TileIndex, style_id: VtStyleId) -> Option<Arc<dyn PackedBundle>> {
         VectorTileProvider::get_tile(self, index, style_id)
     }
+
+    fn get_rendered_state(&self, index: TileIndex, style_id: VtStyleId) -> Option<RenderedState> {
+        // TODO: implement `rendered_before` for vector tiles (if needed/possible)
+        self.get_tile(index, style_id).map(|bundle| RenderedState {
+            bundle,
+            rendered_before: false,
+        })
+    }
+
+    fn set_rendered_before(&self, _index: TileIndex, _style_id: VtStyleId) {}
 }
 
 impl VectorTileProvider {

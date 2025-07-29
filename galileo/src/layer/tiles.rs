@@ -8,12 +8,25 @@ use crate::tile_schema::TileIndex;
 use crate::TileSchema;
 
 #[derive(Clone)]
+pub struct RenderedState {
+    pub bundle: Arc<dyn PackedBundle>,
+    /// tile was already rendered at the map before.
+    pub rendered_before: bool,
+}
+
+#[derive(Clone)]
 pub(crate) struct DisplayedTile<StyleId: Copy> {
     index: TileIndex,
     pub(crate) bundle: Arc<dyn PackedBundle>,
     style_id: StyleId,
     pub(crate) opacity: f32,
     displayed_at: web_time::Instant,
+}
+
+impl<StyleId: Copy + PartialEq> PartialEq for DisplayedTile<StyleId> {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index && self.style_id == other.style_id
+    }
 }
 
 impl<StyleId: Copy> DisplayedTile<StyleId> {
@@ -23,7 +36,11 @@ impl<StyleId: Copy> DisplayedTile<StyleId> {
 }
 
 pub(crate) trait TileProvider<StyleId> {
+    #[allow(dead_code)]
     fn get_tile(&self, index: TileIndex, style_id: StyleId) -> Option<Arc<dyn PackedBundle>>;
+
+    fn get_rendered_state(&self, index: TileIndex, style_id: StyleId) -> Option<RenderedState>;
+    fn set_rendered_before(&self, index: TileIndex, style_id: StyleId);
 }
 
 pub(crate) struct TilesContainer<StyleId, Provider>
@@ -68,28 +85,41 @@ where
                 .iter_mut()
                 .find(|displayed| displayed.index == index && displayed.style_id == style_id)
             {
+                // fade tiles in
                 if !displayed.is_opaque() {
                     to_substitute.push(index);
                     displayed.opacity = ((now.duration_since(displayed.displayed_at)).as_secs_f64()
                         / fade_in_time.as_secs_f64())
                     .min(1.0) as f32;
                     requires_redraw = true;
+                } else {
+                    // Tile is fully opaque, mark it as rendered
+                    self.tile_provider
+                        .set_rendered_before(displayed.index, style_id);
                 }
 
                 needed_tiles.push(displayed.clone());
             } else {
-                match self.tile_provider.get_tile(index, style_id) {
+                match self.tile_provider.get_rendered_state(index, style_id) {
                     None => to_substitute.push(index),
-                    Some(bundle) => {
+                    Some(RenderedState {
+                        bundle,
+                        rendered_before,
+                    }) => {
+                        let opacity = if rendered_before { 1.0 } else { 0.0 };
+
                         needed_tiles.push(DisplayedTile {
                             index,
                             bundle,
                             style_id,
-                            opacity: 0.0,
+                            opacity,
                             displayed_at: now,
                         });
-                        to_substitute.push(index);
-                        requires_redraw = true;
+
+                        if !rendered_before {
+                            to_substitute.push(index);
+                            requires_redraw = true;
+                        }
                     }
                 }
             }
@@ -97,10 +127,7 @@ where
 
         let mut new_displayed = vec![];
         for displayed in displayed_tiles.iter() {
-            if needed_tiles
-                .iter()
-                .any(|new| new.index == displayed.index && new.style_id == displayed.style_id)
-            {
+            if needed_tiles.iter().any(|new| new == displayed) {
                 continue;
             }
 

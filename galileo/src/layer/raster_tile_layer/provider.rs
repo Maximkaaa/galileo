@@ -9,7 +9,7 @@ use quick_cache::GuardResult;
 use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::layer::data_provider::{PersistentCacheController, UrlSource};
-use crate::layer::tiles::TileProvider;
+use crate::layer::tiles::{RenderedState, TileProvider};
 use crate::platform::PlatformService;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{Canvas, ImagePaint, PackedBundle};
@@ -122,7 +122,7 @@ impl RasterTileLoader for RestTileLoader {
 enum TileState {
     Loading,
     Loaded(Arc<DecodedImage>),
-    Rendered(Arc<dyn PackedBundle>),
+    Rendered(RenderedState),
     Error,
 }
 
@@ -179,7 +179,13 @@ impl RasterTileProvider {
                     ImagePaint { opacity: 255 },
                 );
                 let packed = canvas.pack_bundle(&bundle);
-                tiles.insert(*index, TileState::Rendered(packed.into()));
+                tiles.insert(
+                    *index,
+                    TileState::Rendered(RenderedState {
+                        bundle: packed.into(),
+                        rendered_before: false, // Just rendered, not yet faded in
+                    }),
+                );
             }
         }
     }
@@ -188,8 +194,32 @@ impl RasterTileProvider {
 impl TileProvider<()> for RasterTileProvider {
     fn get_tile(&self, index: TileIndex, _style_id: ()) -> Option<Arc<dyn PackedBundle>> {
         match self.tiles.lock().get(&index) {
-            Some(TileState::Rendered(bundle)) => Some(bundle),
+            Some(TileState::Rendered(RenderedState { bundle, .. })) => Some(bundle),
             _ => None,
+        }
+    }
+
+    fn get_rendered_state(&self, index: TileIndex, _style_id: ()) -> Option<RenderedState> {
+        match self.tiles.lock().get(&index) {
+            Some(TileState::Rendered(rendered)) => Some(rendered),
+            _ => None,
+        }
+    }
+
+    fn set_rendered_before(&self, index: TileIndex, _style_id: ()) {
+        let tiles = self.tiles.lock();
+        if let Some(TileState::Rendered(RenderedState {
+            bundle,
+            rendered_before: false,
+        })) = tiles.get(&index)
+        {
+            tiles.insert(
+                index,
+                TileState::Rendered(RenderedState {
+                    bundle,
+                    rendered_before: true,
+                }),
+            );
         }
     }
 }
