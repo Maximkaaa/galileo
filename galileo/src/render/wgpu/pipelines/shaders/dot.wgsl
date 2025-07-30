@@ -13,6 +13,8 @@ var<uniform> transform: ViewUniform;
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) color: vec4<u32>,
+    @location(10) bundle_opacity: f32,
+    @location(11) bundle_offset: vec2<f32>,
 }
 
 struct VertexOutput {
@@ -23,13 +25,12 @@ struct VertexOutput {
 @vertex
 fn vs_main(
     model: VertexInput,
-    @location(10) bundle_opacity: f32,
 ) -> VertexOutput {
     var out: VertexOutput;
     var color = vec4<f32>(model.color) / 255.0;
-    color[3] = color[3] * bundle_opacity;
+    color[3] = color[3] * model.bundle_opacity;
     out.color = color;
-    out.clip_position = transform.view_proj * vec4<f32>(model.position, 1.0);
+    out.clip_position = transform.view_proj * vec4<f32>(model.position.xy + model.bundle_offset, model.position.z, 1.0);
 
     return out;
 }

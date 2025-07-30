@@ -1,5 +1,5 @@
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtPolygon, MvtTile};
-use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d, Point2, Point3, Rect, Vector2};
+use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d, Point2, Point3, Vector2};
 use galileo_types::impls::{ClosedContour, Polygon};
 use galileo_types::{Contour, MultiContour, MultiPolygon, Polygon as PolygonTrait};
 use num_traits::ToPrimitive;
@@ -69,7 +69,7 @@ impl VtProcessor {
                         };
 
                         for point in points {
-                            let position = Self::transform_point(point, bbox, tile_resolution);
+                            let position = Self::transform_point(point, tile_resolution);
                             if !bbox.contains(&Point2::new(position.x(), position.y())) {
                                 // Some vector tiles add out-of-bounds point to start displaying labels that
                                 // are not fully on the screen yet. We need to deal with that case
@@ -103,7 +103,7 @@ impl VtProcessor {
                                         contour
                                             .iter_points()
                                             .map(|p| {
-                                                Self::transform_point(&p, bbox, tile_resolution)
+                                                Self::transform_point(&p, tile_resolution)
                                             })
                                             .collect(),
                                         false,
@@ -118,7 +118,7 @@ impl VtProcessor {
                         if let Some(paint) = Self::get_polygon_symbol(rule, feature) {
                             for polygon in polygons.polygons() {
                                 bundle.add_polygon(
-                                    &Self::transform_polygon(polygon, bbox, tile_resolution),
+                                    &Self::transform_polygon(polygon, tile_resolution),
                                     &paint,
                                     lod_resolution,
                                 );
@@ -176,10 +176,9 @@ impl VtProcessor {
 
     fn transform_polygon(
         mvt_polygon: &MvtPolygon,
-        bbox: Rect,
         tile_resolution: f64,
     ) -> Polygon<Point3> {
-        let cast = |p| Self::transform_point(&p, bbox, tile_resolution);
+        let cast = |p| Self::transform_point(&p, tile_resolution);
 
         Polygon {
             outer_contour: ClosedContour::new(
@@ -198,11 +197,10 @@ impl VtProcessor {
 
     fn transform_point<Num: num_traits::Float + ToPrimitive>(
         p_in: &impl CartesianPoint2d<Num = Num>,
-        tile_bbox: Rect,
         tile_resolution: f64,
     ) -> Point3 {
-        let x = tile_bbox.x_min() + p_in.x().to_f64().expect("double overflow") * tile_resolution;
-        let y = tile_bbox.y_max() - p_in.y().to_f64().expect("double overflow") * tile_resolution;
+        let x = p_in.x().to_f64().expect("double overflow") * tile_resolution;
+        let y = -p_in.y().to_f64().expect("double overflow") * tile_resolution;
         Point3::new(x, y, 0.0)
     }
 }
