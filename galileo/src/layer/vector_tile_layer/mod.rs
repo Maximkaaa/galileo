@@ -21,7 +21,7 @@ use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::render_bundle::RenderBundle;
 use crate::render::{BundleToDraw, Canvas, PackedBundle, PolygonPaint, RenderOptions};
-use crate::tile_schema::TileSchema;
+use crate::tile_schema::{TileIndex, TileSchema};
 use crate::view::MapView;
 use crate::Color;
 
@@ -87,7 +87,7 @@ impl Layer for VectorTileLayer {
     fn prepare(&self, view: &MapView) {
         if let Some(iter) = self.tile_schema.iter_tiles(view) {
             for index in iter {
-                self.tile_provider.load_tile(index, self.style_id);
+                self.tile_provider.load_tile(index.into(), self.style_id);
             }
         }
     }
@@ -145,8 +145,11 @@ impl VectorTileLayer {
         };
 
         let needed_indices: Vec<_> = tile_iter.collect();
+        let mut to_pack: Vec<TileIndex> = needed_indices.iter().map(|t| (*t).into()).collect();
+        to_pack.dedup();
+
         self.tile_provider
-            .pack_tiles(&needed_indices, self.style_id, canvas);
+            .pack_tiles(&to_pack, self.style_id, canvas);
         let requires_redraw = self
             .displayed_tiles
             .update_displayed_tiles(needed_indices, self.style_id);
@@ -207,7 +210,7 @@ impl VectorTileLayer {
 
                 let tolerance = ((view.resolution() / tile_resolution) * PIXEL_TOLERANCE) as f32;
 
-                if let Some(mvt_tile) = self.tile_provider.get_mvt_tile(index) {
+                if let Some(mvt_tile) = self.tile_provider.get_mvt_tile(index.into()) {
                     for layer in &mvt_tile.layers {
                         for feature in &layer.features {
                             match &feature.geometry {

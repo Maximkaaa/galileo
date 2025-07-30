@@ -1,5 +1,5 @@
 use galileo_mvt::{MvtFeature, MvtGeometry, MvtPolygon, MvtTile};
-use galileo_types::cartesian::{CartesianPoint2d, CartesianPoint3d, Point2, Point3, Vector2};
+use galileo_types::cartesian::{CartesianPoint2d, Point3, Rect, Vector2};
 use galileo_types::impls::{ClosedContour, Polygon};
 use galileo_types::{Contour, MultiContour, MultiPolygon, Polygon as PolygonTrait};
 use num_traits::ToPrimitive;
@@ -37,13 +37,14 @@ impl VtProcessor {
         style: &VectorTileStyle,
         tile_schema: &TileSchema,
     ) -> Result<(), GalileoError> {
-        let bbox = tile_schema
-            .tile_bbox(index)
-            .ok_or_else(|| GalileoError::Generic("cannot get tile bbox".into()))?;
         let lod_resolution = tile_schema.lod_resolution(index.z).ok_or_else(|| {
             GalileoError::Generic(format!("cannot get lod resolution for lod {}", index.z))
         })?;
         let tile_resolution = lod_resolution * tile_schema.tile_width() as f64;
+
+        let width = tile_schema.tile_width() as f64;
+        let height = tile_schema.tile_height() as f64;
+        let bbox = Rect::new(0.0, 0.0, width * lod_resolution, -height * lod_resolution);
 
         let bounds = Polygon::new(
             ClosedContour::new(vec![
@@ -70,13 +71,6 @@ impl VtProcessor {
 
                         for point in points {
                             let position = Self::transform_point(point, tile_resolution);
-                            if !bbox.contains(&Point2::new(position.x(), position.y())) {
-                                // Some vector tiles add out-of-bounds point to start displaying labels that
-                                // are not fully on the screen yet. We need to deal with that case
-                                // in some clever way, but for now let's ignore those points.
-                                continue;
-                            }
-
                             match &paint.shape {
                                 PointShape::Label { text, style } => {
                                     if !text.is_empty() {

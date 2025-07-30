@@ -22,27 +22,67 @@ pub enum VerticalDirection {
     BottomToTop,
 }
 
-/// Index of a tile.
+/// Tile index with additional virtual `display_x` index that can be used to wrap tiles
+/// over 180 longitude line.
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, Serialize, Deserialize)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub struct TileIndex {
+pub struct WrappingTileIndex {
     /// Z index.
     pub z: u32,
     /// X index.
     pub x: i32,
     /// Y index.
     pub y: i32,
-    pub(crate) display_x: i32,
+    /// Virtual wrapping X index.
+    pub display_x: i32,
 }
 
-impl TileIndex {
-    /// Create a new index instance.
+impl WrappingTileIndex {
+    /// Create a new index instance without wrapping.
     pub fn new(x: i32, y: i32, z: u32) -> Self {
         Self {
             x,
             y,
             z,
             display_x: x,
+        }
+    }
+}
+
+/// Tile index.
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, Serialize, Deserialize)]
+pub struct TileIndex {
+    /// X index.
+    pub x: i32,
+    /// Y index.
+    pub y: i32,
+    /// Z index.
+    pub z: u32,
+}
+
+impl TileIndex {
+    /// Create a new index instance.
+    pub fn new(x: i32, y: i32, z: u32) -> Self {
+        Self { x, y, z }
+    }
+
+    /// Converts the tile index into a wrapping tile index by setting `display_x` equal to `x`.
+    pub fn into_wrapping(&self) -> WrappingTileIndex {
+        WrappingTileIndex {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            display_x: self.x,
+        }
+    }
+}
+
+impl From<WrappingTileIndex> for TileIndex {
+    fn from(value: WrappingTileIndex) -> Self {
+        Self {
+            x: value.x,
+            y: value.y,
+            z: value.z,
         }
     }
 }
@@ -108,7 +148,7 @@ impl TileSchema {
     }
 
     /// Iterate over tile indices that should be displayed for the given map view.
-    pub fn iter_tiles(&self, view: &MapView) -> Option<impl Iterator<Item = TileIndex>> {
+    pub fn iter_tiles(&self, view: &MapView) -> Option<impl Iterator<Item = WrappingTileIndex>> {
         if *view.crs() != self.crs {
             return None;
         }
@@ -122,7 +162,7 @@ impl TileSchema {
         &self,
         resolution: f64,
         bounding_box: Rect,
-    ) -> Option<impl Iterator<Item = TileIndex>> {
+    ) -> Option<impl Iterator<Item = WrappingTileIndex>> {
         let lod = self.select_lod(resolution)?;
 
         let tile_w = lod.resolution() * self.tile_width as f64;
@@ -160,7 +200,7 @@ impl TileSchema {
             move |display_x: i32| (display_x - schema_x_min).rem_euclid(index_range) + schema_x_min;
 
         Some((x_min..=x_max).flat_map(move |x| {
-            (y_min..=y_max).map(move |y| TileIndex {
+            (y_min..=y_max).map(move |y| WrappingTileIndex {
                 x: actual_x(x),
                 y,
                 z: lod.z_index(),
@@ -209,7 +249,7 @@ impl TileSchema {
         }
     }
 
-    pub(crate) fn tile_bbox(&self, index: TileIndex) -> Option<Rect> {
+    pub(crate) fn tile_bbox(&self, index: WrappingTileIndex) -> Option<Rect> {
         let x_index = index.display_x;
         let y_index = index.y;
 
@@ -356,7 +396,7 @@ mod tests {
         }
 
         let view = get_view(4.0, bbox);
-        let mut tiles: Vec<TileIndex> = schema.iter_tiles(&view).unwrap().collect();
+        let mut tiles: Vec<WrappingTileIndex> = schema.iter_tiles(&view).unwrap().collect();
         tiles.dedup();
         assert_eq!(tiles.len(), 4);
         for tile in tiles {
@@ -366,7 +406,7 @@ mod tests {
         }
 
         let view = get_view(2.0, bbox);
-        let mut tiles: Vec<TileIndex> = schema.iter_tiles(&view).unwrap().collect();
+        let mut tiles: Vec<WrappingTileIndex> = schema.iter_tiles(&view).unwrap().collect();
         tiles.dedup();
         assert_eq!(tiles.len(), 16);
         for tile in tiles {
@@ -389,7 +429,7 @@ mod tests {
         }
 
         let view = get_view(4.0, bbox);
-        let mut tiles: Vec<TileIndex> = schema.iter_tiles(&view).unwrap().collect();
+        let mut tiles: Vec<WrappingTileIndex> = schema.iter_tiles(&view).unwrap().collect();
         tiles.dedup();
         assert_eq!(tiles.len(), 4);
         for tile in tiles {
@@ -399,7 +439,7 @@ mod tests {
         }
 
         let view = get_view(2.0, bbox);
-        let mut tiles: Vec<TileIndex> = schema.iter_tiles(&view).unwrap().collect();
+        let mut tiles: Vec<WrappingTileIndex> = schema.iter_tiles(&view).unwrap().collect();
         tiles.dedup();
         assert_eq!(tiles.len(), 6);
         for tile in tiles {

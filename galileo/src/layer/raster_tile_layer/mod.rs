@@ -3,6 +3,7 @@
 use std::any::Any;
 use std::sync::Arc;
 
+use galileo_types::cartesian::Vector2;
 use provider::RasterTileProvider;
 use web_time::Duration;
 
@@ -89,9 +90,12 @@ impl RasterTileLayer {
         };
 
         let needed_indices: Vec<_> = tile_iter.collect();
+        let mut to_pack: Vec<TileIndex> = needed_indices.iter().map(|t| (*t).into()).collect();
+        to_pack.dedup();
+
         self.tile_container
             .tile_provider
-            .pack_tiles(&needed_indices, canvas);
+            .pack_tiles(&to_pack, canvas);
         let requires_redraw = self
             .tile_container
             .update_displayed_tiles(needed_indices, ());
@@ -137,7 +141,13 @@ impl RasterTileLayer {
             for index in iter {
                 let tile_provider = self.tile_loader.clone();
                 let messenger = self.messenger.clone();
-                Self::load_tile(index, tile_provider, self.tile_container.clone(), messenger).await;
+                Self::load_tile(
+                    index.into(),
+                    tile_provider,
+                    self.tile_container.clone(),
+                    messenger,
+                )
+                .await;
             }
         }
     }
@@ -155,7 +165,11 @@ impl Layer for RasterTileLayer {
         let displayed_tiles = self.tile_container.tiles.lock();
         let to_render: Vec<_> = displayed_tiles
             .iter()
-            .map(|v| BundleToDraw::with_opacity(&*v.bundle, v.opacity))
+            .filter_map(|v| {
+                let tile_bbox = self.tile_schema.tile_bbox(v.index)?;
+                let offset = Vector2::new(tile_bbox.x_min() as f32, tile_bbox.y_max() as f32);
+                Some(BundleToDraw::new(&*v.bundle, v.opacity, offset))
+            })
             .collect();
 
         canvas.draw_bundles(&to_render, RenderOptions::default());
@@ -168,7 +182,7 @@ impl Layer for RasterTileLayer {
                 let container = self.tile_container.clone();
                 let messenger = self.messenger.clone();
                 crate::async_runtime::spawn(async move {
-                    Self::load_tile(index, tile_provider, container, messenger).await;
+                    Self::load_tile(index.into(), tile_provider, container, messenger).await;
                 });
             }
         }

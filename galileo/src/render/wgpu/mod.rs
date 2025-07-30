@@ -984,8 +984,14 @@ impl Canvas for WgpuCanvas<'_> {
         let screen_sets = std::mem::take(&mut self.screen_sets);
         let mut sets: Vec<_> = screen_sets
             .iter()
-            .map(|(set, _, offset)| {
-                let locked = set.lock();
+            .filter_map(|(set, _, offset)| {
+                let Some(locked) = set.try_lock() else {
+                    // TODO: this means that the same tile is reused. We just wait for it to
+                    // disappear from the map. This would result in some visual bugs, but not so
+                    // critical as to be blocked by it ATM.
+                    return None;
+                };
+
                 let projected_anchor = transform
                     * Point4::new(
                         locked.anchor_point[0] as f64 + offset.dx() as f64,
@@ -995,7 +1001,7 @@ impl Canvas for WgpuCanvas<'_> {
                     );
                 let normalaized = projected_anchor / projected_anchor.w.abs();
 
-                (locked, normalaized, offset)
+                Some((locked, normalaized, offset))
             })
             .collect();
         sets.sort_by(|a, b| {

@@ -53,7 +53,7 @@ pub trait PackedBundle: MaybeSend + MaybeSync {
     fn as_any(&self) -> &dyn Any;
 }
 
-/// Packed bundle that is ready to be renderred with the given paramters.
+/// Packed bundle that is ready to be renderred with the given parameters.
 pub struct BundleToDraw<'a> {
     bundle: &'a dyn PackedBundle,
     opacity: f32,
@@ -61,7 +61,7 @@ pub struct BundleToDraw<'a> {
 }
 
 impl<'a> BundleToDraw<'a> {
-    /// Packed bundle with offset and opacity speicified.
+    /// Packed bundle with offset and opacity specified.
     pub fn new(bundle: &'a dyn PackedBundle, opacity: f32, offset: Vector2<f32>) -> Self {
         Self {
             bundle,
