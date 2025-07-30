@@ -69,12 +69,17 @@ impl Layer for VectorTileLayer {
         };
 
         let displayed_tiles = self.displayed_tiles.tiles.lock();
-        let to_render: Vec<_> = std::iter::once(BundleToDraw::with_opacity(&*background_bundle, 1.0))
-            .chain(displayed_tiles.iter().filter_map(|v| {
-                let bbox = self.tile_schema.tile_bbox(v.index)?;
-                Some(BundleToDraw::new(&*v.bundle, v.opacity, Vector2::new(bbox.x_min() as f32, bbox.y_max() as f32)))
-            }))
-            .collect();
+        let to_render: Vec<_> =
+            std::iter::once(BundleToDraw::with_opacity(&*background_bundle, 1.0))
+                .chain(displayed_tiles.iter().filter_map(|v| {
+                    let bbox = self.tile_schema.tile_bbox(v.index)?;
+                    Some(BundleToDraw::new(
+                        &*v.bundle,
+                        v.opacity,
+                        Vector2::new(bbox.x_min() as f32, bbox.y_max() as f32),
+                    ))
+                }))
+                .collect();
 
         canvas.draw_bundles(&to_render, RenderOptions::default());
     }

@@ -4,7 +4,7 @@ use wgpu::{BindGroupLayout, Device, RenderPass, RenderPipeline, TextureFormat};
 
 use crate::render::render_bundle::screen_set::ScreenSetVertex;
 use crate::render::wgpu::pipelines::{default_pipeline_descriptor, default_targets};
-use crate::render::wgpu::{ScreenSetInstance, WgpuVertexBuffers};
+use crate::render::wgpu::{DisplayInstance, WgpuVertexBuffers};
 
 pub struct ScreenSetPipeline {
     wgpu_pipeline: RenderPipeline,
@@ -37,7 +37,7 @@ impl ScreenSetPipeline {
         format: TextureFormat,
         map_view_layout: &BindGroupLayout,
     ) -> Self {
-        let buffers = [ScreenSetVertex::wgpu_desc(), ScreenSetInstance::wgpu_desc()];
+        let buffers = [ScreenSetVertex::wgpu_desc(), DisplayInstance::wgpu_desc()];
         let shader = device.create_shader_module(wgpu::include_wgsl!("./shaders/screen_set.wgsl"));
 
         let targets = default_targets(format);

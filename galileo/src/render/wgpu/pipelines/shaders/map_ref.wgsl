@@ -16,7 +16,7 @@ struct VertexInput {
     @location(2) norm: vec2<f32>,
     @location(3) norm_limit: f32,
     @location(10) bundle_opacity: f32,
-    @location(11) bundle_offset: vec2<f32>,
+    @location(11) bundle_offset: vec3<f32>,
 }
 
 struct VertexOutput {
@@ -41,7 +41,8 @@ fn vs_main(
     }
 
     let norm = model.norm * norm_limit * transform.resolution;
-    let vertex_position = transform.view_proj * vec4<f32>(model.position.xy + model.bundle_offset + norm, model.position[2], 1.0);
+    let position = model.position + model.bundle_offset;
+    let vertex_position = transform.view_proj * vec4<f32>(position.xy + norm, model.position.z, 1.0);
 
     out.clip_position = vertex_position;
 
