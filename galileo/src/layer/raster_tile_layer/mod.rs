@@ -10,7 +10,7 @@ use super::tiles::TilesContainer;
 use super::Layer;
 use crate::layer::attribution::Attribution;
 use crate::messenger::Messenger;
-use crate::render::{Canvas, RenderOptions};
+use crate::render::{BundleToDraw, Canvas, RenderOptions};
 use crate::tile_schema::{TileIndex, TileSchema};
 use crate::view::MapView;
 
@@ -155,10 +155,10 @@ impl Layer for RasterTileLayer {
         let displayed_tiles = self.tile_container.tiles.lock();
         let to_render: Vec<_> = displayed_tiles
             .iter()
-            .map(|v| (&*v.bundle, v.opacity))
+            .map(|v| BundleToDraw::with_opacity(&*v.bundle, v.opacity))
             .collect();
 
-        canvas.draw_bundles_with_opacity(&to_render, RenderOptions::default());
+        canvas.draw_bundles(&to_render, RenderOptions::default());
     }
 
     fn prepare(&self, view: &MapView) {

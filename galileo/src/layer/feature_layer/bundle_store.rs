@@ -4,7 +4,7 @@ use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
 
 use super::FeatureId;
 use crate::render::render_bundle::RenderBundle;
-use crate::render::{Canvas, PackedBundle};
+use crate::render::{BundleToDraw, Canvas, PackedBundle};
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub(super) struct BundleId(u64);
@@ -76,8 +76,8 @@ impl BundleStore {
         self.required_update.updated();
     }
 
-    pub(super) fn packed(&self) -> Vec<&dyn PackedBundle> {
-        self.packed.values().map(|v| &**v).collect()
+    pub(super) fn packed(&self) -> Vec<BundleToDraw> {
+        self.packed.values().map(|v| BundleToDraw::with_opacity(&**v, 1.0)).collect()
     }
 
     pub(super) fn set_bundle_size_limit(&mut self, limit: usize) {

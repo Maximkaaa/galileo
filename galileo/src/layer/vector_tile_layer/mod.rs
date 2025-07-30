@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use galileo_mvt::{MvtFeature, MvtGeometry};
-use galileo_types::cartesian::{CartesianPoint2d, Point2, Point3};
+use galileo_types::cartesian::{CartesianPoint2d, Point2, Point3, Vector2};
 use galileo_types::geometry::CartesianGeometry2d;
 use galileo_types::impls::{ClosedContour, Polygon};
 use galileo_types::MultiPolygon;
@@ -20,7 +20,7 @@ use crate::layer::vector_tile_layer::tile_provider::{VectorTileProvider, VtStyle
 use crate::layer::Layer;
 use crate::messenger::Messenger;
 use crate::render::render_bundle::RenderBundle;
-use crate::render::{Canvas, PackedBundle, PolygonPaint, RenderOptions};
+use crate::render::{BundleToDraw, Canvas, PackedBundle, PolygonPaint, RenderOptions};
 use crate::tile_schema::TileSchema;
 use crate::view::MapView;
 use crate::Color;
@@ -69,11 +69,14 @@ impl Layer for VectorTileLayer {
         };
 
         let displayed_tiles = self.displayed_tiles.tiles.lock();
-        let to_render: Vec<(&dyn PackedBundle, f32)> = std::iter::once((&*background_bundle, 1.0))
-            .chain(displayed_tiles.iter().map(|v| (&*v.bundle, v.opacity)))
+        let to_render: Vec<_> = std::iter::once(BundleToDraw::with_opacity(&*background_bundle, 1.0))
+            .chain(displayed_tiles.iter().filter_map(|v| {
+                let bbox = self.tile_schema.tile_bbox(v.index)?;
+                Some(BundleToDraw::new(&*v.bundle, v.opacity, Vector2::new(bbox.x_min() as f32, bbox.y_max() as f32)))
+            }))
             .collect();
 
-        canvas.draw_bundles_with_opacity(&to_render, RenderOptions::default());
+        canvas.draw_bundles(&to_render, RenderOptions::default());
     }
 
     fn prepare(&self, view: &MapView) {

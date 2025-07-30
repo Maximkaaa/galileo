@@ -6,7 +6,7 @@
 
 use std::any::Any;
 
-use galileo_types::cartesian::Size;
+use galileo_types::cartesian::{Size, Vector2};
 use maybe_sync::{MaybeSend, MaybeSync};
 use render_bundle::RenderBundle;
 use serde::{Deserialize, Serialize};
@@ -40,13 +40,7 @@ pub trait Canvas {
     /// Packs a bundle to make it ready for be rendered with [`Canvas::draw_bundles`] method.
     fn pack_bundle(&self, bundle: &RenderBundle) -> Box<dyn PackedBundle>;
     /// Render the bundles.
-    fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle], options: RenderOptions);
-    /// Render bundles applying the specified opacity to each of them.
-    fn draw_bundles_with_opacity(
-        &mut self,
-        bundles: &[(&dyn PackedBundle, f32)],
-        options: RenderOptions,
-    );
+    fn draw_bundles(&mut self, bundles: &[BundleToDraw], options: RenderOptions);
     /// Render screen sets that were added previously by the `draw_bundles` calls.
     ///
     /// Returns `true` if canvas requires further animation (fading in or out some of the objects).
@@ -57,6 +51,29 @@ pub trait Canvas {
 pub trait PackedBundle: MaybeSend + MaybeSync {
     /// Used to convert from trait object into a specific type by the rendering backend.
     fn as_any(&self) -> &dyn Any;
+}
+
+/// Packed bundle that is ready to be renderred with the given paramters.
+pub struct BundleToDraw<'a> {
+    bundle: &'a dyn PackedBundle,
+    opacity: f32,
+    pub(crate) offset: Vector2<f32>,
+}
+
+impl<'a> BundleToDraw<'a> {
+    /// Packed bundle with offset and opacity speicified.
+    pub fn new(bundle: &'a dyn PackedBundle, opacity: f32, offset: Vector2<f32>) -> Self {
+        Self { bundle, opacity, offset }
+    }
+
+    /// Packed bundle with zero offset.
+    pub fn with_opacity(bundle: &'a dyn PackedBundle, opacity: f32) -> Self {
+        Self {
+            bundle,
+            opacity,
+            offset: Default::default(),
+        }
+    }
 }
 
 /// Rendering options.

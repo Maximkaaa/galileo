@@ -15,6 +15,8 @@ struct VertexInput {
     @location(1) color: vec4<f32>,
     @location(2) norm: vec2<f32>,
     @location(3) norm_limit: f32,
+    @location(10) bundle_opacity: f32,
+    @location(11) bundle_offset: vec2<f32>,
 }
 
 struct VertexOutput {
@@ -25,11 +27,10 @@ struct VertexOutput {
 @vertex
 fn vs_main(
     model: VertexInput,
-    @location(10) bundle_opacity: f32,
 ) -> VertexOutput {
     var out: VertexOutput;
     var color = model.color;
-    color[3] = model.color[3] * bundle_opacity;
+    color[3] = model.color[3] * model.bundle_opacity;
     out.color = color;
 
     var norm_length = sqrt(model.norm[0] * model.norm[0] + model.norm[1] * model.norm[1]) * transform.resolution;
@@ -40,7 +41,7 @@ fn vs_main(
     }
 
     let norm = model.norm * norm_limit * transform.resolution;
-    let vertex_position = transform.view_proj * vec4<f32>(model.position.xy + norm, model.position[2], 1.0);
+    let vertex_position = transform.view_proj * vec4<f32>(model.position.xy + model.bundle_offset + norm, model.position[2], 1.0);
 
     out.clip_position = vertex_position;
 

@@ -8,7 +8,7 @@ use std::time::Duration;
 use ahash::HashMap;
 use cfg_if::cfg_if;
 use effects::horizon::HorizonPipeline;
-use galileo_types::cartesian::{Rect, Size};
+use galileo_types::cartesian::{Rect, Size, Vector2};
 use lyon::tessellation::VertexBuffers;
 use nalgebra::{Point4, Rotation3, Vector3};
 use parking_lot::Mutex;
@@ -22,7 +22,7 @@ use wgpu::{
 };
 
 use super::render_bundle::screen_set::{RenderSetState, ScreenSetData};
-use super::{Canvas, PackedBundle, RenderOptions};
+use super::{BundleToDraw, Canvas, PackedBundle, RenderOptions};
 use crate::decoded_image::DecodedImage;
 use crate::error::GalileoError;
 use crate::map::Map;
@@ -814,7 +814,7 @@ struct WgpuCanvas<'a> {
     view: &'a TextureView,
     map_view: MapView,
 
-    screen_sets: Vec<Arc<Mutex<WgpuScreenSet>>>,
+    screen_sets: Vec<(Arc<Mutex<WgpuScreenSet>>, f32, Vector2<f32>)>,
 }
 
 impl<'a> WgpuCanvas<'a> {
@@ -868,16 +868,7 @@ impl Canvas for WgpuCanvas<'_> {
         ))
     }
 
-    fn draw_bundles(&mut self, bundles: &[&dyn PackedBundle], options: RenderOptions) {
-        let with_opacity: Vec<_> = bundles.iter().map(|bundle| (*bundle, 1.0)).collect();
-        self.draw_bundles_with_opacity(&with_opacity, options);
-    }
-
-    fn draw_bundles_with_opacity(
-        &mut self,
-        bundles: &[(&dyn PackedBundle, f32)],
-        options: RenderOptions,
-    ) {
+    fn draw_bundles(&mut self, bundles: &[super::BundleToDraw], options: RenderOptions) {
         if bundles.is_empty() {
             log::debug!("Requested drawing of 0 bundles");
             return;
@@ -926,18 +917,30 @@ impl Canvas for WgpuCanvas<'_> {
                 occlusion_query_set: None,
             });
 
-            let opacities: Vec<f32> = bundles.iter().map(|(_, opacity)| *opacity).collect();
+            let display_instances: Vec<_> = bundles
+                .iter()
+                .map(
+                    |BundleToDraw {
+                         opacity, offset, ..
+                     }| DisplayInstance {
+                        opacity: *opacity,
+                        offset: [offset.dx(), offset.dy()],
+                    },
+                )
+                .collect();
+
             let display_buffer =
                 self.renderer
                     .device
                     .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label: None,
                         usage: wgpu::BufferUsages::VERTEX,
-                        contents: bytemuck::cast_slice(&opacities),
+                        contents: bytemuck::cast_slice(&display_instances),
                     });
             render_pass.set_vertex_buffer(1, display_buffer.slice(..));
 
-            for (index, (bundle, _)) in bundles.iter().enumerate() {
+
+            for (index, BundleToDraw { bundle, opacity, offset }) in bundles.iter().enumerate() {
                 if let Some(cast) = bundle.as_any().downcast_ref::<WgpuPackedBundle>() {
                     self.renderer_targets.pipelines.render(
                         &mut render_pass,
@@ -947,7 +950,7 @@ impl Canvas for WgpuCanvas<'_> {
                     );
 
                     for screen_set in &cast.screen_sets {
-                        self.screen_sets.push(screen_set.clone());
+                        self.screen_sets.push((screen_set.clone(), *opacity, *offset));
                     }
                 }
             }
@@ -973,18 +976,18 @@ impl Canvas for WgpuCanvas<'_> {
         let screen_sets = std::mem::take(&mut self.screen_sets);
         let mut sets: Vec<_> = screen_sets
             .iter()
-            .map(|set| {
+            .map(|(set, _, offset)| {
                 let locked = set.lock();
                 let projected_anchor = transform
                     * Point4::new(
-                        locked.anchor_point[0] as f64,
-                        locked.anchor_point[1] as f64,
+                        locked.anchor_point[0] as f64 + offset.dx() as f64,
+                        locked.anchor_point[1] as f64 + offset.dy() as f64,
                         locked.anchor_point[2] as f64,
                         1.0,
                     );
                 let normalaized = projected_anchor / projected_anchor.w.abs();
 
-                (locked, normalaized)
+                (locked, normalaized, offset)
             })
             .collect();
         sets.sort_by(|a, b| {
@@ -1005,7 +1008,7 @@ impl Canvas for WgpuCanvas<'_> {
         let mut displayed: Vec<Rect<f32>> = vec![];
         let mut filtered_sets: Vec<_> = sets
             .into_iter()
-            .filter_map(|(mut set, anchor)| {
+            .filter_map(|(mut set, anchor, offset)| {
                 if anchor.w <= 0.0 {
                     // The point is in imaginary plane
                     return None;
@@ -1027,15 +1030,15 @@ impl Canvas for WgpuCanvas<'_> {
                                 start_time: fade_out_start_time,
                             };
 
-                            Some(set)
+                            Some((set, offset))
                         }
                         RenderSetState::Displayed => {
                             set.state = RenderSetState::FadingOut {
                                 start_time: web_time::Instant::now(),
                             };
-                            Some(set)
+                            Some((set, offset))
                         }
-                        RenderSetState::FadingOut { .. } => Some(set),
+                        RenderSetState::FadingOut { .. } => Some((set, offset)),
                     }
                 } else {
                     // Showing the set
@@ -1057,7 +1060,7 @@ impl Canvas for WgpuCanvas<'_> {
                         _ => {}
                     }
 
-                    Some(set)
+                    Some((set, offset))
                 }
             })
             .collect();
@@ -1102,7 +1105,7 @@ impl Canvas for WgpuCanvas<'_> {
 
             let instances: Vec<ScreenSetInstance> = filtered_sets
                 .iter_mut()
-                .map(|set| {
+                .map(|(set, offset)| {
                     let opacity = match set.state {
                         RenderSetState::Hidden => 0.0,
                         RenderSetState::FadingIn { start_time } => {
@@ -1141,8 +1144,14 @@ impl Canvas for WgpuCanvas<'_> {
                             opacity
                         }
                     };
+
+                    let anchor = [
+                        set.anchor_point[0] + offset.dx(),
+                        set.anchor_point[1] + offset.dy(),
+                        set.anchor_point[2],
+                    ];
                     ScreenSetInstance {
-                        anchor: set.anchor_point,
+                        anchor,
                         opacity,
                     }
                 })
@@ -1161,7 +1170,7 @@ impl Canvas for WgpuCanvas<'_> {
 
             for (index, set) in filtered_sets.iter().enumerate().rev() {
                 self.renderer_targets.pipelines.render_screen_set(
-                    &set.data,
+                    &set.0.data,
                     &mut render_pass,
                     index as u32,
                 );
@@ -1434,6 +1443,7 @@ impl PolyVertex {
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct DisplayInstance {
     pub opacity: f32,
+    pub offset: [f32; 2],
 }
 
 impl DisplayInstance {
@@ -1441,11 +1451,18 @@ impl DisplayInstance {
         wgpu::VertexBufferLayout {
             array_stride: size_of::<DisplayInstance>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
-            attributes: &[wgpu::VertexAttribute {
-                offset: 0,
-                shader_location: 10,
-                format: wgpu::VertexFormat::Float32,
-            }],
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 10,
+                    format: wgpu::VertexFormat::Float32,
+                },
+                wgpu::VertexAttribute {
+                    offset: size_of::<f32>() as wgpu::BufferAddress,
+                    shader_location: 11,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+            ],
         }
     }
 }

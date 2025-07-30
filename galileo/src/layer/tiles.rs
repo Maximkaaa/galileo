@@ -9,7 +9,7 @@ use crate::TileSchema;
 
 #[derive(Clone)]
 pub(crate) struct DisplayedTile<StyleId: Copy> {
-    index: TileIndex,
+    pub(crate) index: TileIndex,
     pub(crate) bundle: Arc<dyn PackedBundle>,
     style_id: StyleId,
     pub(crate) opacity: f32,
