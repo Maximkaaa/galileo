@@ -85,7 +85,11 @@ fn build_layer(tile_id: &str, messenger: Option<impl Messenger + 'static>) -> Ra
             y = index.y
         )
     })
-    .with_file_cache_checked(".tile_cache");
+    .with_file_cache_modifier_checked(
+        ".tile_cache",
+        // Remove query parameters from path if they exist
+        Box::new(|path| path.split('?').next().unwrap_or(path).to_string()),
+    );
 
     if let Some(messenger) = messenger {
         builder = builder.with_messenger(messenger);
