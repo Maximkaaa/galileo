@@ -102,9 +102,7 @@ impl VtProcessor {
                                     &galileo_types::impls::Contour::new(
                                         contour
                                             .iter_points()
-                                            .map(|p| {
-                                                Self::transform_point(&p, tile_resolution)
-                                            })
+                                            .map(|p| Self::transform_point(&p, tile_resolution))
                                             .collect(),
                                         false,
                                     ),
@@ -174,10 +172,7 @@ impl VtProcessor {
         rule.symbol.polygon().map(|&s| s.into())
     }
 
-    fn transform_polygon(
-        mvt_polygon: &MvtPolygon,
-        tile_resolution: f64,
-    ) -> Polygon<Point3> {
+    fn transform_polygon(mvt_polygon: &MvtPolygon, tile_resolution: f64) -> Polygon<Point3> {
         let cast = |p| Self::transform_point(&p, tile_resolution);
 
         Polygon {

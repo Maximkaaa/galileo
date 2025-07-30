@@ -77,7 +77,10 @@ impl BundleStore {
     }
 
     pub(super) fn packed(&self) -> Vec<BundleToDraw> {
-        self.packed.values().map(|v| BundleToDraw::with_opacity(&**v, 1.0)).collect()
+        self.packed
+            .values()
+            .map(|v| BundleToDraw::with_opacity(&**v, 1.0))
+            .collect()
     }
 
     pub(super) fn set_bundle_size_limit(&mut self, limit: usize) {

@@ -16,8 +16,8 @@ struct VertexInput {
 }
 
 struct SetInput {
-    @location(10) anchor: vec3<f32>,
-    @location(11) opacity: f32,
+    @location(10) opacity: f32,
+    @location(11) anchor: vec3<f32>,
 }
 
 struct VertexOutput {

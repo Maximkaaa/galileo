@@ -63,7 +63,11 @@ pub struct BundleToDraw<'a> {
 impl<'a> BundleToDraw<'a> {
     /// Packed bundle with offset and opacity speicified.
     pub fn new(bundle: &'a dyn PackedBundle, opacity: f32, offset: Vector2<f32>) -> Self {
-        Self { bundle, opacity, offset }
+        Self {
+            bundle,
+            opacity,
+            offset,
+        }
     }
 
     /// Packed bundle with zero offset.

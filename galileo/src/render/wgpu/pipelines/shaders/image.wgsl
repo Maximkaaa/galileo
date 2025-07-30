@@ -16,7 +16,7 @@ struct VertexInput {
     @location(2) tex_coord: vec2<f32>,
     @location(3) offset: vec2<f32>,
     @location(10) bundle_opacity: f32,
-    @location(11) bundle_offset: vec2<f32>,
+    @location(11) bundle_offset: vec3<f32>,
 }
 
 struct VertexOutput {
@@ -32,7 +32,7 @@ fn vs_main(
     var out: VertexOutput;
     out.tex_coord = model.tex_coord;
 
-    var point_position = transform.view_proj * vec4<f32>(model.position + model.bundle_offset, 0.0, 1.0);
+    var point_position = transform.view_proj * vec4<f32>(model.position + model.bundle_offset.xy, model.bundle_offset.z, 1.0);
     var vertex_delta = vec4<f32>(model.offset * transform.inv_screen_size * point_position[3] * 2.0, 0.0, 0.0);
 
     out.clip_position = point_position + vertex_delta;

@@ -924,7 +924,7 @@ impl Canvas for WgpuCanvas<'_> {
                          opacity, offset, ..
                      }| DisplayInstance {
                         opacity: *opacity,
-                        offset: [offset.dx(), offset.dy()],
+                        offset: [offset.dx(), offset.dy(), 0.0],
                     },
                 )
                 .collect();
@@ -939,8 +939,15 @@ impl Canvas for WgpuCanvas<'_> {
                     });
             render_pass.set_vertex_buffer(1, display_buffer.slice(..));
 
-
-            for (index, BundleToDraw { bundle, opacity, offset }) in bundles.iter().enumerate() {
+            for (
+                index,
+                BundleToDraw {
+                    bundle,
+                    opacity,
+                    offset,
+                },
+            ) in bundles.iter().enumerate()
+            {
                 if let Some(cast) = bundle.as_any().downcast_ref::<WgpuPackedBundle>() {
                     self.renderer_targets.pipelines.render(
                         &mut render_pass,
@@ -950,7 +957,8 @@ impl Canvas for WgpuCanvas<'_> {
                     );
 
                     for screen_set in &cast.screen_sets {
-                        self.screen_sets.push((screen_set.clone(), *opacity, *offset));
+                        self.screen_sets
+                            .push((screen_set.clone(), *opacity, *offset));
                     }
                 }
             }
@@ -1103,7 +1111,7 @@ impl Canvas for WgpuCanvas<'_> {
                 occlusion_query_set: None,
             });
 
-            let instances: Vec<ScreenSetInstance> = filtered_sets
+            let instances: Vec<DisplayInstance> = filtered_sets
                 .iter_mut()
                 .map(|(set, offset)| {
                     let opacity = match set.state {
@@ -1150,9 +1158,10 @@ impl Canvas for WgpuCanvas<'_> {
                         set.anchor_point[1] + offset.dy(),
                         set.anchor_point[2],
                     ];
-                    ScreenSetInstance {
-                        anchor,
+
+                    DisplayInstance {
                         opacity,
+                        offset: anchor,
                     }
                 })
                 .collect();
@@ -1443,7 +1452,7 @@ impl PolyVertex {
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct DisplayInstance {
     pub opacity: f32,
-    pub offset: [f32; 2],
+    pub offset: [f32; 3],
 }
 
 impl DisplayInstance {
@@ -1460,35 +1469,7 @@ impl DisplayInstance {
                 wgpu::VertexAttribute {
                     offset: size_of::<f32>() as wgpu::BufferAddress,
                     shader_location: 11,
-                    format: wgpu::VertexFormat::Float32x2,
-                },
-            ],
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct ScreenSetInstance {
-    anchor: [f32; 3],
-    opacity: f32,
-}
-
-impl ScreenSetInstance {
-    fn wgpu_desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: size_of::<ScreenSetInstance>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Instance,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 10,
                     format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 11,
-                    format: wgpu::VertexFormat::Float32,
                 },
             ],
         }
