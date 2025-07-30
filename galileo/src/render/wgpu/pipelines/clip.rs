@@ -71,12 +71,14 @@ impl ClipPipeline {
         buffers: &'a WgpuVertexBuffers,
         render_pass: &mut RenderPass<'a>,
         render_options: RenderOptions,
+        bundle_index: u32,
     ) {
         self.render(
             buffers,
             render_pass,
             Self::CLIP_STENCIL_VALUE,
             render_options,
+            bundle_index,
         );
     }
 
@@ -85,8 +87,15 @@ impl ClipPipeline {
         buffers: &'a WgpuVertexBuffers,
         render_pass: &mut RenderPass<'a>,
         render_options: RenderOptions,
+        bundle_index: u32,
     ) {
-        self.render(buffers, render_pass, Self::UNCLIP_REFERENCE, render_options);
+        self.render(
+            buffers,
+            render_pass,
+            Self::UNCLIP_REFERENCE,
+            render_options,
+            bundle_index,
+        );
     }
 
     fn render<'a>(
@@ -95,6 +104,7 @@ impl ClipPipeline {
         render_pass: &mut RenderPass<'a>,
         stencil_reference: u32,
         render_options: RenderOptions,
+        bundle_index: u32,
     ) {
         if render_options.antialias {
             render_pass.set_pipeline(&self.wgpu_pipeline_antialias);
@@ -105,6 +115,6 @@ impl ClipPipeline {
         render_pass.set_stencil_reference(stencil_reference);
         render_pass.set_vertex_buffer(0, buffers.vertex.slice(..));
         render_pass.set_index_buffer(buffers.index.slice(..), wgpu::IndexFormat::Uint32);
-        render_pass.draw_indexed(0..buffers.index_count, 0, 0..1);
+        render_pass.draw_indexed(0..buffers.index_count, 0, bundle_index..(bundle_index + 1));
     }
 }

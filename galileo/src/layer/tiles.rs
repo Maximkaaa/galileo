@@ -4,12 +4,12 @@ use std::time::Duration;
 use parking_lot::Mutex;
 
 use crate::render::PackedBundle;
-use crate::tile_schema::TileIndex;
+use crate::tile_schema::{TileIndex, WrappingTileIndex};
 use crate::TileSchema;
 
 #[derive(Clone)]
 pub(crate) struct DisplayedTile<StyleId: Copy> {
-    pub(crate) index: TileIndex,
+    pub(crate) index: WrappingTileIndex,
     pub(crate) bundle: Arc<dyn PackedBundle>,
     style_id: StyleId,
     pub(crate) opacity: f32,
@@ -51,7 +51,7 @@ where
 
     pub(crate) fn update_displayed_tiles(
         &self,
-        needed_indices: impl IntoIterator<Item = TileIndex>,
+        needed_indices: impl IntoIterator<Item = WrappingTileIndex>,
         style_id: StyleId,
     ) -> bool {
         let mut displayed_tiles = self.tiles.lock();
@@ -78,7 +78,7 @@ where
 
                 needed_tiles.push(displayed.clone());
             } else {
-                match self.tile_provider.get_tile(index, style_id) {
+                match self.tile_provider.get_tile(index.into(), style_id) {
                     None => to_substitute.push(index),
                     Some(bundle) => {
                         needed_tiles.push(DisplayedTile {
