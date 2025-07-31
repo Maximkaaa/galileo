@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use egui::FontDefinitions;
 use galileo::control::{EventPropagation, MouseButton, UserEvent, UserEventHandler};
+use galileo::layer::data_provider::remove_parameters_modifier;
 use galileo::layer::vector_tile_layer::style::VectorTileStyle;
 use galileo::layer::vector_tile_layer::VectorTileLayerBuilder;
 use galileo::layer::VectorTileLayer;
@@ -88,11 +89,7 @@ pub(crate) fn run() {
     })
     .with_style(style)
     .with_tile_schema(tile_schema())
-    .with_file_cache_modifier_checked(
-        ".tile_cache",
-        // Remove query parameters from path if they exist
-        Box::new(|path| path.split('?').next().unwrap_or(path).to_string()),
-    )
+    .with_file_cache_modifier_checked(".tile_cache", Box::new(remove_parameters_modifier))
     .with_attribution(
         "© MapTiler© OpenStreetMap contributors".to_string(),
         "https://www.maptiler.com/copyright/".to_string(),

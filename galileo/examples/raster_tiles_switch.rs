@@ -1,5 +1,6 @@
 //! This example shows how to switch tile layers at runtime.
 
+use galileo::layer::data_provider::remove_parameters_modifier;
 use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
 use galileo::layer::RasterTileLayer;
 use galileo::tile_schema::TileIndex;
@@ -85,11 +86,7 @@ fn build_layer(tile_id: &str, messenger: Option<impl Messenger + 'static>) -> Ra
             y = index.y
         )
     })
-    .with_file_cache_modifier_checked(
-        ".tile_cache",
-        // Remove query parameters from path if they exist
-        Box::new(|path| path.split('?').next().unwrap_or(path).to_string()),
-    );
+    .with_file_cache_modifier_checked(".tile_cache", Box::new(remove_parameters_modifier));
 
     if let Some(messenger) = messenger {
         builder = builder.with_messenger(messenger);
