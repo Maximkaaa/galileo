@@ -180,6 +180,25 @@ impl RasterTileLayerBuilder {
     }
 
     /// Same as [`with_file_cache`], but also modifies the file path by given `modifier` function
+    ///
+    /// ```
+    /// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+    ///
+    /// let layer = RasterTileLayerBuilder::new_rest(
+    ///     |index| {
+    ///         format!(
+    ///             "https://tile.openstreetmap.org/{}/{}/{}.png",
+    ///             index.z, index.x, index.y
+    ///         )
+    ///     })
+    ///     .with_file_cache_modifier(
+    ///         "./target",
+    ///         // modify file path to be `uppercase`
+    ///         Box::new(|path| path.to_uppercase())
+    ///     )
+    ///     .build()?;
+    /// # Ok::<(), galileo::error::GalileoError>(())
+    /// ```
     pub fn with_file_cache_modifier(
         mut self,
         path: impl AsRef<Path>,
@@ -223,6 +242,25 @@ impl RasterTileLayerBuilder {
     }
 
     /// Same as [`with_file_cache_checked`], but also modifies the file path by given `modifier` function
+    ///
+    /// ```
+    /// use galileo::layer::raster_tile_layer::RasterTileLayerBuilder;
+    ///
+    /// let layer = RasterTileLayerBuilder::new_rest(
+    ///     |index| {
+    ///         format!(
+    ///             "https://tile.openstreetmap.org/{}/{}/{}.png",
+    ///             index.z, index.x, index.y
+    ///         )
+    ///     })
+    ///     .with_file_cache_modifier_checked(
+    ///         "./target",
+    ///         // modify file path to be `uppercase`
+    ///         Box::new(|path| path.to_uppercase())
+    ///     )
+    ///     .build()?;
+    /// # Ok::<(), galileo::error::GalileoError>(())
+    /// ```
     pub fn with_file_cache_modifier_checked(
         self,
         _path: impl AsRef<Path>,
