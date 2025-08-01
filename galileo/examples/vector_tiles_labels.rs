@@ -1,5 +1,6 @@
 //! This examples shows how to render labels for vector tile points.
 
+use galileo::layer::data_provider::remove_parameters_modifier;
 use galileo::layer::vector_tile_layer::style::{
     StyleRule, VectorTileLabelSymbol, VectorTileStyle, VectorTileSymbol,
 };
@@ -31,11 +32,7 @@ pub(crate) fn run() {
             y = index.y
         )
     })
-    .with_file_cache_modifier_checked(
-        ".tile_cache",
-        // Remove query parameters from path if they exist
-        Box::new(|path| path.split('?').next().unwrap_or(path).to_string()),
-    )
+    .with_file_cache_modifier_checked(".tile_cache", Box::new(remove_parameters_modifier))
     .with_style(default_style())
     .with_tile_schema(tile_schema())
     .with_attribution(

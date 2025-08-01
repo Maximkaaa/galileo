@@ -9,6 +9,12 @@ use crate::layer::data_provider::PersistentCacheController;
 /// Function to modify the default file path of the cache
 pub type FileCachePathModifier = dyn Fn(&str) -> String + Send + Sync;
 
+/// Modifier to remove parameters from file path.
+/// Can be used as a [`FileCachePathModifier`].
+pub fn remove_parameters_modifier(path: &str) -> String {
+    path.split('?').next().unwrap_or(path).to_owned()
+}
+
 /// Stores the cached data as a set of files in the specified folder. It generates file names from the given urls.
 ///
 /// Currently, there is no eviction mechanism.
