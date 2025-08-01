@@ -22,7 +22,7 @@ edition = "2021"
 keywords = ["gis", "map", "rendering"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Maximkaaa/galileo"
-version = "0.2.1"
+version = "0.3.0"
 
 [workspace.lints]
 rust.missing_docs = "warn"
@@ -54,10 +54,10 @@ font-kit = "0.14"
 font-query = { git = "https://github.com/Maximkaaa/font-query" }
 futures = "0.3"
 futures-intrusive = "0.5"
-galileo = { path = "galileo", version = "0.2.1" }
-galileo-egui = { path = "galileo-egui", version = "0.2.1" }
-galileo-mvt = { path = "galileo-mvt", version = "0.2.1" }
-galileo-types = { path = "galileo-types", version = "0.2.1" }
+galileo = { path = "galileo", version = "0.3.0" }
+galileo-egui = { path = "galileo-egui", version = "0.3.0" }
+galileo-mvt = { path = "galileo-mvt", version = "0.3.0" }
+galileo-types = { path = "galileo-types", version = "0.3.0" }
 geodesy = "0.13"
 geojson = "0.24"
 geozero = { version = "0.13", default-features = false }
