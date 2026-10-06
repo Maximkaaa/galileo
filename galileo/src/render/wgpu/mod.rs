@@ -15,11 +15,11 @@ use parking_lot::Mutex;
 use wgpu::util::DeviceExt;
 use wgpu::{
     Adapter, BindGroup, Buffer, BufferAddress, BufferDescriptor, BufferUsages,
-    COPY_BYTES_PER_ROW_ALIGNMENT, CurrentSurfaceTexture, Device, Extent3d, Origin3d, Queue,
-    RenderPassDepthStencilAttachment, StoreOp, Surface, SurfaceConfiguration, SurfaceStatus,
-    SurfaceTexture, TexelCopyBufferInfo, TexelCopyBufferLayout, TexelCopyTextureInfo, Texture,
-    TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
-    TextureViewDescriptor, WasmNotSendSync,
+    COPY_BYTES_PER_ROW_ALIGNMENT, CommandEncoder, CurrentSurfaceTexture, Device, Extent3d,
+    Origin3d, Queue, RenderPassDepthStencilAttachment, StoreOp, Surface, SurfaceConfiguration,
+    SurfaceStatus, SurfaceTexture, TexelCopyBufferInfo, TexelCopyBufferLayout,
+    TexelCopyTextureInfo, Texture, TextureAspect, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureUsages, TextureView, TextureViewDescriptor, WasmNotSendSync,
 };
 
 use super::render_bundle::screen_set::{RenderSetState, ScreenSetData};
@@ -48,7 +48,7 @@ type TexturesMap = HashMap<u64, (Weak<DecodedImage>, Arc<BindGroup>)>;
 /// Render backend that uses `wgpu` crate to render the map.
 pub struct WgpuRenderer {
     device: Device,
-    queue: Queue,
+    queue: Option<Queue>,
     renderer_targets: Option<RendererTargets>,
     background: Color,
     textures: Mutex<TexturesMap>,
@@ -146,7 +146,7 @@ impl WgpuRenderer {
 
         Some(Self {
             device,
-            queue,
+            queue: Some(queue),
             renderer_targets: None,
             background: DEFAULT_BACKGROUND,
             textures: Default::default(),
@@ -332,7 +332,7 @@ impl WgpuRenderer {
         let render_target = RenderTarget::Surface { surface, config };
         let mut renderer = Self {
             device,
-            queue,
+            queue: Some(queue),
             renderer_targets: None,
             background: DEFAULT_BACKGROUND,
             textures: Default::default(),
@@ -348,11 +348,33 @@ impl WgpuRenderer {
     pub fn new_with_device_and_texture(device: Device, queue: Queue, size: Size<u32>) -> Self {
         let mut renderer = Self {
             device,
-            queue,
+            queue: Some(queue),
             renderer_targets: None,
             background: DEFAULT_BACKGROUND,
             textures: Default::default(),
             horizon_options: Some(HorizonOptions::default()),
+        };
+
+        renderer.init_target_texture(size);
+
+        renderer
+    }
+
+    /// Creates a renderer that records drawing into externally supplied wgpu
+    /// command encoders instead of submitting on its own queue.
+    ///
+    /// `device` must own the target texture views passed to
+    /// [`Self::render_to_texture_view_with_encoder`]. This mode has no queue,
+    /// so the legacy self-submitting APIs (`render`, `get_image`, the horizon
+    /// effect) are unavailable until a queued renderer is used instead.
+    pub fn new_with_device(device: Device, size: Size<u32>) -> Self {
+        let mut renderer = Self {
+            device,
+            queue: None,
+            renderer_targets: None,
+            background: DEFAULT_BACKGROUND,
+            textures: Default::default(),
+            horizon_options: None,
         };
 
         renderer.init_target_texture(size);
@@ -596,7 +618,10 @@ impl WgpuRenderer {
             },
         );
 
-        self.queue.submit(Some(encoder.finish()));
+        self.queue
+            .as_ref()
+            .expect("get_image requires a queue")
+            .submit(Some(encoder.finish()));
 
         let buffer_slice = buffer.slice(..);
         let (tx, rx) = futures_intrusive::channel::shared::oneshot_channel();
@@ -648,46 +673,72 @@ impl WgpuRenderer {
         Ok(pixels)
     }
 
-    /// Renders the map to the given texture.
+    /// Renders the map to the given texture and submits the work on the
+    /// renderer's own queue.
     pub fn render_to_texture_view(&self, map: &Map, view: &TextureView) {
-        if let Some(renderer_targets) = &self.renderer_targets {
-            let mut encoder = self
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
+        let queue = self
+            .queue
+            .as_ref()
+            .expect("render_to_texture_view requires a queue");
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
 
-            {
-                let background = self.background.to_f32_array();
-                let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Render Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &renderer_targets.multisampling_view,
-                        depth_slice: None,
-                        resolve_target: Some(view),
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: background[0] as f64,
-                                g: background[1] as f64,
-                                b: background[2] as f64,
-                                a: background[3] as f64,
-                            }),
-                            store: StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                    multiview_mask: None,
-                });
-            }
+        self.render_to_texture_view_with_encoder(map, view, &mut encoder);
 
-            self.queue.submit(std::iter::once(encoder.finish()));
-        } else {
+        queue.submit(Some(encoder.finish()));
+
+        if let Some(targets) = &self.renderer_targets {
+            self.draw_horizon(map.view(), targets, view);
+        }
+    }
+
+    /// Records the map render into `encoder`, resolving into `view`.
+    ///
+    /// Nothing is submitted by this method: the caller owns the encoder and
+    /// decides when and where its commands are submitted. Every pipeline,
+    /// buffer and texture used here is created on the same device that owns
+    /// `view`, so this supports rendering into externally managed textures.
+    /// The horizon effect is not recorded by this method; it is applied by
+    /// the legacy [`Self::render_to_texture_view`] path instead.
+    pub fn render_to_texture_view_with_encoder(
+        &self,
+        map: &Map,
+        view: &TextureView,
+        encoder: &mut CommandEncoder,
+    ) {
+        let Some(renderer_targets) = &self.renderer_targets else {
             return;
+        };
+
+        {
+            let background = self.background.to_f32_array();
+            let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &renderer_targets.multisampling_view,
+                    depth_slice: None,
+                    resolve_target: Some(view),
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: background[0] as f64,
+                            g: background[1] as f64,
+                            b: background[2] as f64,
+                            a: background[3] as f64,
+                        }),
+                        store: StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
         }
 
-        self.render_map(map, view);
+        self.render_map(map, view, encoder);
     }
 
     /// Renders the map.
@@ -708,13 +759,14 @@ impl WgpuRenderer {
         Ok(())
     }
 
-    fn render_map(&self, map: &Map, texture_view: &TextureView) {
+    fn render_map(&self, map: &Map, texture_view: &TextureView, encoder: &mut CommandEncoder) {
         let view = map.view();
         let Some(renderer_targets) = &self.renderer_targets else {
             return;
         };
 
-        let Some(mut canvas) = WgpuCanvas::new(self, renderer_targets, texture_view, view.clone())
+        let Some(mut canvas) =
+            WgpuCanvas::new(self, renderer_targets, texture_view, view.clone(), encoder)
         else {
             log::warn!("Layer cannot be rendered to the map view.");
             return;
@@ -725,11 +777,10 @@ impl WgpuRenderer {
         }
 
         let needs_animation = canvas.draw_screen_sets();
+        canvas.flush_pending_uploads();
         if needs_animation {
             map.redraw();
         }
-
-        self.draw_horizon(view, renderer_targets, texture_view);
     }
 
     /// Returns options of the horizon effect used by the renderer.
@@ -763,6 +814,10 @@ impl WgpuRenderer {
         let Some(pipeline) = &renderer_targets.horizon_effect else {
             return;
         };
+        let queue = self
+            .queue
+            .as_ref()
+            .expect("horizon effect requires a queue");
 
         let mut encoder = self
             .device
@@ -799,10 +854,10 @@ impl WgpuRenderer {
             });
 
             renderer_targets.pipelines.set_bindings(&mut render_pass);
-            pipeline.render(view, &self.queue, &mut render_pass, 0);
+            pipeline.render(view, queue, &mut render_pass, 0);
         }
 
-        self.queue.submit(std::iter::once(encoder.finish()));
+        queue.submit(std::iter::once(encoder.finish()));
     }
 
     /// Returns the size of the rendering area.
@@ -824,7 +879,11 @@ impl WgpuRenderer {
             .retain(|_, (image_ref, _)| image_ref.strong_count() > 0);
     }
 
-    fn get_or_create_image_texture(&self, image: &Arc<DecodedImage>) -> Arc<BindGroup> {
+    fn get_or_create_image_texture(
+        &self,
+        image: &Arc<DecodedImage>,
+        pending: &Mutex<Vec<ImageUpload>>,
+    ) -> Arc<BindGroup> {
         let mut hasher = ahash::AHasher::default();
         image.hash(&mut hasher);
         let hash = hasher.finish();
@@ -833,27 +892,50 @@ impl WgpuRenderer {
             return texture.clone();
         }
 
-        let texture = self
+        let (texture, staging, bind_group, width, height, bytes_per_row) = self
             .renderer_targets
             .as_ref()
             .expect("trying to use pipelines of uninitialized renderer")
             .pipelines
-            .create_image_texture(&self.device, &self.queue, image);
+            .create_image_texture(&self.device, self.queue.as_ref(), image);
+
+        if let Some(staging) = staging {
+            pending.lock().push(ImageUpload {
+                texture,
+                staging,
+                width,
+                height,
+                bytes_per_row,
+            });
+        }
 
         self.textures
             .lock()
-            .insert(hash, (Arc::downgrade(image), texture.clone()));
+            .insert(hash, (Arc::downgrade(image), bind_group.clone()));
 
-        texture
+        bind_group
     }
+}
+
+/// A newly created image texture together with the staging buffer that carries
+/// its pixels. The staging buffer is uploaded with an encoder copy before the
+/// first render pass that samples the texture.
+struct ImageUpload {
+    texture: Texture,
+    staging: Buffer,
+    width: u32,
+    height: u32,
+    bytes_per_row: u32,
 }
 
 struct WgpuCanvas<'a> {
     renderer: &'a WgpuRenderer,
     renderer_targets: &'a RendererTargets,
     view: &'a TextureView,
+    encoder: &'a mut CommandEncoder,
     map_view: MapView,
 
+    pending_uploads: Mutex<Vec<ImageUpload>>,
     screen_sets: Vec<(Arc<Mutex<WgpuScreenSet>>, f32, Vector2<f32>)>,
 }
 
@@ -863,6 +945,7 @@ impl<'a> WgpuCanvas<'a> {
         renderer_targets: &'a RendererTargets,
         view: &'a TextureView,
         map_view: MapView,
+        encoder: &'a mut CommandEncoder,
     ) -> Option<Self> {
         let rotation_mtx = Rotation3::new(Vector3::new(
             map_view.rotation_x(),
@@ -870,28 +953,66 @@ impl<'a> WgpuCanvas<'a> {
             -map_view.rotation_z(),
         ))
         .to_homogeneous();
-        renderer.queue.write_buffer(
+        let staging = renderer
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Map view staging buffer"),
+                usage: wgpu::BufferUsages::COPY_SRC,
+                contents: bytemuck::cast_slice(&[ViewUniform {
+                    view_proj: map_view.map_to_scene_mtx()?,
+                    view_rotation: rotation_mtx.cast::<f32>().data.0,
+                    inv_screen_size: [
+                        1.0 / renderer.size().width() as f32,
+                        1.0 / renderer.size().height() as f32,
+                    ],
+                    resolution: map_view.resolution() as f32,
+                    _padding: [0.0; 1],
+                }]),
+            });
+        encoder.copy_buffer_to_buffer(
+            &staging,
+            0,
             renderer_targets.pipelines.map_view_buffer(),
             0,
-            bytemuck::cast_slice(&[ViewUniform {
-                view_proj: map_view.map_to_scene_mtx()?,
-                view_rotation: rotation_mtx.cast::<f32>().data.0,
-                inv_screen_size: [
-                    1.0 / renderer.size().width() as f32,
-                    1.0 / renderer.size().height() as f32,
-                ],
-                resolution: map_view.resolution() as f32,
-                _padding: [0.0; 1],
-            }]),
+            size_of::<ViewUniform>() as u64,
         );
 
         Some(Self {
             renderer,
             renderer_targets,
             view,
+            encoder,
             map_view,
+            pending_uploads: Mutex::new(Vec::new()),
             screen_sets: vec![],
         })
+    }
+
+    fn flush_pending_uploads(&mut self) {
+        let pending = std::mem::take(&mut *self.pending_uploads.lock());
+        for upload in pending {
+            self.encoder.copy_buffer_to_texture(
+                TexelCopyBufferInfo {
+                    buffer: &upload.staging,
+                    layout: TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some(upload.bytes_per_row),
+                        rows_per_image: Some(upload.height),
+                    },
+                },
+                TexelCopyTextureInfo {
+                    aspect: TextureAspect::All,
+                    texture: &upload.texture,
+                    mip_level: 0,
+                    origin: Origin3d::ZERO,
+                },
+                Extent3d {
+                    width: upload.width,
+                    height: upload.height,
+                    depth_or_array_layers: 1,
+                },
+            );
+        }
     }
 }
 
@@ -905,6 +1026,7 @@ impl Canvas for WgpuCanvas<'_> {
             bundle,
             self.renderer,
             self.renderer_targets,
+            &self.pending_uploads,
         ))
     }
 
@@ -914,12 +1036,8 @@ impl Canvas for WgpuCanvas<'_> {
             return;
         }
 
-        let mut encoder =
-            self.renderer
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
+        self.flush_pending_uploads();
+        let encoder = &mut *self.encoder;
 
         {
             let (view, resolve_target, depth_view) = if options.antialias {
@@ -1005,10 +1123,6 @@ impl Canvas for WgpuCanvas<'_> {
                 }
             }
         }
-
-        self.renderer
-            .queue
-            .submit(std::iter::once(encoder.finish()));
     }
 
     fn draw_screen_sets(&mut self) -> bool {
@@ -1023,6 +1137,7 @@ impl Canvas for WgpuCanvas<'_> {
         };
         let size = view.size();
 
+        self.flush_pending_uploads();
         let screen_sets = std::mem::take(&mut self.screen_sets);
         let mut sets: Vec<_> = screen_sets
             .iter()
@@ -1122,12 +1237,7 @@ impl Canvas for WgpuCanvas<'_> {
             .collect();
 
         let mut is_animating = false;
-        let mut encoder =
-            self.renderer
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
+        let encoder = &mut *self.encoder;
 
         {
             let view = &self.renderer_targets.multisampling_view;
@@ -1236,10 +1346,6 @@ impl Canvas for WgpuCanvas<'_> {
             }
         }
 
-        self.renderer
-            .queue
-            .submit(std::iter::once(encoder.finish()));
-
         is_animating
     }
 }
@@ -1283,6 +1389,7 @@ impl WgpuPackedBundle {
         bundle: &RenderBundle,
         renderer: &WgpuRenderer,
         renderer_targets: &RendererTargets,
+        pending: &Mutex<Vec<ImageUpload>>,
     ) -> Self {
         let RenderBundle {
             world_set,
@@ -1323,7 +1430,7 @@ impl WgpuPackedBundle {
 
         let textures: Vec<_> = image_store
             .iter()
-            .map(|decoded_image| renderer.get_or_create_image_texture(decoded_image))
+            .map(|decoded_image| renderer.get_or_create_image_texture(decoded_image, pending))
             .collect();
 
         let mut image_buffers = vec![];
@@ -1370,7 +1477,7 @@ impl WgpuPackedBundle {
                     WgpuScreenSetData::Vertex(buffers)
                 }
                 ScreenSetData::Image { vertices, bitmap } => {
-                    let bind_group = renderer.get_or_create_image_texture(bitmap);
+                    let bind_group = renderer.get_or_create_image_texture(bitmap, pending);
                     let image = renderer_targets
                         .pipelines
                         .screen_set_image_pipeline()

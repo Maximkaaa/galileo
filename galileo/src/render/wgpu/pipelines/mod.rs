@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 use screen_set_image::ScreenSetImagePipeline;
 use screen_set_vertex::ScreenSetPipeline;
-use wgpu::util::{DeviceExt, TextureDataOrder};
+use wgpu::util::DeviceExt;
 use wgpu::{
     BindGroup, BindGroupLayout, Buffer, CompareFunction, DepthStencilState, Device, PipelineLayout,
     Queue, RenderPass, RenderPipelineDescriptor, ShaderModule, StencilFaceState, StencilOperation,
-    StencilState, TextureFormat, VertexBufferLayout,
+    StencilState, Texture, TextureFormat, VertexBufferLayout,
 };
 
 use super::WgpuScreenSetData;
@@ -197,19 +197,39 @@ impl Pipelines {
     pub fn create_image_texture(
         &self,
         device: &Device,
-        queue: &Queue,
+        _queue: Option<&Queue>,
         image: &DecodedImage,
-    ) -> Arc<BindGroup> {
+    ) -> (Texture, Option<Buffer>, Arc<BindGroup>, u32, u32, u32) {
         let texture_size = wgpu::Extent3d {
             width: image.width(),
             height: image.height(),
             depth_or_array_layers: 1,
         };
 
-        let texture = match &image.0 {
-            DecodedImageType::Bitmap { bytes, .. } => device.create_texture_with_data(
-                queue,
-                &wgpu::TextureDescriptor {
+        let (texture, staging, width, height, bytes_per_row) = match &image.0 {
+            DecodedImageType::Bitmap { bytes, .. } => {
+                let width = image.width();
+                let height = image.height();
+                let bytes_per_row = width * 4;
+                let bytes_per_row_aligned = bytes_per_row
+                    .div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT)
+                    * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+
+                let mut contents = vec![0u8; (bytes_per_row_aligned * height) as usize];
+                for (destination_row, source_row) in contents
+                    .chunks_exact_mut(bytes_per_row_aligned as usize)
+                    .zip(bytes.chunks_exact(bytes_per_row as usize))
+                {
+                    destination_row[..bytes_per_row as usize].copy_from_slice(source_row);
+                }
+
+                let staging = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Image staging buffer"),
+                    usage: wgpu::BufferUsages::COPY_SRC,
+                    contents: &contents,
+                });
+
+                let texture = device.create_texture(&wgpu::TextureDescriptor {
                     size: texture_size,
                     mip_level_count: 1,
                     sample_count: 1,
@@ -218,14 +238,15 @@ impl Pipelines {
                     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     label: None,
                     view_formats: &[],
-                },
-                TextureDataOrder::default(),
-                bytes,
-            ),
+                });
+
+                (texture, Some(staging), width, height, bytes_per_row_aligned)
+            }
             #[cfg(target_arch = "wasm32")]
             DecodedImageType::JsImageBitmap { js_image, .. } => {
                 use wgpu::{CopyExternalImageSourceInfo, ExternalImageSource, Origin2d};
 
+                let queue = _queue.expect("wasm image uploads require a queue");
                 let texture = device.create_texture(&wgpu::TextureDescriptor {
                     size: texture_size,
                     mip_level_count: 1,
@@ -256,7 +277,7 @@ impl Pipelines {
                     texture_size,
                 );
 
-                texture
+                (texture, None, js_image.width(), js_image.height(), 0)
             }
         };
 
@@ -287,7 +308,14 @@ impl Pipelines {
             label: Some("diffuse_bind_group"),
         });
 
-        Arc::new(texture_bind_group)
+        (
+            texture,
+            staging,
+            Arc::new(texture_bind_group),
+            width,
+            height,
+            bytes_per_row,
+        )
     }
 }
 
