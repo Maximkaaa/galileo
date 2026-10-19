@@ -44,8 +44,8 @@ impl ScreenSetImagePipeline {
         texture_bind_group_layout: &BindGroupLayout,
     ) -> Self {
         let buffers = [
-            ScreenSetImageVertex::wgpu_desc(),
-            DisplayInstance::wgpu_desc(),
+            Some(ScreenSetImageVertex::wgpu_desc()),
+            Some(DisplayInstance::wgpu_desc()),
         ];
         let shader =
             device.create_shader_module(wgpu::include_wgsl!("./shaders/screen_set_image.wgsl"));

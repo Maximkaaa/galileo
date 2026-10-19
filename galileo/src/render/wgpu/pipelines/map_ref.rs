@@ -16,7 +16,10 @@ impl MapRefPipeline {
         format: TextureFormat,
         map_view_layout: &BindGroupLayout,
     ) -> Self {
-        let buffers = [PolyVertex::wgpu_desc(), DisplayInstance::wgpu_desc()];
+        let buffers = [
+            Some(PolyVertex::wgpu_desc()),
+            Some(DisplayInstance::wgpu_desc()),
+        ];
         let shader = device.create_shader_module(wgpu::include_wgsl!("./shaders/map_ref.wgsl"));
 
         let targets = default_targets(format);

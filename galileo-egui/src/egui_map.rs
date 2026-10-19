@@ -37,7 +37,7 @@ use crate::EguiMapOptions;
 ///
 /// impl eframe::App for MapApp {
 ///     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-///         egui::CentralPanel::default().show_inside(ui, |ui| {
+///         egui::CentralPanel::default().show(ui, |ui| {
 ///             EguiMap::new(&mut self.map)
 ///                 .with_position(&mut self.position)
 ///                 .with_resolution(&mut self.resolution)
@@ -180,11 +180,8 @@ impl<'a> EguiMapState {
         map.set_size(size.cast());
         map.set_view(map.view().with_dpi_scale_factor(ctx.pixels_per_point()));
 
-        let mut renderer = WgpuRenderer::new_with_device_and_texture(
-            render_state.device.clone(),
-            render_state.queue.clone(),
-            size,
-        );
+        let mut renderer =
+            WgpuRenderer::new_with_device_and_texture(render_state.device.clone(), size);
         renderer.set_horizon_options(options.horizon_options);
 
         let texture = renderer
@@ -378,8 +375,11 @@ impl<'a> EguiMapState {
     fn draw(&mut self) {
         log::trace!("Redrawing the map");
         self.map.load_layers();
-        self.renderer
-            .render_to_texture_view(&self.map, &self.texture_view);
+        self.renderer.render_to_texture_view(
+            &self.map,
+            &self.texture_view,
+            &self.egui_render_state.queue,
+        );
     }
 
     fn process_events(&mut self, events: &[Event], offset: [f32; 2]) {
