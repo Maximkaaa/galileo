@@ -180,11 +180,8 @@ impl<'a> EguiMapState {
         map.set_size(size.cast());
         map.set_view(map.view().with_dpi_scale_factor(ctx.pixels_per_point()));
 
-        let mut renderer = WgpuRenderer::new_with_device_and_texture(
-            render_state.device.clone(),
-            render_state.queue.clone(),
-            size,
-        );
+        let mut renderer =
+            WgpuRenderer::new_with_device_and_texture(render_state.device.clone(), size);
         renderer.set_horizon_options(options.horizon_options);
 
         let texture = renderer
@@ -379,7 +376,7 @@ impl<'a> EguiMapState {
         log::trace!("Redrawing the map");
         self.map.load_layers();
         self.renderer
-            .render_to_texture_view(&self.map, &self.texture_view);
+            .render_to_texture_view(&self.map, &self.texture_view, &self.egui_render_state.queue);
     }
 
     fn process_events(&mut self, events: &[Event], offset: [f32; 2]) {

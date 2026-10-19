@@ -90,13 +90,15 @@ async fn main() -> Result<()> {
     // We create a renderer without window, so it will use internal texture to render to.
     // Every time the `render` method is called, the image is updated and can be retrieved
     // by the `get_image` method.
-    let renderer = WgpuRenderer::new_with_texture_rt(image_size)
+    let (renderer, queue) = WgpuRenderer::new_with_texture_rt(image_size)
         .await
         .expect("failed to create renderer");
-    renderer.render(&map).expect("failed to render the map");
+    renderer
+        .render(&map, &queue)
+        .expect("failed to render the map");
 
     let bitmap = renderer
-        .get_image()
+        .get_image(&queue)
         .await
         .expect("failed to get image bitmap from texture");
     let buffer =

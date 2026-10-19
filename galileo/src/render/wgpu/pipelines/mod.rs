@@ -194,12 +194,13 @@ impl Pipelines {
         }
     }
 
+    #[cfg_attr(not(target_arch = "wasm32"), allow(unused_variables))]
     pub fn create_image_texture(
         &self,
         device: &Device,
-        _queue: Option<&Queue>,
+        queue: Option<&Queue>,
         image: &DecodedImage,
-    ) -> (Texture, Option<Buffer>, Arc<BindGroup>, u32, u32, u32) {
+    ) -> ImageTexture {
         let texture_size = wgpu::Extent3d {
             width: image.width(),
             height: image.height(),
@@ -246,7 +247,7 @@ impl Pipelines {
             DecodedImageType::JsImageBitmap { js_image, .. } => {
                 use wgpu::{CopyExternalImageSourceInfo, ExternalImageSource, Origin2d};
 
-                let queue = _queue.expect("wasm image uploads require a queue");
+                let queue = queue.expect("wasm image uploads require a queue");
                 let texture = device.create_texture(&wgpu::TextureDescriptor {
                     size: texture_size,
                     mip_level_count: 1,
@@ -308,15 +309,31 @@ impl Pipelines {
             label: Some("diffuse_bind_group"),
         });
 
-        (
+        ImageTexture {
             texture,
             staging,
-            Arc::new(texture_bind_group),
+            bind_group: Arc::new(texture_bind_group),
             width,
             height,
             bytes_per_row,
-        )
+        }
     }
+}
+
+/// A texture created for a decoded image together with the bind group used to
+/// sample it and an optional staging buffer carrying its pixels.
+///
+/// When [`ImageTexture::staging`] is `Some`, the texture is not filled yet:
+/// the staging buffer must be copied into it with
+/// [`wgpu::CommandEncoder::copy_buffer_to_texture`] before the texture is
+/// sampled.
+pub(crate) struct ImageTexture {
+    pub(crate) texture: Texture,
+    pub(crate) staging: Option<Buffer>,
+    pub(crate) bind_group: Arc<BindGroup>,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) bytes_per_row: u32,
 }
 
 pub(crate) fn default_targets(format: TextureFormat) -> [Option<wgpu::ColorTargetState>; 1] {

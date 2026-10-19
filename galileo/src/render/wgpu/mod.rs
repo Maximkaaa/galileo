@@ -48,7 +48,6 @@ type TexturesMap = HashMap<u64, (Weak<DecodedImage>, Arc<BindGroup>)>;
 /// Render backend that uses `wgpu` crate to render the map.
 pub struct WgpuRenderer {
     device: Device,
-    queue: Option<Queue>,
     renderer_targets: Option<RendererTargets>,
     background: Color,
     textures: Mutex<TexturesMap>,
@@ -130,8 +129,10 @@ impl RenderTarget {
 impl WgpuRenderer {
     /// Creates a new wgpu renderer with default parameters.
     ///
-    /// Returns `None` if a device adapter cannot be acquired.
-    pub async fn new() -> Option<Self> {
+    /// The renderer owns no queue, so the returned [`Queue`] must be passed
+    /// to the submitting render methods. Returns `None` if a device adapter
+    /// cannot be acquired.
+    pub async fn new() -> Option<(Self, Queue)> {
         let instance = Self::create_instance();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -144,24 +145,26 @@ impl WgpuRenderer {
 
         let (device, queue) = Self::create_device(&adapter).await;
 
-        Some(Self {
-            device,
-            queue: Some(queue),
-            renderer_targets: None,
-            background: DEFAULT_BACKGROUND,
-            textures: Default::default(),
-            horizon_options: Some(HorizonOptions::default()),
-        })
+        Some((
+            Self {
+                device,
+                renderer_targets: None,
+                background: DEFAULT_BACKGROUND,
+                textures: Default::default(),
+                horizon_options: Some(HorizonOptions::default()),
+            },
+            queue,
+        ))
     }
 
     /// Creates a new wgpu renderer that renders the map to an image buffer of the given size.
     ///
     /// Returns `None` if a device adapter cannot be acquired.
-    pub async fn new_with_texture_rt(size: Size<u32>) -> Option<Self> {
-        let mut renderer = Self::new().await?;
+    pub async fn new_with_texture_rt(size: Size<u32>) -> Option<(Self, Queue)> {
+        let (mut renderer, queue) = Self::new().await?;
         renderer.init_target_texture(size);
 
-        Some(renderer)
+        Some((renderer, queue))
     }
 
     fn init_target_texture(&mut self, size: Size<u32>) {
@@ -252,7 +255,7 @@ impl WgpuRenderer {
     /// window size.
     ///
     /// Returns `None` if a device adapter cannot be acquired.
-    pub async fn new_with_window<W>(window: Arc<W>, size: Size<u32>) -> Option<Self>
+    pub async fn new_with_window<W>(window: Arc<W>, size: Size<u32>) -> Option<(Self, Queue)>
     where
         W: raw_window_handle::HasWindowHandle
             + raw_window_handle::HasDisplayHandle
@@ -266,9 +269,9 @@ impl WgpuRenderer {
         log::info!("Configuring surface with size {size:?}");
         surface.configure(&device, &config);
 
-        Some(Self::new_with_device_and_surface(
-            device, surface, queue, config,
-        ))
+        let renderer = Self::new_with_device_and_surface(device, surface, config);
+
+        Some((renderer, queue))
     }
 
     /// Creates a wgpu surface for the given window.
@@ -323,16 +326,17 @@ impl WgpuRenderer {
     }
 
     /// Creates a new renderer from the initialized wgpu structs.
+    ///
+    /// The renderer stores no queue, so pass one to the submitting render
+    /// methods.
     pub fn new_with_device_and_surface(
         device: Device,
         surface: Surface<'static>,
-        queue: Queue,
         config: SurfaceConfiguration,
     ) -> Self {
         let render_target = RenderTarget::Surface { surface, config };
         let mut renderer = Self {
             device,
-            queue: Some(queue),
             renderer_targets: None,
             background: DEFAULT_BACKGROUND,
             textures: Default::default(),
@@ -343,12 +347,11 @@ impl WgpuRenderer {
         renderer
     }
 
-    /// Creates a new rendering using the given wgpu device and queue, and rendering to a texture
+    /// Creates a new rendering using the given wgpu device, rendering to a texture
     /// with the given size.
-    pub fn new_with_device_and_texture(device: Device, queue: Queue, size: Size<u32>) -> Self {
+    pub fn new_with_device_and_texture(device: Device, size: Size<u32>) -> Self {
         let mut renderer = Self {
             device,
-            queue: Some(queue),
             renderer_targets: None,
             background: DEFAULT_BACKGROUND,
             textures: Default::default(),
@@ -361,16 +364,17 @@ impl WgpuRenderer {
     }
 
     /// Creates a renderer that records drawing into externally supplied wgpu
-    /// command encoders instead of submitting on its own queue.
+    /// command encoders instead of submitting work itself.
     ///
-    /// `device` must own the target texture views passed to
-    /// [`Self::render_to_texture_view_with_encoder`]. This mode has no queue,
-    /// so the legacy self-submitting APIs (`render`, `get_image`, the horizon
-    /// effect) are unavailable until a queued renderer is used instead.
+    /// The renderer never owns a queue. Use
+    /// [`Self::render_to_texture_view_with_encoder`] to record into a
+    /// caller-owned encoder, or pass a queue explicitly to the submitting
+    /// methods ([`Self::render`], [`Self::render_to_texture_view`] and
+    /// [`Self::get_image`]). `device` must own the target texture views the
+    /// renderer draws into.
     pub fn new_with_device(device: Device, size: Size<u32>) -> Self {
         let mut renderer = Self {
             device,
-            queue: None,
             renderer_targets: None,
             background: DEFAULT_BACKGROUND,
             textures: Default::default(),
@@ -568,7 +572,9 @@ impl WgpuRenderer {
     }
 
     /// Returns the image of the last render operation.
-    pub async fn get_image(&self) -> Result<Vec<u8>, SurfaceStatus> {
+    ///
+    /// The recorded readback commands are submitted on the given queue.
+    pub async fn get_image(&self, queue: &Queue) -> Result<Vec<u8>, SurfaceStatus> {
         let Some(renderer_targets) = &self.renderer_targets else {
             return Err(SurfaceStatus::Lost);
         };
@@ -618,10 +624,7 @@ impl WgpuRenderer {
             },
         );
 
-        self.queue
-            .as_ref()
-            .expect("get_image requires a queue")
-            .submit(Some(encoder.finish()));
+        queue.submit(Some(encoder.finish()));
 
         let buffer_slice = buffer.slice(..);
         let (tx, rx) = futures_intrusive::channel::shared::oneshot_channel();
@@ -673,13 +676,9 @@ impl WgpuRenderer {
         Ok(pixels)
     }
 
-    /// Renders the map to the given texture and submits the work on the
-    /// renderer's own queue.
-    pub fn render_to_texture_view(&self, map: &Map, view: &TextureView) {
-        let queue = self
-            .queue
-            .as_ref()
-            .expect("render_to_texture_view requires a queue");
+    /// Renders the map to the given texture and submits the work on the given
+    /// queue.
+    pub fn render_to_texture_view(&self, map: &Map, view: &TextureView, queue: &Queue) {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -691,7 +690,7 @@ impl WgpuRenderer {
         queue.submit(Some(encoder.finish()));
 
         if let Some(targets) = &self.renderer_targets {
-            self.draw_horizon(map.view(), targets, view);
+            self.draw_horizon(map.view(), targets, view, queue);
         }
     }
 
@@ -738,11 +737,11 @@ impl WgpuRenderer {
             });
         }
 
-        self.render_map(map, view, encoder);
+        self.render_map(map, view, encoder, None);
     }
 
-    /// Renders the map.
-    pub fn render(&self, map: &Map) -> Result<(), SurfaceStatus> {
+    /// Renders the map and submits the recorded work on the given queue.
+    pub fn render(&self, map: &Map, queue: &Queue) -> Result<(), SurfaceStatus> {
         let Some(renderer_targets) = &self.renderer_targets else {
             return Ok(());
         };
@@ -752,21 +751,27 @@ impl WgpuRenderer {
         let texture = renderer_targets.render_target.texture()?;
         let view = texture.view();
 
-        self.render_to_texture_view(map, &view);
+        self.render_to_texture_view(map, &view, queue);
 
         texture.present();
 
         Ok(())
     }
 
-    fn render_map(&self, map: &Map, texture_view: &TextureView, encoder: &mut CommandEncoder) {
+    fn render_map(
+        &self,
+        map: &Map,
+        texture_view: &TextureView,
+        encoder: &mut CommandEncoder,
+        queue: Option<&Queue>,
+    ) {
         let view = map.view();
         let Some(renderer_targets) = &self.renderer_targets else {
             return;
         };
 
         let Some(mut canvas) =
-            WgpuCanvas::new(self, renderer_targets, texture_view, view.clone(), encoder)
+            WgpuCanvas::new(self, renderer_targets, texture_view, view.clone(), encoder, queue)
         else {
             log::warn!("Layer cannot be rendered to the map view.");
             return;
@@ -810,14 +815,11 @@ impl WgpuRenderer {
         view: &MapView,
         renderer_targets: &RendererTargets,
         texture_view: &TextureView,
+        queue: &Queue,
     ) {
         let Some(pipeline) = &renderer_targets.horizon_effect else {
             return;
         };
-        let queue = self
-            .queue
-            .as_ref()
-            .expect("horizon effect requires a queue");
 
         let mut encoder = self
             .device
@@ -883,6 +885,7 @@ impl WgpuRenderer {
         &self,
         image: &Arc<DecodedImage>,
         pending: &Mutex<Vec<ImageUpload>>,
+        queue: Option<&Queue>,
     ) -> Arc<BindGroup> {
         let mut hasher = ahash::AHasher::default();
         image.hash(&mut hasher);
@@ -892,28 +895,28 @@ impl WgpuRenderer {
             return texture.clone();
         }
 
-        let (texture, staging, bind_group, width, height, bytes_per_row) = self
+        let created = self
             .renderer_targets
             .as_ref()
             .expect("trying to use pipelines of uninitialized renderer")
             .pipelines
-            .create_image_texture(&self.device, self.queue.as_ref(), image);
+            .create_image_texture(&self.device, queue, image);
 
-        if let Some(staging) = staging {
+        if let Some(staging) = created.staging {
             pending.lock().push(ImageUpload {
-                texture,
+                texture: created.texture,
                 staging,
-                width,
-                height,
-                bytes_per_row,
+                width: created.width,
+                height: created.height,
+                bytes_per_row: created.bytes_per_row,
             });
         }
 
         self.textures
             .lock()
-            .insert(hash, (Arc::downgrade(image), bind_group.clone()));
+            .insert(hash, (Arc::downgrade(image), created.bind_group.clone()));
 
-        bind_group
+        created.bind_group
     }
 }
 
@@ -933,6 +936,7 @@ struct WgpuCanvas<'a> {
     renderer_targets: &'a RendererTargets,
     view: &'a TextureView,
     encoder: &'a mut CommandEncoder,
+    queue: Option<&'a Queue>,
     map_view: MapView,
 
     pending_uploads: Mutex<Vec<ImageUpload>>,
@@ -946,6 +950,7 @@ impl<'a> WgpuCanvas<'a> {
         view: &'a TextureView,
         map_view: MapView,
         encoder: &'a mut CommandEncoder,
+        queue: Option<&'a Queue>,
     ) -> Option<Self> {
         let rotation_mtx = Rotation3::new(Vector3::new(
             map_view.rotation_x(),
@@ -982,6 +987,7 @@ impl<'a> WgpuCanvas<'a> {
             renderer_targets,
             view,
             encoder,
+            queue,
             map_view,
             pending_uploads: Mutex::new(Vec::new()),
             screen_sets: vec![],
@@ -1027,6 +1033,7 @@ impl Canvas for WgpuCanvas<'_> {
             self.renderer,
             self.renderer_targets,
             &self.pending_uploads,
+            self.queue,
         ))
     }
 
@@ -1390,6 +1397,7 @@ impl WgpuPackedBundle {
         renderer: &WgpuRenderer,
         renderer_targets: &RendererTargets,
         pending: &Mutex<Vec<ImageUpload>>,
+        queue: Option<&Queue>,
     ) -> Self {
         let RenderBundle {
             world_set,
@@ -1430,7 +1438,9 @@ impl WgpuPackedBundle {
 
         let textures: Vec<_> = image_store
             .iter()
-            .map(|decoded_image| renderer.get_or_create_image_texture(decoded_image, pending))
+            .map(|decoded_image| {
+                renderer.get_or_create_image_texture(decoded_image, pending, queue)
+            })
             .collect();
 
         let mut image_buffers = vec![];
@@ -1477,7 +1487,8 @@ impl WgpuPackedBundle {
                     WgpuScreenSetData::Vertex(buffers)
                 }
                 ScreenSetData::Image { vertices, bitmap } => {
-                    let bind_group = renderer.get_or_create_image_texture(bitmap, pending);
+                    let bind_group =
+                        renderer.get_or_create_image_texture(bitmap, pending, queue);
                     let image = renderer_targets
                         .pipelines
                         .screen_set_image_pipeline()
