@@ -76,7 +76,7 @@ impl HorizonPipeline {
         map_view_layout: &BindGroupLayout,
         options: HorizonOptions,
     ) -> Self {
-        let buffers = [HorizonVertex::wgpu_desc()];
+        let buffers = [Some(HorizonVertex::wgpu_desc())];
         let shader = device.create_shader_module(wgpu::include_wgsl!("./shaders/horizon.wgsl"));
 
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {

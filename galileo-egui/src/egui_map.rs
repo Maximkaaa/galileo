@@ -37,7 +37,7 @@ use crate::EguiMapOptions;
 ///
 /// impl eframe::App for MapApp {
 ///     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-///         egui::CentralPanel::default().show_inside(ui, |ui| {
+///         egui::CentralPanel::default().show(ui, |ui| {
 ///             EguiMap::new(&mut self.map)
 ///                 .with_position(&mut self.position)
 ///                 .with_resolution(&mut self.resolution)
@@ -375,8 +375,11 @@ impl<'a> EguiMapState {
     fn draw(&mut self) {
         log::trace!("Redrawing the map");
         self.map.load_layers();
-        self.renderer
-            .render_to_texture_view(&self.map, &self.texture_view, &self.egui_render_state.queue);
+        self.renderer.render_to_texture_view(
+            &self.map,
+            &self.texture_view,
+            &self.egui_render_state.queue,
+        );
     }
 
     fn process_events(&mut self, events: &[Event], offset: [f32; 2]) {

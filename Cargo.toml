@@ -48,9 +48,9 @@ chumsky = "0.12"
 console_log = "1"
 console_error_panic_hook = "0.1"
 csv = "1.3"
-egui = "0.34"
-egui-wgpu = "0.34"
-eframe = { version = "0.34", default-features = false }
+egui = "0.36.2"
+egui-wgpu = "0.36.2"
+eframe = { version = "0.36.2", default-features = false }
 either = "1"
 env_logger = "0.11"
 fontdb = { version = "0.23", default-features = false }
@@ -102,6 +102,12 @@ wasm-bindgen = "0.2"
 wasm-bindgen-derive = "0.2"
 wasm-bindgen-futures = "0.4"
 web-time = "1"
-web-sys = "0.3, <0.3.92"
+web-sys = "0.3"
 wgpu = { git = "https://github.com/gfx-rs/wgpu.git", rev = "014d9e84813a2946febfa4888694c0b70565b2f5", default-features = false, features = ["metal", "wgsl", "webgl", "vulkan", "gles"] }
 winit = { version = "0.30", default-features = false }
+
+[patch.crates-io]
+# Unify the crates.io wgpu 30 dependency used by the egui stack with the git
+# revision pinned above, so every crate in this workspace shares one wgpu
+# instance.
+wgpu = { git = "https://github.com/gfx-rs/wgpu.git", rev = "014d9e84813a2946febfa4888694c0b70565b2f5" }

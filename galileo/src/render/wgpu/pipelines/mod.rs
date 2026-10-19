@@ -348,7 +348,7 @@ pub(crate) fn default_pipeline_descriptor<'a>(
     pipeline_layout: &'a PipelineLayout,
     shader: &'a ShaderModule,
     targets: &'a [Option<wgpu::ColorTargetState>],
-    buffers: &'a [VertexBufferLayout<'a>],
+    buffers: &'a [Option<VertexBufferLayout<'a>>],
     antialias: bool,
 ) -> RenderPipelineDescriptor<'a> {
     let stencil_state = StencilFaceState {

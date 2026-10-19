@@ -158,7 +158,7 @@ impl EguiMapApp {
 
 impl eframe::App for EguiMapApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             EguiMap::new(&mut self.map).show_ui(ui);
 
             egui::Window::new("Galileo map").show(ui.ctx(), |ui| {

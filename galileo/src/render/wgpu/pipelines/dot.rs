@@ -23,7 +23,7 @@ impl DotPipeline {
         let mut desc = PointInstance::wgpu_desc();
         desc.step_mode = VertexStepMode::Vertex;
 
-        let buffers = [desc, DisplayInstance::wgpu_desc()];
+        let buffers = [Some(desc), Some(DisplayInstance::wgpu_desc())];
         let shader = device.create_shader_module(wgpu::include_wgsl!("./shaders/dot.wgsl"));
 
         let targets = default_targets(format);

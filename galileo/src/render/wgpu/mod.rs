@@ -84,9 +84,9 @@ impl RenderTargetTexture<'_> {
         }
     }
 
-    fn present(self) {
+    fn present(self, queue: &Queue) {
         match self {
-            RenderTargetTexture::Surface(t) => t.present(),
+            RenderTargetTexture::Surface(t) => queue.present(t),
             RenderTargetTexture::Texture(_) => {}
         }
     }
@@ -139,6 +139,7 @@ impl WgpuRenderer {
                 power_preference: wgpu::PowerPreference::default(),
                 compatible_surface: None,
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await
             .ok()?;
@@ -300,6 +301,7 @@ impl WgpuRenderer {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await
             .ok()?;
@@ -321,6 +323,7 @@ impl WgpuRenderer {
             present_mode: surface_caps.present_modes[0],
             desired_maximum_frame_latency: 2,
             alpha_mode: surface_caps.alpha_modes[0],
+            color_space: wgpu::SurfaceColorSpace::Auto,
             view_formats: vec![],
         }
     }
@@ -655,7 +658,9 @@ impl WgpuRenderer {
             }
         }
 
-        let data = buffer_slice.get_mapped_range();
+        let data = buffer_slice
+            .get_mapped_range()
+            .expect("failed to map the readback buffer");
         let mut pixels = vec![
             0u8;
             (render_target_size.width() * render_target_size.height() * RGBA_BYTES_PER_PIXEL)
@@ -753,7 +758,7 @@ impl WgpuRenderer {
 
         self.render_to_texture_view(map, &view, queue);
 
-        texture.present();
+        texture.present(queue);
 
         Ok(())
     }
@@ -770,9 +775,14 @@ impl WgpuRenderer {
             return;
         };
 
-        let Some(mut canvas) =
-            WgpuCanvas::new(self, renderer_targets, texture_view, view.clone(), encoder, queue)
-        else {
+        let Some(mut canvas) = WgpuCanvas::new(
+            self,
+            renderer_targets,
+            texture_view,
+            view.clone(),
+            encoder,
+            queue,
+        ) else {
             log::warn!("Layer cannot be rendered to the map view.");
             return;
         };
@@ -1487,8 +1497,7 @@ impl WgpuPackedBundle {
                     WgpuScreenSetData::Vertex(buffers)
                 }
                 ScreenSetData::Image { vertices, bitmap } => {
-                    let bind_group =
-                        renderer.get_or_create_image_texture(bitmap, pending, queue);
+                    let bind_group = renderer.get_or_create_image_texture(bitmap, pending, queue);
                     let image = renderer_targets
                         .pipelines
                         .screen_set_image_pipeline()

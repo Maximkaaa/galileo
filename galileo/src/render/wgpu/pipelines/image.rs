@@ -32,7 +32,10 @@ impl ImagePipeline {
         texture_bind_group_layout: &BindGroupLayout,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::include_wgsl!("./shaders/image.wgsl"));
-        let buffers = [ImageVertex::wgpu_desc(), DisplayInstance::wgpu_desc()];
+        let buffers = [
+            Some(ImageVertex::wgpu_desc()),
+            Some(DisplayInstance::wgpu_desc()),
+        ];
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
